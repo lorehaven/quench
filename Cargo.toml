@@ -1,0 +1,83 @@
+[workspace]
+members = [
+  "quench-auth",
+  "quench-cache",
+  "quench-cli",
+  "quench-client",
+  "quench-config",
+  "quench-db",
+  "quench-starter",
+  "quench-web",
+  "quench-web-components",
+  "examples/*",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+authors = ["Paweł Walus <pawel.walus@protonmail.com>"]
+homepage = "https://github.com/lorehaven/quench"
+repository = "https://github.com/lorehaven/quench"
+license = "MIT"
+readme = "README.md"
+
+[workspace.dependencies]
+actix-service = { version = "2.0" }
+actix-web = { version = "4.14", features = ["rustls-0_23"] }
+anyhow = { version = "1.0" }
+argon2 = { version = "0.5" }
+async-trait = { version = "0.1" }
+axum = { version = "0.8", features = ["json"] }
+base64 = { version = "0.23" }
+chrono = { version = "0.4", features = ["serde"] }
+crossterm = { version = "0.29" }
+dashmap = { version = "6.2" }
+dotenvy = { version = "0.15" }
+envmnt = { version = "0.10" }
+fluent-syntax = { version = "0.12" }
+futures-util = { version = "0.3" }
+hex = { version = "0.4" }
+html5ever = { version = "0.39" }
+jsonwebtoken = { version = "11.0", features = ["aws_lc_rs"] }
+markup5ever_rcdom = { version = "0.39" }
+quench-auth = { path = "quench-auth", registry = "ennor", version = "0.3.6" }
+quench-cache = { path = "quench-cache", registry = "ennor", version = "0.1.7" }
+quench-cli = { path = "quench-cli", registry = "ennor", version = "0.1.2" }
+quench-client = { path = "quench-client", registry = "ennor", version = "0.2.2" }
+quench-config = { path = "quench-config", registry = "ennor", version = "0.1.2" }
+quench-db = { path = "quench-db", registry = "ennor", version = "0.2.1" }
+quench-starter = { path = "quench-starter", registry = "ennor", version = "0.3.5" }
+quench-web = { path = "quench-web", registry = "ennor", version = "0.1.11" }
+quench-web-components = { path = "quench-web-components", registry = "ennor", version = "0.1.5" }
+redis = { version = "1.5", features = ["tokio-comp", "cluster-async", "connection-manager"] }
+reqwest = { version = "0.13", default-features = false, features = [
+  "json",
+  "stream",
+  "rustls",
+  "cookies",
+  "multipart",
+  "form",
+] }
+rustls = { version = "0.23", features = ["ring"] }
+semver = { version = "1.0" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
+serde_yaml = { version = "0.9" }
+sha2 = { version = "0.11" }
+sqlx = { version = "0.9", features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "json", "chrono", "uuid"] }
+strum = { version = "0.28" }
+strum_macros = { version = "0.28" }
+tempfile = { version = "3.27" }
+thiserror = { version = "2.0" }
+tokio = { version = "1.53", features = ["full"] }
+toml = { version = "1.1" }
+tower-http = { version = "0.7", features = ["fs"] }
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3" }
+urlencoding = { version = "2.1" }
+uuid = { version = "1.24", features = ["v4"] }
+walkdir = { version = "2.5" }
+which = { version = "8.0" }
+
+[profile.release]
+strip = "debuginfo"

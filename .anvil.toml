@@ -1,0 +1,13 @@
+[release]
+registry = "ennor"
+packages = [
+    "quench-auth",
+    "quench-cache",
+    "quench-cli",
+    "quench-client",
+    "quench-config",
+    "quench-db",
+    "quench-starter",
+    "quench-web",
+    "quench-web-components",
+]

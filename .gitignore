@@ -1,0 +1,7 @@
+*.iml
+.idea
+**/dist/
+**/target/
+.aider*
+.cargo/
+.claude/
