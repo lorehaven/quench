@@ -65,11 +65,25 @@ fn gatehouse_endpoint(path: &str, return_to: Option<&str>) -> Option<String> {
 /// cross-site top-level navigations, which is exactly the redirect back from
 /// gatehouse after login.
 pub fn session_cookie(token: impl Into<String>) -> Cookie<'static> {
-    realm_cookie(session_cookie_name(), token.into())
+    realm_cookie(session_cookie_name(), token.into(), None)
 }
 
+/// Carries a `Max-Age` matching `REFRESH_TOKEN_TTL_SECS` - the refresh token's
+/// own server-side validity - so the cookie survives a browser restart instead
+/// of vanishing as a session cookie while the token behind it is still good.
 pub fn refresh_cookie(token: impl Into<String>) -> Cookie<'static> {
-    realm_cookie(refresh_cookie_name(), token.into())
+    realm_cookie(
+        refresh_cookie_name(),
+        token.into(),
+        Some(refresh_cookie_max_age()),
+    )
+}
+
+fn refresh_cookie_max_age() -> Duration {
+    let secs: i64 = envmnt::get_or("REFRESH_TOKEN_TTL_SECS", "604800")
+        .parse()
+        .unwrap_or(604800);
+    Duration::seconds(secs)
 }
 
 /// Expired counterparts, for logout.
@@ -81,7 +95,7 @@ pub fn cleared_refresh_cookie() -> Cookie<'static> {
     cleared_cookie(refresh_cookie_name())
 }
 
-fn realm_cookie(name: String, value: String) -> Cookie<'static> {
+fn realm_cookie(name: String, value: String, max_age: Option<Duration>) -> Cookie<'static> {
     let mut builder = Cookie::build(name, value)
         .path("/")
         .http_only(true)
@@ -89,6 +103,9 @@ fn realm_cookie(name: String, value: String) -> Cookie<'static> {
         .secure(true);
     if let Some(domain) = cookie_domain() {
         builder = builder.domain(domain);
+    }
+    if let Some(max_age) = max_age {
+        builder = builder.max_age(max_age);
     }
     builder.finish()
 }
