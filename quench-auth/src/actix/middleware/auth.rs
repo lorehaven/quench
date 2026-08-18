@@ -83,10 +83,7 @@ where
             .cookie(&realm::session_cookie_name())
             .map(|cookie| cookie.value().to_string());
 
-        // Kept separate from `header_token`/`cookie_token` above rather than
-        // folded into the initial lookup: it is only ever consulted below,
-        // once the access token in hand has turned out to be missing or
-        // unusable, never as an alternative source of an access token itself.
+        // Only consulted below, as a fallback once `token` turns out unusable.
         let refresh_token = req
             .cookie(&realm::refresh_cookie_name())
             .map(|cookie| cookie.value().to_string());
@@ -101,19 +98,9 @@ where
                 None => None,
             };
 
-            // A `forge_session` cookie stops decoding after
-            // `ACCESS_TOKEN_TTL_SECS` (15 minutes by default) long before the
-            // week-long `forge_refresh` cookie sitting next to it does. Absent
-            // this, every relying party bounced the browser straight to
-            // gatehouse's login page on that schedule regardless of how live
-            // the refresh cookie still was - the session cookie's `Max-Age` is
-            // unset (a browser-session cookie), so it lingers, stale, exactly
-            // long enough to keep tricking a user into thinking they're still
-            // signed in. Silently exchanging it here, the same way
-            // `gatehouse-service`'s own `/refresh` cookie-flow does, is what
-            // keeps a live refresh token actually useful past the access
-            // token's TTL instead of only serving API callers who spend it by
-            // hand.
+            // The access token outlives its `ACCESS_TOKEN_TTL_SECS` far less
+            // than the refresh token does - silently exchange it here instead
+            // of bouncing a still-valid session to login.
             let (claims, refreshed) = match claims {
                 Some(claims) => (claims, None),
                 None => {
@@ -153,12 +140,8 @@ where
     }
 }
 
-/// Runs the checks a bearer/cookie access token must pass: decodes, confirms
-/// this service is in its audience, and - for tokens carrying a session id -
-/// confirms that session is still active. Shared between the first attempt
-/// with whatever token the request arrived with and the retry after
-/// [`sso_client::refresh`], so the two can't drift into checking different
-/// things.
+/// Decodes and validates one access token. Shared by the first attempt and
+/// the retry after [`sso_client::refresh`], so both check the same things.
 async fn authenticate(token: &str, config: &JwtConfig, req: &ServiceRequest) -> Option<Claims> {
     let claims = match config.decode_claims(token).await {
         Ok(claims) => claims,

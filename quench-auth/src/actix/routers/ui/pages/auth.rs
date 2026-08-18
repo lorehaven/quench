@@ -132,18 +132,9 @@ pub async fn refresh_delegation(request: &actix_web::HttpRequest) -> HttpRespons
     refreshed
 }
 
-/// Sends the browser to sign in - unless it is already holding a `forge_refresh`
-/// cookie still good enough to renew, in which case this renews it directly and
-/// skips gatehouse's login page entirely.
-///
-/// Without this, landing here at all (every `is_ui_authenticated` failure
-/// funnels through it) meant a full credential re-entry the moment the
-/// short-lived `forge_session` cookie expired, even seconds after a refresh
-/// would have succeeded - the access token's `ACCESS_TOKEN_TTL_SECS` is
-/// minutes, the refresh token's is days, and nothing between them used to
-/// bridge that gap. A failed refresh (no cookie, or gatehouse rejects it) falls
-/// through to the same authorization-code + PKCE round trip as before - see
-/// `sso_client::authorize_redirect`.
+/// Sends the browser to sign in - unless a `forge_refresh` cookie is still
+/// good enough to renew, in which case this skips gatehouse's login page
+/// entirely. Falls through to `sso_client::authorize_redirect` otherwise.
 pub async fn login_delegation(request: &actix_web::HttpRequest, sso: &SsoConfig) -> HttpResponse {
     if let Some(refresh_token) = request
         .cookie(&realm::refresh_cookie_name())

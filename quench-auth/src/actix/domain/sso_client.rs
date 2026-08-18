@@ -57,26 +57,15 @@ struct TokenResponse {
     refresh_token: String,
 }
 
-/// A fresh access/refresh pair, however it was obtained - the code exchange
-/// in [`callback`] or the rotation in [`refresh`]. Distinct from the private
-/// `TokenResponse` it is built from only in being public: callers outside
-/// this module have no business seeing gatehouse's wire shape.
+/// A fresh access/refresh pair, public where `TokenResponse` isn't - callers
+/// outside this module have no business seeing gatehouse's wire shape.
 pub struct RefreshedTokens {
     pub access_token: String,
     pub refresh_token: String,
 }
 
-/// Exchanges a `forge_refresh` cookie's value for a fresh token pair by
-/// calling gatehouse's own `/refresh` - the only place allowed to mint
-/// tokens, per `docker/gatehouse-service/src/api/auth.rs`'s module doc ("a
-/// relying party verifies tokens, it never issues them"). No client
-/// credentials needed: gatehouse's `/refresh` trusts the refresh token itself,
-/// the same way it does for its own cookie-flow refresh.
-///
-/// `None` on any failure - an unreachable gatehouse, an expired or
-/// already-rotated refresh token, an unparseable response - so a caller can
-/// treat "could not refresh" as one outcome and fall back to a full sign-in
-/// without needing to know why.
+/// Trades a `forge_refresh` value for a fresh pair via gatehouse's `/refresh`;
+/// `None` on any failure, so the caller just falls back to a full sign-in.
 pub async fn refresh(refresh_token: &str) -> Option<RefreshedTokens> {
     let base = realm::gatehouse_url()?;
     let tls_verify: bool = envmnt::get_or("GATEHOUSE_TLS_VERIFY", "true")

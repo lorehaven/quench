@@ -190,3 +190,9 @@ pub fn highlighted_panel(title: impl Into<String>, content: Element) -> Element 
         .highlighted(true)
         .build()
 }
+
+/// A "nothing here" placeholder: `<div class="empty" data-i18n="{key}">`.
+/// The surrounding content/container wrapper stays with the caller.
+pub fn empty_state(i18n_key: &str) -> Element {
+    div().class("empty").attr("data-i18n", i18n_key)
+}
