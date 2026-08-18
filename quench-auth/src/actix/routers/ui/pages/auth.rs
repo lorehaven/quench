@@ -101,12 +101,6 @@ pub async fn auth_status(request: &actix_web::HttpRequest, config: &JwtConfig) -
     }
 }
 
-#[derive(Deserialize)]
-struct RefreshedTokens {
-    access_token: String,
-    refresh_token: String,
-}
-
 /// Exchanges this browser's refresh cookie for a fresh token pair, so a tab
 /// left open past the access token's expiry does not have to go through
 /// gatehouse's login page to keep going.
@@ -114,13 +108,9 @@ struct RefreshedTokens {
 /// Gatehouse is a distinct origin with no CORS policy open to relying
 /// parties, and the refresh cookie is `SameSite=Lax`, so the browser cannot
 /// call gatehouse directly from a fetch. This service makes that call on the
-/// browser's behalf and hands back only its own new cookies - the same shape
-/// `sso_client::callback` already uses to turn an authorization code into a
-/// session.
+/// browser's behalf, via `sso_client::refresh`, and hands back only its own
+/// new cookies.
 pub async fn refresh_delegation(request: &actix_web::HttpRequest) -> HttpResponse {
-    let Some(base) = realm::gatehouse_url() else {
-        return HttpResponse::ServiceUnavailable().finish();
-    };
     let Some(refresh_token) = request
         .cookie(&realm::refresh_cookie_name())
         .map(|cookie| cookie.value().to_string())
@@ -128,29 +118,8 @@ pub async fn refresh_delegation(request: &actix_web::HttpRequest) -> HttpRespons
         return HttpResponse::Unauthorized().finish();
     };
 
-    let tls_verify: bool = envmnt::get_or("GATEHOUSE_TLS_VERIFY", "true")
-        .parse()
-        .unwrap_or(true);
-    let Ok(http) = reqwest::Client::builder()
-        .danger_accept_invalid_certs(!tls_verify)
-        .build()
-    else {
-        return HttpResponse::InternalServerError().finish();
-    };
-
-    let response = http
-        .post(format!("{base}/api/v1/auth/refresh"))
-        .json(&serde_json::json!({ "refresh_token": refresh_token }))
-        .send()
-        .await;
-    let Ok(response) = response else {
-        return HttpResponse::ServiceUnavailable().finish();
-    };
-    if !response.status().is_success() {
+    let Some(tokens) = sso_client::refresh(&refresh_token).await else {
         return HttpResponse::Unauthorized().finish();
-    }
-    let Ok(tokens) = response.json::<RefreshedTokens>().await else {
-        return HttpResponse::BadGateway().finish();
     };
 
     let mut refreshed = HttpResponse::Ok().json(AuthStatus {
@@ -163,10 +132,32 @@ pub async fn refresh_delegation(request: &actix_web::HttpRequest) -> HttpRespons
     refreshed
 }
 
-/// Starts the authorization-code + PKCE round trip at gatehouse, so this
-/// service ends up with a token it fetched itself rather than trusting a
-/// realm-wide cookie gatehouse set directly. See `sso_client::authorize_redirect`.
-pub fn login_delegation(request: &actix_web::HttpRequest, sso: &SsoConfig) -> HttpResponse {
+/// Sends the browser to sign in - unless it is already holding a `forge_refresh`
+/// cookie still good enough to renew, in which case this renews it directly and
+/// skips gatehouse's login page entirely.
+///
+/// Without this, landing here at all (every `is_ui_authenticated` failure
+/// funnels through it) meant a full credential re-entry the moment the
+/// short-lived `forge_session` cookie expired, even seconds after a refresh
+/// would have succeeded - the access token's `ACCESS_TOKEN_TTL_SECS` is
+/// minutes, the refresh token's is days, and nothing between them used to
+/// bridge that gap. A failed refresh (no cookie, or gatehouse rejects it) falls
+/// through to the same authorization-code + PKCE round trip as before - see
+/// `sso_client::authorize_redirect`.
+pub async fn login_delegation(request: &actix_web::HttpRequest, sso: &SsoConfig) -> HttpResponse {
+    if let Some(refresh_token) = request
+        .cookie(&realm::refresh_cookie_name())
+        .map(|cookie| cookie.value().to_string())
+        && let Some(tokens) = sso_client::refresh(&refresh_token).await
+    {
+        let mut response = HttpResponse::Found()
+            .append_header(("Location", realm::ui_path("/home")))
+            .finish();
+        let _ = response.add_cookie(&realm::session_cookie(tokens.access_token));
+        let _ = response.add_cookie(&realm::refresh_cookie(tokens.refresh_token));
+        return response;
+    }
+
     sso_client::authorize_redirect(request, sso)
 }
 
