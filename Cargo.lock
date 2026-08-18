@@ -2115,7 +2115,7 @@ dependencies = [
 
 [[package]]
 name = "quench-auth"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -2231,7 +2231,7 @@ dependencies = [
 
 [[package]]
 name = "quench-starter"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "actix-service",
  "actix-web",
