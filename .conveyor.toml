@@ -27,13 +27,17 @@ image = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
 # workspace.dependencies pulls all nine directly), so a breaking change in
 # any of them is worth catching before it reaches a dependent's next build.
 #
-# conveyor's checkout is a shallow, single-commit clone - `anvil
+# conveyor's checkout is usually a shallow, single-commit clone - `anvil
 # semver-check`'s default baseline is the commit before a package's last
-# version bump, which isn't on disk yet at depth 1. If this job's origin
-# fetch needs a credential the initial checkout didn't persist into
-# .git/config, give it one via `secrets`.
+# version bump, which isn't on disk yet at depth 1. Not always shallow,
+# though: checkout.rs falls back to a full `git fetch` of the ref when the
+# server won't serve the sha directly, and `git fetch --unshallow` on an
+# already-complete repo is a fatal error, not a no-op - so this only
+# unshallows when there's actually a shallow boundary to remove. If this
+# job's origin fetch needs a credential the initial checkout didn't persist
+# into .git/config, give it one via `secrets`.
 steps = [
-  { run = "git fetch --unshallow origin" },
+  { run = "if [ \"$(git rev-parse --is-shallow-repository)\" = true ]; then git fetch --unshallow origin; fi" },
   { anvil = "semver-check -p quench-auth" },
   { anvil = "semver-check -p quench-cache" },
   { anvil = "semver-check -p quench-cli" },
@@ -72,5 +76,14 @@ steps = [{ anvil = "nextest --all" }, { run = "cargo test --doc --workspace" }]
 name      = "coverage"
 image     = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
 env       = { RUST_BACKTRACE = "1" }
-steps     = [{ run = "cargo llvm-cov --workspace --lcov --output-path lcov.info" }]
+# `--lcov`/`--text` are separate report formats - one invocation can only
+# produce one, so the run that actually exercises the tests is kept
+# report-less and the two reports are regenerated from its profile data
+# instead of re-running everything twice. The plain `report` (no format
+# flag) is the human table `crate::scan::parse_coverage` reads.
+steps = [
+  { run = "cargo llvm-cov --workspace --no-report" },
+  { run = "cargo llvm-cov report --lcov --output-path lcov.info" },
+  { run = "cargo llvm-cov report" },
+]
 artifacts = ["lcov.info"]
