@@ -6,7 +6,9 @@ use futures_util::future::LocalBoxFuture;
 use std::rc::Rc;
 use uuid::Uuid;
 
-const CORRELATION_ID_HEADER: &str = "X-Correlation-ID";
+// Lowercase: `HeaderName::from_static` requires it, and HTTP header names are
+// case-insensitive on the wire (and in `HeaderMap::get`) regardless.
+const CORRELATION_ID_HEADER: &str = "x-correlation-id";
 
 /// Middleware that adds or propagates correlation IDs for request tracing
 pub struct CorrelationIdMiddleware;

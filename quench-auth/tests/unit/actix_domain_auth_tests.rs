@@ -111,3 +111,69 @@ fn permissions_is_a_persisted_column() {
     use quench_db::prelude::Model;
     assert!(User::columns().contains(&"permissions"));
 }
+
+#[test]
+fn a_fresh_user_is_neither_disabled_nor_locked() {
+    let user = user(vec![Role::User], &[]);
+    assert!(!user.is_disabled());
+    assert!(!user.is_locked());
+}
+
+#[test]
+fn failed_logins_below_the_threshold_do_not_lock() {
+    let mut u = user(vec![Role::User], &[]);
+    for _ in 0..4 {
+        u.record_failed_login(5, chrono::Duration::minutes(15));
+    }
+    assert_eq!(u.failed_login_attempts, 4);
+    assert!(!u.is_locked());
+}
+
+#[test]
+fn the_nth_failed_login_locks_and_resets_the_counter() {
+    let mut u = user(vec![Role::User], &[]);
+    for _ in 0..5 {
+        u.record_failed_login(5, chrono::Duration::minutes(15));
+    }
+    assert!(u.is_locked());
+    // The count is "failures since the last lock", not a running total - it
+    // must not still read 5 once a lock has just been applied.
+    assert_eq!(u.failed_login_attempts, 0);
+}
+
+#[test]
+fn a_lock_expires_on_its_own_once_the_duration_passes() {
+    let mut u = user(vec![Role::User], &[]);
+    u.locked_until = Some(chrono::Utc::now() - chrono::Duration::seconds(1));
+    assert!(!u.is_locked());
+}
+
+#[test]
+fn a_successful_login_clears_the_failure_count_and_stamps_last_login() {
+    let mut u = user(vec![Role::User], &[]);
+    u.record_failed_login(5, chrono::Duration::minutes(15));
+    u.record_failed_login(5, chrono::Duration::minutes(15));
+    assert!(u.last_login_at.is_none());
+
+    u.record_successful_login();
+
+    assert_eq!(u.failed_login_attempts, 0);
+    assert!(u.last_login_at.is_some());
+}
+
+#[test]
+fn disabled_is_driven_by_disabled_at_alone() {
+    let mut u = user(vec![Role::User], &[]);
+    assert!(!u.is_disabled());
+    u.disabled_at = Some(chrono::Utc::now());
+    assert!(u.is_disabled());
+}
+
+#[test]
+fn role_parse_round_trips_through_display_and_rejects_unknown_values() {
+    for role in [Role::Admin, Role::User, Role::Service] {
+        assert_eq!(Role::parse(&role.to_string()), Some(role));
+    }
+    assert_eq!(Role::parse("  ADMIN  "), Some(Role::Admin));
+    assert_eq!(Role::parse("nonsense"), None);
+}

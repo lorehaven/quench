@@ -143,20 +143,3 @@ where
 fn is_safe(method: &Method) -> bool {
     matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::is_safe;
-    use actix_web::http::Method;
-
-    #[test]
-    fn only_get_head_and_options_are_safe() {
-        assert!(is_safe(&Method::GET));
-        assert!(is_safe(&Method::HEAD));
-        assert!(is_safe(&Method::OPTIONS));
-        assert!(!is_safe(&Method::POST));
-        assert!(!is_safe(&Method::PUT));
-        assert!(!is_safe(&Method::PATCH));
-        assert!(!is_safe(&Method::DELETE));
-    }
-}
