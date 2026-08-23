@@ -1,4 +1,10 @@
-/// Initialize logging with configurable verbosity via RUST_LOG environment variable
+/// Initialize logging with configurable verbosity via RUST_LOG environment variable.
+///
+/// Loads `.env` files (project root, then any service-specific
+/// `docker/<bin>/.env`) before handing off to `quench_log::init()`, which
+/// reads `RUST_LOG` plus the rest of its own configuration - console and
+/// rolling-file (JSON by default) output, both on by default. See
+/// `quench-log`'s own docs for the full list of variables.
 pub fn init() {
     // Try to load .env from common locations for local development
     let _ = dotenvy::dotenv(); // Load from project root
@@ -12,12 +18,7 @@ pub fn init() {
         }
     }
 
-    let log_level = std::env::var("RUST_LOG")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(tracing::Level::INFO);
-
-    tracing_subscriber::fmt().with_max_level(log_level).init();
+    quench_log::init();
 
     let actual_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
     tracing::debug!("Logging initialized with RUST_LOG={}", actual_level);

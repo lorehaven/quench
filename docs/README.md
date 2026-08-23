@@ -13,6 +13,7 @@ docs/
 ├── quench-client.md
 ├── quench-config.md
 ├── quench-db.md
+├── quench-log.md
 ├── quench-starter.md
 ├── quench-web.md
 ├── quench-web-components.md
@@ -30,6 +31,7 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench Web](./quench-web.md) — dependency-light server-rendered HTML/CSS/JS page builder
 - [Quench Web Components](./quench-web-components.md) — higher-level UI builders on top of Quench Web
 - [Quench DB](./quench-db.md) — ORM/CRUD abstraction plus a migration catalog engine
+- [Quench Log](./quench-log.md) — console + rolling-file (JSON by default) `tracing` subscriber
 - [Quench Cache](./quench-cache.md) — shared in-process/Redis caching layer
 - [Quench Client](./quench-client.md) — shared authenticated HTTP client wrappers
 - [Quench Config](./quench-config.md) — typed config/env loading helper
@@ -67,6 +69,7 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ├── quench-client/          # authenticated HTTP client wrappers
 ├── quench-config/          # typed config/env loading
 ├── quench-db/              # ORM/CRUD abstraction plus migrations
+├── quench-log/             # console + rolling-file tracing subscriber
 ├── quench-starter/         # Actix service bootstrap
 ├── quench-web/             # server-rendered HTML/CSS/JS page builder
 ├── quench-web-components/  # UI components built on quench-web

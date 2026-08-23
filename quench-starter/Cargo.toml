@@ -24,6 +24,7 @@ envmnt = { workspace = true }
 quench-cli = { workspace = true }
 quench-auth = { workspace = true }
 quench-db = { workspace = true }
+quench-log = { workspace = true }
 quench-web = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }
