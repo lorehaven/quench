@@ -2313,7 +2313,7 @@ dependencies = [
 
 [[package]]
 name = "quench-starter"
-version = "0.3.10"
+version = "0.3.11"
 dependencies = [
  "actix-service",
  "actix-web",
