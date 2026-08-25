@@ -9,18 +9,50 @@ fn sessions() -> Arc<SessionDb> {
 }
 
 #[actix_web::test]
-async fn refresh_tokens_rotate_and_old_tokens_stop_working() {
+async fn refresh_tokens_rotate_and_the_new_one_works() {
     let sessions = sessions();
     let (session, first) = sessions.create("user", 3600).await.unwrap();
 
     let (_, second) = sessions.rotate(&first, 3600).await.unwrap().unwrap();
 
-    assert!(
-        sessions.rotate(&first, 3600).await.unwrap().is_none(),
-        "a consumed refresh token must not work twice"
-    );
     assert!(sessions.rotate(&second, 3600).await.unwrap().is_some());
     assert!(sessions.is_active(&session.id, "user").await.unwrap());
+}
+
+/// The fix for a client that rotated its token and then never found out - see
+/// this module's own doc comment. A second presentation of the same
+/// now-consumed token has to succeed once, with the exact token the first
+/// rotation already produced, or a crash between gatehouse minting that token
+/// and the client persisting it would lock the client out for good.
+#[actix_web::test]
+async fn a_just_rotated_token_still_works_once_more_for_a_lost_response() {
+    let sessions = sessions();
+    let (_, first) = sessions.create("user", 3600).await.unwrap();
+
+    let (_, second) = sessions.rotate(&first, 3600).await.unwrap().unwrap();
+    let (_, replayed) = sessions.rotate(&first, 3600).await.unwrap().unwrap();
+
+    assert_eq!(
+        replayed, second,
+        "the recovered token has to be the one already-completed rotation, not a new one"
+    );
+}
+
+/// The recovery in the test above is itself single-use: it exists to answer
+/// the caller's very next retry, not to keep a captured old token replayable
+/// for the whole grace window.
+#[actix_web::test]
+async fn a_recovered_token_does_not_work_a_second_time() {
+    let sessions = sessions();
+    let (_, first) = sessions.create("user", 3600).await.unwrap();
+
+    sessions.rotate(&first, 3600).await.unwrap().unwrap();
+    sessions.rotate(&first, 3600).await.unwrap().unwrap();
+
+    assert!(
+        sessions.rotate(&first, 3600).await.unwrap().is_none(),
+        "a third presentation of an old token must not work"
+    );
 }
 
 #[actix_web::test]

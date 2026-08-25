@@ -5,12 +5,13 @@
 //! TTL, revocation is a delete, and there is nothing to sweep. Refresh-token
 //! rotation is a single atomic take, so a replayed token cannot win a race.
 //!
-//! Three keys per session:
+//! Four keys per session:
 //!
 //! ```text
 //! session:{sid}         -> { username, refresh_hash }   TTL = refresh lifetime
 //! refresh:{token_hash}  -> sid                          TTL = refresh lifetime
 //! user:{username}       -> set of sids                  TTL = refresh lifetime
+//! reuse:{old_hash}      -> { sid, username, token }      TTL = grace window
 //! ```
 //!
 //! The third is an index, and the only key that is not reachable from a token.
@@ -20,6 +21,23 @@
 //! that have since expired - [`SessionDb::revoke_all`] skips what is already
 //! gone - but it must never *miss* one, which is why it is a set rather than a
 //! JSON array read and written back.
+//!
+//! The fourth exists for a narrower reason than any of those three: a client
+//! that rotates its refresh token and then never finds out - killed, or loses
+//! connectivity, between gatehouse minting the next token and the response
+//! reaching (or being persisted by) the caller - is left holding a token that
+//! now looks identical to a stolen, already-used one. Without `reuse:*` that
+//! client is locked out for good despite having done nothing wrong; a fresh
+//! login is its only way back in. [`SessionDb::rotate`] answers a *second*
+//! presentation of the same now-consumed token, within [`REUSE_GRACE_SECS`],
+//! with the exact same result the first rotation already produced, rather
+//! than treating it as invalid - and that recovery is itself a `take`, good
+//! for one answer, not the whole window. This does cost a little of
+//! single-use rotation's usual guarantee - a captured-in-flight token gets
+//! one extra replay instead of zero - but the window is short and this is a
+//! small deployment, not a target worth that trade against a real client
+//! losing its
+//! session to a crash.
 
 use quench_cache::CacheStore;
 use serde::{Deserialize, Serialize};
@@ -34,6 +52,13 @@ pub struct Session {
     pub id: String,
     pub username: String,
 }
+
+/// How long a just-consumed refresh token still answers [`SessionDb::rotate`]
+/// with the token it was rotated to, instead of "no such token" - long enough
+/// to cover a lost or never-persisted response, short enough that a captured
+/// old token stays useless well before it would otherwise have mattered. See
+/// this module's own doc comment for why this exists at all.
+const REUSE_GRACE_SECS: u64 = 30;
 
 pub struct SessionDb {
     store: CacheStore,
@@ -64,6 +89,10 @@ impl SessionDb {
 
     fn refresh_key(token_hash: &str) -> String {
         format!("refresh:{token_hash}")
+    }
+
+    fn reuse_key(old_hash: &str) -> String {
+        format!("reuse:{old_hash}")
     }
 
     fn user_key(username: &str) -> String {
@@ -103,9 +132,12 @@ impl SessionDb {
 
     /// Exchanges a refresh token for a new one.
     ///
-    /// The old token is consumed atomically, so a token presented twice - by a
-    /// racing client or by an attacker replaying a stolen one - succeeds at
-    /// most once.
+    /// The old token is consumed atomically, so a token presented twice in
+    /// quick succession - a racing client, or an attacker replaying a stolen
+    /// one - only ever triggers one real rotation. A *second* presentation of
+    /// that exact same now-consumed token, though, gets the rotation's result
+    /// handed back again rather than an error, for [`REUSE_GRACE_SECS`] - see
+    /// this module's own doc comment for why.
     pub async fn rotate(
         &self,
         refresh_token: &str,
@@ -113,7 +145,7 @@ impl SessionDb {
     ) -> anyhow::Result<Option<(Session, String)>> {
         let old_hash = hash_refresh_token(refresh_token);
         let Some(session_id) = self.store.take(&Self::refresh_key(&old_hash)).await? else {
-            return Ok(None);
+            return self.rotate_from_reuse(&old_hash).await;
         };
         let Some(session_id) = session_id.as_str().map(str::to_string) else {
             return Ok(None);
@@ -123,7 +155,11 @@ impl SessionDb {
             // The session went away between the two reads: expired or revoked.
             return Ok(None);
         };
-        let Some(username) = record.get("username").and_then(|v| v.as_str()) else {
+        let Some(username) = record
+            .get("username")
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+        else {
             return Ok(None);
         };
 
@@ -139,21 +175,69 @@ impl SessionDb {
             )
             .await?;
         self.store
-            .set(&Self::refresh_key(&next_hash), json!(session_id), Some(ttl))
+            .set(
+                &Self::refresh_key(&next_hash),
+                json!(&session_id),
+                Some(ttl),
+            )
             .await?;
         // The session keys just had their lifetime extended; the index has to
         // follow or it expires first and the session becomes unrevokable.
         // `add_to_set` is idempotent, so re-adding is how the TTL is refreshed.
         self.store
-            .add_to_set(&Self::user_key(username), &session_id, Some(ttl))
+            .add_to_set(&Self::user_key(&username), &session_id, Some(ttl))
+            .await?;
+        // The recovery path for whoever asks again with `refresh_token` before
+        // finding out this already happened - see `rotate_from_reuse`.
+        self.store
+            .set(
+                &Self::reuse_key(&old_hash),
+                json!({
+                    "session_id": session_id,
+                    "username": username,
+                    "refresh_token": next_token,
+                }),
+                Some(REUSE_GRACE_SECS),
+            )
             .await?;
 
         Ok(Some((
             Session {
                 id: session_id,
-                username: username.to_string(),
+                username,
             },
             next_token,
+        )))
+    }
+
+    /// The recovery path for a refresh token that `rotate` just found already
+    /// consumed: within the grace window, hand back the exact token pair that
+    /// consuming it produced, rather than treating this presentation as
+    /// invalid. Outside the window - or if it was never rotated at all - this
+    /// is `None`, same as today.
+    ///
+    /// `take`, not `get`: recovery is itself single-use, the same guarantee
+    /// `rotate`'s own primary path gives the *current* token. Without this, a
+    /// captured old token would stay replayable for the whole grace window
+    /// instead of exactly the one recovery it exists for.
+    async fn rotate_from_reuse(&self, old_hash: &str) -> anyhow::Result<Option<(Session, String)>> {
+        let Some(reuse) = self.store.take(&Self::reuse_key(old_hash)).await? else {
+            return Ok(None);
+        };
+        let (Some(session_id), Some(username), Some(refresh_token)) = (
+            reuse.get("session_id").and_then(|v| v.as_str()),
+            reuse.get("username").and_then(|v| v.as_str()),
+            reuse.get("refresh_token").and_then(|v| v.as_str()),
+        ) else {
+            return Ok(None);
+        };
+
+        Ok(Some((
+            Session {
+                id: session_id.to_string(),
+                username: username.to_string(),
+            },
+            refresh_token.to_string(),
         )))
     }
 
