@@ -1,31 +1,36 @@
 use bytes::Bytes;
+use futures_util::Stream;
 use http::{HeaderName, HeaderValue, StatusCode};
-use http_body_util::{BodyExt, Full};
+use http_body_util::{BodyExt, Full, StreamBody};
 use hyper::body::{Body as HttpBody, Frame};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// A boxed, type-erased response body.
-pub struct BoxBody(
-    Pin<Box<dyn HttpBody<Data = Bytes, Error = std::convert::Infallible> + Send + Sync>>,
-);
+type BoxError = Box<dyn std::error::Error + Send + Sync>;
+
+/// A boxed, type-erased response body. Its error type isn't `Infallible`:
+/// a fixed body (`from_bytes`/`json`/...) never fails, but a
+/// [`Response::streaming`] one can genuinely error mid-stream (the
+/// producer side closes, a broadcast channel lags), and both need to fit
+/// through the same box.
+pub struct BoxBody(Pin<Box<dyn HttpBody<Data = Bytes, Error = BoxError> + Send + Sync>>);
 
 impl BoxBody {
     pub fn new<B>(body: B) -> Self
     where
-        B: HttpBody<Data = Bytes, Error = std::convert::Infallible> + Send + Sync + 'static,
+        B: HttpBody<Data = Bytes, Error = BoxError> + Send + Sync + 'static,
     {
         Self(Box::pin(body))
     }
 
     pub fn empty() -> Self {
-        Self::new(Full::new(Bytes::new()))
+        Self::new(Full::new(Bytes::new()).map_err(|never: std::convert::Infallible| match never {}))
     }
 }
 
 impl HttpBody for BoxBody {
     type Data = Bytes;
-    type Error = std::convert::Infallible;
+    type Error = BoxError;
 
     fn poll_frame(
         self: Pin<&mut Self>,
@@ -106,8 +111,34 @@ impl Response {
         let inner = http::Response::builder()
             .status(status)
             .body(BoxBody::new(
-                Full::new(bytes).map_err(|never| match never {}),
+                Full::new(bytes).map_err(|never: std::convert::Infallible| match never {}),
             ))
+            .expect("status is always a valid response head");
+        Self { inner }
+    }
+
+    /// A chunked response body driven by `stream`: each `Ok` item becomes
+    /// one chunk, an `Err` ends the stream (hyper closes the connection
+    /// having already sent the headers, the same way actix-web's
+    /// `.streaming()` does on a mid-stream error). What
+    /// `GpuBroadcaster`/`VllmBroadcaster`-style SSE endpoints port to -
+    /// format each item as `event: ...\ndata: ...\n\n` before handing it
+    /// in, and set `content-type: text/event-stream` via
+    /// [`header`](Self::header).
+    ///
+    /// This is a *response* body - unrelated to
+    /// [`crate::body::InboundBody`], which streams a *request* body in.
+    pub fn streaming<S, E>(status: StatusCode, stream: S) -> Self
+    where
+        S: Stream<Item = Result<Bytes, E>> + Send + Sync + 'static,
+        E: Into<BoxError> + 'static,
+    {
+        use futures_util::StreamExt;
+
+        let frames = stream.map(|item| item.map(Frame::data).map_err(Into::into));
+        let inner = http::Response::builder()
+            .status(status)
+            .body(BoxBody::new(StreamBody::new(frames)))
             .expect("status is always a valid response head");
         Self { inner }
     }

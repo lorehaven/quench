@@ -21,6 +21,7 @@ async-trait = { workspace = true }
 bytes = { version = "1.12" }
 bytestring = { workspace = true }
 http = { workspace = true }
+futures-util = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true, features = ["server", "http1", "http2"] }
 hyper-util = { workspace = true, features = ["tokio", "server-auto", "server-graceful"] }

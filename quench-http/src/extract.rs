@@ -109,6 +109,30 @@ impl<T: DeserializeOwned + Send> FromRequest for Json<T> {
     }
 }
 
+/// Buffers and deserializes an `application/x-www-form-urlencoded` request
+/// body into `T` - the body-reading counterpart to [`Query`], for an HTML
+/// `<form method="post">` (no JS/htmx) rather than a `?query=string`. Same
+/// [`BodyLimit`] as `Json`/`Bytes`.
+pub struct Form<T>(pub T);
+
+impl<T> Deref for Form<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+#[async_trait]
+impl<T: DeserializeOwned + Send> FromRequest for Form<T> {
+    async fn from_request(req: &mut Request) -> Result<Self, HttpError> {
+        let limit = resolve_body_limit(req);
+        let bytes = req.take_body().collect_limited(limit).await?;
+        serde_urlencoded::from_bytes(&bytes)
+            .map(Form)
+            .map_err(|e| ExtractError::InvalidForm(e.to_string()).into())
+    }
+}
+
 /// Buffers the raw request body, up to the request's [`BodyLimit`] - the
 /// non-JSON counterpart to [`Json`], for a handler that wants the bytes
 /// themselves (a non-JSON upload small enough to buffer, a signature to

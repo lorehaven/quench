@@ -37,10 +37,10 @@ pub mod prelude {
     pub use crate::endpoint::{Endpoint, IntoResponse};
     pub use crate::error::{DiError, ExtractError, HttpError};
     pub use crate::extract::{
-        BodyLimit, Bytes, Extension, FromRequest, Inject, Json, Limited, Path, Query,
+        BodyLimit, Bytes, Extension, Form, FromRequest, Inject, Json, Limited, Path, Query,
     };
     pub use crate::http;
-    pub use crate::middleware::{Middleware, wrap};
+    pub use crate::middleware::{Middleware, OnPathPrefix, wrap};
     pub use crate::multipart::{Field, Multipart};
     pub use crate::request::Request;
     pub use crate::response::Response;

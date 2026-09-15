@@ -51,6 +51,8 @@ pub enum ExtractError {
     InvalidQuery(String),
     #[error("invalid JSON body: {0}")]
     InvalidJson(String),
+    #[error("invalid form body: {0}")]
+    InvalidForm(String),
     #[error("invalid multipart body: {0}")]
     InvalidMultipart(String),
     #[error("body exceeds the {0} byte limit")]
