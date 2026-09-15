@@ -5,7 +5,10 @@
 //! place those names are constructed - building them per service is what kept
 //! the old setup from being single sign-on.
 
-use actix_web::cookie::{Cookie, SameSite, time::Duration};
+// Not `actix_web::cookie` (which is just `pub use cookie;` under the hood -
+// see actix-web's own lib.rs): depending on the standalone crate directly
+// is what makes this module usable from the quench-http side too.
+use cookie::{Cookie, SameSite, time::Duration};
 
 pub const DEFAULT_AUTH_SCHEMA: &str = "auth";
 pub const DEFAULT_SESSION_COOKIE: &str = "forge_session";

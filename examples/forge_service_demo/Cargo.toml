@@ -1,0 +1,29 @@
+[package]
+name = "quench-example-forge-service"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - a minimal forge-service-shaped demo: quench-starter's bootstrap (health, base path, TLS-optional, graceful shutdown) plus quench-auth's Auth/RequireWrite middleware - the template for migrating a real service"
+keywords = ["development", "tools"]
+categories = ["development-tools"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[[bin]]
+name = "quench-example-forge-service"
+path = "src/main.rs"
+
+[dependencies]
+async-trait = { workspace = true }
+envmnt = { workspace = true }
+quench-auth = { workspace = true }
+quench-cache = { workspace = true }
+quench-http = { workspace = true }
+quench-starter = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

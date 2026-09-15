@@ -251,7 +251,7 @@ impl User {
 
 impl Model for User {
     fn table_name() -> String {
-        format!("{}.users", crate::actix::domain::realm::auth_schema())
+        format!("{}.users", crate::domain::realm::auth_schema())
     }
 
     fn columns() -> Vec<&'static str> {

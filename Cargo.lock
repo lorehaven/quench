@@ -40,7 +40,7 @@ dependencies = [
  "flate2",
  "foldhash",
  "futures-core",
- "h2",
+ "h2 0.3.27",
  "http 0.2.12",
  "httparse",
  "httpdate",
@@ -1276,6 +1276,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "h2"
+version = "0.4.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef8e5e5a340588f4452631496976cf8636d4a7ecf600239fdc27615d2530bc16"
+dependencies = [
+ "atomic-waker",
+ "bytes",
+ "fnv",
+ "futures-core",
+ "futures-sink",
+ "http 1.5.0",
+ "indexmap 2.14.0",
+ "slab",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1443,6 +1462,7 @@ dependencies = [
  "bytes",
  "futures-channel",
  "futures-core",
+ "h2 0.4.19",
  "http 1.5.0",
  "http-body",
  "httparse",
@@ -1650,6 +1670,15 @@ checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
 dependencies = [
  "equivalent",
  "hashbrown 0.17.1",
+]
+
+[[package]]
+name = "inventory"
+version = "0.3.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4f0c30c76f2f4ccee3fe55a2435f691ca00c0e4bd87abe4f4a851b1d4dac39b"
+dependencies = [
+ "rustversion",
 ]
 
 [[package]]
@@ -1929,6 +1958,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "multer"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83e87776546dc87511aa5ee218730c92b666d7264ab6ed41f9d215af9cd5224b"
+dependencies = [
+ "bytes",
+ "encoding_rs",
+ "futures-util",
+ "http 1.5.0",
+ "httparse",
+ "memchr",
+ "mime",
+ "spin",
+ "version_check",
+]
+
+[[package]]
 name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2184,21 +2230,26 @@ dependencies = [
 
 [[package]]
 name = "quench-auth"
-version = "0.3.12"
+version = "0.4.0"
 dependencies = [
  "actix-web",
  "anyhow",
  "argon2",
  "async-trait",
  "base64 0.23.1",
+ "bytes",
  "chrono",
+ "cookie 0.16.2",
  "ed25519-dalek",
  "envmnt",
  "futures-util",
  "hex",
+ "http 1.5.0",
+ "http-body-util",
  "jsonwebtoken",
  "quench-cache",
  "quench-db",
+ "quench-http",
  "rand 0.8.7",
  "rand_core 0.6.4",
  "reqwest",
@@ -2301,6 +2352,70 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-example-forge-service"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "envmnt",
+ "quench-auth",
+ "quench-cache",
+ "quench-http",
+ "quench-starter",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "quench-example-http"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "quench-http",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "quench-http"
+version = "0.1.0"
+dependencies = [
+ "actix-router",
+ "async-trait",
+ "bytes",
+ "bytestring",
+ "http 1.5.0",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "inventory",
+ "multer",
+ "quench-http-macros",
+ "rustls",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "thiserror",
+ "tokio",
+ "tokio-rustls",
+ "tracing",
+]
+
+[[package]]
+name = "quench-http-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.3",
+]
+
+[[package]]
 name = "quench-log"
 version = "0.1.0"
 dependencies = [
@@ -2313,16 +2428,20 @@ dependencies = [
 
 [[package]]
 name = "quench-starter"
-version = "0.3.12"
+version = "0.4.0"
 dependencies = [
  "actix-service",
  "actix-web",
+ "async-trait",
+ "bytes",
  "dotenvy",
  "envmnt",
  "futures-util",
+ "http 1.5.0",
  "quench-auth",
  "quench-cli",
  "quench-db",
+ "quench-http",
  "quench-log",
  "quench-web",
  "reqwest",

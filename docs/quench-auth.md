@@ -1,10 +1,16 @@
 # Quench Auth
 
-`quench-auth` (crate `quench_auth`) is the relying-party half of Forge's realm authentication. It gives every service the pieces needed to *verify* a token or session that gatehouse issued — JWT decode/verify, permission checks, session-revocation lookups, and the actix middleware and UI helpers that wire those into a service's request pipeline. It deliberately does not include a login form, a token-issuing API, or user administration: those live in gatehouse (`docker/gatehouse-service`), the one service in the realm allowed to mint tokens and manage accounts. Relying parties that depend on it include gatehouse itself (which also uses it to verify its own tokens), sage-service, switchboard-service, warehouse-service, and conveyor-service.
+`quench-auth` (crate `quench_auth`) is the relying-party half of Forge's realm authentication. It gives every service the pieces needed to *verify* a token or session that gatehouse issued — JWT decode/verify, permission checks, session-revocation lookups, and the middleware and UI helpers that wire those into a service's request pipeline, for either of Forge's two HTTP stacks. It deliberately does not include a login form, a token-issuing API, or user administration: those live in gatehouse (`docker/gatehouse-service`), the one service in the realm allowed to mint tokens and manage accounts. Relying parties that depend on it include gatehouse itself (which also uses it to verify its own tokens), sage-service, switchboard-service, warehouse-service, and conveyor-service.
+
+## Two stacks, one domain layer
+
+`quench_auth::domain::*` (`auth`, `jwt`, `jwks`, `realm`, `session`, `signing`) is entirely framework-agnostic — JWT encode/decode, session storage, realm cookie/URL conventions, Ed25519 signing. It never touches `actix-web` or `quench-http`. `quench_auth::actix::*` and `quench_auth::http::*` are two thin, parallel layers on top of that shared core: same middleware names (`middleware::auth::Auth`, `middleware::require_write::RequireWrite`), same `routers::ui` helpers, same `domain::sso_client` config and refresh logic — just rebuilt against [`quench-http`](./quench-http.md)'s `Request`/`Response`/`Middleware` instead of actix-web's. `quench_auth::actix::domain::*` and `quench_auth::http::domain::*` both re-export the same `domain::*` types unchanged, so `quench_auth::prelude::JwtConfig`/`Claims`/... are identical regardless of which stack a service is on.
+
+The one behavioral difference: `quench_auth::http::middleware::auth::Auth` reads `Claims` back via `Request::extensions()`/`Extension<Claims>` (quench-http's per-request data mechanism) instead of actix's `HttpMessage::extensions()` — see [Quench Http](./quench-http.md#middleware) for why that extractor exists.
 
 ## Public API / Key Types
 
-Reachable via `quench_auth::prelude` (see `libs/quench-auth/src/prelude.rs`) and `quench_auth::actix::*`:
+Reachable via `quench_auth::prelude` (see `libs/quench-auth/src/prelude.rs`), `quench_auth::domain::*` (framework-agnostic), `quench_auth::actix::*`, and `quench_auth::http::*`:
 
 | Module | Purpose |
 |---|---|
@@ -13,11 +19,11 @@ Reachable via `quench_auth::prelude` (see `libs/quench-auth/src/prelude.rs`) and
 | `domain::realm` | the realm's cookie names, cookie domain, and gatehouse URLs — the only place these are constructed |
 | `domain::session` | `Session`, `SessionDb` (backed by `quench-cache`'s `CacheStore`, i.e. Redis in a deployment); `is_active` for per-request revocation checks, `revoke_all` to end every session a user holds |
 | `domain::jwks` | `JwksVerifier`, which fetches and caches gatehouse's published JWKS over HTTP so a relying party can verify a token's signature without a shared secret |
-| `domain::sso_client` | the relying-party half of the authorization-code + PKCE flow against gatehouse's `/authorize` and `/auth/callback` |
-| `middleware::auth::Auth` | actix middleware that verifies the token on every request: signature, expiry, audience, session |
-| `middleware::require_write::RequireWrite` | actix middleware enforcing the `"write"` action on any non-GET/HEAD/OPTIONS request, reading the `Claims` `Auth` already placed in request extensions |
-| `routers::ui` | `is_ui_authenticated`, `get_user_from_req` |
-| `routers::ui::pages::auth` | `login_delegation`, `auth_callback`, `logout_delegation`, `redirect_target`/`validated_redirect` (open-redirect-safe `?redirect=` handling), `auth_status` |
+| `domain::sso_client` | config (`SsoConfig`) and the token-refresh call, shared by both stacks; `actix::domain::sso_client`/`http::domain::sso_client` add the request/response-touching `authorize_redirect`/`callback` on top, one per stack |
+| `actix::middleware::auth::Auth` / `http::middleware::auth::Auth` | verifies the token on every request: signature, expiry, audience, session |
+| `actix::middleware::require_write::RequireWrite` / `http::middleware::require_write::RequireWrite` | enforces the `"write"` action on any non-GET/HEAD/OPTIONS request, reading the `Claims` `Auth` already placed in request extensions |
+| `actix::routers::ui` / `http::routers::ui` | `is_ui_authenticated`, `get_user_from_req` |
+| `actix::routers::ui::pages::auth` / `http::routers::ui::pages::auth` | `login_delegation`, `auth_callback`, `logout_delegation`, `redirect_target`/`validated_redirect` (open-redirect-safe `?redirect=` handling), `auth_status` |
 
 ## Checking a permission
 
@@ -39,12 +45,17 @@ Service *access* needs no check at all: gatehouse narrows a token's audience lis
 
 ## Mounting the middleware
 
-`Auth` establishes identity (signature, expiry, audience, session); `RequireWrite` layers a blanket write check on top of it. Actix runs the *last*-registered `.wrap()` first, so `Auth` must be the outer layer:
+`Auth` establishes identity (signature, expiry, audience, session); `RequireWrite` layers a blanket write check on top of it. Either way, `Auth` has to run first so `RequireWrite` finds the `Claims` it left behind — but the two stacks apply that in opposite orders, because actix's `.wrap()` runs the *last*-registered middleware first, while quench-http's `wrap()` makes the *last* call the *outermost* layer (see [Quench Http](./quench-http.md#middleware)):
 
 ```rust
+// actix-web
 web::scope("/api/v1/things")
     .wrap(RequireWrite::new(config.clone()))
-    .wrap(Auth::new(config))
+    .wrap(Auth::new(config)) // registered last, actix runs it first
+
+// quench-http
+let app = wrap(routes, RequireWrite::new(config.clone()));
+let app = wrap(app, Auth::new(config)); // wrapped last, quench-http runs it first
 ```
 
 ## Noticing a session that ended
@@ -81,6 +92,6 @@ Read from the environment via `envmnt` (see `JwtConfig::from_parts` and `domain:
 
 ## Testing
 
-Unit tests live under `libs/quench-auth/tests/unit/`, covering `domain::auth`, `domain::jwt`, `domain::realm`, `domain::session`, `middleware::require_write`, and `routers::ui::pages::auth`. `JwtConfig::for_tests()` and `JwtConfig::for_tests_with_signing()` are exposed publicly (not `#[cfg(test)]`) specifically so downstream crates' own test binaries can build a config without a real database or gatehouse.
+Unit tests live under `libs/quench-auth/tests/unit/`, covering `domain::auth`, `domain::jwt`, `domain::realm`, `domain::session`, `actix::middleware::require_write`, and `actix::routers::ui::pages::auth`. The `http::*` stack has its own top-level integration tests (`tests/http_middleware_auth.rs`, `tests/http_middleware_require_write.rs`, `tests/http_sso_client.rs`) mirroring the same scenarios one-for-one against `quench-http` instead of actix — including a full mock-gatehouse token exchange for `http::domain::sso_client::callback`. `JwtConfig::for_tests()` and `JwtConfig::for_tests_with_signing()` are exposed publicly (not `#[cfg(test)]`) specifically so downstream crates' own test binaries (and `examples/forge_service_demo`) can build a config without a real database or gatehouse.
 
 [Home](../README.md)

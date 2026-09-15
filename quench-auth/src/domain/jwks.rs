@@ -1,8 +1,8 @@
 //! Verifies tokens against gatehouse's published JWKS, instead of a shared
 //! secret every service used to hold. Every relying party's [`JwtConfig`]
-//! (`crate::actix::domain::jwt`) uses one of these.
+//! (`crate::domain::jwt`) uses one of these.
 
-use crate::actix::domain::jwt::KeyResolver;
+use crate::domain::jwt::KeyResolver;
 use async_trait::async_trait;
 use jsonwebtoken::DecodingKey;
 use quench_cache::CacheStore;

@@ -1,5 +1,5 @@
-use crate::actix::domain::auth::{Permissions, Role};
-use crate::actix::domain::jwks::JwksVerifier;
+use crate::domain::auth::{Permissions, Role};
+use crate::domain::jwks::JwksVerifier;
 use async_trait::async_trait;
 use jsonwebtoken::{
     Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, decode_header, encode,
@@ -89,7 +89,7 @@ impl JwtConfig {
     /// Gatehouse itself never uses this; see `docker/gatehouse-service/src/keys.rs`
     /// for the persisted, rotatable equivalent.
     pub fn for_tests_with_signing() -> Self {
-        use crate::actix::domain::signing::{decoding_key, encoding_key, generate_signing_key};
+        use crate::domain::signing::{decoding_key, encoding_key, generate_signing_key};
 
         struct OneKey {
             kid: String,

@@ -1,6 +1,6 @@
 [package]
 name = "quench-starter"
-version = "0.3.12"
+version = "0.4.0"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - server bootstrap and utilities"
@@ -18,12 +18,15 @@ path = "src/lib.rs"
 [dependencies]
 actix-service = { workspace = true }
 actix-web = { workspace = true }
+async-trait = { workspace = true }
+bytes = { version = "1.12" }
 dotenvy = { workspace = true }
 futures-util = { workspace = true }
 envmnt = { workspace = true }
 quench-cli = { workspace = true }
 quench-auth = { workspace = true }
 quench-db = { workspace = true }
+quench-http = { workspace = true }
 quench-log = { workspace = true }
 quench-web = { workspace = true }
 reqwest = { workspace = true }
@@ -34,3 +37,6 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
+
+[dev-dependencies]
+http = { workspace = true }

@@ -1,35 +1,11 @@
 use actix_web::dev::HttpServiceFactory;
 use actix_web::middleware::NormalizePath;
 use actix_web::{HttpResponse, Responder, get, web};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
-#[derive(Clone, Default)]
-pub struct HealthState {
-    live: Arc<AtomicBool>,
-    ready: Arc<AtomicBool>,
-}
-
-impl HealthState {
-    pub fn live() -> Self {
-        Self {
-            live: Arc::new(AtomicBool::new(true)),
-            ready: Arc::new(AtomicBool::new(false)),
-        }
-    }
-
-    pub fn is_live(&self) -> bool {
-        self.live.load(Ordering::Acquire)
-    }
-
-    pub fn is_ready(&self) -> bool {
-        self.ready.load(Ordering::Acquire)
-    }
-
-    pub fn mark_ready(&self) {
-        self.ready.store(true, Ordering::Release);
-    }
-}
+// `HealthState` doesn't touch actix - it moved to `common::health` so the
+// quench-http bootstrap (`crate::http`) can share it instead of duplicating
+// it. Re-exported so `quench_starter::prelude::HealthState` keeps working.
+pub use crate::common::health::HealthState;
 
 pub fn scope() -> impl HttpServiceFactory {
     web::scope("/health")
