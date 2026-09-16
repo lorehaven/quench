@@ -27,7 +27,7 @@ readme = "README.md"
 [workspace.dependencies]
 actix-router = { version = "0.5", default-features = false }
 actix-service = { version = "2.0" }
-actix-web = { version = "4.14", features = ["rustls-0_23"] }
+actix-web = { version = "4.15", features = ["rustls-0_23"] }
 anyhow = { version = "1.0" }
 argon2 = { version = "0.5" }
 async-trait = { version = "0.1" }
@@ -55,7 +55,7 @@ http-body-util = { version = "0.1" }
 hyper = { version = "1.11" }
 hyper-util = { version = "0.1" }
 inventory = { version = "0.3" }
-jsonwebtoken = { version = "11.0", features = ["aws_lc_rs"] }
+jsonwebtoken = { version = "11.1", features = ["aws_lc_rs"] }
 markup5ever_rcdom = { version = "0.39" }
 multer = { version = "3.1" }
 proc-macro2 = { version = "1.0" }
@@ -72,7 +72,7 @@ quench-starter = { path = "quench-starter", registry = "ennor", version = "0.4.0
 quench-web = { path = "quench-web", registry = "ennor", version = "0.1.11" }
 quench-web-components = { path = "quench-web-components", registry = "ennor", version = "0.1.5" }
 quote = { version = "1.0" }
-redis = { version = "1.5", features = ["tokio-comp", "cluster-async", "connection-manager"] }
+redis = { version = "1.7", features = ["tokio-comp", "cluster-async", "connection-manager"] }
 reqwest = { version = "0.13", default-features = false, features = [
   "json",
   "stream",
@@ -103,7 +103,7 @@ tracing = { version = "0.1" }
 tracing-appender = { version = "0.2" }
 tracing-subscriber = { version = "0.3" }
 urlencoding = { version = "2.1" }
-uuid = { version = "1.24", features = ["v4"] }
+uuid = { version = "1.26", features = ["v4"] }
 walkdir = { version = "2.5" }
 which = { version = "8.0" }
 
