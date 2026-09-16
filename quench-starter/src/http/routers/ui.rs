@@ -78,11 +78,11 @@ pub async fn base_path_slash_redirect() -> Response {
     ui_root_redirect()
 }
 
-/// See `swagger::force_link`'s doc comment - same reason.
+/// See `swagger::register_routes`'s doc comment - same reason.
 /// `server_root_redirect` doesn't need to be listed here: `crate::http::serve`
 /// already calls it directly (see `RootOrMounted`), which is itself
 /// enough of a real reference to keep it linked.
-pub(crate) fn force_link() {
+pub(crate) fn register_routes() {
     let _ = base_path_redirect as fn() -> _;
     let _ = base_path_slash_redirect as fn() -> _;
 }

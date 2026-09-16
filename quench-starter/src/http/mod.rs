@@ -23,13 +23,14 @@ use std::sync::Arc;
 /// `#[injectable]` linked into the binary, plus `Db` and `HealthState`
 /// seeded directly since they're constructed before the graph exists),
 /// discovers every `#[get]`/`#[post]`/... route, mounts the whole thing
-/// under `BASE_PATH`, and serves it.
+/// under `BASE_PATH`, and serves it. For a service that needs extra DI
+/// providers or its own middleware (auth, most often), build `app`/
+/// `container` yourself and call [`serve_app`] instead - see its doc
+/// comment.
 pub async fn serve<I>(db: Option<Arc<DbWrapper>>, init: I) -> std::io::Result<()>
 where
     I: Future<Output = ()> + Send + 'static,
 {
-    let _ = rustls::crypto::ring::default_provider().install_default();
-
     let base_path = normalize_base_path(&envmnt::get_or("BASE_PATH", "/"));
     tracing::info!("Server initialized with BASE_PATH: {base_path}");
 
@@ -38,13 +39,7 @@ where
         None => DbWrapper::init_env().await,
     };
     let health_state = HealthState::live();
-
-    let init_health_state = health_state.clone();
-    tokio::spawn(async move {
-        init.await;
-        init_health_state.mark_ready();
-        tracing::info!("Service initialization complete");
-    });
+    health_state.spawn_ready_when(init);
 
     let container = ContainerBuilder::new()
         .provide(db_wrapper.db.clone())
@@ -55,25 +50,44 @@ where
     let container = Arc::new(container);
 
     let app = discover_and_mount(base_path);
+    let service_name = envmnt::get_or("SERVICE_NAME", "service");
+    serve_app(&format!("{service_name}-service"), app, container).await
+}
+
+/// The TLS-detecting tail end of [`serve`]: HTTPS plus an HTTP->HTTPS
+/// redirect server when `SERVER_CERT_PATH`/`SERVER_KEY_PATH` exist, plain
+/// HTTP on `SERVER_ADDR` otherwise - shared by every service that can't use
+/// [`serve`] directly because it needs extra DI providers or middleware
+/// (`Auth`, most often) around [`discover_and_mount`]'s output:
+///
+/// ```ignore
+/// let app = quench_starter::http::discover_and_mount(base_path);
+/// let app = wrap(app, Auth::new(config));
+/// let container = Arc::new(ContainerBuilder::new().provide(extra).build().await?);
+/// quench_starter::http::serve_app("my-service", app, container).await
+/// ```
+pub async fn serve_app(
+    service_name: &str,
+    app: Arc<dyn Endpoint>,
+    container: Arc<quench_http::di::Container>,
+) -> std::io::Result<()> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
 
     let (https_addr, http_addr) = server_addrs();
-    let service_name = envmnt::get_or("SERVICE_NAME", "service");
 
-    let tls = load_tls(
+    match load_tls(
         envmnt::get_or("SERVER_CERT_PATH", "cert.pem"),
         envmnt::get_or("SERVER_KEY_PATH", "key.pem"),
-    );
-
-    match tls {
+    ) {
         Some(config) => {
             print_status(
                 Tone::Success,
-                &format!("{service_name}-service"),
+                service_name,
                 &format!("starting HTTPS server on {https_addr}"),
             );
             print_status(
                 Tone::Info,
-                &format!("{service_name}-service"),
+                service_name,
                 &format!("starting HTTP redirect server on {http_addr}"),
             );
 
@@ -87,11 +101,7 @@ where
             Ok(())
         }
         None => {
-            print_status(
-                Tone::Warn,
-                &format!("{service_name}-service"),
-                "starting plain HTTP server",
-            );
+            print_status(Tone::Warn, service_name, "starting plain HTTP server");
             serve_http(app, container, https_addr).await
         }
     }
@@ -110,7 +120,7 @@ where
 /// let app = quench_starter::http::discover_and_mount(base_path);
 /// let app = wrap(app, RequireWrite::new(config.clone()));
 /// let app = wrap(app, Auth::new(config)); // outermost: runs first
-/// serve_http(app, container, addr).await
+/// quench_starter::http::serve_app("my-service", app, container).await
 /// ```
 ///
 /// (See `quench_auth::http::middleware`'s doc comment for why `Auth` has
@@ -121,11 +131,11 @@ pub fn discover_and_mount(base_path: impl Into<String>) -> Arc<dyn Endpoint> {
 
     // Guarantees `health`/`swagger`/`base_path_redirect`/`base_path_slash_redirect`
     // are linked into this binary before `discover_routes()` runs - see
-    // `routers::swagger::force_link`'s doc comment for why that isn't
+    // `routers::swagger::register_routes`'s doc comment for why that isn't
     // automatic just because `quench-starter` is a dependency.
-    routers::health::force_link();
-    routers::swagger::force_link();
-    routers::ui::force_link();
+    routers::health::register_routes();
+    routers::swagger::register_routes();
+    routers::ui::register_routes();
 
     // Before the discovered route set: every service mounts its own routes
     // under a catch-all pattern, which would otherwise swallow the bare

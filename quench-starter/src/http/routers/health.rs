@@ -41,8 +41,8 @@ pub async fn ready(Inject(state): Inject<HealthState>) -> Response {
     }
 }
 
-/// See `swagger::force_link`'s doc comment - same reason.
-pub(crate) fn force_link() {
+/// See `swagger::register_routes`'s doc comment - same reason.
+pub(crate) fn register_routes() {
     let _ = health as fn() -> _;
     let _ = live as fn(Inject<HealthState>) -> _;
     let _ = ready as fn(Inject<HealthState>) -> _;

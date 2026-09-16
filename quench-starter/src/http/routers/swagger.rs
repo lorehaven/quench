@@ -22,7 +22,7 @@ async fn swagger_index_redirect() -> Response {
 /// where nothing else happens to pull this module in would silently lose
 /// these two routes. See [`quench_http::route::RouteRegistration`]'s doc
 /// comment for the full explanation.
-pub(crate) fn force_link() {
+pub(crate) fn register_routes() {
     let _ = swagger_redirect as fn() -> _;
     let _ = swagger_index_redirect as fn() -> _;
 }

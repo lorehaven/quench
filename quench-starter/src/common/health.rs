@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -28,5 +29,20 @@ impl HealthState {
 
     pub fn mark_ready(&self) {
         self.ready.store(true, Ordering::Release);
+    }
+
+    /// Spawns `init`, then marks this ready once it completes - so `/health`
+    /// answers live-but-not-ready while dependency waits and one-time setup
+    /// run, instead of blocking startup on them.
+    pub fn spawn_ready_when<F>(&self, init: F)
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        let state = self.clone();
+        tokio::spawn(async move {
+            init.await;
+            state.mark_ready();
+            tracing::info!("Service initialization complete");
+        });
     }
 }
