@@ -2490,7 +2490,7 @@ dependencies = [
 
 [[package]]
 name = "quench-starter"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "actix-service",
  "actix-web",
@@ -2518,7 +2518,7 @@ dependencies = [
 
 [[package]]
 name = "quench-web"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "anyhow",
  "fluent-syntax",
@@ -2531,7 +2531,7 @@ dependencies = [
 
 [[package]]
 name = "quench-web-components"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "quench-web",
  "strum",
