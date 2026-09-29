@@ -221,24 +221,39 @@ fn render_head_link(link: Link, static_attrs: &BTreeMap<String, String>) -> Stri
     format!("<link {attrs}></link>")
 }
 
-fn pretty_html_string(node: &Handle, indent: usize, is_preformatted: bool) -> String {
+/// Writes `node` back out as HTML.
+///
+/// `is_preformatted` keeps whitespace exactly (`pre`, `code`, `textarea`, ...).
+/// `raw_text` is stricter and rarer: the body of `script` and `style` is code,
+/// not text, and must not be escaped. Every other text node *is* escaped here -
+/// the parser decoded `&lt;` back to `<` on the way in, so writing it out as-is
+/// would turn any text a page displayed (a username, a title) into live markup.
+fn pretty_html_string(
+    node: &Handle,
+    indent: usize,
+    is_preformatted: bool,
+    raw_text: bool,
+) -> String {
     match &node.data {
         markup5ever_rcdom::NodeData::Document => node
             .children
             .borrow()
             .iter()
-            .map(|child| pretty_html_string(child, indent, false))
+            .map(|child| pretty_html_string(child, indent, false, false))
             .collect(),
         markup5ever_rcdom::NodeData::Text { contents } => {
             let contents_ref = contents.borrow();
+            if raw_text {
+                return contents_ref.to_string();
+            }
             if is_preformatted {
-                contents_ref.to_string()
+                html_escape(&contents_ref)
             } else {
                 let text = contents_ref.trim();
                 if text.is_empty() {
                     "".to_string()
                 } else {
-                    format!("{}{}\n", " ".repeat(indent), text)
+                    format!("{}{}\n", " ".repeat(indent), html_escape(text))
                 }
             }
         }
@@ -250,16 +265,13 @@ fn pretty_html_string(node: &Handle, indent: usize, is_preformatted: bool) -> St
                 .collect();
 
             let tag = name.local.as_ref();
-            let pre = tag == "script"
-                || tag == "style"
-                || tag == "pre"
-                || tag == "code"
-                || tag == "textarea";
+            let code = tag == "script" || tag == "style";
+            let pre = code || tag == "pre" || tag == "code" || tag == "textarea";
 
             if pre {
                 let mut s = format!("<{}{}>", name.local, attrs_string);
                 for child in node.children.borrow().iter() {
-                    s.push_str(&pretty_html_string(child, 0, true));
+                    s.push_str(&pretty_html_string(child, 0, true, code));
                 }
                 s.push_str(&format!("</{}>", name.local));
                 if is_preformatted {
@@ -272,7 +284,7 @@ fn pretty_html_string(node: &Handle, indent: usize, is_preformatted: bool) -> St
 
                 // Recurse into children
                 for child in node.children.borrow().iter() {
-                    s.push_str(&pretty_html_string(child, indent + 4, false));
+                    s.push_str(&pretty_html_string(child, indent + 4, false, false));
                 }
 
                 s.push_str(&format!("{}{}</{}>\n", " ".repeat(indent), "", name.local));
@@ -289,5 +301,5 @@ pub fn pretty_print_html(html_string: &str) -> String {
         .read_from(&mut html_string.as_bytes())
         .unwrap();
 
-    pretty_html_string(&dom.document, 0, false)
+    pretty_html_string(&dom.document, 0, false, false)
 }
