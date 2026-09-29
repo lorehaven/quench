@@ -24,7 +24,7 @@ steps = [{ anvil = "machete" }, { anvil = "audit" }, { anvil = "deny" }]
 name  = "semver-check"
 image = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
 # Every package here is published to `ennor` and consumed elsewhere (forge's
-# workspace.dependencies pulls all nine directly), so a breaking change in
+# workspace.dependencies pulls them directly), so a breaking change in
 # any of them is worth catching before it reaches a dependent's next build.
 #
 # conveyor's checkout is usually a shallow, single-commit clone - `anvil
@@ -44,6 +44,7 @@ steps = [
   { anvil = "semver-check -p quench-client" },
   { anvil = "semver-check -p quench-config" },
   { anvil = "semver-check -p quench-db" },
+  { anvil = "semver-check -p quench-mail" },
   { anvil = "semver-check -p quench-starter" },
   { anvil = "semver-check -p quench-web" },
   { anvil = "semver-check -p quench-web-components" },
