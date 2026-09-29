@@ -15,6 +15,7 @@ docs/
 ├── quench-db.md
 ├── quench-http.md
 ├── quench-log.md
+├── quench-mail.md
 ├── quench-starter.md
 ├── quench-web.md
 ├── quench-web-components.md
@@ -39,6 +40,7 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench Cache](./quench-cache.md) — shared in-process/Redis caching layer
 - [Quench Client](./quench-client.md) — shared authenticated HTTP client wrappers
 - [Quench Config](./quench-config.md) — typed config/env loading helper
+- [Quench Mail](./quench-mail.md) — MIME message builder and async SMTP submission client
 - [Quench CLI](./quench-cli.md) — shared terminal UI styling for CLI tools
 
 The `docker/*` services and several `cli/*` tools in the sibling [Forge](https://github.com/lorehaven/forge) repository depend on these crates, pulled in from the `ennor` cargo registry like any other dependency — see that repo's own docs for how they're used in practice.
@@ -78,6 +80,7 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ├── quench-http/            # lightweight poem-shaped HTTP framework
 ├── quench-http-macros/     # #[get]/#[post]/#[injectable]/... proc macros for quench-http
 ├── quench-log/             # console + rolling-file tracing subscriber
+├── quench-mail/            # MIME message builder + async SMTP submission client
 ├── quench-starter/         # service bootstrap (Actix and Quench Http)
 ├── quench-web/             # server-rendered HTML/CSS/JS page builder
 ├── quench-web-components/  # UI components built on quench-web

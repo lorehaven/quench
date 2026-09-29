@@ -8,6 +8,7 @@ packages = [
     "quench-config",
     "quench-db",
     "quench-log",
+    "quench-mail",
     "quench-starter",
     "quench-web",
     "quench-web-components",

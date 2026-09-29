@@ -9,6 +9,7 @@ members = [
   "quench-http",
   "quench-http-macros",
   "quench-log",
+  "quench-mail",
   "quench-starter",
   "quench-web",
   "quench-web-components",
@@ -68,6 +69,7 @@ quench-db = { path = "quench-db", registry = "ennor", version = "0.2.1" }
 quench-http = { path = "quench-http", registry = "ennor", version = "0.1.0" }
 quench-http-macros = { path = "quench-http-macros", registry = "ennor", version = "0.1.0" }
 quench-log = { path = "quench-log", registry = "ennor", version = "0.1.0" }
+quench-mail = { path = "quench-mail", registry = "ennor", version = "0.1.0" }
 quench-starter = { path = "quench-starter", registry = "ennor", version = "0.4.0" }
 quench-web = { path = "quench-web", registry = "ennor", version = "0.1.11" }
 quench-web-components = { path = "quench-web-components", registry = "ennor", version = "0.1.5" }
@@ -105,6 +107,7 @@ tracing-subscriber = { version = "0.3" }
 urlencoding = { version = "2.1" }
 uuid = { version = "1.26", features = ["v4"] }
 walkdir = { version = "2.5" }
+webpki-roots = { version = "1.0" }
 which = { version = "8.0" }
 
 [profile.release]

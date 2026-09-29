@@ -15,6 +15,7 @@ See [docs/](./docs/) for per-crate reference.
 - [Quench Cache](./docs/quench-cache.md) — shared in-process/Redis caching layer
 - [Quench Client](./docs/quench-client.md) — shared authenticated HTTP client wrappers
 - [Quench Config](./docs/quench-config.md) — typed config/env loading helper
+- [Quench Mail](./docs/quench-mail.md) — MIME message builder and async SMTP submission client
 - [Quench CLI](./docs/quench-cli.md) — shared terminal UI styling for CLI tools
 
 ## Build

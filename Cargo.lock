@@ -2475,6 +2475,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-mail"
+version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "chrono",
+ "rustls",
+ "thiserror",
+ "tokio",
+ "tokio-rustls",
+ "uuid",
+ "webpki-roots",
+]
+
+[[package]]
 name = "quench-starter"
 version = "0.4.2"
 dependencies = [
