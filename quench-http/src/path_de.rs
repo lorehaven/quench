@@ -25,10 +25,39 @@ impl de::Error for Error {
     }
 }
 
+/// Deserializes the captures into `T`. Values are percent-decoded first (a
+/// `%2f` in a capture becomes `/`, so a handler validating a name sees what
+/// the client meant, not the wire form); invalid UTF-8 is an error.
 pub(crate) fn from_params<T: de::DeserializeOwned>(
     params: &[(String, String)],
 ) -> Result<T, Error> {
-    T::deserialize(Params(params))
+    let decoded = params
+        .iter()
+        .map(|(name, value)| Ok((name.clone(), percent_decode(value)?)))
+        .collect::<Result<Vec<_>, Error>>()?;
+    T::deserialize(Params(&decoded))
+}
+
+fn percent_decode(value: &str) -> Result<String, Error> {
+    let bytes = value.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let hex = |b: u8| (b as char).to_digit(16);
+        if bytes[i] == b'%'
+            && let (Some(h), Some(l)) = (
+                bytes.get(i + 1).and_then(|b| hex(*b)),
+                bytes.get(i + 2).and_then(|b| hex(*b)),
+            )
+        {
+            out.push((h * 16 + l) as u8);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).map_err(|_| de::Error::custom("path parameter is not valid UTF-8"))
 }
 
 struct Params<'a>(&'a [(String, String)]);
@@ -296,6 +325,16 @@ mod tests {
         let v: (String, i64) = from_params(&p(&[("a", "n"), ("b", "-7")])).unwrap();
         assert_eq!(v, ("n".to_string(), -7));
         assert!(from_params::<(String, String)>(&p(&[("a", "n")])).is_err());
+    }
+
+    #[test]
+    fn captures_are_percent_decoded() {
+        assert_eq!(
+            from_params::<String>(&p(&[("n", "..%2fetc%20x")])).unwrap(),
+            "../etc x"
+        );
+        assert_eq!(from_params::<String>(&p(&[("n", "100%")])).unwrap(), "100%");
+        assert!(from_params::<String>(&p(&[("n", "%ff")])).is_err());
     }
 
     #[test]

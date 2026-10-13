@@ -42,8 +42,13 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Cheap to clone: clones share one connection pool.
 #[derive(Clone)]
 pub struct Client {
+    inner: Arc<Inner>,
+}
+
+struct Inner {
     pool: PoolClient<HttpsConnector<HttpConnector>, Full<Bytes>>,
     timeout: Option<Duration>,
 }
@@ -93,7 +98,7 @@ impl Client {
                 .map_err(|e| Error::Request(format!("{}: {e}", url.as_ref()))),
             headers: HeaderMap::new(),
             body: Bytes::new(),
-            timeout: self.timeout,
+            timeout: self.inner.timeout,
             error: None,
         }
     }
@@ -144,8 +149,10 @@ impl ClientBuilder {
             .build();
 
         Ok(Client {
-            pool: PoolClient::builder(TokioExecutor::new()).build(https),
-            timeout: self.timeout,
+            inner: Arc::new(Inner {
+                pool: PoolClient::builder(TokioExecutor::new()).build(https),
+                timeout: self.timeout,
+            }),
         })
     }
 }
@@ -313,6 +320,7 @@ async fn exchange(
             .map_err(|e| Error::Request(e.to_string()))?;
 
         let response = client
+            .inner
             .pool
             .request(request)
             .await
