@@ -1,4 +1,4 @@
-//! `Multipart` is the quench-http replacement for `actix-multipart`,
+//! `Multipart` reads `multipart/form-data` field by field,
 //! needed to migrate `sage-service`'s file upload endpoint (a `file` bytes
 //! field plus optional `conversation_id`/`project_id` text fields - see
 //! `docker/sage-service/src/routers/files.rs`'s `FileUploadForm`).

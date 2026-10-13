@@ -174,7 +174,11 @@ fn plan_migration(
         hasher.update(statement.as_bytes());
         hasher.update(b";\n");
     }
-    let checksum = hex::encode(hasher.finalize());
+    let checksum: String = hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
 
     Ok(PlannedMigration {
         id: format!("{}:{}", resolved.instance(), migration.id),

@@ -43,7 +43,7 @@ impl ConfigLoader {
         let content = fs::read_to_string(path)
             .map_err(|e| ConfigError::ReadError(format!("{}: {}", path, e)))?;
 
-        serde_yaml::from_str(&content)
+        serde_norway::from_str(&content)
             .map_err(|e| ConfigError::ParseError(format!("YAML parse error: {}", e)))
     }
 

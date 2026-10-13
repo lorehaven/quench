@@ -1,7 +1,6 @@
 use crate::styles::common::{content, elements, footer, header, modal, root};
 use crate::styling::css::CssRule;
 use std::fmt::{Display, Formatter};
-use strum_macros::EnumIter;
 
 pub mod bootstrap_dark;
 pub mod bootstrap_light;
@@ -20,7 +19,7 @@ pub trait ThemeSpec {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, EnumIter)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Theme {
     DefaultDark,
     DefaultLight,
@@ -40,6 +39,18 @@ impl Display for Theme {
 }
 
 impl Theme {
+    /// Every theme, in declaration order.
+    pub const ALL: [Theme; 4] = [
+        Theme::DefaultDark,
+        Theme::DefaultLight,
+        Theme::BootstrapDark,
+        Theme::BootstrapLight,
+    ];
+
+    pub fn iter() -> impl Iterator<Item = Theme> {
+        Self::ALL.into_iter()
+    }
+
     pub fn theme(theme: Self) -> String {
         match theme {
             Theme::DefaultDark => default_dark::DefaultDarkTheme::render(),

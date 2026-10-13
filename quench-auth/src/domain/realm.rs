@@ -5,9 +5,6 @@
 //! place those names are constructed - building them per service is what kept
 //! the old setup from being single sign-on.
 
-// Not `actix_web::cookie` (which is just `pub use cookie;` under the hood -
-// see actix-web's own lib.rs): depending on the standalone crate directly
-// is what makes this module usable from the quench-http side too.
 use cookie::{Cookie, SameSite, time::Duration};
 
 pub const DEFAULT_AUTH_SCHEMA: &str = "auth";
@@ -56,7 +53,10 @@ fn gatehouse_endpoint(path: &str, return_to: Option<&str>) -> Option<String> {
     let base = gatehouse_url()?;
     Some(match return_to {
         Some(target) if !target.is_empty() => {
-            format!("{base}{path}?redirect={}", urlencoding::encode(target))
+            format!(
+                "{base}{path}?redirect={}",
+                crate::domain::percent::encode(target)
+            )
         }
         _ => format!("{base}{path}"),
     })
@@ -99,7 +99,7 @@ pub fn cleared_refresh_cookie() -> Cookie<'static> {
 }
 
 fn realm_cookie(name: String, value: String, max_age: Option<Duration>) -> Cookie<'static> {
-    let mut builder = Cookie::build(name, value)
+    let mut builder = Cookie::build((name, value))
         .path("/")
         .http_only(true)
         .same_site(SameSite::Lax)
@@ -110,11 +110,11 @@ fn realm_cookie(name: String, value: String, max_age: Option<Duration>) -> Cooki
     if let Some(max_age) = max_age {
         builder = builder.max_age(max_age);
     }
-    builder.finish()
+    builder.build()
 }
 
 fn cleared_cookie(name: String) -> Cookie<'static> {
-    let mut builder = Cookie::build(name, "")
+    let mut builder = Cookie::build((name, ""))
         .path("/")
         .http_only(true)
         .same_site(SameSite::Lax)
@@ -123,30 +123,30 @@ fn cleared_cookie(name: String) -> Cookie<'static> {
     if let Some(domain) = cookie_domain() {
         builder = builder.domain(domain);
     }
-    builder.finish()
+    builder.build()
 }
 
 /// A short-lived, unnamed-elsewhere cookie for the authorize round trip.
 /// Deliberately not domain-scoped even when `AUTH_COOKIE_DOMAIN` is set: it is
 /// read back by the exact host that set it, never another relying party.
 pub fn authorize_state_cookie(value: impl Into<String>) -> Cookie<'static> {
-    Cookie::build(AUTHORIZE_STATE_COOKIE, value.into())
+    Cookie::build((AUTHORIZE_STATE_COOKIE, value.into()))
         .path("/")
         .http_only(true)
         .same_site(SameSite::Lax)
         .secure(true)
         .max_age(Duration::minutes(5))
-        .finish()
+        .build()
 }
 
 pub fn cleared_authorize_state_cookie() -> Cookie<'static> {
-    Cookie::build(AUTHORIZE_STATE_COOKIE, "")
+    Cookie::build((AUTHORIZE_STATE_COOKIE, ""))
         .path("/")
         .http_only(true)
         .same_site(SameSite::Lax)
         .secure(true)
         .max_age(Duration::seconds(0))
-        .finish()
+        .build()
 }
 
 /// This service's own mount point (`BASE_PATH`), normalized to either `/` or

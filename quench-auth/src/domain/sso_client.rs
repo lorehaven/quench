@@ -1,16 +1,13 @@
 //! The framework-agnostic half of the relying-party side of the
 //! authorization-code + PKCE flow: config, the token-refresh HTTP call, and
 //! the PKCE state shape. The parts that build a redirect response or read
-//! the incoming request (`authorize_redirect`, `callback`, ...) stay
-//! per-framework - see `crate::actix::domain::sso_client` and
-//! `crate::http::domain::sso_client` - since they're the only parts that
-//! actually touch `HttpRequest`/`HttpResponse` (or quench-http's
-//! equivalents).
+//! the incoming request (`authorize_redirect`, `callback`, ...) live
+//! in `crate::http::domain::sso_client`, since they're the only parts that
+//! touch the request / response types.
 
 use crate::domain::realm;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
@@ -68,7 +65,7 @@ pub async fn refresh(refresh_token: &str) -> Option<RefreshedTokens> {
     let tls_verify: bool = envmnt::get_or("GATEHOUSE_TLS_VERIFY", "true")
         .parse()
         .unwrap_or(true);
-    let client = reqwest::Client::builder()
+    let client = quench_client::transport::Client::builder()
         .danger_accept_invalid_certs(!tls_verify)
         .build()
         .ok()?;
@@ -90,6 +87,6 @@ pub async fn refresh(refresh_token: &str) -> Option<RefreshedTokens> {
 
 pub(crate) fn random_urlsafe(bytes: usize) -> String {
     let mut buf = vec![0u8; bytes];
-    rand::thread_rng().fill_bytes(&mut buf);
+    getrandom::fill(&mut buf).expect("the OS random source is available");
     URL_SAFE_NO_PAD.encode(buf)
 }

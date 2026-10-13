@@ -1,4 +1,4 @@
-//! Mirrors the coverage intent of the actix `RequireWrite` tests: safe
+//! `RequireWrite`: safe
 //! methods always pass, a write needs the permission, and mounting order
 //! (`Auth` outermost) is what makes `Claims` visible to this middleware.
 

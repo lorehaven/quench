@@ -17,4 +17,3 @@ path = "src/lib.rs"
 
 [dependencies]
 quench-web = { workspace = true }
-strum = { workspace = true }

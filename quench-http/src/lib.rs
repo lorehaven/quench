@@ -1,6 +1,5 @@
-//! Quench's own HTTP framework: a lightweight (poem-shaped, not
-//! actix-shaped) core, routing that keeps actix-router's regex-constrained
-//! wildcard path segments (needed for the docker registry / cargo sparse
+//! Quench's own HTTP framework: a lightweight (poem-shaped) core,
+//! routing with regex-style wildcard path segments (`{name:.+}`) (needed for the docker registry / cargo sparse
 //! index APIs), annotation-driven route and component discovery
 //! (`#[get]`/`#[post]`/... and `#[injectable]`, via `inventory` - no
 //! per-service `.service(...)` registration list to maintain), and a real
@@ -26,6 +25,8 @@ pub mod error;
 pub mod extract;
 pub mod middleware;
 pub mod multipart;
+mod path_de;
+mod pattern;
 pub mod request;
 pub mod response;
 pub mod route;

@@ -1,5 +1,14 @@
-use crossterm::style::Stylize;
 use std::io::Write;
+
+/// `text` wrapped in the SGR `codes` (e.g. `"1;96"`), or untouched when the
+/// `NO_COLOR` convention (https://no-color.org) asks for plain output.
+fn paint(codes: &str, text: impl std::fmt::Display) -> String {
+    if std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()) {
+        text.to_string()
+    } else {
+        format!("\x1b[{codes}m{text}\x1b[0m")
+    }
+}
 
 pub enum Tone {
     Info,
@@ -24,30 +33,30 @@ pub fn print_box_banner(title: &str, subtitle: &str) {
     let border = "┌─────────────────────────────────────────────┐";
     let bottom = "└─────────────────────────────────────────────┘";
 
-    println!("{}", border.dark_cyan());
-    println!("{}", format!("│ {:<43} │", title).white().bold());
-    println!("{}", format!("│ {:<43} │", subtitle).dark_grey());
-    println!("{}", bottom.dark_cyan());
+    println!("{}", paint("36", border));
+    println!("{}", paint("1;97", format!("│ {:<43} │", title)));
+    println!("{}", paint("90", format!("│ {:<43} │", subtitle)));
+    println!("{}", paint("36", bottom));
 }
 
 pub fn print_status(tone: Tone, label: &str, message: &str) {
     let styled_label = match tone {
-        Tone::Info => label.cyan().bold(),
-        Tone::Success => label.green().bold(),
-        Tone::Warn => label.yellow().bold(),
-        Tone::Error => label.red().bold(),
+        Tone::Info => paint("1;96", label),
+        Tone::Success => paint("1;92", label),
+        Tone::Warn => paint("1;93", label),
+        Tone::Error => paint("1;91", label),
     };
 
-    println!("{} {}", styled_label, message.white());
+    println!("{} {}", styled_label, paint("97", message));
 }
 
 pub fn print_component_preview(name: &str, description: &str) {
-    let head = format!("[{name}]").cyan().bold();
-    println!("{} {}", head, description.white());
+    let head = paint("1;96", format!("[{name}]"));
+    println!("{} {}", head, paint("97", description));
 }
 
 pub fn repl_prompt(app: &str, context: &str) -> String {
-    format!("{}({})> ", app.cyan().bold(), context.dark_grey())
+    format!("{}({})> ", paint("1;96", app), paint("90", context))
 }
 
 pub fn print_line(message: impl AsRef<str>) {

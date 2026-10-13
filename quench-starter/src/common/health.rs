@@ -3,8 +3,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Tracks liveness/readiness independently of the HTTP framework in front
-/// of it - both `actix::routers::health` and `http::routers::health` wrap
-/// the same state.
+/// of it; `http::routers::health` exposes it.
 #[derive(Clone, Default)]
 pub struct HealthState {
     live: Arc<AtomicBool>,

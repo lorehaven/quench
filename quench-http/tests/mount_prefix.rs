@@ -1,7 +1,6 @@
 //! `mount` is what lets a service's whole route tree sit under a
 //! runtime-configured `BASE_PATH` (an env var, so it can't be baked into
-//! the `&'static str` route patterns `#[get]`/... register) - the
-//! quench-http equivalent of actix-web's `web::scope(&base_path)`.
+//! the `&'static str` route patterns `#[get]`/... register).
 
 use bytes::Bytes;
 use http::{HeaderMap, Method, StatusCode, Uri};

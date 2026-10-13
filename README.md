@@ -8,7 +8,7 @@ See [docs/](./docs/) for per-crate reference.
 
 - [Quench Auth](./docs/quench-auth.md) — relying-party token/session verification
 - [Quench Http](./docs/quench-http.md) — lightweight, `poem`-shaped HTTP framework: annotation-discovered routing, dependency injection, plain-async middleware
-- [Quench Starter](./docs/quench-starter.md) — service bootstrap (TLS, base-path scoping, health, DB wiring), for both the Actix and Quench Http stacks
+- [Quench Starter](./docs/quench-starter.md) — service bootstrap (TLS, base-path scoping, health, DB wiring)
 - [Quench Web](./docs/quench-web.md) — dependency-light server-rendered HTML/CSS/JS page builder
 - [Quench Web Components](./docs/quench-web-components.md) — higher-level UI builders on top of Quench Web
 - [Quench DB](./docs/quench-db.md) — ORM/CRUD abstraction plus a migration catalog engine

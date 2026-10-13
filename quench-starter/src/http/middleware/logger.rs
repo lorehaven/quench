@@ -1,7 +1,5 @@
-//! Ported from `crate::actix::middleware::logger::FilteredLogger`. The
-//! actix version needed a `Transform`/`Service` pair (~60 lines) to get an
-//! around-the-request hook; `quench_http::Middleware` is the same shape as
-//! a `tower`/`poem` middleware - one `async fn`.
+//! Request logging that skips noisy paths (health probes, assets).
+//! `quench_http::Middleware` is a single `async fn` around the endpoint.
 
 use async_trait::async_trait;
 use quench_http::prelude::{Endpoint, Middleware, Request, Response};

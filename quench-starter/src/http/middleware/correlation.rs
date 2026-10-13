@@ -1,13 +1,9 @@
-//! Ported from `crate::actix::middleware::correlation`. Same behavior:
-//! propagate an inbound `x-correlation-id` or mint one, echo it on the
+//! Propagate an inbound `x-correlation-id` or mint one, echo it on the
 //! response, and record it on the current tracing span.
 //!
-//! Known gap vs. the actix version: it also stashed the id in
-//! `HttpMessage::extensions()` so a handler could read it back
-//! (`get_correlation_id`). `quench_http::Request` has no typed
-//! per-request extension map yet, so that accessor isn't ported - add one
-//! if/when a handler actually needs to read its own correlation id rather
-//! than just having it flow through the tracing span.
+//! The id is not stashed in the request's extensions, so a handler can't
+//! read it back - add that if a handler ever needs its own correlation id
+//! rather than just having it flow through the tracing span.
 
 use async_trait::async_trait;
 use quench_http::prelude::{Endpoint, Middleware, Request, Response};
@@ -35,8 +31,8 @@ impl Middleware for CorrelationId {
 
 /// Helper to inject correlation ID into outgoing HTTP requests.
 pub fn inject_correlation_id_header(
-    builder: reqwest::RequestBuilder,
+    builder: quench_client::transport::RequestBuilder,
     correlation_id: &str,
-) -> reqwest::RequestBuilder {
+) -> quench_client::transport::RequestBuilder {
     builder.header(CORRELATION_ID_HEADER, correlation_id)
 }

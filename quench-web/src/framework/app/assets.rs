@@ -2,7 +2,6 @@ use super::i18n::available_locales;
 use crate::Theme;
 use crate::framework::app::i18n::generate_translations_js;
 use crate::framework::theme_shared;
-use strum::IntoEnumIterator;
 
 pub fn create_asset_files(default_theme: Theme, resources_prefix: &str) {
     let supported_themes = Theme::iter().collect::<Vec<_>>();

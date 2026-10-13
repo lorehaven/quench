@@ -4,7 +4,7 @@ use crate::response::Response;
 use async_trait::async_trait;
 
 /// The unit of request handling - poem/tower-flavored (a plain async
-/// `call`), not actix's `Service`/`Transform` pair. `#[get]`/`#[post]`/...
+/// `call`). `#[get]`/`#[post]`/...
 /// expands a handler function into one of these; middleware wraps one
 /// `Endpoint` in another.
 #[async_trait]

@@ -1,7 +1,6 @@
 use super::i18n::available_locales;
 use super::scripts::{locale_script, session_script, theme_script};
 use crate::{Element, Link, PageBuilder, Script, Theme, div};
-use strum::IntoEnumIterator;
 
 /// How often a page asks whether its session is still good.
 ///

@@ -1,7 +1,4 @@
-use argon2::{
-    Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
-    password_hash::{SaltString, rand_core::OsRng},
-};
+use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use chrono::{DateTime, Duration, Utc};
 use quench_db::prelude::{Crud, Db, Model, Repository};
 use serde::{Deserialize, Serialize};
@@ -166,9 +163,8 @@ impl User {
     }
 
     pub fn hash_password(password: &str) -> anyhow::Result<String> {
-        let salt = SaltString::generate(&mut OsRng);
         Ok(Argon2::default()
-            .hash_password(password.as_bytes(), &salt)
+            .hash_password(password.as_bytes())
             .map_err(|err| anyhow::anyhow!("failed to hash password: {err}"))?
             .to_string())
     }

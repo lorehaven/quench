@@ -1,8 +1,6 @@
-//! quench-http counterpart to `crate::actix` - same bootstrap shape
-//! (base-path scope, health/readiness, swagger redirect, UI base-path/root
-//! redirects, filtered logger + correlation-id middleware, TLS with an
-//! HTTP->HTTPS redirect server), rebuilt on `quench_http` instead of
-//! `actix-web`.
+//! Service bootstrap on `quench_http`: base-path scope, health/readiness,
+//! swagger redirect, UI base-path/root redirects, filtered logger +
+//! correlation-id middleware, TLS with an HTTP->HTTPS redirect server.
 
 pub mod domain;
 pub mod middleware;
@@ -192,8 +190,8 @@ struct RedirectToHttps {
 #[async_trait]
 impl Endpoint for RedirectToHttps {
     async fn call(&self, req: Request) -> Response {
-        // Reads the `Host` header directly rather than actix's
-        // `connection_info()` (which also honors `X-Forwarded-Host`) - fine
+        // Reads the `Host` header directly rather than honoring
+        // `X-Forwarded-Host` - fine
         // for a redirect server sitting directly in front of the HTTPS
         // listener; add forwarded-header handling here if this ever sits
         // behind another proxy.

@@ -16,12 +16,8 @@ name = "quench_starter"
 path = "src/lib.rs"
 
 [dependencies]
-actix-service = { workspace = true }
-actix-web = { workspace = true }
 async-trait = { workspace = true }
 bytes = { version = "1.12" }
-dotenvy = { workspace = true }
-futures-util = { workspace = true }
 envmnt = { workspace = true }
 quench-cli = { workspace = true }
 quench-auth = { workspace = true }
@@ -29,7 +25,7 @@ quench-db = { workspace = true }
 quench-http = { workspace = true }
 quench-log = { workspace = true }
 quench-web = { workspace = true }
-reqwest = { workspace = true }
+quench-client = { workspace = true }
 rustls = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

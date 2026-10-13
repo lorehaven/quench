@@ -1,8 +1,8 @@
 # Quench Http
 
-`quench-http` (crate `quench_http`) is Forge's own HTTP framework — a lightweight, `poem`-shaped alternative to `actix-web`. It exists because Forge's services needed three things actix didn't give them cleanly: middleware and extractors without `Service`/`Transform` boilerplate, dependency injection that resolves a real graph instead of threading `Arc`s through every scope by hand, and route/component *discovery* — annotate a function and it's wired in, no `.service(handler)` list to keep in sync. Routing is still built on `actix-router` under the hood (a standalone crate, no dependency on the rest of actix), specifically so the regex-constrained, multi-segment wildcard segments Forge's Docker registry and crates-index endpoints need (`/{name:.+}/blobs/{digest}`) keep working exactly as written — a plain radix-tree router (what most minimal Rust frameworks use) can't express those.
+`quench-http` (crate `quench_http`) is Forge's own HTTP framework — a lightweight, `poem`-shaped HTTP framework. It exists because Forge's services needed three things: middleware and extractors without `Service`/`Transform` boilerplate, dependency injection that resolves a real graph instead of threading `Arc`s through every scope by hand, and route/component *discovery* — annotate a function and it's wired in, no `.service(handler)` list to keep in sync. Routing uses a small built-in matcher (`src/pattern.rs`, no regex dependency) that supports the multi-segment wildcard segments Forge's Docker registry and crates-index endpoints need (`/{name:.+}/blobs/{digest}`) — a plain radix-tree router (what most minimal Rust frameworks use) can't express those.
 
-If you know `actix-web` or `poem`, the shapes will feel familiar: an `Endpoint` trait instead of `Service`, a `Middleware` trait that's a plain `async fn` instead of a `Transform`/`Service` pair, and extractors (`Path`, `Query`, `Json`, ...) that work as handler parameters the same way. The two things that don't have a direct equivalent in either are the annotation-driven discovery (`#[get]`/`#[injectable]`, no manual registration) and the dependency-injection container.
+If you know `poem` or `tower`, the shapes will feel familiar: an `Endpoint` trait instead of `Service`, a `Middleware` trait that's a plain `async fn` and extractors (`Path`, `Query`, `Json`, ...) that work as handler parameters the same way. The two things that don't have a direct equivalent are the annotation-driven discovery (`#[get]`/`#[injectable]`, no manual registration) and the dependency-injection container.
 
 This page is a guide, not just a reference — it builds up feature by feature the way `examples/http_demo` (a runnable version of everything below) does. For the fuller production-service shape — health checks, base-path scoping, TLS, auth middleware — see [Quench Starter](./quench-starter.md) and [Quench Auth](./quench-auth.md), and [Example: Forge Service Demo](./examples/forge_service_demo.md) for how they compose with this crate.
 
@@ -55,7 +55,7 @@ async fn get_user(Path(id): Path<u64>) -> String {
 async fn create_user(Json(body): Json<NewUser>) -> Json<User> { /* ... */ }
 ```
 
-`#[get]`, `#[post]`, `#[put]`, `#[delete]`, `#[patch]` all work the same way. Path patterns use `actix-router` syntax:
+`#[get]`, `#[post]`, `#[put]`, `#[delete]`, `#[patch]` all work the same way. Path patterns are literal text plus `{name}`, `{name:.+}` and `{name:.*}` (any other `:constraint` panics at registration):
 
 | Pattern | Matches |
 |---|---|
@@ -67,7 +67,7 @@ async fn create_user(Json(body): Json<NewUser>) -> Json<User> { /* ... */ }
 
 Every handler discovered anywhere in the linked binary is assembled into one `Router` by `discover_routes()`. A path that matches but not for the requested method answers `405`; a path that matches nothing answers `404`.
 
-When two patterns can both match the same request (a static route and a wildcard covering the same prefix, like a sparse index's `/config.json` next to a catch-all `/{path:.*}`), the first one *registered* wins - same rule actix-web's own `.service()` ordering follows. Registration order for `#[get]`/... handlers is link order, which is usually source order within one crate; across crates it's link order between them, which isn't something you control directly - see [Quench Starter's registration-order caveat](./quench-starter.md#a-registration-order-caveat-on-the-quench-http-stack) for the concrete case this hits (a service's own catch-all route vs. `quench-starter`'s built-in ones).
+When two patterns can both match the same request (a static route and a wildcard covering the same prefix, like a sparse index's `/config.json` next to a catch-all `/{path:.*}`), the first one *registered* wins . Registration order for `#[get]`/... handlers is link order, which is usually source order within one crate; across crates it's link order between them, which isn't something you control directly - see [Quench Starter's registration-order caveat](./quench-starter.md#a-registration-order-caveat-on-the-quench-http-stack) for the concrete case this hits (a service's own catch-all route vs. `quench-starter`'s built-in ones).
 
 ### Mounting under a prefix
 
@@ -204,14 +204,14 @@ impl Middleware for RequestLogger {
 let app = wrap(router, RequestLogger);
 ```
 
-`wrap(inner, m)` makes `m` the new outermost layer: `wrap(wrap(inner, a), b)` runs `b`, then `a`, then `inner` - the last `wrap` call is outermost, the *opposite* of actix-web's `.wrap()` (which runs the last-registered one first). This matters when ordering is load-bearing, e.g. `quench-auth`'s `Auth`/`RequireWrite` pair - `RequireWrite` reads the `Claims` `Auth` inserts, so `Auth` has to run first, which here means it's the outer layer:
+`wrap(inner, m)` makes `m` the new outermost layer: `wrap(wrap(inner, a), b)` runs `b`, then `a`, then `inner` - the last `wrap` call is outermost. This matters when ordering is load-bearing, e.g. `quench-auth`'s `Auth`/`RequireWrite` pair - `RequireWrite` reads the `Claims` `Auth` inserts, so `Auth` has to run first, which here means it's the outer layer:
 
 ```rust
 let app = wrap(routes, RequireWrite::new(config.clone()));
 let app = wrap(app, Auth::new(config)); // outermost: runs first
 ```
 
-Middleware that needs to hand a handler some per-request data - decoded auth claims, a request ID - stashes it via `req.extensions_mut().insert(value)`; a handler reads it back with the `Extension<T>` extractor. This is deliberately distinct from `Inject<T>`: `Extension` is fresh data set on *this* request, `Inject` is a shared service the container resolved once - the same split `axum` (`State` vs `Extension`) and `actix-web` (`web::Data` vs `HttpMessage::extensions()`) both make.
+Middleware that needs to hand a handler some per-request data - decoded auth claims, a request ID - stashes it via `req.extensions_mut().insert(value)`; a handler reads it back with the `Extension<T>` extractor. This is deliberately distinct from `Inject<T>`: `Extension` is fresh data set on *this* request, `Inject` is a shared service the container resolved once - the same `State` vs `Extension` split other frameworks make.
 
 ### Scoping middleware to part of the app
 
@@ -242,7 +242,7 @@ let app = wrap(app, OnPathPrefix { prefix: "/api/", inner: Auth::new(config) });
 
 ## Body size limits
 
-`Json`, `Bytes`, and `Multipart` all cap how much they'll buffer, using the same knob: [`BodyLimit`](#dependency-injection), seeded once via `ContainerBuilder::provide` - the quench-http equivalent of actix-web's `web::PayloadConfig::new(n)`. Nothing provided falls back to `DEFAULT_BODY_LIMIT` (2 MiB).
+`Json`, `Bytes`, and `Multipart` all cap how much they'll buffer, using the same knob: [`BodyLimit`](#dependency-injection), seeded once via `ContainerBuilder::provide`. Nothing provided falls back to `DEFAULT_BODY_LIMIT` (2 MiB).
 
 ```rust
 let container = ContainerBuilder::new()
@@ -260,7 +260,7 @@ async fn upload_report(Limited(Json(report)): Limited<Json<Report>, 10_000_000>)
 
 ## Multipart uploads
 
-`Multipart` reads a `multipart/form-data` body field by field - no derive macro, like `axum`'s `Multipart` rather than `actix-multipart`'s `#[derive(MultipartForm)]`:
+`Multipart` reads a `multipart/form-data` body field by field - no derive macro:
 
 ```rust
 #[post("/upload")]

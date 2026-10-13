@@ -1,11 +1,7 @@
-//! Ported from `crate::actix::middleware::auth`. Same rules: bearer header
-//! or realm session cookie, with a silent refresh-token exchange when the
-//! access token is gone but the refresh token isn't; same unauthorized
-//! behavior (redirect for a browser, 401 for an API caller). The one real
-//! difference is where `Claims` lands for a handler to read: actix stashed
-//! them in `ServiceRequest::extensions_mut()`; here it's
-//! `Request::extensions_mut()` - see `crate::http`'s module doc for why
-//! quench-http needed that added at all.
+//! Bearer header or realm session cookie, with a silent refresh-token exchange when the
+//! access token is gone but the refresh token isn't; unauthorized
+//! requests get a redirect for a browser and a 401 for an API caller.
+//! `Claims` land in `Request::extensions_mut()` for a handler to read.
 //!
 //! `SessionDb` comes from the DI container (`req.container().get::<SessionDb>()`)
 //! rather than `app_data`, which is the quench-http equivalent - a service

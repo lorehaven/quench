@@ -17,7 +17,9 @@ pub struct GeneratedSigningKey {
 }
 
 pub fn generate_signing_key() -> GeneratedSigningKey {
-    let signing_key = SigningKey::generate(&mut rand_core::OsRng);
+    let mut seed = [0u8; 32];
+    getrandom::fill(&mut seed).expect("the OS random source is available");
+    let signing_key = SigningKey::from_bytes(&seed);
     let private_key_der = signing_key
         .to_pkcs8_der()
         .expect("an Ed25519 key always encodes to PKCS8 DER")

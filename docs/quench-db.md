@@ -1,6 +1,6 @@
 # Quench Db
 
-`quench-db` (crate `quench_db`) is a small ORM and database abstraction layer used across the Forge estate's Actix services. It provides a generic `Database` trait plus a `Model`/`Crud` pair for simple CRUD access over Postgres (via `sqlx`) or an in-memory backend, and — separately — a versioned migration catalog, planner and runner used to install and evolve database schemas. `quench-starter` re-exports `quench-db` as part of its `DbWrapper` bootstrap, and `foundry-service` is the dedicated job that drives the migration catalog against a real database.
+`quench-db` (crate `quench_db`) is a small ORM and database abstraction layer used across the Forge estate's services. It provides a generic `Database` trait plus a `Model`/`Crud` pair for simple CRUD access over Postgres (via `sqlx`) or an in-memory backend, and — separately — a versioned migration catalog, planner and runner used to install and evolve database schemas. `quench-starter` re-exports `quench-db` as part of its `DbWrapper` bootstrap, and `foundry-service` is the dedicated job that drives the migration catalog against a real database.
 
 ## Public API / Key Types
 

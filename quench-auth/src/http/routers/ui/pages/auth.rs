@@ -1,8 +1,5 @@
-//! Sending a browser to gatehouse. Ported from
-//! `crate::actix::routers::ui::pages::auth`; see that module's doc comment
-//! for what this is for. Uses `crate::domain::realm::ui_path` directly
-//! rather than the actix version's private duplicate of the same
-//! normalization.
+//! Sending a browser to gatehouse. Uses `crate::domain::realm::ui_path`
+//! for the base-path normalization.
 
 use crate::domain::jwt::JwtConfig;
 use crate::domain::realm;
@@ -37,8 +34,13 @@ impl AuthStatus {
     }
 }
 
-/// Answers "is the cookie I am holding still worth anything". Always a
-/// `200` - see the actix version's doc comment for why.
+/// Answers "is the cookie I am holding still worth anything".
+///
+/// Always a `200`: this is a question about the session, not a request that
+/// needs one, and answering `401` would make every watcher's error handling
+/// carry the meaning instead of the body. Reads the cookie and the signature
+/// only - the shared-store check is `is_ui_authenticated`'s job, on the
+/// requests that matter.
 pub async fn auth_status(request: &Request, config: &JwtConfig) -> Response {
     if !config.auth_enabled {
         return json(&AuthStatus {
@@ -67,9 +69,12 @@ pub async fn auth_status(request: &Request, config: &JwtConfig) -> Response {
     }
 }
 
-/// Exchanges this browser's refresh cookie for a fresh token pair. See the
-/// actix version's doc comment for why this proxies through the service
-/// rather than letting the browser call gatehouse directly.
+/// Exchanges this browser's refresh cookie for a fresh token pair.
+///
+/// Gatehouse is a distinct origin with no CORS policy open to relying
+/// parties, and the refresh cookie is `SameSite=Lax`, so the browser cannot
+/// call gatehouse directly; this service does it on the browser's behalf and
+/// hands back only its own new cookies.
 pub async fn refresh_delegation(request: &Request) -> Response {
     let Some(refresh_token) = cookie_value(request, &realm::refresh_cookie_name()) else {
         return Response::new(StatusCode::UNAUTHORIZED);
@@ -148,7 +153,7 @@ fn gatehouse_not_configured() -> Response {
 
 /// Best-effort absolute URL for `path` on this service - see
 /// `crate::http::domain::sso_client`'s own `absolute_url` for the same
-/// simplification vs. actix's `connection_info()`.
+/// simplification (no legacy `Forwarded` header).
 fn absolute_url(request: &Request, path: &str) -> String {
     let scheme = request.header("x-forwarded-proto").unwrap_or("https");
     let host = request
@@ -167,7 +172,7 @@ pub fn redirect_target(request: &Request) -> Option<String> {
         let (key, value) = pair.split_once('=')?;
         (key == "redirect").then_some(value)
     })?;
-    let decoded = urlencoding::decode(raw).ok()?.into_owned();
+    let decoded = crate::domain::percent::decode(raw)?;
     validated_redirect(&decoded)
 }
 

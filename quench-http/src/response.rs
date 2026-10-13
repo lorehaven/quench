@@ -119,8 +119,7 @@ impl Response {
 
     /// A chunked response body driven by `stream`: each `Ok` item becomes
     /// one chunk, an `Err` ends the stream (hyper closes the connection
-    /// having already sent the headers, the same way actix-web's
-    /// `.streaming()` does on a mid-stream error). What
+    /// having already sent the headers). What
     /// `GpuBroadcaster`/`VllmBroadcaster`-style SSE endpoints port to -
     /// format each item as `event: ...\ndata: ...\n\n` before handing it
     /// in, and set `content-type: text/event-stream` via

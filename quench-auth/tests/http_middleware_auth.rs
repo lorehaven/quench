@@ -1,6 +1,4 @@
-//! Same scenarios as `tests/unit/actix_middleware_auth_tests.rs`, against
-//! the quench-http port - proof the port is behaviorally equivalent, not
-//! just that it compiles.
+//! `Auth` middleware scenarios against quench-http.
 
 use bytes::Bytes;
 use http::{HeaderMap, Method, StatusCode, Uri};

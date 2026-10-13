@@ -1,7 +1,7 @@
 use crate::endpoint::Endpoint;
+use crate::pattern::Pattern;
 use crate::request::Request;
 use crate::response::Response;
-use actix_router::Router as InnerRouter;
 use async_trait::async_trait;
 use http::{Method, StatusCode};
 use std::collections::HashMap;
@@ -14,11 +14,11 @@ struct RouteEntry {
 }
 
 /// Matches a request path (including the regex-constrained, multi-segment
-/// wildcards actix-router supports - `/{name:.+}/blobs/{digest}` and
-/// friends - unchanged from the actix-web route strings they're ported
-/// from) to a registered handler.
+/// wildcards - `/{name:.+}/blobs/{digest}` and friends, see
+/// [`crate::pattern`]) to a registered handler. Patterns are tried in
+/// registration order.
 pub struct Router {
-    inner: InnerRouter<RouteEntry>,
+    routes: Vec<(Pattern, RouteEntry)>,
 }
 
 impl Router {
@@ -29,11 +29,19 @@ impl Router {
     /// Dispatches to the matching handler. 404s when no pattern matches the
     /// path at all, 405s when the path matches but not for this method.
     pub async fn dispatch(&self, mut req: Request) -> Response {
-        match self.inner.recognize(&mut req.params) {
-            Some((entry, _id)) => match entry.handlers.iter().find(|(m, _)| m == req.method()) {
-                Some((_, endpoint)) => endpoint.call(req).await,
-                None => Response::text(StatusCode::METHOD_NOT_ALLOWED, "method not allowed"),
-            },
+        let matched = self
+            .routes
+            .iter()
+            .find_map(|(pattern, entry)| Some((pattern.matches(req.routed_path())?, entry)));
+
+        match matched {
+            Some((params, entry)) => {
+                req.params = params;
+                match entry.handlers.iter().find(|(m, _)| m == req.method()) {
+                    Some((_, endpoint)) => endpoint.call(req).await,
+                    None => Response::text(StatusCode::METHOD_NOT_ALLOWED, "method not allowed"),
+                }
+            }
             None => Response::not_found(),
         }
     }
@@ -67,7 +75,7 @@ impl Endpoint for Mount {
             return Response::not_found();
         }
 
-        req.skip_prefix(self.prefix.len() as u16);
+        req.skip_prefix(self.prefix.len());
         self.inner.call(req).await
     }
 }
@@ -86,13 +94,12 @@ pub fn mount(prefix: impl Into<String>, inner: Arc<dyn Endpoint>) -> Arc<dyn End
 /// Builds a [`Router`]. Patterns that can overlap (a static route and a
 /// trailing wildcard covering the same prefix, as in the crates sparse
 /// index's `/config.json` vs `/{path:.*}`) are matched in *registration*
-/// order, same as actix-web's `.service()` order - register the specific
-/// ones first.
+/// order - register the specific ones first.
 #[derive(Default)]
 pub struct RouterBuilder {
     // Path pattern -> index into `routes`, so registering a second method on
     // an already-seen pattern extends its handler list instead of shadowing
-    // it (actix-router itself only matches on path, not method).
+    // it (matching is on path first, method second).
     index: HashMap<&'static str, usize>,
     routes: Vec<(&'static str, RouteEntry)>,
 }
@@ -120,12 +127,12 @@ impl RouterBuilder {
     }
 
     pub fn finish(self) -> Router {
-        let mut builder = InnerRouter::build();
-        for (pattern, entry) in self.routes {
-            builder.path(pattern, entry);
-        }
         Router {
-            inner: builder.finish(),
+            routes: self
+                .routes
+                .into_iter()
+                .map(|(pattern, entry)| (Pattern::parse(pattern), entry))
+                .collect(),
         }
     }
 }

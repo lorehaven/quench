@@ -16,10 +16,8 @@ name = "quench_http"
 path = "src/lib.rs"
 
 [dependencies]
-actix-router = { workspace = true }
 async-trait = { workspace = true }
 bytes = { version = "1.12" }
-bytestring = { workspace = true }
 http = { workspace = true }
 futures-util = { workspace = true }
 http-body-util = { workspace = true }

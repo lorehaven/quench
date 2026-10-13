@@ -1,7 +1,5 @@
 use crate::body::InboundBody;
 use crate::di::Container;
-use actix_router::Path as RoutedPath;
-use bytestring::ByteString;
 use http::{Extensions, HeaderMap, Method, Uri};
 use std::sync::Arc;
 
@@ -10,15 +8,16 @@ use std::sync::Arc;
 /// body, a handle to the application's dependency container so extractors
 /// can pull injected *services* out of it, and a per-request extension map
 /// for *data* a middleware wants a handler to see (decoded auth claims, a
-/// correlation id, ...) - the same `Inject`/`Extension` split axum and
-/// actix-web (`web::Data` vs `HttpMessage::extensions()`) both make, for the
-/// same reason: a service is one shared instance the container resolves
+/// correlation id, ...) - the `Inject`/`Extension` split, for the
+/// reason that a service is one shared instance the container resolves
 /// once, a claims struct is fresh per request and has nowhere else to live.
 pub struct Request {
     method: Method,
     uri: Uri,
     headers: HeaderMap,
-    pub(crate) params: RoutedPath<ByteString>,
+    pub(crate) params: Vec<(String, String)>,
+    /// Bytes of the URI path already consumed by [`crate::router::mount`].
+    prefix_skip: usize,
     body: Option<InboundBody>,
     container: Arc<Container>,
     extensions: Extensions,
@@ -32,12 +31,12 @@ impl Request {
         body: InboundBody,
         container: Arc<Container>,
     ) -> Self {
-        let path = ByteString::from(uri.path().to_owned());
         Self {
             method,
             uri,
             headers,
-            params: RoutedPath::new(path),
+            params: Vec::new(),
+            prefix_skip: 0,
             body: Some(body),
             container,
             extensions: Extensions::new(),
@@ -69,7 +68,10 @@ impl Request {
     }
 
     pub fn path_param(&self, name: &str) -> Option<&str> {
-        self.params.get(name)
+        self.params
+            .iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v.as_str())
     }
 
     pub fn container(&self) -> &Arc<Container> {
@@ -82,11 +84,15 @@ impl Request {
         self.body.take().unwrap_or_else(InboundBody::empty)
     }
 
-    /// Skips the first `n` characters of the path when the router matches
-    /// it - what mounting a sub-app at a runtime-configured prefix (see
-    /// [`crate::router::mount`]) needs under the hood, mirroring
-    /// actix-web's own scope nesting.
-    pub fn skip_prefix(&mut self, n: u16) {
-        self.params.skip(n);
+    /// Skips the first `n` bytes of the path when the router matches it -
+    /// what mounting a sub-app at a runtime-configured prefix (see
+    /// [`crate::router::mount`]) needs under the hood.
+    pub fn skip_prefix(&mut self, n: usize) {
+        self.prefix_skip += n;
+    }
+
+    /// The part of the URI path the router matches against.
+    pub(crate) fn routed_path(&self) -> &str {
+        &self.uri.path()[self.prefix_skip..]
     }
 }

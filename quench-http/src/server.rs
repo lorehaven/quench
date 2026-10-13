@@ -232,7 +232,6 @@ async fn handle(
 }
 
 /// Loads a TLS server config from a PEM cert chain + private key, mirroring
-/// what `quench-starter`'s actix bootstrap did - same file formats, same
 /// `None` on missing/unreadable files so callers can fall back to plain
 /// HTTP in dev.
 pub fn load_tls(

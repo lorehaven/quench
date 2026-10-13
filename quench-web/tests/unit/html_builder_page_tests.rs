@@ -103,7 +103,7 @@ fn build_panics_without_content() {
 
 #[test]
 fn pretty_print_html_indents_element_tags() {
-    // html5ever always parses a full document: a bare fragment gets an
+    // The writer always emits a full document: a bare fragment gets an
     // implied <html><head></head><body>...</body></html> wrapped around it.
     let pretty = pretty_print_html("<div><span>hi</span></div>");
     assert_eq!(

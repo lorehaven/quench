@@ -1,10 +1,10 @@
-pub use crate::actix::domain::auth::{Actions, Permissions, Role, User, UserDb};
-pub use crate::actix::domain::jwt::{Claims, JwtConfig};
-pub use crate::actix::domain::realm;
-pub use crate::actix::domain::session::{Session, SessionDb};
+pub use crate::domain::auth::{Actions, Permissions, Role, User, UserDb};
+pub use crate::domain::jwt::{Claims, JwtConfig};
+pub use crate::domain::realm;
+pub use crate::domain::session::{Session, SessionDb};
 pub mod jwt {
-    pub use crate::actix::domain::jwt::*;
+    pub use crate::domain::jwt::*;
 }
 pub mod routers {
-    pub use crate::actix::routers::*;
+    pub use crate::http::routers::*;
 }

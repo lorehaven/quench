@@ -1,6 +1,5 @@
 //! Mounting order: `wrap(inner, m)` runs `m` *around* `inner` - the last
-//! `wrap` call is outermost, the opposite of actix-web's `.wrap()` (last
-//! registered runs first). `RequireWrite` reads the `Claims` `Auth` sets,
+//! `wrap` call is outermost. `RequireWrite` reads the `Claims` `Auth` sets,
 //! so `Auth` has to run first, which here means it's the *outer* layer:
 //!
 //! ```ignore

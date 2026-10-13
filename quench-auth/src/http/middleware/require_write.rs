@@ -1,9 +1,7 @@
-//! Ported from `crate::actix::middleware::require_write`. Same rule, same
-//! mounting-order requirement - see that module's doc comment, which this
-//! doesn't repeat. The one behavioral difference: `quench_http::wrap`'s
-//! composition order is the opposite of actix's `.wrap()` (outermost first,
-//! not last), so here `Auth` wraps `RequireWrite`, not the other way round -
-//! see `crate::http::middleware`'s own doc comment for the exact call.
+//! Blanket write check: any non-GET/HEAD/OPTIONS request needs the
+//! `"write"` action. It reads the `Claims` `Auth` sets, so `Auth` has to wrap
+//! `RequireWrite` - see `crate::http::middleware`'s doc comment for the exact
+//! call.
 
 use crate::domain::jwt::{Claims, JwtConfig};
 use async_trait::async_trait;

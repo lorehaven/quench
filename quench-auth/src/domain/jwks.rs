@@ -30,7 +30,7 @@ struct Jwk {
 }
 
 pub struct JwksVerifier {
-    http: reqwest::Client,
+    http: quench_client::transport::Client,
     jwks_url: String,
     cache: CacheStore,
 }
@@ -49,7 +49,7 @@ impl JwksVerifier {
     }
 
     pub async fn new(gatehouse_base_url: &str, tls_verify: bool) -> anyhow::Result<Self> {
-        let http = reqwest::Client::builder()
+        let http = quench_client::transport::Client::builder()
             .danger_accept_invalid_certs(!tls_verify)
             .timeout(Duration::from_secs(5))
             .build()?;

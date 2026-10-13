@@ -1,5 +1,5 @@
 //! `Response::streaming` is what an SSE endpoint (switchboard's GPU/vLLM
-//! status streams, ported from actix-web's `.streaming()`) needs: a
+//! status streams) needs: a
 //! chunked body driven by an item stream rather than a fixed buffer.
 //! Proved over a real socket, since chunked framing is a wire-level
 //! concern `Endpoint::call` dispatch alone can't exercise.

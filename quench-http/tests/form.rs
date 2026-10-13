@@ -1,7 +1,6 @@
 //! `Form<T>` reads `application/x-www-form-urlencoded` bodies - what an
 //! HTML `<form method="post">` (no JS/htmx) sends, and what
-//! `switchboard-service`'s `delete_model_form` needs (ported from actix's
-//! `web::Form`).
+//! `switchboard-service`'s `delete_model_form` needs.
 
 use bytes::Bytes as RawBytes;
 use http::{HeaderMap, Method, StatusCode, Uri};

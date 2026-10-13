@@ -1,8 +1,7 @@
 //! `Extension<T>` (middleware -> handler data, e.g. decoded auth claims)
 //! and `Response::append_header` (repeated `Set-Cookie`-shaped headers)
-//! exist specifically to port `quench-auth`'s actix middleware, which
-//! stashes claims via `HttpMessage::extensions()` and sets two cookies on
-//! one response.
+//! exist for `quench-auth`'s middleware, which stashes claims in the
+//! request's extensions and sets two cookies on one response.
 
 use async_trait::async_trait;
 use bytes::Bytes;

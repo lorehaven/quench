@@ -1,7 +1,7 @@
 //! `OnPathPrefix` is what lets a service scope a middleware (`Auth`, most
-//! often) to part of its route tree - `web::scope("/api/...").wrap(...)`'s
-//! quench-http counterpart, needed because discovered routes are one flat
-//! router rather than actix-web's per-scope middleware stacks.
+//! often) to part of its route tree, needed because
+//! discovered routes are one flat router rather than per-scope middleware
+//! stacks.
 
 use async_trait::async_trait;
 use bytes::Bytes;

@@ -1,8 +1,7 @@
 //! The quench-http half of the relying-party authorization-code + PKCE
-//! flow. See `crate::actix::domain::sso_client` for the actix-web
-//! equivalent and `crate::domain::sso_client` for the framework-agnostic
-//! config/refresh logic both share - this module only differs from the
-//! actix one in how it reads the request and builds the response.
+//! flow. See `crate::domain::sso_client` for the framework-agnostic
+//! config/refresh logic; this module reads the request and builds the
+//! response.
 
 use crate::domain::realm;
 use crate::domain::sso_client::{AuthorizeState, TokenResponse, random_urlsafe};
@@ -16,7 +15,7 @@ use sha2::{Digest, Sha256};
 pub use crate::domain::sso_client::{RefreshedTokens, SsoConfig, refresh};
 
 /// Redirects the browser to gatehouse's `/authorize`, starting the code
-/// exchange. See `crate::actix::domain::sso_client::authorize_redirect`.
+/// exchange.
 pub fn authorize_redirect(request: &Request, config: &SsoConfig) -> Response {
     let Some(base) = realm::gatehouse_url() else {
         return gatehouse_not_configured();
@@ -44,10 +43,10 @@ pub fn authorize_redirect(request: &Request, config: &SsoConfig) -> Response {
 
     let url = format!(
         "{base}/api/v1/authorize?client_id={client_id}&redirect_uri={redirect_uri}&state={state}&code_challenge={code_challenge}&code_challenge_method=S256",
-        client_id = urlencoding::encode(&config.client_id),
-        redirect_uri = urlencoding::encode(&callback_url),
-        state = urlencoding::encode(&state),
-        code_challenge = urlencoding::encode(&code_challenge),
+        client_id = crate::domain::percent::encode(&config.client_id),
+        redirect_uri = crate::domain::percent::encode(&callback_url),
+        state = crate::domain::percent::encode(&state),
+        code_challenge = crate::domain::percent::encode(&code_challenge),
     );
 
     Response::new(StatusCode::FOUND)
@@ -81,7 +80,7 @@ pub async fn callback(request: &Request, config: &SsoConfig) -> Response {
     }
 
     let callback_url = absolute_url(request, &realm::ui_path("/auth/callback"));
-    let http = match reqwest::Client::builder()
+    let http = match quench_client::transport::Client::builder()
         .danger_accept_invalid_certs(!config.tls_verify)
         .build()
     {
@@ -153,8 +152,7 @@ fn gatehouse_not_configured() -> Response {
 /// Best-effort absolute URL for `path` on this service. Reads
 /// `X-Forwarded-Proto`/`X-Forwarded-Host` when present (set by the reverse
 /// proxy in front of a deployment), falling back to `https` and the `Host`
-/// header - simpler than actix-web's `connection_info()`, which also
-/// understands the legacy `Forwarded` header; add that here if a deployment
+/// header - no legacy `Forwarded` header support; add that here if a deployment
 /// ever needs it.
 fn absolute_url(request: &Request, path: &str) -> String {
     let scheme = request.header("x-forwarded-proto").unwrap_or("https");
@@ -173,7 +171,7 @@ fn query_params(request: &Request) -> std::collections::HashMap<String, String> 
         .split('&')
         .filter_map(|pair| {
             let (key, value) = pair.split_once('=')?;
-            let value = urlencoding::decode(value).ok()?.into_owned();
+            let value = crate::domain::percent::decode(value)?;
             Some((key.to_string(), value))
         })
         .collect()

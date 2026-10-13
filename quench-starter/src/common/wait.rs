@@ -11,11 +11,11 @@ pub fn gatehouse_health_url() -> String {
 }
 
 pub async fn wait_for_services(service_name: &str, urls: Vec<&str>) {
-    let client = reqwest::Client::builder()
+    let client = quench_client::transport::Client::builder()
         .timeout(Duration::from_secs(2))
         .danger_accept_invalid_certs(true)
         .build()
-        .unwrap_or_else(|_| reqwest::Client::new());
+        .unwrap_or_else(|_| quench_client::transport::Client::new());
 
     for url in urls {
         print_status(

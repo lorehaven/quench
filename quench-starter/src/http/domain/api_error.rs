@@ -1,8 +1,5 @@
 //! The `{"error": "..."}` shape most of the estate's JSON APIs answer with,
 //! plus a small `ApiError` a service's own error type can convert into.
-//! Same shape as `crate::actix::domain::api_error` - ported, not
-//! reinvented, since `HttpResponse::build(status).json(...)` and
-//! `Response::json(status, ...)` do the same thing.
 
 use quench_http::prelude::Response;
 use quench_http::prelude::http::StatusCode;

@@ -1,7 +1,6 @@
 use quench_web::dom::{on_dom_ready, set_select_value, toggle_modal, update_from_select};
 use quench_web::framework::app::available_locales;
 use quench_web::{Element, Theme, div, i, label, nav, option, script, select};
-use strum::IntoEnumIterator;
 
 pub fn nav_button() -> Element {
     nav()

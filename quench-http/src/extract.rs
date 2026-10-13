@@ -29,8 +29,7 @@ impl<T> Deref for Path<T> {
 #[async_trait]
 impl<T: DeserializeOwned + Send> FromRequest for Path<T> {
     async fn from_request(req: &mut Request) -> Result<Self, HttpError> {
-        req.params
-            .load()
+        crate::path_de::from_params(&req.params)
             .map(Path)
             .map_err(|e| ExtractError::InvalidPath(e.to_string()).into())
     }
@@ -63,8 +62,7 @@ impl<T: DeserializeOwned + Send> FromRequest for Query<T> {
 pub const DEFAULT_BODY_LIMIT: usize = 2 * 1024 * 1024;
 
 /// An app-wide override for [`DEFAULT_BODY_LIMIT`], seeded once via
-/// `ContainerBuilder::provide(BodyLimit(n))` - the quench-http equivalent
-/// of actix-web's `web::PayloadConfig::new(n)`. A service that accepts
+/// `ContainerBuilder::provide(BodyLimit(n))` - A service that accepts
 /// large uploads (warehouse's blobs/files, sized well past a JSON
 /// payload's usual few KB) provides one bigger limit that every buffered
 /// extractor in the app then respects, rather than raising a limit that

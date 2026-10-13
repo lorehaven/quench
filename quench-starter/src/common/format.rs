@@ -1,4 +1,4 @@
-//! Plain string formatting with no `actix`/`Element` dependency, so it's
+//! Plain string formatting with no `Element` dependency, so it's
 //! reachable from non-UI code too (a tool executor, a CLI).
 
 /// A byte count as a short, human-scaled label (`"512 B"`, `"7 KB"`, `"3.4 MB"`).

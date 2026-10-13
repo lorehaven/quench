@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::path::Path;
-use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Migration {
@@ -81,10 +80,11 @@ impl MigrationLoader {
         dir: P,
         exclude: &[&str],
     ) -> anyhow::Result<Vec<Migration>> {
-        let mut files: Vec<_> = WalkDir::new(dir)
-            .max_depth(1)
+        // A missing / unreadable directory simply has no migrations.
+        let mut files: Vec<_> = std::fs::read_dir(dir)
             .into_iter()
-            .filter_map(|e| e.ok())
+            .flatten()
+            .flatten()
             .filter(|e| e.path().extension().is_some_and(|ext| ext == "toml"))
             .filter(|e| {
                 !e.file_name()
@@ -94,7 +94,7 @@ impl MigrationLoader {
             .collect();
 
         // Sort files by name (yyyy-mm-dd-0000.toml)
-        files.sort_by(|a, b| a.file_name().cmp(b.file_name()));
+        files.sort_by_key(|e| e.file_name());
 
         let mut all_migrations = Vec::new();
 

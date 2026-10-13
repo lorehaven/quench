@@ -32,7 +32,7 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 
 - [Quench Auth](./quench-auth.md) — relying-party token/session verification
 - [Quench Http](./quench-http.md) — lightweight, `poem`-shaped HTTP framework: annotation-discovered routing, dependency injection, plain-async middleware
-- [Quench Starter](./quench-starter.md) — service bootstrap (TLS, base-path scoping, health, DB wiring), for both the Actix and Quench Http stacks
+- [Quench Starter](./quench-starter.md) — service bootstrap (TLS, base-path scoping, health, DB wiring)
 - [Quench Web](./quench-web.md) — dependency-light server-rendered HTML/CSS/JS page builder
 - [Quench Web Components](./quench-web-components.md) — higher-level UI builders on top of Quench Web
 - [Quench DB](./quench-db.md) — ORM/CRUD abstraction plus a migration catalog engine
@@ -81,7 +81,7 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ├── quench-http-macros/     # #[get]/#[post]/#[injectable]/... proc macros for quench-http
 ├── quench-log/             # console + rolling-file tracing subscriber
 ├── quench-mail/            # MIME message builder + async SMTP submission client
-├── quench-starter/         # service bootstrap (Actix and Quench Http)
+├── quench-starter/         # service bootstrap
 ├── quench-web/             # server-rendered HTML/CSS/JS page builder
 ├── quench-web-components/  # UI components built on quench-web
 ├── examples/               # runnable references: basic, db_example, http_demo, forge_service_demo

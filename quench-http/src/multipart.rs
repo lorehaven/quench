@@ -1,5 +1,4 @@
-//! `multipart/form-data` support - the quench-http counterpart to
-//! `actix-multipart`. Field-by-field, like axum's `Multipart` extractor,
+//! `multipart/form-data` support. Field-by-field
 //! rather than a `#[derive(MultipartForm)]` struct: a handler calls
 //! `next_field()` in a loop and matches on `field.name()`.
 //!

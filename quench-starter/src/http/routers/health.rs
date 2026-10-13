@@ -1,9 +1,6 @@
-//! Ported from `crate::actix::routers::health`: same three endpoints, same
-//! meaning (`/health` for "process is up", `/live`/`/ready` for k8s
-//! probes), `HealthState` itself unchanged (it lives in `common::health`
-//! and never touched actix). The scope-mounting `NormalizePath::trim()`
-//! actix used doesn't have an equivalent here yet - trailing-slash
-//! normalization is a follow-up, not something either probe relies on.
+//! Three endpoints: `/health` for "process is up", `/live`/`/ready` for
+//! k8s probes, backed by `HealthState` (in `common::health`). There is no
+//! trailing-slash normalization - neither probe relies on it.
 
 pub use crate::common::health::HealthState;
 use quench_http::prelude::http::StatusCode;

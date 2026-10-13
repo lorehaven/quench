@@ -1,5 +1,5 @@
-//! quench-http feature tour: routing (including the regex-constrained
-//! wildcard segments actix-router keeps working), annotation-discovered
+//! quench-http feature tour: routing (including regex-style multi-segment
+//! wildcard segments), annotation-discovered
 //! components and routes, a real dependency-injection graph, extractors
 //! (`Path`/`Query`/`Json`/`Inject`/`Multipart`), a configurable body-size
 //! limit, plain-async middleware, and graceful shutdown - no quench-auth
@@ -103,8 +103,8 @@ async fn counter(Inject(counter): Inject<Counter>) -> String {
     format!("this counter has been hit {n} time(s) since startup")
 }
 
-/// A regex-constrained, multi-segment wildcard path - the reason
-/// quench-http keeps actix-router instead of a plain radix-tree matcher.
+/// A multi-segment wildcard path - the reason quench-http has its own
+/// backtracking matcher instead of a plain radix tree.
 /// `name` swallows however many `/`-separated segments come before
 /// `/blobs/...`, mirroring the docker registry API's
 /// `/{name:.+}/blobs/{digest}` (see `warehouse-service`).
@@ -158,8 +158,7 @@ async fn big(Json(_body): Json<serde_json::Value>) -> &'static str {
 }
 
 // ---------------------------------------------------------------------
-// Middleware - a plain async fn wrapping the rest of the app, unlike
-// actix-web's Service/Transform pair.
+// Middleware - a plain async fn wrapping the rest of the app.
 // ---------------------------------------------------------------------
 
 struct RequestLogger;

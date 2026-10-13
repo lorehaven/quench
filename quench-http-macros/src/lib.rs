@@ -83,9 +83,9 @@ fn route_impl(method: &str, attr: TokenStream, item: TokenStream) -> TokenStream
     expanded.into()
 }
 
-/// Discoverable `GET` route: `#[get("/users/{id}")]`. Path patterns use
-/// actix-router syntax, including regex-constrained multi-segment segments
-/// (`{name:.+}`) for cases like the docker registry API where a captured
+/// Discoverable `GET` route: `#[get("/users/{id}")]`. Path patterns are literal
+/// text plus `{name}` (one segment) and the multi-segment captures
+/// `{name:.+}` / `{name:.*}`, for cases like the docker registry API where a captured
 /// segment has to swallow further `/`s.
 #[proc_macro_attribute]
 pub fn get(attr: TokenStream, item: TokenStream) -> TokenStream {

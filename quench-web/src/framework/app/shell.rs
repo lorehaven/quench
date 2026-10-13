@@ -4,7 +4,6 @@ use crate::{
     AppBuilder, Element, FooterBuilder, HeaderBuilder, Link, NavPanelBuilder, Script, Theme,
 };
 use anyhow::Result;
-use strum::IntoEnumIterator;
 
 #[derive(Clone, Debug)]
 pub struct AppShellBuilder {

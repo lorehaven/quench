@@ -1,7 +1,6 @@
 use crate::dom::{on_dom_ready, set_select_value, toggle_modal, update_from_select};
 use crate::framework::app::available_locales;
 use crate::{Element, Theme, div, i, label, nav, option, script, select};
-use strum::IntoEnumIterator;
 
 pub fn nav_button() -> Element {
     nav()

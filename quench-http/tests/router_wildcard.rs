@@ -1,6 +1,6 @@
-//! Proves the routing engine keeps actix-router's regex-constrained,
-//! multi-segment wildcard segments - the reason this crate reuses
-//! actix-router instead of a plain radix-tree matcher. These patterns are
+//! Proves the routing engine supports regex-style, multi-segment wildcard
+//! segments - the reason this crate has its own matcher instead of a plain
+//! radix-tree one. These patterns are
 //! lifted verbatim from `warehouse-service`'s docker registry routes.
 
 use async_trait::async_trait;
@@ -52,8 +52,8 @@ async fn matches_multi_segment_name_before_fixed_suffix() {
     let router = builder.finish();
 
     // `name` has to swallow the slash in `library/ubuntu` and still leave
-    // `/blobs/{digest}` matchable - a plain radix-tree router (axum/poem's
-    // default) can't do this; actix-router's regex segments can.
+    // `/blobs/{digest}` matchable - a plain radix-tree router (the usual
+    // default) can't do this; backtracking `{name:.+}` segments can.
     let resp = router
         .dispatch(get("/library/ubuntu/blobs/sha256:deadbeef", &container))
         .await;
@@ -105,7 +105,7 @@ async fn wrong_method_on_matched_path_is_405() {
 async fn registration_order_breaks_ties_between_overlapping_patterns() {
     // Mirrors the crates sparse index: a static `/config.json` route has to
     // win over a trailing `/{path:.*}` catch-all covering the same prefix,
-    // exactly like actix-web's own `.service()` registration order.
+    // matched in registration order.
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
 
     let mut builder = RouterBuilder::default();

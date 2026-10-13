@@ -4,7 +4,7 @@
 //! code-exchange path against a tiny mock gatehouse.
 //!
 //! Each test holds `ENV_LOCK` across its `.await`s, same as
-//! `tests/unit/actix_middleware_auth_tests.rs`: every test here runs on
+//! `tests/http_middleware_auth.rs`: every test here runs on
 //! its own thread (`cargo test`'s default), so nothing else on the same
 //! runtime can deadlock on it.
 #![allow(clippy::await_holding_lock)]

@@ -1,6 +1,9 @@
 use anyhow::{Context, Result, anyhow};
 use serde::{Serialize, de::DeserializeOwned};
 use thiserror::Error;
+use transport::{Client, Response};
+
+pub mod transport;
 
 #[derive(Error, Debug)]
 pub enum ClientError {
@@ -18,7 +21,7 @@ pub type ClientResult<T> = std::result::Result<T, ClientError>;
 
 #[derive(Clone)]
 pub struct HttpClient {
-    http: reqwest::Client,
+    http: Client,
     base_url: String,
 }
 
@@ -84,7 +87,7 @@ impl HttpClient {
         self.handle_response::<T>(res).await
     }
 
-    async fn handle_response<T: DeserializeOwned>(&self, res: reqwest::Response) -> Result<T> {
+    async fn handle_response<T: DeserializeOwned>(&self, res: Response) -> Result<T> {
         let status = res.status();
 
         if !status.is_success() {
@@ -111,7 +114,7 @@ impl HttpClientBuilder {
     }
 
     pub fn build(self) -> Result<HttpClient> {
-        let http = reqwest::Client::builder()
+        let http = Client::builder()
             .danger_accept_invalid_certs(!self.tls_verify)
             .build()?;
 
@@ -160,7 +163,7 @@ impl BasicAuthClient {
             .client
             .http
             .get(&url)
-            .basic_auth(&self.username, Some(&self.password))
+            .basic_auth(&self.username, Some(self.password.as_str()))
             .send()
             .await
             .context("Failed to send GET request")?;
@@ -175,7 +178,7 @@ impl BasicAuthClient {
             .client
             .http
             .post(&url)
-            .basic_auth(&self.username, Some(&self.password))
+            .basic_auth(&self.username, Some(self.password.as_str()))
             .json(body)
             .send()
             .await
@@ -190,7 +193,7 @@ impl BasicAuthClient {
             .client
             .http
             .put(&url)
-            .basic_auth(&self.username, Some(&self.password))
+            .basic_auth(&self.username, Some(self.password.as_str()))
             .json(body)
             .send()
             .await
@@ -205,7 +208,7 @@ impl BasicAuthClient {
             .client
             .http
             .delete(&url)
-            .basic_auth(&self.username, Some(&self.password))
+            .basic_auth(&self.username, Some(self.password.as_str()))
             .send()
             .await
             .context("Failed to send DELETE request")?;
@@ -222,7 +225,7 @@ impl BasicAuthClient {
             .client
             .http
             .delete(&url)
-            .basic_auth(&self.username, Some(&self.password))
+            .basic_auth(&self.username, Some(self.password.as_str()))
             .send()
             .await
             .context("Failed to send DELETE request")?;
@@ -263,7 +266,7 @@ impl BasicAuthClientBuilder {
     }
 
     pub fn build(self) -> Result<BasicAuthClient> {
-        let http = reqwest::Client::builder()
+        let http = Client::builder()
             .danger_accept_invalid_certs(!self.tls_verify)
             .build()?;
 
@@ -339,7 +342,7 @@ impl BearerAuthClient {
 #[derive(Clone)]
 pub struct ClientCredentialsClient {
     client: HttpClient,
-    http: reqwest::Client,
+    http: Client,
     token_url: String,
     client_id: String,
     client_secret: String,
@@ -499,7 +502,7 @@ impl ClientCredentialsClientBuilder {
     }
 
     pub fn build(self) -> Result<ClientCredentialsClient> {
-        let http = reqwest::Client::builder()
+        let http = Client::builder()
             .danger_accept_invalid_certs(!self.tls_verify)
             .build()?;
         Ok(ClientCredentialsClient {

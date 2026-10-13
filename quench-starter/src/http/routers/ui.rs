@@ -1,4 +1,4 @@
-//! Ported from `crate::actix::routers::ui`. Every service puts its pages
+//! Every service puts its pages
 //! under `/ui`, so the bare server root and the bare base path both land
 //! there rather than on a 404 - `/ui` itself then decides between the home
 //! page and the login page.
@@ -16,8 +16,7 @@
 //!
 //! `base_path_redirect`/`base_path_slash_redirect` *do* go through the
 //! normal `#[get]`/`discover_routes()` path, same as any service's own
-//! routes - which means, unlike actix's explicit `.service(...)` call
-//! order, there's no *guaranteed* ordering between these two and a route a
+//! routes - which means there's no *guaranteed* ordering between these two and a route a
 //! service registers at the same pattern (a root-mounted `{path:.*}`
 //! catch-all can match `""`/`"/"` too). In practice `quench-starter`'s own
 //! `inventory` registrations link before a dependent service's, so these
@@ -29,6 +28,9 @@ use crate::common::routes::with_base_path;
 use bytes::Bytes;
 use quench_http::prelude::http::StatusCode;
 use quench_http::prelude::{Request, Response, get};
+
+pub mod common;
+pub mod pages;
 use std::fs;
 use std::path::{Component, Path as FsPath, PathBuf};
 
@@ -48,9 +50,11 @@ pub fn ui_login_redirect() -> Response {
     Response::new(StatusCode::FOUND).header("Location", ui_path("/login"))
 }
 
-/// The same redirect, in the form the caller can actually act on - see the
-/// actix version's doc comment for why a plain `302` doesn't work for an
-/// htmx-driven request.
+/// The same redirect, in the form the caller can actually act on. A fragment
+/// request is an XHR, and the browser follows a `302` below the point htmx
+/// can see it, so an htmx-driven request gets `HX-Redirect` (on a `200`, since
+/// htmx ignores the headers of a response it considers an error) and turns
+/// that into a real navigation.
 pub fn ui_login_redirect_for(request: &Request) -> Response {
     if request.header("hx-request").is_some() {
         return Response::new(StatusCode::OK).header("HX-Redirect", ui_path("/login"));
