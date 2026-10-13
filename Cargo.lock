@@ -1605,7 +1605,7 @@ dependencies = [
 
 [[package]]
 name = "quench-auth"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
  "argon2",
@@ -1654,7 +1654,7 @@ dependencies = [
 
 [[package]]
 name = "quench-client"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1757,7 +1757,7 @@ dependencies = [
 
 [[package]]
 name = "quench-http"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1815,7 +1815,7 @@ dependencies = [
 
 [[package]]
 name = "quench-starter"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "async-trait",
  "bytes",
