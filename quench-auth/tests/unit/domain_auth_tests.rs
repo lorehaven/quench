@@ -8,7 +8,7 @@ fn grants(pairs: &[(&str, &[&str])]) -> Permissions {
         .map(|(service, actions)| {
             (
                 (*service).to_string(),
-                actions.iter().map(|action| action.to_string()).collect(),
+                actions.iter().map(ToString::to_string).collect(),
             )
         })
         .collect()

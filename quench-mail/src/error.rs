@@ -33,6 +33,7 @@ pub struct Reply {
 
 impl Reply {
     /// The reply text, lines joined with a space.
+    #[must_use]
     pub fn message(&self) -> String {
         self.lines.join(" ")
     }
@@ -78,18 +79,20 @@ pub enum Error {
 impl Error {
     /// Worth trying again later: network trouble, timeouts and 4xx replies.
     /// Never true for a 5xx refusal, a bad login, or a mistake in the message.
+    #[must_use]
     pub fn is_transient(&self) -> bool {
         match self {
-            Error::Io(_) | Error::Timeout(_) => true,
-            Error::Rejected { reply, .. } => (400..500).contains(&reply.code),
+            Self::Io(_) | Self::Timeout(_) => true,
+            Self::Rejected { reply, .. } => (400..500).contains(&reply.code),
             _ => false,
         }
     }
 
     /// The server's reply, for the variants that carry one.
-    pub fn reply(&self) -> Option<&Reply> {
+    #[must_use]
+    pub const fn reply(&self) -> Option<&Reply> {
         match self {
-            Error::Rejected { reply, .. } | Error::Auth(reply) => Some(reply),
+            Self::Rejected { reply, .. } | Self::Auth(reply) => Some(reply),
             _ => None,
         }
     }

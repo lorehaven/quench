@@ -1,6 +1,7 @@
 //! A dependency doesn't have to be `#[injectable]` - anything seeded via
 //! `ContainerBuilder::provide` (config read from env, a DB pool built by
 //! `async fn init()`, ...) satisfies the graph just as well.
+#![allow(clippy::unused_async)] // `#[injectable]` constructors are async by contract
 
 use quench_http::prelude::injectable;
 use std::sync::Arc;

@@ -157,7 +157,10 @@ async fn serve(tcp: TcpStream, behavior: &Behavior, received: &mut Received) {
     }
 
     let mut tcp = tcp;
-    if let Outcome::Upgrade = converse(&mut tcp, behavior, received, false).await {
+    if matches!(
+        converse(&mut tcp, behavior, received, false).await,
+        Outcome::Upgrade
+    ) {
         let Ok(mut tls) = acceptor().accept(tcp).await else {
             return;
         };
@@ -171,6 +174,7 @@ enum Outcome {
     Upgrade,
 }
 
+#[allow(clippy::too_many_lines)] // one protocol state machine; splitting it would hide the flow
 async fn converse<S>(
     stream: &mut S,
     behavior: &Behavior,
@@ -226,9 +230,7 @@ where
             lines.push("250 8BITMIME".to_string());
             say_all(out, &lines).await
         } else if upper == "STARTTLS" {
-            if behavior.tls != Tls::Upgrade {
-                say(out, "502 5.5.1 not supported").await
-            } else {
+            if behavior.tls == Tls::Upgrade {
                 let mut reply = String::from("220 2.0.0 ready to start TLS");
                 if let Some(extra) = behavior.inject_after_starttls {
                     reply.push_str("\r\n");
@@ -237,6 +239,7 @@ where
                 let _ = say(out, &reply).await;
                 return Outcome::Upgrade;
             }
+            say(out, "502 5.5.1 not supported").await
         } else if upper.starts_with("AUTH PLAIN") {
             let token = command["AUTH PLAIN".len()..].trim();
             let decoded = STANDARD.decode(token).unwrap_or_default();
@@ -258,7 +261,7 @@ where
             check_login(out, behavior, &mut authed, user, pass).await
         } else if let Some(rest) = upper.strip_prefix("MAIL FROM:") {
             let _ = rest;
-            received.authed_as = authed.clone();
+            received.authed_as.clone_from(&authed);
             received.from = angle(&command);
             say(out, "250 2.1.0 ok").await
         } else if upper.starts_with("RCPT TO:") {
@@ -283,7 +286,7 @@ where
         } else {
             say(out, "500 5.5.2 unknown command").await
         };
-        received.authed_as = authed.clone();
+        received.authed_as.clone_from(&authed);
         if sent.is_err() {
             return Outcome::Done;
         }

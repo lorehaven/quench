@@ -6,13 +6,21 @@ use std::task::{Context, Poll};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
-/// A boxed, type-erased inbound request body (real connection or, in tests,
-/// an in-memory buffer) - streamed rather than pre-buffered so handlers that
+/// A boxed, type-erased inbound request body.
+///
+/// Wraps a real connection or, in tests, an in-memory buffer - streamed rather than pre-buffered so handlers that
 /// pipe large uploads to disk (blob/artifact storage) don't pay for a full
 /// in-memory copy.
 pub struct InboundBody(Pin<Box<dyn HttpBody<Data = Bytes, Error = BoxError> + Send + Sync>>);
 
+impl std::fmt::Debug for InboundBody {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InboundBody").finish_non_exhaustive()
+    }
+}
+
 impl InboundBody {
+    #[must_use]
     pub fn empty() -> Self {
         Self(Box::pin(
             Empty::new().map_err(|never: std::convert::Infallible| match never {}),

@@ -90,9 +90,8 @@ async fn missing_boundary_is_rejected_before_reading_any_field() {
         container.clone(),
     );
 
-    let err = match Multipart::from_request(&mut req).await {
-        Err(e) => e,
-        Ok(_) => panic!("a non-multipart content-type should be rejected"),
+    let Err(err) = Multipart::from_request(&mut req).await else {
+        panic!("a non-multipart content-type should be rejected");
     };
     assert_eq!(err.into_response().status(), StatusCode::BAD_REQUEST);
 }

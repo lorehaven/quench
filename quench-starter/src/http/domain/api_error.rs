@@ -5,6 +5,7 @@ use quench_http::prelude::Response;
 use quench_http::prelude::http::StatusCode;
 use serde_json::json;
 
+#[must_use]
 pub fn json_error(status: StatusCode, message: &str) -> Response {
     Response::json(status, &json!({ "error": message }))
         .unwrap_or_else(|_| Response::text(status, message.to_string()))
@@ -12,6 +13,7 @@ pub fn json_error(status: StatusCode, message: &str) -> Response {
 
 /// A status + message a handler can build with `?` once its own error type
 /// has a `From` impl into this.
+#[derive(Debug)]
 pub struct ApiError {
     status: StatusCode,
     message: String,
@@ -37,6 +39,6 @@ impl ApiError {
 
 impl quench_http::prelude::IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        ApiError::into_response(self)
+        Self::into_response(self)
     }
 }

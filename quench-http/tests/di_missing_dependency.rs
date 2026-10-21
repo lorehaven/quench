@@ -1,6 +1,7 @@
 //! A component whose dependency has no `#[injectable]` and isn't
 //! `provide`d fails the whole graph build with a named error, rather than
 //! panicking the first time something tries to use it.
+#![allow(clippy::unused_async)] // `#[injectable]` constructors are async by contract
 
 use quench_http::di::{ContainerBuilder, DiError};
 use quench_http::prelude::injectable;

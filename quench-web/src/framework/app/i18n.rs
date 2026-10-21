@@ -14,7 +14,7 @@ pub fn available_locales() -> anyhow::Result<Vec<String>> {
     for entry in std::fs::read_dir(i18n_path)? {
         let entry = entry?;
         let path = entry.path();
-        if path.extension().map(|s| s == "ftl").unwrap_or(false)
+        if path.extension().is_some_and(|s| s == "ftl")
             && let Some(locale) = path.file_stem().map(|s| s.to_string_lossy().to_string())
         {
             locales.push(locale);
@@ -43,14 +43,14 @@ pub fn parse_ftl_with_options(supported_locales: Option<&[String]>) -> anyhow::R
     }
 
     let allowed: Option<HashSet<&str>> =
-        supported_locales.map(|v| v.iter().map(|s| s.as_str()).collect());
+        supported_locales.map(|v| v.iter().map(std::string::String::as_str).collect());
     let mut all_locales = serde_json::Map::new();
 
     for entry in std::fs::read_dir(i18n_path)? {
         let entry = entry?;
         let path = entry.path();
 
-        if path.extension().map(|s| s == "ftl").unwrap_or(false) {
+        if path.extension().is_some_and(|s| s == "ftl") {
             let locale = path.file_stem().unwrap().to_string_lossy().to_string();
             if let Some(allowed) = &allowed
                 && !allowed.contains(locale.as_str())
@@ -63,7 +63,7 @@ pub fn parse_ftl_with_options(supported_locales: Option<&[String]>) -> anyhow::R
                 .map_err(|_| anyhow::anyhow!("Failed to parse FTL: {}", path.display()))?;
             let mut map = serde_json::Map::new();
 
-            for entry in res.body.iter() {
+            for entry in &res.body {
                 if let Entry::Message(msg) = entry
                     && let Some(pattern) = &msg.value
                 {
@@ -78,7 +78,7 @@ pub fn parse_ftl_with_options(supported_locales: Option<&[String]>) -> anyhow::R
                                 expression:
                                     Expression::Inline(InlineExpression::VariableReference { id }),
                             } => format!("{{${}}}", id.name),
-                            _ => String::new(),
+                            PatternElement::Placeable { .. } => String::new(),
                         })
                         .collect::<String>();
 
@@ -93,6 +93,7 @@ pub fn parse_ftl_with_options(supported_locales: Option<&[String]>) -> anyhow::R
     Ok(serde_json::to_string_pretty(&all_locales)?)
 }
 
+#[must_use]
 pub fn generate_translations_js(supported_locales: &[String]) -> String {
     let translations = parse_ftl_with_options(Some(supported_locales)).unwrap_or_default();
     format!("window.qTranslations = {translations};")

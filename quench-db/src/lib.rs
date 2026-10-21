@@ -28,6 +28,7 @@ pub trait Database: Send + Sync + Debug {
 pub trait Model: Serialize + DeserializeOwned + Send + Sync + Debug + Unpin + Clone {
     fn table_name() -> String;
     fn columns() -> Vec<&'static str>;
+    #[must_use]
     fn primary_key_name() -> String {
         "id".to_string()
     }
@@ -71,16 +72,17 @@ pub enum Db {
 impl Db {
     pub async fn connect(url: &str) -> Result<Self, DbError> {
         if url.is_empty() {
-            Ok(Db::InMemory(InMemoryDb::new()))
+            Ok(Self::InMemory(InMemoryDb::new()))
         } else {
-            Ok(Db::Postgres(PostgresDb::new(url).await?))
+            Ok(Self::Postgres(PostgresDb::new(url).await?))
         }
     }
 
+    #[must_use]
     pub fn repository<T: Model>(&self) -> Repository<T> {
         match self {
-            Db::Postgres(db) => Repository::Postgres(PostgresRepository::new(db.clone())),
-            Db::InMemory(db) => Repository::InMemory(InMemoryRepository::new(db.clone())),
+            Self::Postgres(db) => Repository::Postgres(PostgresRepository::new(db.clone())),
+            Self::InMemory(db) => Repository::InMemory(InMemoryRepository::new(db.clone())),
         }
     }
 }
@@ -89,15 +91,24 @@ impl Db {
 impl Database for Db {
     async fn execute(&self, query: &str) -> Result<(), DbError> {
         match self {
-            Db::Postgres(db) => db.execute(query).await,
-            Db::InMemory(db) => db.execute(query).await,
+            Self::Postgres(db) => db.execute(query).await,
+            Self::InMemory(db) => db.execute(query).await,
         }
     }
 
     async fn migrate(&self, migrations: Vec<Migration>) -> Result<(), DbError> {
         match self {
-            Db::Postgres(db) => db.migrate(migrations).await,
-            Db::InMemory(db) => db.migrate(migrations).await,
+            Self::Postgres(db) => db.migrate(migrations).await,
+            Self::InMemory(db) => db.migrate(migrations).await,
+        }
+    }
+}
+
+impl<T: Model> std::fmt::Debug for Repository<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Postgres(repo) => f.debug_tuple("Postgres").field(repo).finish(),
+            Self::InMemory(repo) => f.debug_tuple("InMemory").field(repo).finish(),
         }
     }
 }
@@ -114,43 +125,43 @@ where
 {
     async fn create(&self, model: &T) -> Result<T, DbError> {
         match self {
-            Repository::Postgres(repo) => repo.create(model).await,
-            Repository::InMemory(repo) => repo.create(model).await,
+            Self::Postgres(repo) => repo.create(model).await,
+            Self::InMemory(repo) => repo.create(model).await,
         }
     }
 
     async fn read(&self, id: &str) -> Result<Option<T>, DbError> {
         match self {
-            Repository::Postgres(repo) => repo.read(id).await,
-            Repository::InMemory(repo) => repo.read(id).await,
+            Self::Postgres(repo) => repo.read(id).await,
+            Self::InMemory(repo) => repo.read(id).await,
         }
     }
 
     async fn update(&self, model: &T) -> Result<T, DbError> {
         match self {
-            Repository::Postgres(repo) => repo.update(model).await,
-            Repository::InMemory(repo) => repo.update(model).await,
+            Self::Postgres(repo) => repo.update(model).await,
+            Self::InMemory(repo) => repo.update(model).await,
         }
     }
 
     async fn delete(&self, id: &str) -> Result<(), DbError> {
         match self {
-            Repository::Postgres(repo) => repo.delete(id).await,
-            Repository::InMemory(repo) => repo.delete(id).await,
+            Self::Postgres(repo) => repo.delete(id).await,
+            Self::InMemory(repo) => repo.delete(id).await,
         }
     }
 
     async fn list(&self) -> Result<Vec<T>, DbError> {
         match self {
-            Repository::Postgres(repo) => repo.list().await,
-            Repository::InMemory(repo) => repo.list().await,
+            Self::Postgres(repo) => repo.list().await,
+            Self::InMemory(repo) => repo.list().await,
         }
     }
 
     async fn find_by(&self, column: &str, value: &str) -> Result<Vec<T>, DbError> {
         match self {
-            Repository::Postgres(repo) => repo.find_by(column, value).await,
-            Repository::InMemory(repo) => repo.find_by(column, value).await,
+            Self::Postgres(repo) => repo.find_by(column, value).await,
+            Self::InMemory(repo) => repo.find_by(column, value).await,
         }
     }
 }

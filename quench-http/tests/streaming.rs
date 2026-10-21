@@ -3,6 +3,7 @@
 //! chunked body driven by an item stream rather than a fixed buffer.
 //! Proved over a real socket, since chunked framing is a wire-level
 //! concern `Endpoint::call` dispatch alone can't exercise.
+#![allow(clippy::items_after_statements)] // test-local helper types sit next to the code that uses them
 
 use async_trait::async_trait;
 use bytes::Bytes;

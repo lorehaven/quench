@@ -1,5 +1,6 @@
 use crate::styling::css::CssRule;
 
+#[must_use]
 pub fn elements() -> Vec<CssRule> {
     vec![
         h1(),
@@ -242,6 +243,7 @@ fn binding_code_input() -> CssRule {
         )
 }
 
+#[allow(clippy::too_many_lines)] // a flat list of CSS properties
 fn table() -> CssRule {
     CssRule::new(".table")
         .property("display", "flex")

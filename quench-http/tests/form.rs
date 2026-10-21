@@ -48,9 +48,8 @@ async fn malformed_body_is_a_bad_request() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
     let mut req = form_request("unrelated=1", &container);
 
-    let err = match Form::<DeleteRequest>::from_request(&mut req).await {
-        Err(e) => e,
-        Ok(_) => panic!("expected a missing required field to fail"),
+    let Err(err) = Form::<DeleteRequest>::from_request(&mut req).await else {
+        panic!("expected a missing required field to fail");
     };
     assert_eq!(err.into_response().status(), StatusCode::BAD_REQUEST);
 }

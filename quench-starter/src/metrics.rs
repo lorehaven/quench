@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 /// Metrics for inter-service HTTP calls
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct RequestMetrics {
     request_count: Arc<AtomicU64>,
     error_count: Arc<AtomicU64>,
@@ -13,6 +13,7 @@ pub struct RequestMetrics {
 }
 
 impl RequestMetrics {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             request_count: Arc::new(AtomicU64::new(0)),
@@ -35,14 +36,13 @@ impl RequestMetrics {
         self.request_count.fetch_add(1, Ordering::Relaxed);
         self.error_count.fetch_add(1, Ordering::Relaxed);
 
-        let mut last_error = self.last_error.lock().unwrap();
-        *last_error = Some(error_msg.to_string());
-
-        let mut last_error_time = self.last_error_time.lock().unwrap();
-        *last_error_time = Some(Instant::now());
+        *self.last_error.lock().unwrap() = Some(error_msg.to_string());
+        *self.last_error_time.lock().unwrap() = Some(Instant::now());
     }
 
     /// Get current metrics snapshot
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)] // the rate is a display percentage; counts stay far below 2^52
     pub fn snapshot(&self) -> MetricsSnapshot {
         let total_requests = self.request_count.load(Ordering::Relaxed);
         let error_count = self.error_count.load(Ordering::Relaxed);
@@ -72,10 +72,8 @@ impl RequestMetrics {
         self.request_count.store(0, Ordering::Relaxed);
         self.error_count.store(0, Ordering::Relaxed);
         self.total_latency_ms.store(0, Ordering::Relaxed);
-        let mut last_error = self.last_error.lock().unwrap();
-        *last_error = None;
-        let mut last_error_time = self.last_error_time.lock().unwrap();
-        *last_error_time = None;
+        *self.last_error.lock().unwrap() = None;
+        *self.last_error_time.lock().unwrap() = None;
     }
 }
 
@@ -98,9 +96,10 @@ pub struct MetricsSnapshot {
 }
 
 impl MetricsSnapshot {
+    #[must_use]
     pub fn to_prometheus(&self, metric_name: &str) -> String {
         format!(
-            r#"# HELP {}_total_requests Total number of requests
+            r"# HELP {}_total_requests Total number of requests
 # TYPE {}_total_requests counter
 {}_total_requests {{}} {}
 
@@ -115,7 +114,7 @@ impl MetricsSnapshot {
 # HELP {}_error_rate Error rate as a percentage
 # TYPE {}_error_rate gauge
 {}_error_rate {{}} {:.2}
-"#,
+",
             metric_name,
             metric_name,
             metric_name,
@@ -137,19 +136,22 @@ impl MetricsSnapshot {
 }
 
 /// Timed block for measuring operation duration
+#[derive(Debug)]
 pub struct TimedBlock {
     start: Instant,
 }
 
 impl TimedBlock {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             start: Instant::now(),
         }
     }
 
+    #[must_use]
     pub fn elapsed_ms(&self) -> u64 {
-        self.start.elapsed().as_millis() as u64
+        u64::try_from(self.start.elapsed().as_millis()).unwrap_or(u64::MAX)
     }
 }
 

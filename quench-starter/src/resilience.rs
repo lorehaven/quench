@@ -22,6 +22,11 @@ impl Default for RetryConfig {
 }
 
 /// Execute a function with exponential backoff retry
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)] // millisecond delays, clamped to `max_delay_ms` right after
 pub async fn retry_with_backoff<F, Fut, T, E>(mut f: F, config: RetryConfig) -> Result<T, E>
 where
     F: FnMut() -> Fut,
@@ -57,43 +62,34 @@ where
 }
 
 /// Format error messages for user-friendly output
+#[must_use]
 pub fn format_error_message(error: &str, context: &str) -> String {
     let error_lower = error.to_lowercase();
 
     if error_lower.contains("timeout") || error_lower.contains("time out") {
         format!(
-            "The {} request timed out. The service may be busy or unreachable. Please try again.",
-            context
+            "The {context} request timed out. The service may be busy or unreachable. Please try again."
         )
     } else if error_lower.contains("connection") || error_lower.contains("connect") {
         format!(
-            "Could not connect to {}. Please check your internet connection and try again.",
-            context
+            "Could not connect to {context}. Please check your internet connection and try again."
         )
     } else if error_lower.contains("rate limit") || error_lower.contains("429") {
-        format!(
-            "{} is rate limiting requests. Please wait a moment and try again.",
-            context
-        )
+        format!("{context} is rate limiting requests. Please wait a moment and try again.")
     } else if error_lower.contains("unauthorized")
         || error_lower.contains("401")
         || error_lower.contains("api key")
     {
-        format!(
-            "Authentication failed for {}. The API key may be invalid or expired.",
-            context
-        )
+        format!("Authentication failed for {context}. The API key may be invalid or expired.")
     } else if error_lower.contains("not found") || error_lower.contains("404") {
-        format!(
-            "{} could not find what you're looking for. Try rephrasing your request.",
-            context
-        )
+        format!("{context} could not find what you're looking for. Try rephrasing your request.")
     } else {
-        format!("{} encountered an error: {}", context, error)
+        format!("{context} encountered an error: {error}")
     }
 }
 
 /// Circuit breaker state machine for failing services
+#[derive(Debug)]
 pub struct CircuitBreaker {
     failure_threshold: u32,
     success_threshold: u32,
@@ -112,7 +108,8 @@ pub enum CircuitState {
 }
 
 impl CircuitBreaker {
-    pub fn new(failure_threshold: u32, success_threshold: u32, timeout_secs: u64) -> Self {
+    #[must_use]
+    pub const fn new(failure_threshold: u32, success_threshold: u32, timeout_secs: u64) -> Self {
         Self {
             failure_threshold,
             success_threshold,
@@ -124,6 +121,7 @@ impl CircuitBreaker {
         }
     }
 
+    #[allow(clippy::significant_drop_tightening)] // the lock has to span the whole check-and-update
     pub fn call_succeeded(&self) {
         let mut state = self.state.lock().unwrap();
 
@@ -148,10 +146,11 @@ impl CircuitBreaker {
                 self.failure_count
                     .store(0, std::sync::atomic::Ordering::Relaxed);
             }
-            _ => {}
+            CircuitState::Open => {}
         }
     }
 
+    #[allow(clippy::significant_drop_tightening)] // the lock has to span the whole check-and-update
     pub fn call_failed(&self) {
         let mut state = self.state.lock().unwrap();
         let mut last_failure = self.last_failure_time.lock().unwrap();
@@ -170,11 +169,12 @@ impl CircuitBreaker {
         }
     }
 
+    #[allow(clippy::significant_drop_tightening)] // the lock has to span the whole check-and-update
     pub fn is_available(&self) -> bool {
         let mut state = self.state.lock().unwrap();
 
         match *state {
-            CircuitState::Closed => true,
+            CircuitState::Closed | CircuitState::HalfOpen => true,
             CircuitState::Open => {
                 if let Ok(last_failure) = self.last_failure_time.lock()
                     && let Some(failure_time) = *last_failure
@@ -189,7 +189,6 @@ impl CircuitBreaker {
                 }
                 false
             }
-            CircuitState::HalfOpen => true,
         }
     }
 

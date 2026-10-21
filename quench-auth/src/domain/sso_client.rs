@@ -1,6 +1,8 @@
 //! The framework-agnostic half of the relying-party side of the
 //! authorization-code + PKCE flow: config, the token-refresh HTTP call, and
-//! the PKCE state shape. The parts that build a redirect response or read
+//! the PKCE state shape.
+//!
+//! The parts that build a redirect response or read
 //! the incoming request (`authorize_redirect`, `callback`, ...) live
 //! in `crate::http::domain::sso_client`, since they're the only parts that
 //! touch the request / response types.
@@ -17,7 +19,19 @@ pub struct SsoConfig {
     pub(crate) tls_verify: bool,
 }
 
+// Hand-written so the client secret can never end up in a log line.
+impl std::fmt::Debug for SsoConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SsoConfig")
+            .field("client_id", &self.client_id)
+            .field("client_secret", &"<redacted>")
+            .field("tls_verify", &self.tls_verify)
+            .finish()
+    }
+}
+
 impl SsoConfig {
+    #[must_use]
     pub fn init() -> Self {
         let client_id = envmnt::get_or("GATEHOUSE_CLIENT_ID", "");
         let client_secret = envmnt::get_or("GATEHOUSE_CLIENT_SECRET", "");
@@ -56,6 +70,13 @@ pub(crate) struct TokenResponse {
 pub struct RefreshedTokens {
     pub access_token: String,
     pub refresh_token: String,
+}
+
+// Hand-written so the tokens can never end up in a log line.
+impl std::fmt::Debug for RefreshedTokens {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RefreshedTokens").finish_non_exhaustive()
+    }
 }
 
 /// Trades a `forge_refresh` value for a fresh pair via gatehouse's `/refresh`;

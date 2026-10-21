@@ -1,5 +1,7 @@
 use crate::{Script, Theme, js};
 
+#[must_use]
+#[allow(clippy::too_many_lines)] // mostly one embedded JS template
 pub fn locale_script(supported_locales: &[String], default_locale: Option<&str>) -> Script {
     let resolved_default_locale = match default_locale {
         Some(locale) if supported_locales.iter().any(|l| l == locale) => locale.to_string(),
@@ -177,6 +179,7 @@ window.getLocale = getLocale;
 /// that serves no `/ui/status` - a network blip, or a body that will not parse
 /// are all left alone: throwing somebody out of a working page because one
 /// request failed would be a worse bug than the one this closes.
+#[must_use]
 pub fn session_script(resources_prefix: &str, interval_secs: u64) -> Script {
     let status_url = format!("{resources_prefix}/status");
     let refresh_url = format!("{resources_prefix}/refresh");
@@ -260,6 +263,7 @@ document.addEventListener("visibilitychange", () => {{
     )
 }
 
+#[must_use]
 pub fn theme_script(
     default_theme: &str,
     supported_themes: &[Theme],

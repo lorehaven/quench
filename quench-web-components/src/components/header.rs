@@ -8,15 +8,18 @@ pub struct HeaderBuilder {
 }
 
 impl HeaderBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn label(mut self, value: impl Into<String>) -> Self {
         self.label = value.into();
         self
     }
 
+    #[must_use]
     pub fn with_nav(mut self, value: Element) -> Self {
         self.with_nav = true;
         self.nav_panel = Some(value);

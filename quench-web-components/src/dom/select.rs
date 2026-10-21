@@ -1,3 +1,4 @@
+#[must_use]
 pub fn update_from_select(select_id: &str, update_fn: &str) -> String {
     format!(
         "const selected = document.getElementById('{select_id}').value;\
@@ -5,6 +6,7 @@ pub fn update_from_select(select_id: &str, update_fn: &str) -> String {
     )
 }
 
+#[must_use]
 pub fn set_select_value(select_id: &str, get_fn: &str) -> String {
     format!(
         "const select = document.getElementById('{select_id}');\

@@ -25,6 +25,7 @@
 //! Then Ctrl+C: the log line for any request still in flight prints
 //! *before* the process exits, proving the shutdown drains it instead of
 //! cutting it off.
+#![allow(clippy::unused_async)] // route handlers and `#[injectable]` constructors are async by contract
 
 use async_trait::async_trait;
 use quench_http::prelude::*;

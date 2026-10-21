@@ -5,7 +5,10 @@ use quench_starter::http::routers::ui::common::css::{
 };
 
 fn render_all(rules: &[quench_web::prelude::CssRule]) -> String {
-    rules.iter().map(|rule| rule.render()).collect()
+    rules
+        .iter()
+        .map(quench_web::prelude::CssRule::render)
+        .collect()
 }
 
 #[test]

@@ -18,7 +18,7 @@
 use crate::migrations::{Migration, MigrationLoader};
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 pub const MODULE_MANIFEST: &str = "module.toml";
@@ -94,14 +94,14 @@ impl<'de> Deserialize<'de> for Requirement {
         }
 
         match Raw::deserialize(deserializer)? {
-            Raw::Short(spec) => Requirement::parse_short(&spec).map_err(serde::de::Error::custom),
+            Raw::Short(spec) => Self::parse_short(&spec).map_err(serde::de::Error::custom),
             Raw::Table {
                 module,
                 version,
                 schema,
             } => {
                 let version = version.unwrap_or_else(|| "*".to_string());
-                Ok(Requirement {
+                Ok(Self {
                     module,
                     version: VersionReq::parse(&version).map_err(serde::de::Error::custom)?,
                     schema,
@@ -136,6 +136,7 @@ pub struct ModuleManifest {
 }
 
 impl ModuleManifest {
+    #[must_use]
     pub fn fallback_schema(&self) -> String {
         self.default_schema
             .clone()
@@ -154,15 +155,18 @@ pub struct CatalogModule {
 }
 
 impl CatalogModule {
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.manifest.name
     }
 
-    pub fn version(&self) -> &Version {
+    #[must_use]
+    pub const fn version(&self) -> &Version {
         &self.manifest.version
     }
 
     /// Migrations introduced at or before `version`, in catalog order.
+    #[must_use]
     pub fn migrations_up_to(&self, version: &Version) -> Vec<&Migration> {
         self.migrations
             .iter()
@@ -173,6 +177,7 @@ impl CatalogModule {
 
 /// The version a migration was introduced in; untagged migrations are always
 /// applied.
+#[must_use]
 pub fn migration_since(migration: &Migration) -> Version {
     migration
         .since
@@ -200,7 +205,7 @@ impl Catalog {
                 path: root.to_path_buf(),
                 source: e,
             })?
-            .filter_map(|entry| entry.ok())
+            .filter_map(std::result::Result::ok)
             .map(|entry| entry.path())
             .filter(|path| path.join(MODULE_MANIFEST).is_file())
             .collect();
@@ -251,9 +256,9 @@ impl Catalog {
 
     fn validate(&self) -> Result<(), CatalogError> {
         for module in self.modules.values() {
-            let mut seen = BTreeMap::new();
+            let mut seen = BTreeSet::new();
             for migration in &module.migrations {
-                if seen.insert(migration.id.clone(), ()).is_some() {
+                if !seen.insert(migration.id.clone()) {
                     return Err(CatalogError::DuplicateMigrationId {
                         module: module.name().to_string(),
                         id: migration.id.clone(),
@@ -298,6 +303,7 @@ impl Catalog {
         Ok(())
     }
 
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&CatalogModule> {
         self.modules.get(name)
     }
@@ -306,10 +312,12 @@ impl Catalog {
         self.modules.values()
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.modules.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.modules.is_empty()
     }
@@ -362,7 +370,7 @@ pub enum CatalogError {
         module_version: String,
     },
 
-    #[error("unknown module '{name}'{}", match required_by { Some(m) => format!(" required by '{m}'"), None => String::new() })]
+    #[error("unknown module '{name}'{}", required_by.as_ref().map_or_else(String::new, |m| format!(" required by '{m}'")))]
     UnknownModule {
         name: String,
         required_by: Option<String>,

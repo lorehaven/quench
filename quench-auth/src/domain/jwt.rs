@@ -43,6 +43,19 @@ pub struct JwtConfig {
     signer: Option<Arc<dyn KeySigner>>,
 }
 
+impl std::fmt::Debug for JwtConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("JwtConfig")
+            .field("service_name", &self.service_name)
+            .field("audiences", &self.audiences)
+            .field("realm", &self.realm)
+            .field("auth_enabled", &self.auth_enabled)
+            .field("access_token_ttl_secs", &self.access_token_ttl_secs)
+            .field("refresh_token_ttl_secs", &self.refresh_token_ttl_secs)
+            .finish_non_exhaustive()
+    }
+}
+
 impl JwtConfig {
     /// Relying-party construction: verifies tokens against the estate's
     /// published JWKS (`GATEHOUSE_URL`). Cannot sign - nothing but gatehouse
@@ -73,6 +86,7 @@ impl JwtConfig {
     /// decode or encode. Public rather than `#[cfg(test)]`, since it is used
     /// from other crates' test binaries where a crate-local `cfg(test)` would
     /// not be visible.
+    #[must_use]
     pub fn for_tests() -> Self {
         struct NoKeys;
         #[async_trait]
@@ -88,6 +102,7 @@ impl JwtConfig {
     /// for tests that need a real sign/verify round trip without a database.
     /// Gatehouse itself never uses this; see `docker/gatehouse-service/src/keys.rs`
     /// for the persisted, rotatable equivalent.
+    #[must_use]
     pub fn for_tests_with_signing() -> Self {
         use crate::domain::signing::{decoding_key, encoding_key, generate_signing_key};
 
@@ -142,7 +157,7 @@ impl JwtConfig {
             .unwrap_or(900);
         let refresh_token_ttl_secs = envmnt::get_or("REFRESH_TOKEN_TTL_SECS", "604800")
             .parse()
-            .unwrap_or(604800);
+            .unwrap_or(604_800);
 
         Self {
             service_name,
@@ -196,8 +211,9 @@ impl JwtConfig {
         validation.required_spec_claims.insert("exp".to_string());
         let token_data = decode::<Claims>(token, &key, &validation)?;
 
-        let now = chrono::Utc::now().timestamp() as usize;
-        if token_data.claims.iat > now + validation.leeway as usize {
+        let now = usize::try_from(chrono::Utc::now().timestamp()).unwrap_or(0);
+        let leeway = usize::try_from(validation.leeway).unwrap_or(usize::MAX);
+        if token_data.claims.iat > now.saturating_add(leeway) {
             return Err(ErrorKind::ImmatureSignature.into());
         }
 
@@ -244,6 +260,7 @@ impl JwtConfig {
     /// A caller cannot widen a token past `SERVICE_AUDIENCES` by asking for
     /// more, so a stale grant naming a service this deployment does not run
     /// cannot put that service in an audience list.
+    #[must_use]
     pub fn narrow_audiences(&self, wanted: &[String]) -> Vec<String> {
         self.audiences
             .iter()
@@ -269,6 +286,7 @@ pub struct Claims {
 }
 
 impl Claims {
+    #[must_use]
     pub fn for_audiences(
         sub: String,
         aud: Vec<String>,
@@ -277,8 +295,9 @@ impl Claims {
         duration_secs: i64,
     ) -> Self {
         let now = chrono::Utc::now();
-        let iat = now.timestamp() as usize;
-        let exp = (now + chrono::Duration::seconds(duration_secs)).timestamp() as usize;
+        let iat = usize::try_from(now.timestamp()).unwrap_or(0);
+        let exp = usize::try_from((now + chrono::Duration::seconds(duration_secs)).timestamp())
+            .unwrap_or(0);
 
         Self {
             sub,
@@ -291,6 +310,7 @@ impl Claims {
     }
 
     /// Whether this token may be presented to `service_name`.
+    #[must_use]
     pub fn allows(&self, service_name: &str) -> bool {
         self.aud.iter().any(|audience| audience == service_name)
     }
@@ -311,6 +331,7 @@ impl Claims {
     /// vocabularies are kept disjoint (roles never contain a colon, permission
     /// levels are only `read`/`write`) so that cannot arise, and this makes it a
     /// guarantee rather than a convention.
+    #[must_use]
     pub fn has_role(&self, role: &str) -> bool {
         self.roles()
             .iter()
@@ -321,6 +342,7 @@ impl Claims {
     /// `{service: {action, ...}}`. A service granted several actions carries
     /// one token per action (`sage:read sage:write`), not a combined one -
     /// the wire format stays a flat list of space-separated tokens either way.
+    #[must_use]
     pub fn permissions(&self) -> Permissions {
         let mut result = Permissions::new();
         for entry in self.roles() {
@@ -338,6 +360,7 @@ impl Claims {
     ///
     /// A wildcard role short-circuits, which is why an admin's token carries no
     /// permission entries at all.
+    #[must_use]
     pub fn can(&self, service: &str, action: &str) -> bool {
         if self.has_wildcard() {
             return true;
@@ -348,6 +371,7 @@ impl Claims {
     }
 
     /// Whether any role on the token grants everything.
+    #[must_use]
     pub fn has_wildcard(&self) -> bool {
         self.roles().iter().any(|held| {
             !held.contains(':') && Role::parse(held).is_some_and(|role| role.is_wildcard())

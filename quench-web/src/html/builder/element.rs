@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
 #[derive(Clone, Debug)]
 pub struct Element {
     tag: String,
     attributes: HashMap<String, String>,
-    children: Vec<Element>,
+    children: Vec<Self>,
     text_content: Option<String>,
     onclick: Option<String>,
     onchange: Option<String>,
@@ -12,6 +13,9 @@ pub struct Element {
     defer: bool,
 }
 
+// The builder takes `impl ToString` so callers can pass `&str`, `String`, numbers or
+// enums alike; it only ever borrows them.
+#[allow(clippy::needless_pass_by_value)]
 impl Element {
     pub(crate) fn new(tag: impl ToString) -> Self {
         Self {
@@ -26,17 +30,19 @@ impl Element {
         }
     }
 
+    #[must_use]
     pub fn attr(mut self, key: impl ToString, value: impl ToString) -> Self {
         self.attributes.insert(key.to_string(), value.to_string());
         self
     }
 
+    #[must_use]
     pub fn class(mut self, class: impl ToString) -> Self {
         let mut classes = self
             .attributes
             .get("class")
             .unwrap_or(&String::new())
-            .to_string();
+            .clone();
         if !classes.is_empty() {
             classes.push(' ');
         }
@@ -45,56 +51,64 @@ impl Element {
         self
     }
 
+    #[must_use]
     pub fn text(mut self, text: impl ToString) -> Self {
         self.text_content = Some(text.to_string());
         self
     }
 
-    pub fn child(mut self, child: Element) -> Self {
+    #[must_use]
+    pub fn child(mut self, child: Self) -> Self {
         self.children.push(child);
         self
     }
 
-    pub fn child_opt(mut self, child: Option<Element>) -> Self {
+    #[must_use]
+    pub fn child_opt(mut self, child: Option<Self>) -> Self {
         if let Some(child) = child {
             self.children.push(child);
         }
         self
     }
 
+    #[must_use]
     pub fn on_click(mut self, js_code: impl ToString) -> Self {
         self.onclick = Some(js_code.to_string());
         self
     }
 
+    #[must_use]
     pub fn on_change(mut self, js_code: impl ToString) -> Self {
         self.onchange = Some(js_code.to_string());
         self
     }
 
-    pub fn raw(mut self) -> Self {
+    #[must_use]
+    pub const fn raw(mut self) -> Self {
         self.raw = true;
         self
     }
 
-    pub fn defer(mut self) -> Self {
+    #[must_use]
+    pub const fn defer(mut self) -> Self {
         self.defer = true;
         self
     }
 
+    #[must_use]
     pub fn render(&self) -> String {
         let mut html = format!("<{}", self.tag);
 
         for (key, value) in &self.attributes {
-            html.push_str(&format!(" {}=\"{}\"", key, html_escape(value)));
+            let _ = write!(html, " {}=\"{}\"", key, html_escape(value));
         }
 
         if let Some(onclick) = &self.onclick {
-            html.push_str(&format!(" onclick=\"{}\"", html_escape(onclick)));
+            let _ = write!(html, " onclick=\"{}\"", html_escape(onclick));
         }
 
         if let Some(onchange) = &self.onchange {
-            html.push_str(&format!(" onchange=\"{}\"", html_escape(onchange)));
+            let _ = write!(html, " onchange=\"{}\"", html_escape(onchange));
         }
 
         if self.defer {
@@ -115,16 +129,16 @@ impl Element {
             html.push_str(&child.render());
         }
 
-        html.push_str(&format!("</{}>", self.tag));
+        let _ = write!(html, "</{}>", self.tag);
         html
     }
 }
 
 // Helper function to escape HTML
 pub(crate) fn html_escape(s: &str) -> String {
-    s.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;")
-        .replace("'", "&#39;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }

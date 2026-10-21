@@ -19,7 +19,7 @@ pub enum ClientError {
 
 pub type ClientResult<T> = std::result::Result<T, ClientError>;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct HttpClient {
     http: Client,
     base_url: String,
@@ -30,6 +30,7 @@ impl HttpClient {
         Self::builder(base_url).build()
     }
 
+    #[must_use]
     pub fn builder(base_url: &str) -> HttpClientBuilder {
         HttpClientBuilder {
             base_url: base_url.to_string(),
@@ -49,7 +50,11 @@ impl HttpClient {
         self.handle_response::<T>(res).await
     }
 
-    pub async fn post<S: Serialize, T: DeserializeOwned>(&self, path: &str, body: &S) -> Result<T> {
+    pub async fn post<S: Serialize + Sync, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &S,
+    ) -> Result<T> {
         let url = format!("{}{}", self.base_url, path);
         let res = self
             .http
@@ -62,7 +67,11 @@ impl HttpClient {
         self.handle_response::<T>(res).await
     }
 
-    pub async fn put<S: Serialize, T: DeserializeOwned>(&self, path: &str, body: &S) -> Result<T> {
+    pub async fn put<S: Serialize + Sync, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &S,
+    ) -> Result<T> {
         let url = format!("{}{}", self.base_url, path);
         let res = self
             .http
@@ -95,20 +104,22 @@ impl HttpClient {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(anyhow!("HTTP {}: {}", status, body));
+            return Err(anyhow!("HTTP {status}: {body}"));
         }
 
         res.json::<T>().await.context("Failed to parse response")
     }
 }
 
+#[derive(Debug)]
 pub struct HttpClientBuilder {
     base_url: String,
     tls_verify: bool,
 }
 
 impl HttpClientBuilder {
-    pub fn tls_verify(mut self, verify: bool) -> Self {
+    #[must_use]
+    pub const fn tls_verify(mut self, verify: bool) -> Self {
         self.tls_verify = verify;
         self
     }
@@ -133,6 +144,16 @@ pub struct BasicAuthClient {
     password: String,
 }
 
+impl std::fmt::Debug for BasicAuthClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BasicAuthClient")
+            .field("client", &self.client)
+            .field("username", &self.username)
+            .field("password", &"<redacted>")
+            .finish_non_exhaustive()
+    }
+}
+
 impl BasicAuthClient {
     pub fn new(base_url: &str, username: &str, password: &str) -> Result<Self> {
         let client = HttpClient::new(base_url)?;
@@ -143,6 +164,7 @@ impl BasicAuthClient {
         })
     }
 
+    #[must_use]
     pub fn builder(base_url: &str) -> BasicAuthClientBuilder {
         BasicAuthClientBuilder {
             base_url: base_url.to_string(),
@@ -172,7 +194,11 @@ impl BasicAuthClient {
         self.client.handle_response::<T>(res).await
     }
 
-    pub async fn post<S: Serialize, T: DeserializeOwned>(&self, path: &str, body: &S) -> Result<T> {
+    pub async fn post<S: Serialize + Sync, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &S,
+    ) -> Result<T> {
         let url = format!("{}{}", self.client.base_url, path);
         let res = self
             .client
@@ -187,7 +213,11 @@ impl BasicAuthClient {
         self.client.handle_response::<T>(res).await
     }
 
-    pub async fn put<S: Serialize, T: DeserializeOwned>(&self, path: &str, body: &S) -> Result<T> {
+    pub async fn put<S: Serialize + Sync, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &S,
+    ) -> Result<T> {
         let url = format!("{}{}", self.client.base_url, path);
         let res = self
             .client
@@ -236,7 +266,7 @@ impl BasicAuthClient {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(anyhow!("HTTP {}: {}", status, body));
+            return Err(anyhow!("HTTP {status}: {body}"));
         }
         Ok(())
     }
@@ -249,18 +279,32 @@ pub struct BasicAuthClientBuilder {
     password: String,
 }
 
+impl std::fmt::Debug for BasicAuthClientBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BasicAuthClientBuilder")
+            .field("base_url", &self.base_url)
+            .field("tls_verify", &self.tls_verify)
+            .field("username", &self.username)
+            .field("password", &"<redacted>")
+            .finish_non_exhaustive()
+    }
+}
+
 impl BasicAuthClientBuilder {
+    #[must_use]
     pub fn username(mut self, username: &str) -> Self {
         self.username = username.to_string();
         self
     }
 
+    #[must_use]
     pub fn password(mut self, password: &str) -> Self {
         self.password = password.to_string();
         self
     }
 
-    pub fn tls_verify(mut self, verify: bool) -> Self {
+    #[must_use]
+    pub const fn tls_verify(mut self, verify: bool) -> Self {
         self.tls_verify = verify;
         self
     }
@@ -286,6 +330,15 @@ impl BasicAuthClientBuilder {
 pub struct BearerAuthClient {
     client: HttpClient,
     token: String,
+}
+
+impl std::fmt::Debug for BearerAuthClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BearerAuthClient")
+            .field("client", &self.client)
+            .field("token", &"<redacted>")
+            .finish_non_exhaustive()
+    }
 }
 
 impl BearerAuthClient {
@@ -317,7 +370,11 @@ impl BearerAuthClient {
         self.client.handle_response::<T>(res).await
     }
 
-    pub async fn post<S: Serialize, T: DeserializeOwned>(&self, path: &str, body: &S) -> Result<T> {
+    pub async fn post<S: Serialize + Sync, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &S,
+    ) -> Result<T> {
         let url = format!("{}{}", self.client.base_url, path);
         let res = self
             .client
@@ -335,7 +392,9 @@ impl BearerAuthClient {
 
 /// HTTP client authenticating via the `client_credentials` grant against
 /// gatehouse - what a machine identity (sage calling switchboard) uses
-/// instead of the HTTP Basic it used to send. Exchanges once, caches the
+/// instead of the HTTP Basic it used to send.
+///
+/// Exchanges once, caches the
 /// access token, and re-exchanges shortly before it expires; the target
 /// service never sees the client secret, only the bearer token gatehouse
 /// issued for it.
@@ -349,10 +408,29 @@ pub struct ClientCredentialsClient {
     cached: std::sync::Arc<tokio::sync::Mutex<Option<CachedToken>>>,
 }
 
+impl std::fmt::Debug for ClientCredentialsClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClientCredentialsClient")
+            .field("client", &self.client)
+            .field("token_url", &self.token_url)
+            .field("client_id", &self.client_id)
+            .field("client_secret", &"<redacted>")
+            .finish_non_exhaustive()
+    }
+}
+
 #[derive(Clone)]
 struct CachedToken {
     access_token: String,
     expires_at: std::time::Instant,
+}
+
+impl std::fmt::Debug for CachedToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CachedToken")
+            .field("access_token", &"<redacted>")
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(serde::Deserialize)]
@@ -362,6 +440,7 @@ struct TokenResponse {
 }
 
 impl ClientCredentialsClient {
+    #[must_use]
     pub fn builder(base_url: &str) -> ClientCredentialsClientBuilder {
         ClientCredentialsClientBuilder {
             base_url: base_url.to_string(),
@@ -410,9 +489,8 @@ impl ClientCredentialsClient {
             .await
             .context("failed to parse the client_credentials token response")?;
 
-        let ttl = tokens.expires_in.max(30) as u64 - 30;
-        let mut guard = self.cached.lock().await;
-        *guard = Some(CachedToken {
+        let ttl = tokens.expires_in.max(30).cast_unsigned() - 30;
+        *self.cached.lock().await = Some(CachedToken {
             access_token: tokens.access_token.clone(),
             expires_at: std::time::Instant::now() + std::time::Duration::from_secs(ttl),
         });
@@ -432,7 +510,11 @@ impl ClientCredentialsClient {
         self.client.handle_response::<T>(res).await
     }
 
-    pub async fn post<S: Serialize, T: DeserializeOwned>(&self, path: &str, body: &S) -> Result<T> {
+    pub async fn post<S: Serialize + Sync, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &S,
+    ) -> Result<T> {
         let token = self.access_token().await?;
         let url = format!("{}{}", self.client.base_url, path);
         let res = self
@@ -465,7 +547,7 @@ impl ClientCredentialsClient {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(anyhow!("HTTP {}: {}", status, body));
+            return Err(anyhow!("HTTP {status}: {body}"));
         }
         Ok(())
     }
@@ -479,24 +561,40 @@ pub struct ClientCredentialsClientBuilder {
     tls_verify: bool,
 }
 
+impl std::fmt::Debug for ClientCredentialsClientBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClientCredentialsClientBuilder")
+            .field("base_url", &self.base_url)
+            .field("token_url", &self.token_url)
+            .field("client_id", &self.client_id)
+            .field("tls_verify", &self.tls_verify)
+            .field("client_secret", &"<redacted>")
+            .finish_non_exhaustive()
+    }
+}
+
 impl ClientCredentialsClientBuilder {
     /// Gatehouse's token endpoint, e.g. `https://localhost:5443/gatehouse/api/v1/token`.
+    #[must_use]
     pub fn token_url(mut self, url: &str) -> Self {
         self.token_url = url.to_string();
         self
     }
 
+    #[must_use]
     pub fn client_id(mut self, id: &str) -> Self {
         self.client_id = id.to_string();
         self
     }
 
+    #[must_use]
     pub fn client_secret(mut self, secret: &str) -> Self {
         self.client_secret = secret.to_string();
         self
     }
 
-    pub fn tls_verify(mut self, verify: bool) -> Self {
+    #[must_use]
+    pub const fn tls_verify(mut self, verify: bool) -> Self {
         self.tls_verify = verify;
         self
     }

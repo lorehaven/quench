@@ -9,6 +9,7 @@
 //! and cargo compiles every integration test file as a separate binary, so
 //! putting unrelated `#[injectable]`s in the same file would have them all
 //! show up in the same graph.
+#![allow(clippy::unused_async)] // `#[injectable]` constructors are async by contract
 
 use quench_http::di::{Container, ContainerBuilder};
 use quench_http::prelude::injectable;

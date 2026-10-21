@@ -39,11 +39,11 @@ pub enum Security {
 }
 
 impl Security {
-    fn default_port(self) -> u16 {
+    const fn default_port(self) -> u16 {
         match self {
-            Security::Tls => 465,
-            Security::StartTls => 587,
-            Security::None => 25,
+            Self::Tls => 465,
+            Self::StartTls => 587,
+            Self::None => 25,
         }
     }
 }
@@ -71,6 +71,7 @@ pub struct Response {
 
 impl Response {
     /// Server text such as `2.0.0 Message queued as 1234` - what to log.
+    #[must_use]
     pub fn message(&self) -> String {
         self.reply.message()
     }
@@ -90,13 +91,15 @@ pub struct MailerBuilder {
 }
 
 impl MailerBuilder {
-    pub fn security(mut self, security: Security) -> Self {
+    #[must_use]
+    pub const fn security(mut self, security: Security) -> Self {
         self.security = security;
         self
     }
 
     /// Defaults to 465, 587 or 25 by [`Security`].
-    pub fn port(mut self, port: u16) -> Self {
+    #[must_use]
+    pub const fn port(mut self, port: u16) -> Self {
         self.port = Some(port);
         self
     }
@@ -104,11 +107,13 @@ impl MailerBuilder {
     /// The name the server's certificate must be valid for, when that is not
     /// the host connected to - e.g. connecting to an in-cluster service name
     /// while the certificate is for the public hostname.
+    #[must_use]
     pub fn tls_server_name(mut self, name: &str) -> Self {
         self.tls_server_name = Some(name.to_string());
         self
     }
 
+    #[must_use]
     pub fn credentials(mut self, username: &str, password: &str) -> Self {
         self.credentials = Some(Credentials {
             username: username.to_string(),
@@ -118,13 +123,15 @@ impl MailerBuilder {
     }
 
     /// The name announced in `EHLO`. Defaults to `localhost`.
+    #[must_use]
     pub fn hello_name(mut self, name: &str) -> Self {
         self.hello_name = name.to_string();
         self
     }
 
     /// Limit for connecting and for each wait on the server. Default 30 s.
-    pub fn timeout(mut self, timeout: Duration) -> Self {
+    #[must_use]
+    pub const fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
     }
@@ -145,7 +152,8 @@ impl MailerBuilder {
     }
 
     /// Send credentials over an unencrypted connection. Off by default.
-    pub fn allow_plaintext_auth(mut self, allow: bool) -> Self {
+    #[must_use]
+    pub const fn allow_plaintext_auth(mut self, allow: bool) -> Self {
         self.allow_plaintext_auth = allow;
         self
     }
@@ -263,6 +271,7 @@ impl fmt::Debug for Mailer {
 
 impl Mailer {
     /// Connects to `host` over TLS (port 465) unless told otherwise.
+    #[must_use]
     pub fn builder(host: &str) -> MailerBuilder {
         MailerBuilder {
             host: host.to_string(),
@@ -362,9 +371,9 @@ impl AsyncRead for Stream {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         match self.get_mut() {
-            Stream::Plain(s) => Pin::new(s).poll_read(cx, buf),
-            Stream::Tls(s) => Pin::new(s.as_mut()).poll_read(cx, buf),
-            Stream::Empty => Poll::Ready(Err(not_connected())),
+            Self::Plain(s) => Pin::new(s).poll_read(cx, buf),
+            Self::Tls(s) => Pin::new(s.as_mut()).poll_read(cx, buf),
+            Self::Empty => Poll::Ready(Err(not_connected())),
         }
     }
 }
@@ -376,25 +385,25 @@ impl AsyncWrite for Stream {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         match self.get_mut() {
-            Stream::Plain(s) => Pin::new(s).poll_write(cx, buf),
-            Stream::Tls(s) => Pin::new(s.as_mut()).poll_write(cx, buf),
-            Stream::Empty => Poll::Ready(Err(not_connected())),
+            Self::Plain(s) => Pin::new(s).poll_write(cx, buf),
+            Self::Tls(s) => Pin::new(s.as_mut()).poll_write(cx, buf),
+            Self::Empty => Poll::Ready(Err(not_connected())),
         }
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match self.get_mut() {
-            Stream::Plain(s) => Pin::new(s).poll_flush(cx),
-            Stream::Tls(s) => Pin::new(s.as_mut()).poll_flush(cx),
-            Stream::Empty => Poll::Ready(Err(not_connected())),
+            Self::Plain(s) => Pin::new(s).poll_flush(cx),
+            Self::Tls(s) => Pin::new(s.as_mut()).poll_flush(cx),
+            Self::Empty => Poll::Ready(Err(not_connected())),
         }
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match self.get_mut() {
-            Stream::Plain(s) => Pin::new(s).poll_shutdown(cx),
-            Stream::Tls(s) => Pin::new(s.as_mut()).poll_shutdown(cx),
-            Stream::Empty => Poll::Ready(Ok(())),
+            Self::Plain(s) => Pin::new(s).poll_shutdown(cx),
+            Self::Tls(s) => Pin::new(s.as_mut()).poll_shutdown(cx),
+            Self::Empty => Poll::Ready(Ok(())),
         }
     }
 }
@@ -407,7 +416,7 @@ struct Connection {
 }
 
 impl Connection {
-    fn new(stream: Stream, timeout: Duration) -> Self {
+    const fn new(stream: Stream, timeout: Duration) -> Self {
         Self {
             stream,
             buffer: Vec::new(),
@@ -491,7 +500,7 @@ impl Connection {
     }
 }
 
-/// `250-text` / `250 text` -> (250, "text", is_last).
+/// `250-text` / `250 text` -> (250, "text", `is_last`).
 fn parse_reply_line(line: &str) -> Result<(u16, &str, bool), Error> {
     let bad = || Error::Protocol(format!("malformed reply line {line:?}"));
     let bytes = line.as_bytes();
@@ -528,7 +537,7 @@ struct Capabilities {
 
 impl Capabilities {
     fn parse(reply: &Reply) -> Self {
-        let mut caps = Capabilities::default();
+        let mut caps = Self::default();
         // The first line is the greeting, the rest are extensions.
         for line in reply.lines.iter().skip(1) {
             let mut words = line.split_whitespace();
@@ -596,13 +605,10 @@ impl Session {
                 "server sent data before the TLS handshake".into(),
             ));
         }
-        let tcp = match std::mem::replace(&mut self.conn.stream, Stream::Empty) {
-            Stream::Plain(tcp) => tcp,
-            _ => {
-                return Err(Error::Protocol(
-                    "cannot upgrade this connection to TLS".into(),
-                ));
-            }
+        let Stream::Plain(tcp) = std::mem::replace(&mut self.conn.stream, Stream::Empty) else {
+            return Err(Error::Protocol(
+                "cannot upgrade this connection to TLS".into(),
+            ));
         };
         self.conn.stream = Stream::Tls(Box::new(handshake(&self.inner, tcp).await?));
         self.secure = true;
@@ -713,6 +719,7 @@ impl Session {
 /// The DATA payload: a leading `.` on any line is doubled so it cannot end the
 /// message early, a final CRLF is ensured, and the `.` terminator appended.
 #[doc(hidden)]
+#[must_use]
 pub fn dot_stuff(data: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(data.len() + 16);
     let mut line_start = true;

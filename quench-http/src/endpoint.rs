@@ -1,10 +1,10 @@
-use crate::error::HttpError;
 use crate::request::Request;
 use crate::response::Response;
 use async_trait::async_trait;
 
-/// The unit of request handling - poem/tower-flavored (a plain async
-/// `call`). `#[get]`/`#[post]`/...
+/// The unit of request handling - poem/tower-flavored (a plain async `call`).
+///
+/// `#[get]`/`#[post]`/...
 /// expands a handler function into one of these; middleware wraps one
 /// `Endpoint` in another.
 #[async_trait]
@@ -12,7 +12,9 @@ pub trait Endpoint: Send + Sync {
     async fn call(&self, req: Request) -> Response;
 }
 
-/// Converts a handler's return value into a [`Response`]. Implemented for
+/// Converts a handler's return value into a [`Response`].
+///
+/// Implemented for
 /// `Response` itself, common scalar bodies, and `Result<T, E>` where both
 /// sides implement it - so a handler can just return `Json<T>`,
 /// `Result<Json<T>, HttpError>`, `&'static str`, etc.
@@ -46,7 +48,7 @@ impl IntoResponse for &'static str {
 
 impl IntoResponse for crate::error::HttpError {
     fn into_response(self) -> Response {
-        HttpError::into_response(self)
+        Self::into_response(self)
     }
 }
 

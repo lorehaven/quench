@@ -27,7 +27,7 @@ fn test_cache_set_and_get() {
         tokens_used: Some(100),
     };
 
-    cache.set(key.clone(), response.clone());
+    cache.set(key.clone(), response);
     let retrieved = cache.get(&key);
 
     assert!(retrieved.is_some());

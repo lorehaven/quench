@@ -1,5 +1,7 @@
 //! Blanket write check: any non-GET/HEAD/OPTIONS request needs the
-//! `"write"` action. It reads the `Claims` `Auth` sets, so `Auth` has to wrap
+//! `"write"` action.
+//!
+//! It reads the `Claims` `Auth` sets, so `Auth` has to wrap
 //! `RequireWrite` - see `crate::http::middleware`'s doc comment for the exact
 //! call.
 
@@ -8,12 +10,14 @@ use async_trait::async_trait;
 use quench_http::prelude::http::{Method, StatusCode};
 use quench_http::prelude::{Endpoint, Middleware, Request, Response};
 
+#[derive(Debug)]
 pub struct RequireWrite {
     config: JwtConfig,
 }
 
 impl RequireWrite {
-    pub fn new(config: JwtConfig) -> Self {
+    #[must_use]
+    pub const fn new(config: JwtConfig) -> Self {
         Self { config }
     }
 }
@@ -46,6 +50,6 @@ impl Middleware for RequireWrite {
 }
 
 /// Methods that never need `write`, whatever the route behind them does.
-fn is_safe(method: &Method) -> bool {
+const fn is_safe(method: &Method) -> bool {
     matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS)
 }

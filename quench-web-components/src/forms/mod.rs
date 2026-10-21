@@ -20,31 +20,37 @@ impl FormInput {
         }
     }
 
+    #[must_use]
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
     }
 
+    #[must_use]
     pub fn input_type(mut self, input_type: impl Into<String>) -> Self {
         self.input_type = input_type.into();
         self
     }
 
+    #[must_use]
     pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
         self.placeholder = Some(placeholder.into());
         self
     }
 
-    pub fn required(mut self, required: bool) -> Self {
+    #[must_use]
+    pub const fn required(mut self, required: bool) -> Self {
         self.required = required;
         self
     }
 
+    #[must_use]
     pub fn value(mut self, value: impl Into<String>) -> Self {
         self.value = Some(value.into());
         self
     }
 
+    #[must_use]
     pub fn build(self) -> Element {
         let mut input_elem = input()
             .attr("type", &self.input_type)
@@ -92,31 +98,37 @@ impl FormSelect {
         }
     }
 
+    #[must_use]
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
     }
 
+    #[must_use]
     pub fn option(mut self, value: impl Into<String>, label: impl Into<String>) -> Self {
         self.options.push((value.into(), label.into()));
         self
     }
 
+    #[must_use]
     pub fn options(mut self, options: Vec<(String, String)>) -> Self {
         self.options = options;
         self
     }
 
+    #[must_use]
     pub fn selected(mut self, value: impl Into<String>) -> Self {
         self.selected = Some(value.into());
         self
     }
 
-    pub fn required(mut self, required: bool) -> Self {
+    #[must_use]
+    pub const fn required(mut self, required: bool) -> Self {
         self.required = required;
         self
     }
 
+    #[must_use]
     pub fn build(self) -> Element {
         let mut select_elem = select().attr("name", &self.name).attr("id", &self.name);
 
@@ -167,36 +179,43 @@ impl FormTextarea {
         }
     }
 
+    #[must_use]
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
     }
 
+    #[must_use]
     pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
         self.placeholder = Some(placeholder.into());
         self
     }
 
-    pub fn rows(mut self, rows: usize) -> Self {
+    #[must_use]
+    pub const fn rows(mut self, rows: usize) -> Self {
         self.rows = Some(rows);
         self
     }
 
-    pub fn cols(mut self, cols: usize) -> Self {
+    #[must_use]
+    pub const fn cols(mut self, cols: usize) -> Self {
         self.cols = Some(cols);
         self
     }
 
-    pub fn required(mut self, required: bool) -> Self {
+    #[must_use]
+    pub const fn required(mut self, required: bool) -> Self {
         self.required = required;
         self
     }
 
+    #[must_use]
     pub fn value(mut self, value: impl Into<String>) -> Self {
         self.value = Some(value.into());
         self
     }
 
+    #[must_use]
     pub fn build(self) -> Element {
         let mut textarea_elem = textarea().attr("name", &self.name).attr("id", &self.name);
 

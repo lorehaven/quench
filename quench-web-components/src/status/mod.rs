@@ -9,21 +9,23 @@ pub enum StatusLevel {
 }
 
 impl StatusLevel {
-    pub fn class_name(&self) -> &'static str {
+    #[must_use]
+    pub const fn class_name(&self) -> &'static str {
         match self {
-            StatusLevel::Info => "status-info",
-            StatusLevel::Success => "status-success",
-            StatusLevel::Warning => "status-warning",
-            StatusLevel::Error => "status-error",
+            Self::Info => "status-info",
+            Self::Success => "status-success",
+            Self::Warning => "status-warning",
+            Self::Error => "status-error",
         }
     }
 
-    pub fn icon_class(&self) -> &'static str {
+    #[must_use]
+    pub const fn icon_class(&self) -> &'static str {
         match self {
-            StatusLevel::Info => "fas fa-info-circle",
-            StatusLevel::Success => "fas fa-check-circle",
-            StatusLevel::Warning => "fas fa-exclamation-circle",
-            StatusLevel::Error => "fas fa-times-circle",
+            Self::Info => "fas fa-info-circle",
+            Self::Success => "fas fa-check-circle",
+            Self::Warning => "fas fa-exclamation-circle",
+            Self::Error => "fas fa-times-circle",
         }
     }
 }
@@ -44,36 +46,43 @@ impl StatusBadge {
         }
     }
 
-    pub fn level(mut self, level: StatusLevel) -> Self {
+    #[must_use]
+    pub const fn level(mut self, level: StatusLevel) -> Self {
         self.level = Some(level);
         self
     }
 
-    pub fn info(mut self) -> Self {
+    #[must_use]
+    pub const fn info(mut self) -> Self {
         self.level = Some(StatusLevel::Info);
         self
     }
 
-    pub fn success(mut self) -> Self {
+    #[must_use]
+    pub const fn success(mut self) -> Self {
         self.level = Some(StatusLevel::Success);
         self
     }
 
-    pub fn warning(mut self) -> Self {
+    #[must_use]
+    pub const fn warning(mut self) -> Self {
         self.level = Some(StatusLevel::Warning);
         self
     }
 
-    pub fn error(mut self) -> Self {
+    #[must_use]
+    pub const fn error(mut self) -> Self {
         self.level = Some(StatusLevel::Error);
         self
     }
 
-    pub fn with_icon(mut self, with_icon: bool) -> Self {
+    #[must_use]
+    pub const fn with_icon(mut self, with_icon: bool) -> Self {
         self.with_icon = with_icon;
         self
     }
 
+    #[must_use]
     pub fn build(self) -> Element {
         let mut badge = span().class("status-badge");
 
@@ -105,36 +114,43 @@ impl AlertBox {
         }
     }
 
-    pub fn level(mut self, level: StatusLevel) -> Self {
+    #[must_use]
+    pub const fn level(mut self, level: StatusLevel) -> Self {
         self.level = Some(level);
         self
     }
 
-    pub fn info(mut self) -> Self {
+    #[must_use]
+    pub const fn info(mut self) -> Self {
         self.level = Some(StatusLevel::Info);
         self
     }
 
-    pub fn success(mut self) -> Self {
+    #[must_use]
+    pub const fn success(mut self) -> Self {
         self.level = Some(StatusLevel::Success);
         self
     }
 
-    pub fn warning(mut self) -> Self {
+    #[must_use]
+    pub const fn warning(mut self) -> Self {
         self.level = Some(StatusLevel::Warning);
         self
     }
 
-    pub fn error(mut self) -> Self {
+    #[must_use]
+    pub const fn error(mut self) -> Self {
         self.level = Some(StatusLevel::Error);
         self
     }
 
-    pub fn closeable(mut self, closeable: bool) -> Self {
+    #[must_use]
+    pub const fn closeable(mut self, closeable: bool) -> Self {
         self.closeable = closeable;
         self
     }
 
+    #[must_use]
     pub fn build(self) -> Element {
         let mut alert = div().class("alert");
 

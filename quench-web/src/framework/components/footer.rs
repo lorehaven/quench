@@ -6,15 +6,18 @@ pub struct FooterBuilder {
 }
 
 impl FooterBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn label(mut self, value: impl Into<String>) -> Self {
         self.label = value.into();
         self
     }
 
+    #[must_use]
     pub fn build(self) -> Element {
         footer()
             .class("footer")

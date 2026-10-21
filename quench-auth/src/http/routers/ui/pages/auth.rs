@@ -11,13 +11,13 @@ use serde::{Deserialize, Serialize};
 
 /// `?err=1` on the login page. Gatehouse renders the error; a relying party
 /// only ever passes the parameter through.
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct LoginQuery {
     pub err: Option<String>,
 }
 
 /// What a page's session watcher is told about the session it is holding.
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct AuthStatus {
     pub authenticated: bool,
     pub username: Option<String>,
@@ -25,7 +25,8 @@ pub struct AuthStatus {
 }
 
 impl AuthStatus {
-    pub fn anonymous() -> Self {
+    #[must_use]
+    pub const fn anonymous() -> Self {
         Self {
             authenticated: false,
             username: None,
@@ -129,10 +130,9 @@ pub async fn auth_callback(request: &Request, sso: &SsoConfig) -> Response {
 /// Realm-wide logout, which is also gatehouse's to perform.
 pub fn logout_delegation(request: &Request) -> Response {
     let return_to = absolute_url(request, &realm::ui_path("/login"));
-    match realm::gatehouse_logout_url(Some(&return_to)) {
-        Some(url) => Response::new(StatusCode::FOUND).header("Location", url),
-        None => gatehouse_not_configured(),
-    }
+    realm::gatehouse_logout_url(Some(&return_to)).map_or_else(gatehouse_not_configured, |url| {
+        Response::new(StatusCode::FOUND).header("Location", url)
+    })
 }
 
 fn json<T: serde::Serialize>(value: &T) -> Response {
@@ -176,6 +176,7 @@ pub fn redirect_target(request: &Request) -> Option<String> {
     validated_redirect(&decoded)
 }
 
+#[must_use]
 pub fn validated_redirect(target: &str) -> Option<String> {
     let same_origin =
         target.starts_with('/') && !target.starts_with("//") && !target.starts_with("/\\");

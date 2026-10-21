@@ -3,6 +3,7 @@
 //! `provide`d as-is - that would key it on `TypeId::of::<Arc<T>>()`
 //! instead of `TypeId::of::<T>()`, and no `Arc<T>`-shaped dependency would
 //! ever find it.
+#![allow(clippy::unused_async)] // `#[injectable]` constructors are async by contract
 
 use quench_http::di::ContainerBuilder;
 use quench_http::prelude::injectable;

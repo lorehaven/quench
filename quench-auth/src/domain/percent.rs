@@ -3,12 +3,13 @@
 
 use std::fmt::Write;
 
+#[must_use]
 pub fn encode(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for &b in input.as_bytes() {
         match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
-                out.push(b as char)
+                out.push(b as char);
             }
             _ => {
                 let _ = write!(out, "%{b:02X}");
@@ -20,17 +21,18 @@ pub fn encode(input: &str) -> String {
 
 /// `None` when the decoded bytes aren't valid UTF-8. A `%` not followed by
 /// two hex digits is kept literally, as `urlencoding` does.
+#[must_use]
 pub fn decode(input: &str) -> Option<String> {
     let bytes = input.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
-        let hex = |b: u8| (b as char).to_digit(16);
+        let hex = |b: u8| (b as char).to_digit(16).and_then(|d| u8::try_from(d).ok());
         if bytes[i] == b'%'
             && let (Some(&h), Some(&l)) = (bytes.get(i + 1), bytes.get(i + 2))
             && let (Some(h), Some(l)) = (hex(h), hex(l))
         {
-            out.push((h * 16 + l) as u8);
+            out.push(h * 16 + l);
             i += 3;
         } else {
             out.push(bytes[i]);

@@ -10,6 +10,7 @@
 //! fragment in `<html><head></head><body>…</body></html>`.
 
 use super::element::html_escape;
+use std::fmt::Write as _;
 
 const VOID: &[&str] = &[
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source",
@@ -228,15 +229,12 @@ fn decode(text: &str) -> String {
             .find(';')
             .filter(|&semi| semi <= 10)
             .and_then(|semi| reference(&rest[1..semi]).map(|c| (c, semi)));
-        match decoded {
-            Some((c, semi)) => {
-                out.push(c);
-                rest = &rest[semi + 1..];
-            }
-            None => {
-                out.push('&');
-                rest = &rest[1..];
-            }
+        if let Some((c, semi)) = decoded {
+            out.push(c);
+            rest = &rest[semi + 1..];
+        } else {
+            out.push('&');
+            rest = &rest[1..];
         }
     }
     out.push_str(rest);
@@ -317,11 +315,10 @@ fn wrap_document(nodes: Vec<Node>) -> Element {
 /// writing it out as-is would turn any text a page displayed (a username, a
 /// title) into live markup.
 fn write_element(e: &Element, indent: usize, is_preformatted: bool) -> String {
-    let attrs: String = e
-        .attrs
-        .iter()
-        .map(|(k, v)| format!(" {k}=\"{}\"", html_escape(v)))
-        .collect();
+    let attrs = e.attrs.iter().fold(String::new(), |mut out, (k, v)| {
+        let _ = write!(out, " {k}=\"{}\"", html_escape(v));
+        out
+    });
 
     let tag = e.name.as_str();
     let code = tag == "script" || tag == "style";
@@ -332,7 +329,7 @@ fn write_element(e: &Element, indent: usize, is_preformatted: bool) -> String {
         for child in &e.children {
             s.push_str(&write_node(child, 0, true, code));
         }
-        s.push_str(&format!("</{tag}>"));
+        let _ = write!(s, "</{tag}>");
         if is_preformatted {
             s
         } else {
@@ -343,7 +340,7 @@ fn write_element(e: &Element, indent: usize, is_preformatted: bool) -> String {
         for child in &e.children {
             s.push_str(&write_node(child, indent + 4, false, false));
         }
-        s.push_str(&format!("{}</{tag}>\n", " ".repeat(indent)));
+        let _ = writeln!(s, "{}</{tag}>", " ".repeat(indent));
         s
     }
 }

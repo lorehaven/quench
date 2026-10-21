@@ -1,5 +1,6 @@
 use quench_web::prelude::CssRule;
 
+#[must_use]
 pub fn layout_rules() -> Vec<CssRule> {
     vec![
         CssRule::new("header").child(
@@ -80,6 +81,7 @@ pub fn layout_rules() -> Vec<CssRule> {
     ]
 }
 
+#[must_use]
 pub fn home_rules() -> Vec<CssRule> {
     vec![
         CssRule::new(".home-content").property("width", "100%"),
@@ -157,6 +159,7 @@ pub fn home_rules() -> Vec<CssRule> {
     ]
 }
 
+#[must_use]
 pub fn login_rules() -> Vec<CssRule> {
     vec![
         // The login page runs without a top panel, so only the footer and the
@@ -200,6 +203,7 @@ pub fn login_rules() -> Vec<CssRule> {
     ]
 }
 
+#[must_use]
 pub fn meta_rules() -> Vec<CssRule> {
     vec![
         CssRule::new(".meta-list")

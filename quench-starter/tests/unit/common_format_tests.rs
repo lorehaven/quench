@@ -19,5 +19,5 @@ fn kilobyte_range_rounds_to_a_whole_number() {
 #[test]
 fn megabyte_and_above_keeps_one_decimal_place() {
     assert_eq!(human_bytes(1024 * 1024), "1.0 MB");
-    assert_eq!(human_bytes((1024.0 * 1024.0 * 3.4) as i64), "3.4 MB");
+    assert_eq!(human_bytes(1024 * 1024 * 34 / 10), "3.4 MB");
 }

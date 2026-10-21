@@ -1,5 +1,6 @@
 //! Two components that depend on each other are caught as a cycle at
 //! startup rather than deadlocking or blowing the stack.
+#![allow(clippy::unused_async)] // `#[injectable]` constructors are async by contract
 
 use quench_http::di::{ContainerBuilder, DiError};
 use quench_http::prelude::injectable;

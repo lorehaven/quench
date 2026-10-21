@@ -39,13 +39,14 @@ pub fn wrap<M: Middleware>(inner: Arc<dyn Endpoint>, middleware: M) -> Arc<dyn E
 /// `/login` route. quench-http's discovered routes are all one flat router, so
 /// scoping a middleware to part of it is a middleware concern instead of a
 /// routing one.
+#[derive(Debug)]
 pub struct OnPathPrefix<M> {
     prefix: &'static str,
     inner: M,
 }
 
 impl<M> OnPathPrefix<M> {
-    pub fn new(prefix: &'static str, inner: M) -> Self {
+    pub const fn new(prefix: &'static str, inner: M) -> Self {
         Self { prefix, inner }
     }
 }

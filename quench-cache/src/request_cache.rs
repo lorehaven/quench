@@ -13,12 +13,14 @@ pub struct CachedResponse {
 }
 
 /// Request/response cache with TTL (24 hours default)
+#[derive(Debug)]
 pub struct RequestCache {
     cache: Arc<DashMap<String, CachedResponse>>,
     ttl_secs: u64,
 }
 
 impl RequestCache {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             cache: Arc::new(DashMap::new()),
@@ -26,6 +28,7 @@ impl RequestCache {
         }
     }
 
+    #[must_use]
     pub fn with_ttl(ttl_secs: u64) -> Self {
         Self {
             cache: Arc::new(DashMap::new()),
@@ -34,6 +37,7 @@ impl RequestCache {
     }
 
     /// Generate cache key from inputs
+    #[must_use]
     pub fn generate_key(parts: &[&str]) -> String {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
@@ -44,6 +48,7 @@ impl RequestCache {
     }
 
     /// Get cached response if valid and not expired
+    #[must_use]
     pub fn get(&self, key: &str) -> Option<CachedResponse> {
         if let Some(entry) = self.cache.get(key) {
             let now = SystemTime::now()
@@ -68,6 +73,7 @@ impl RequestCache {
     }
 
     /// Check if key exists in cache
+    #[must_use]
     pub fn has(&self, key: &str) -> bool {
         self.cache.contains_key(key)
     }
@@ -78,6 +84,7 @@ impl RequestCache {
     }
 
     /// Get cache statistics
+    #[must_use]
     pub fn stats(&self) -> CacheStats {
         let mut total_size = 0;
         let mut expired_count = 0;
@@ -103,6 +110,7 @@ impl RequestCache {
     }
 
     /// Remove expired entries from cache
+    #[must_use]
     pub fn cleanup_expired(&self) -> usize {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)

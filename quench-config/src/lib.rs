@@ -18,11 +18,13 @@ pub enum ConfigError {
 pub type Result<T> = std::result::Result<T, ConfigError>;
 
 /// Configuration loader supporting multiple formats and sources
+#[derive(Debug)]
 pub struct ConfigLoader {
     env_prefix: String,
 }
 
 impl ConfigLoader {
+    #[must_use]
     pub fn new(env_prefix: &str) -> Self {
         Self {
             env_prefix: env_prefix.to_string(),
@@ -31,29 +33,29 @@ impl ConfigLoader {
 
     /// Load from JSON file
     pub fn from_json_file<T: DeserializeOwned>(path: &str) -> Result<T> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| ConfigError::ReadError(format!("{}: {}", path, e)))?;
+        let content =
+            fs::read_to_string(path).map_err(|e| ConfigError::ReadError(format!("{path}: {e}")))?;
 
         serde_json::from_str(&content)
-            .map_err(|e| ConfigError::ParseError(format!("JSON parse error: {}", e)))
+            .map_err(|e| ConfigError::ParseError(format!("JSON parse error: {e}")))
     }
 
     /// Load from YAML file
     pub fn from_yaml_file<T: DeserializeOwned>(path: &str) -> Result<T> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| ConfigError::ReadError(format!("{}: {}", path, e)))?;
+        let content =
+            fs::read_to_string(path).map_err(|e| ConfigError::ReadError(format!("{path}: {e}")))?;
 
         serde_norway::from_str(&content)
-            .map_err(|e| ConfigError::ParseError(format!("YAML parse error: {}", e)))
+            .map_err(|e| ConfigError::ParseError(format!("YAML parse error: {e}")))
     }
 
     /// Load from TOML file
     pub fn from_toml_file<T: DeserializeOwned>(path: &str) -> Result<T> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| ConfigError::ReadError(format!("{}: {}", path, e)))?;
+        let content =
+            fs::read_to_string(path).map_err(|e| ConfigError::ReadError(format!("{path}: {e}")))?;
 
         toml::from_str(&content)
-            .map_err(|e| ConfigError::ParseError(format!("TOML parse error: {}", e)))
+            .map_err(|e| ConfigError::ParseError(format!("TOML parse error: {e}")))
     }
 
     /// Try loading from multiple sources in order (file -> env var)
@@ -65,11 +67,14 @@ impl ConfigLoader {
         if let Some(path) = file_path
             && Path::new(path).exists()
         {
-            if path.ends_with(".json") {
+            let extension = Path::new(path).extension();
+            let has_extension =
+                |wanted: &str| extension.is_some_and(|ext| ext.eq_ignore_ascii_case(wanted));
+            if has_extension("json") {
                 return Self::from_json_file(path);
-            } else if path.ends_with(".yaml") || path.ends_with(".yml") {
+            } else if has_extension("yaml") || has_extension("yml") {
                 return Self::from_yaml_file(path);
-            } else if path.ends_with(".toml") {
+            } else if has_extension("toml") {
                 return Self::from_toml_file(path);
             }
         }
@@ -81,11 +86,12 @@ impl ConfigLoader {
         }
 
         default.ok_or_else(|| {
-            ConfigError::MissingValue(format!("No config found in file or env var {}", env_var))
+            ConfigError::MissingValue(format!("No config found in file or env var {env_var}"))
         })
     }
 
     /// Get environment variable with optional prefix
+    #[must_use]
     pub fn env_string(&self, key: &str, default: &str) -> String {
         let prefixed_key = format!("{}_{}", self.env_prefix, key);
         std::env::var(&prefixed_key)
@@ -94,18 +100,21 @@ impl ConfigLoader {
     }
 
     /// Get environment variable as u64
+    #[must_use]
     pub fn env_u64(&self, key: &str, default: u64) -> u64 {
         let value = self.env_string(key, &default.to_string());
         value.parse().unwrap_or(default)
     }
 
     /// Get environment variable as bool
+    #[must_use]
     pub fn env_bool(&self, key: &str, default: bool) -> bool {
         let value = self.env_string(key, &default.to_string()).to_lowercase();
         matches!(value.as_str(), "true" | "1" | "yes" | "on")
     }
 
     /// Get environment variable split by comma
+    #[must_use]
     pub fn env_list(&self, key: &str, default: &[&str]) -> Vec<String> {
         let value = self.env_string(key, &default.join(","));
         value
@@ -128,11 +137,12 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
+    #[must_use]
     pub fn from_env() -> Self {
         let loader = ConfigLoader::new("APP");
         Self {
             service_name: loader.env_string("SERVICE_NAME", "unknown"),
-            port: loader.env_u64("PORT", 8080) as u16,
+            port: u16::try_from(loader.env_u64("PORT", 8080)).unwrap_or(8080),
             database_url: loader.env_string("DATABASE_URL", ""),
             log_level: loader.env_string("LOG_LEVEL", "info"),
             debug: loader.env_bool("DEBUG", false),

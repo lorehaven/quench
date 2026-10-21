@@ -1,6 +1,7 @@
 use super::ThemeSpec;
 use crate::styling::css::CssRule;
 
+#[derive(Debug)]
 pub struct BootstrapDarkTheme;
 
 impl ThemeSpec for BootstrapDarkTheme {

@@ -1,4 +1,6 @@
-//! A real dependency-injection container: components declare their
+//! A real dependency-injection container.
+//!
+//! Components declare their
 //! dependencies (as `Arc<T>` constructor parameters via `#[injectable]`),
 //! and [`ContainerBuilder::build`] resolves the whole graph with a
 //! topological sort - detecting missing dependencies and cycles at startup
@@ -25,6 +27,7 @@ pub type ConstructFuture = Pin<Box<dyn Future<Output = Result<BoxedAny, DiError>
 /// function pointers rather than a `TypeId`/`Vec` computed up front: a bare
 /// `TypeId::of::<T>()` or `vec![...]` call isn't valid in that position, but
 /// a reference to a plain `fn` is.
+#[derive(Debug)]
 pub struct ComponentFactory {
     pub type_id: fn() -> TypeId,
     /// Also a function pointer, not a plain `&'static str`: like `type_id`,
@@ -53,7 +56,7 @@ pub struct Container {
 
 impl std::fmt::Debug for Container {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let count = self.resolved.read().map(|r| r.len()).unwrap_or(0);
+        let count = self.resolved.read().map_or(0, |r| r.len());
         f.debug_struct("Container")
             .field("resolved_components", &count)
             .finish()
@@ -95,21 +98,25 @@ impl Container {
     }
 }
 
-/// Builds a [`Container`]: seed it with externally-constructed values via
+/// Builds a [`Container`].
+///
+/// Seed it with externally-constructed values via
 /// [`provide`](Self::provide) (config loaded from env, a DB pool, anything
 /// that isn't itself `#[injectable]`), then [`build`](Self::build) resolves
 /// every `#[injectable]` component discovered in the linked binary,
 /// constructing each exactly once, in dependency order.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ContainerBuilder {
     container: Container,
 }
 
 impl ContainerBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn provide<T: Any + Send + Sync + 'static>(self, value: T) -> Self {
         self.container.insert(Arc::new(value));
         self
@@ -121,6 +128,7 @@ impl ContainerBuilder {
     /// `provide(arc)` instead would key it on `TypeId::of::<Arc<T>>()`, not
     /// `TypeId::of::<T>()` - an `Inject<T>`/`#[injectable]` dependency on
     /// `Arc<T>` would then find nothing.
+    #[must_use]
     pub fn provide_arc<T: Any + Send + Sync + 'static>(self, value: Arc<T>) -> Self {
         self.container.insert(value);
         self

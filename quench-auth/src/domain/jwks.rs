@@ -29,6 +29,7 @@ struct Jwk {
     x: String,
 }
 
+#[derive(Debug)]
 pub struct JwksVerifier {
     http: quench_client::transport::Client,
     jwks_url: String,

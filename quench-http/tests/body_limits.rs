@@ -51,9 +51,8 @@ async fn provided_body_limit_rejects_a_body_over_the_configured_cap() {
     );
     let mut req = request_with_body(r#"{"ok":true}"#, &container);
 
-    let err = match Json::<Small>::from_request(&mut req).await {
-        Err(e) => e,
-        Ok(_) => panic!("expected the body to exceed the 5-byte limit"),
+    let Err(err) = Json::<Small>::from_request(&mut req).await else {
+        panic!("expected the body to exceed the 5-byte limit");
     };
     assert_eq!(err.into_response().status(), StatusCode::BAD_REQUEST);
 }
@@ -86,9 +85,8 @@ async fn bytes_extractor_respects_the_same_body_limit() {
     );
     let mut req = request_with_body("hello", &container);
 
-    let err = match Bytes::from_request(&mut req).await {
-        Err(e) => e,
-        Ok(_) => panic!("expected the body to exceed the 3-byte limit"),
+    let Err(err) = Bytes::from_request(&mut req).await else {
+        panic!("expected the body to exceed the 3-byte limit");
     };
     assert_eq!(err.into_response().status(), StatusCode::BAD_REQUEST);
 }

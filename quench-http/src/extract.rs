@@ -6,7 +6,9 @@ use std::any::Any;
 use std::ops::Deref;
 use std::sync::Arc;
 
-/// Pulls typed data out of an incoming [`Request`]. Implemented for
+/// Pulls typed data out of an incoming [`Request`].
+///
+/// Implemented for
 /// [`Path`], [`Query`], [`Json`], [`Inject`], and raw body accessors; a
 /// `#[get]`/`#[post]`/... handler's parameters are each resolved through
 /// this trait, in order, before the handler body runs.
@@ -17,6 +19,7 @@ pub trait FromRequest: Sized {
 
 /// Deserializes captured path parameters (e.g. `/{name:.+}/blobs/{digest}`)
 /// into `T`.
+#[derive(Debug)]
 pub struct Path<T>(pub T);
 
 impl<T> Deref for Path<T> {
@@ -36,6 +39,7 @@ impl<T: DeserializeOwned + Send> FromRequest for Path<T> {
 }
 
 /// Deserializes the request's query string into `T`.
+#[derive(Debug)]
 pub struct Query<T>(pub T);
 
 impl<T> Deref for Query<T> {
@@ -55,18 +59,23 @@ impl<T: DeserializeOwned + Send> FromRequest for Query<T> {
     }
 }
 
-/// The cap a buffered-body extractor (`Json<T>`, `Bytes`) falls back to
-/// when nothing more specific was configured for this request - either no
+/// The cap a buffered-body extractor (`Json<T>`, `Bytes`) falls back to.
+///
+/// Applies when nothing more specific was configured for this request - either no
 /// [`BodyLimit`] was provided at all, or (for `Json`/`Bytes`) the handler
 /// didn't ask for a different one via [`Limited`].
 pub const DEFAULT_BODY_LIMIT: usize = 2 * 1024 * 1024;
 
-/// An app-wide override for [`DEFAULT_BODY_LIMIT`], seeded once via
-/// `ContainerBuilder::provide(BodyLimit(n))` - A service that accepts
+/// An app-wide override for [`DEFAULT_BODY_LIMIT`].
+///
+/// Seeded once via
+/// `ContainerBuilder::provide(BodyLimit(n))`. A service that accepts
 /// large uploads (warehouse's blobs/files, sized well past a JSON
 /// payload's usual few KB) provides one bigger limit that every buffered
 /// extractor in the app then respects, rather than raising a limit that
-/// was never configurable per call site. Use [`Limited`] instead when only
+/// was never configurable per call site.
+///
+/// Use [`Limited`] instead when only
 /// *one* route needs a different limit than the rest of the app.
 #[derive(Debug, Clone, Copy)]
 pub struct BodyLimit(pub usize);
@@ -80,13 +89,13 @@ impl Default for BodyLimit {
 pub(crate) fn resolve_body_limit(req: &Request) -> usize {
     req.container()
         .get::<BodyLimit>()
-        .map(|limit| limit.0)
-        .unwrap_or(DEFAULT_BODY_LIMIT)
+        .map_or(DEFAULT_BODY_LIMIT, |limit| limit.0)
 }
 
 /// Buffers and deserializes a JSON request body into `T`, up to the
 /// request's [`BodyLimit`] (falling back to [`DEFAULT_BODY_LIMIT`] if none
 /// was provided).
+#[derive(Debug)]
 pub struct Json<T>(pub T);
 
 impl<T> Deref for Json<T> {
@@ -108,9 +117,14 @@ impl<T: DeserializeOwned + Send> FromRequest for Json<T> {
 }
 
 /// Buffers and deserializes an `application/x-www-form-urlencoded` request
-/// body into `T` - the body-reading counterpart to [`Query`], for an HTML
-/// `<form method="post">` (no JS/htmx) rather than a `?query=string`. Same
+/// body into `T`.
+///
+/// The body-reading counterpart to [`Query`], for an HTML
+/// `<form method="post">` (no JS/htmx) rather than a `?query=string`.
+///
+/// Same
 /// [`BodyLimit`] as `Json`/`Bytes`.
+#[derive(Debug)]
 pub struct Form<T>(pub T);
 
 impl<T> Deref for Form<T> {
@@ -131,12 +145,16 @@ impl<T: DeserializeOwned + Send> FromRequest for Form<T> {
     }
 }
 
-/// Buffers the raw request body, up to the request's [`BodyLimit`] - the
-/// non-JSON counterpart to [`Json`], for a handler that wants the bytes
+/// Buffers the raw request body, up to the request's [`BodyLimit`].
+///
+/// The non-JSON counterpart to [`Json`], for a handler that wants the bytes
 /// themselves (a non-JSON upload small enough to buffer, a signature to
-/// verify over the raw body, ...). A body large enough to want streaming
+/// verify over the raw body, ...).
+///
+/// A body large enough to want streaming
 /// instead should go through [`crate::body::InboundBody`] via
 /// `Request::take_body` directly, uncapped.
+#[derive(Debug)]
 pub struct Bytes(pub bytes::Bytes);
 
 impl Deref for Bytes {
@@ -159,13 +177,16 @@ impl FromRequest for Bytes {
 }
 
 /// Wraps another extractor (`Json<T>`, `Bytes`) to use `LIMIT` bytes
-/// instead of the request's [`BodyLimit`] - for the one route that needs a
+/// instead of the request's [`BodyLimit`].
+///
+/// For the one route that needs a
 /// different cap than the rest of the app, without having to change what
 /// every other buffered extractor falls back to:
 ///
 /// ```ignore
 /// async fn handler(Limited::<Json<Report>, 10_000_000>(Json(report)): Limited<Json<Report>, 10_000_000>) { ... }
 /// ```
+#[derive(Debug)]
 pub struct Limited<T, const LIMIT: usize>(pub T);
 
 impl<T, const LIMIT: usize> Deref for Limited<T, LIMIT> {
@@ -180,7 +201,7 @@ impl<T: DeserializeOwned + Send, const LIMIT: usize> FromRequest for Limited<Jso
     async fn from_request(req: &mut Request) -> Result<Self, HttpError> {
         let bytes = req.take_body().collect_limited(LIMIT).await?;
         serde_json::from_slice(&bytes)
-            .map(|value| Limited(Json(value)))
+            .map(|value| Self(Json(value)))
             .map_err(|e| ExtractError::InvalidJson(e.to_string()).into())
     }
 }
@@ -191,16 +212,19 @@ impl<const LIMIT: usize> FromRequest for Limited<Bytes, LIMIT> {
         req.take_body()
             .collect_limited(LIMIT)
             .await
-            .map(|b| Limited(Bytes(b)))
+            .map(|b| Self(Bytes(b)))
             .map_err(Into::into)
     }
 }
 
 /// Reads a value a middleware stashed on this request via
-/// `req.extensions_mut().insert(value)` - e.g. auth middleware inserting
+/// `req.extensions_mut().insert(value)` - e.g.
+///
+/// auth middleware inserting
 /// decoded claims for a handler to read back. Distinct from [`Inject`]:
 /// this is per-request *data*, not a shared *service* the DI container
 /// resolves once.
+#[derive(Debug)]
 pub struct Extension<T>(pub T);
 
 impl<T> Deref for Extension<T> {
@@ -232,6 +256,7 @@ impl<T: Clone + Send + Sync + 'static> FromRequest for Extension<T> {
 /// Resolves a dependency-injected service (anything `#[injectable]`, or
 /// seeded via `ContainerBuilder::provide`) straight out of the request's
 /// container.
+#[derive(Debug)]
 pub struct Inject<T: ?Sized>(pub Arc<T>);
 
 impl<T: ?Sized> Deref for Inject<T> {
@@ -243,7 +268,7 @@ impl<T: ?Sized> Deref for Inject<T> {
 
 impl<T: ?Sized> Clone for Inject<T> {
     fn clone(&self) -> Self {
-        Inject(self.0.clone())
+        Self(self.0.clone())
     }
 }
 

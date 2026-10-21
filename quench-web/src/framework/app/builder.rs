@@ -32,6 +32,7 @@ pub struct AppBuilder {
 }
 
 impl AppBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             supported_themes: Theme::iter().collect(),
@@ -40,61 +41,73 @@ impl AppBuilder {
         }
     }
 
+    #[must_use]
     pub fn title(mut self, value: impl Into<String>) -> Self {
         self.title = value.into();
         self
     }
 
+    #[must_use]
     pub fn links(mut self, value: Vec<Link>) -> Self {
         self.links = value;
         self
     }
 
+    #[must_use]
     pub fn scripts(mut self, value: Vec<Script>) -> Self {
         self.scripts = value;
         self
     }
 
+    #[must_use]
     pub fn supported_themes(mut self, value: Vec<Theme>) -> Self {
         self.supported_themes = value;
         self
     }
 
+    #[must_use]
     pub fn supported_locales(mut self, value: Vec<String>) -> Self {
         self.supported_locales = value;
         self
     }
 
-    pub fn default_theme(mut self, value: Theme) -> Self {
+    #[must_use]
+    pub const fn default_theme(mut self, value: Theme) -> Self {
         self.default_theme = value;
         self
     }
 
+    #[must_use]
     pub fn default_locale(mut self, value: impl Into<String>) -> Self {
         self.default_locale = Some(value.into());
         self
     }
 
+    #[must_use]
     pub fn header(mut self, value: Element) -> Self {
         self.header = Some(value);
         self
     }
 
+    #[must_use]
     pub fn page_content(mut self, value: Element) -> Self {
         self.content = Some(value);
         self
     }
 
+    #[must_use]
     pub fn footer(mut self, value: Element) -> Self {
         self.footer = Some(value);
         self
     }
 
+    #[must_use]
     pub fn resources_prefix(mut self, value: String) -> Self {
         self.resources_prefix = value;
         self
     }
 
+    #[must_use]
     pub fn build(self) -> String {
         let active_theme = self.default_theme.to_string();
         let supported_locales = if self.supported_locales.is_empty() {
@@ -153,7 +166,7 @@ impl AppBuilder {
                     &format!("{}/assets/css/themes/{theme}.css", self.resources_prefix),
                 )
                 .attr("as", "style"),
-            )
+            );
         });
         links.extend(self.links);
 

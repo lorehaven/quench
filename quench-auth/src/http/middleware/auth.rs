@@ -1,6 +1,9 @@
-//! Bearer header or realm session cookie, with a silent refresh-token exchange when the
+//! Authenticates a request by Bearer header or realm session cookie.
+//!
+//! Does a silent refresh-token exchange when the
 //! access token is gone but the refresh token isn't; unauthorized
 //! requests get a redirect for a browser and a 401 for an API caller.
+//!
 //! `Claims` land in `Request::extensions_mut()` for a handler to read.
 //!
 //! `SessionDb` comes from the DI container (`req.container().get::<SessionDb>()`)
@@ -16,12 +19,14 @@ use async_trait::async_trait;
 use quench_http::prelude::http::StatusCode;
 use quench_http::prelude::{Endpoint, Middleware, Request, Response};
 
+#[derive(Debug)]
 pub struct Auth {
     config: JwtConfig,
 }
 
 impl Auth {
-    pub fn new(config: JwtConfig) -> Self {
+    #[must_use]
+    pub const fn new(config: JwtConfig) -> Self {
         Self { config }
     }
 }
@@ -55,24 +60,22 @@ impl Middleware for Auth {
         // The access token outlives its `ACCESS_TOKEN_TTL_SECS` far less than
         // the refresh token does - silently exchange it here instead of
         // bouncing a still-valid session to login.
-        let (claims, refreshed) = match claims {
-            Some(claims) => (claims, None),
-            None => {
-                let Some(refresh_token) = refresh_token else {
-                    if token.is_none() {
-                        tracing::warn!("Auth: no token found in header or cookie");
-                    }
-                    return unauthorized(&req);
-                };
-                let Some(tokens) = sso_client::refresh(&refresh_token).await else {
-                    return unauthorized(&req);
-                };
-                let Some(claims) = authenticate(&tokens.access_token, &self.config, &req).await
-                else {
-                    return unauthorized(&req);
-                };
-                (claims, Some(tokens))
-            }
+        let (claims, refreshed) = if let Some(claims) = claims {
+            (claims, None)
+        } else {
+            let Some(refresh_token) = refresh_token else {
+                if token.is_none() {
+                    tracing::warn!("Auth: no token found in header or cookie");
+                }
+                return unauthorized(&req);
+            };
+            let Some(tokens) = sso_client::refresh(&refresh_token).await else {
+                return unauthorized(&req);
+            };
+            let Some(claims) = authenticate(&tokens.access_token, &self.config, &req).await else {
+                return unauthorized(&req);
+            };
+            (claims, Some(tokens))
         };
 
         req.extensions_mut().insert(claims);
@@ -114,15 +117,14 @@ async fn authenticate(token: &str, config: &JwtConfig, req: &Request) -> Option<
     }
 
     if let Some(session_id) = claims.sid.as_deref() {
-        let active = match req.container().get::<SessionDb>() {
-            Ok(session_db) => session_db
+        let active = if let Ok(session_db) = req.container().get::<SessionDb>() {
+            session_db
                 .is_active(session_id, &claims.sub)
                 .await
-                .unwrap_or(false),
-            Err(_) => {
-                tracing::warn!("Auth: SessionDb not found in the container");
-                false
-            }
+                .unwrap_or(false)
+        } else {
+            tracing::warn!("Auth: SessionDb not found in the container");
+            false
         };
         if !active {
             tracing::warn!(

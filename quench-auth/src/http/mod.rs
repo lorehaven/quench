@@ -1,4 +1,6 @@
-//! The quench-http side of auth. The framework-agnostic parts (JWT,
+//! The quench-http side of auth.
+//!
+//! The framework-agnostic parts (JWT,
 //! sessions, realm cookies/URLs, Ed25519 signing) live in `crate::domain`;
 //! `middleware::{Auth, RequireWrite}`, `routers::ui::{is_ui_authenticated,
 //! get_user_from_req}`, and `domain::sso_client`'s request/response-touching

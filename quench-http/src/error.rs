@@ -23,6 +23,7 @@ pub enum DiError {
 }
 
 impl DiError {
+    #[must_use]
     pub fn not_found<T: 'static>() -> Self {
         Self::NotFound(std::any::type_name::<T>())
     }
@@ -68,10 +69,11 @@ impl HttpError {
         Self::Status(code, msg.into())
     }
 
+    #[must_use]
     pub fn into_response(self) -> Response {
         let status = match &self {
-            HttpError::Status(code, _) => *code,
-            HttpError::Extraction(_) => http::StatusCode::BAD_REQUEST,
+            Self::Status(code, _) => *code,
+            Self::Extraction(_) => http::StatusCode::BAD_REQUEST,
         };
         Response::text(status, self.to_string())
     }

@@ -1,5 +1,7 @@
 //! Unit tests for `common/wait.rs`.
 
+#![allow(unsafe_code)] // tests mutate the process environment (`set_var` is unsafe in edition 2024)
+
 use quench_starter::common::wait::{gatehouse_health_url, wait_for_services};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -11,7 +13,9 @@ use tokio::net::TcpListener;
 
 #[test]
 fn gatehouse_health_url_appends_the_ready_path_and_strips_a_trailing_slash() {
-    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = ENV_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     unsafe {
         std::env::set_var("GATEHOUSE_URL", "https://gatehouse.internal/");
     }
@@ -26,7 +30,9 @@ fn gatehouse_health_url_appends_the_ready_path_and_strips_a_trailing_slash() {
 
 #[test]
 fn gatehouse_health_url_defaults_to_a_bare_ready_path_when_unset() {
-    let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _guard = ENV_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     unsafe {
         std::env::remove_var("GATEHOUSE_URL");
     }

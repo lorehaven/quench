@@ -7,6 +7,7 @@ use crate::migrations::{Migration, RenderError};
 use semver::Version;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap};
+use std::fmt::Write as _;
 
 /// Schema placeholder used as the instance key of database-scoped modules, so
 /// they resolve to a single instance no matter how many schemas pull them in.
@@ -83,6 +84,7 @@ pub struct ResolvedModule {
 
 impl ResolvedModule {
     /// Stable identity of this module instance, used in the ledger.
+    #[must_use]
     pub fn instance(&self) -> String {
         instance_key(&self.module, &self.schema, self.scope)
     }
@@ -121,7 +123,8 @@ pub struct MigrationPlan {
 }
 
 impl MigrationPlan {
-    pub fn is_empty(&self) -> bool {
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
         self.migrations.is_empty()
     }
 
@@ -174,11 +177,10 @@ fn plan_migration(
         hasher.update(statement.as_bytes());
         hasher.update(b";\n");
     }
-    let checksum: String = hasher
-        .finalize()
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect();
+    let checksum = hasher.finalize().iter().fold(String::new(), |mut out, b| {
+        let _ = write!(out, "{b:02x}");
+        out
+    });
 
     Ok(PlannedMigration {
         id: format!("{}:{}", resolved.instance(), migration.id),
@@ -201,6 +203,7 @@ struct Edge {
     wanted: semver::VersionReq,
 }
 
+#[allow(clippy::too_many_lines)] // one resolution pass; the phases share a lot of state
 fn resolve_modules(
     catalog: &Catalog,
     requests: &[InstallRequest],
@@ -210,7 +213,6 @@ fn resolve_modules(
     }
 
     let mut instances: BTreeMap<String, ResolvedModule> = BTreeMap::new();
-    let mut pinned: BTreeSet<String> = BTreeSet::new();
     let mut edges: Vec<Edge> = Vec::new();
 
     // Explicit requests first: they pin versions that dependencies must satisfy.
@@ -251,7 +253,6 @@ fn resolve_modules(
             });
         }
 
-        pinned.insert(key.clone());
         instances.insert(
             key,
             ResolvedModule {
@@ -394,6 +395,8 @@ fn topological_order(
         return Err(PlanError::DependencyCycle { modules: cycle });
     }
 
+    // `ordered` borrows `instances`, so the keys are copied out before removing.
+    #[allow(clippy::needless_collect)]
     let order: Vec<String> = ordered.into_iter().map(str::to_string).collect();
     let mut instances = instances;
     Ok(order

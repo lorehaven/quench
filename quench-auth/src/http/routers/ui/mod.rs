@@ -38,15 +38,14 @@ async fn session_is_active(req: &Request, claims: &Claims) -> bool {
         return true;
     };
 
-    match req.container().get::<SessionDb>() {
-        Ok(sessions) => sessions
+    if let Ok(sessions) = req.container().get::<SessionDb>() {
+        sessions
             .is_active(session_id, &claims.sub)
             .await
-            .unwrap_or(false),
-        Err(_) => {
-            tracing::debug!("no SessionDb registered; trusting token validity alone");
-            true
-        }
+            .unwrap_or(false)
+    } else {
+        tracing::debug!("no SessionDb registered; trusting token validity alone");
+        true
     }
 }
 

@@ -16,6 +16,17 @@ pub struct GeneratedSigningKey {
     pub public_key: Vec<u8>,
 }
 
+// Hand-written so the private key can never end up in a log line.
+impl std::fmt::Debug for GeneratedSigningKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GeneratedSigningKey")
+            .field("private_key_der", &"<redacted>")
+            .field("public_key", &self.public_key)
+            .finish()
+    }
+}
+
+#[must_use]
 pub fn generate_signing_key() -> GeneratedSigningKey {
     let mut seed = [0u8; 32];
     getrandom::fill(&mut seed).expect("the OS random source is available");
@@ -32,10 +43,12 @@ pub fn generate_signing_key() -> GeneratedSigningKey {
     }
 }
 
+#[must_use]
 pub fn encoding_key(private_key_der: &[u8]) -> EncodingKey {
     EncodingKey::from_ed_der(private_key_der)
 }
 
+#[must_use]
 pub fn decoding_key(public_key: &[u8]) -> DecodingKey {
     DecodingKey::from_ed_der(public_key)
 }

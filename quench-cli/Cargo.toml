@@ -17,3 +17,6 @@ path = "src/lib.rs"
 
 [dependencies]
 rustyline = { workspace = true }
+
+[lints]
+workspace = true

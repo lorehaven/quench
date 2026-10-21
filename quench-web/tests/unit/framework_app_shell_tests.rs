@@ -55,7 +55,7 @@ fn an_unsupported_default_theme_falls_back_to_the_first_supported_one() {
 #[test]
 #[should_panic(expected = "failed to build app shell")]
 fn build_panics_when_an_unsupported_locale_file_is_missing() {
-    AppShellBuilder::new()
+    let _ = AppShellBuilder::new()
         .supported_locales(vec!["xx-XX".to_string()])
         .build();
 }

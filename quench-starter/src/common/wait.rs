@@ -5,6 +5,7 @@ use tokio::time::sleep;
 /// The one dependency every relying party shares: they all verify tokens
 /// against gatehouse's JWKS and redirect there for login, so none of them is
 /// meaningfully ready until it is reachable.
+#[must_use]
 pub fn gatehouse_health_url() -> String {
     let gatehouse_url = envmnt::get_or("GATEHOUSE_URL", "");
     format!("{}/health/ready", gatehouse_url.trim_end_matches('/'))
@@ -21,7 +22,7 @@ pub async fn wait_for_services(service_name: &str, urls: Vec<&str>) {
         print_status(
             Tone::Info,
             service_name,
-            &format!("waiting for dependency: {}", url),
+            &format!("waiting for dependency: {url}"),
         );
 
         let mut ready = false;
@@ -39,7 +40,7 @@ pub async fn wait_for_services(service_name: &str, urls: Vec<&str>) {
         print_status(
             Tone::Success,
             service_name,
-            &format!("dependency ready: {}", url),
+            &format!("dependency ready: {url}"),
         );
     }
 }

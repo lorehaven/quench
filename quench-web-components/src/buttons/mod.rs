@@ -11,14 +11,15 @@ pub enum ButtonVariant {
 }
 
 impl ButtonVariant {
-    pub fn class_name(&self) -> &'static str {
+    #[must_use]
+    pub const fn class_name(&self) -> &'static str {
         match self {
-            ButtonVariant::Primary => "btn btn-primary",
-            ButtonVariant::Secondary => "btn btn-secondary",
-            ButtonVariant::Danger => "btn btn-danger",
-            ButtonVariant::Success => "btn btn-success",
-            ButtonVariant::Warning => "btn btn-warning",
-            ButtonVariant::Outline => "btn btn-outline",
+            Self::Primary => "btn btn-primary",
+            Self::Secondary => "btn btn-secondary",
+            Self::Danger => "btn btn-danger",
+            Self::Success => "btn btn-success",
+            Self::Warning => "btn btn-warning",
+            Self::Outline => "btn btn-outline",
         }
     }
 }
@@ -42,56 +43,67 @@ impl ButtonBuilder {
         }
     }
 
-    pub fn variant(mut self, variant: ButtonVariant) -> Self {
+    #[must_use]
+    pub const fn variant(mut self, variant: ButtonVariant) -> Self {
         self.variant = Some(variant);
         self
     }
 
-    pub fn primary(mut self) -> Self {
+    #[must_use]
+    pub const fn primary(mut self) -> Self {
         self.variant = Some(ButtonVariant::Primary);
         self
     }
 
-    pub fn secondary(mut self) -> Self {
+    #[must_use]
+    pub const fn secondary(mut self) -> Self {
         self.variant = Some(ButtonVariant::Secondary);
         self
     }
 
-    pub fn danger(mut self) -> Self {
+    #[must_use]
+    pub const fn danger(mut self) -> Self {
         self.variant = Some(ButtonVariant::Danger);
         self
     }
 
-    pub fn success(mut self) -> Self {
+    #[must_use]
+    pub const fn success(mut self) -> Self {
         self.variant = Some(ButtonVariant::Success);
         self
     }
 
-    pub fn warning(mut self) -> Self {
+    #[must_use]
+    pub const fn warning(mut self) -> Self {
         self.variant = Some(ButtonVariant::Warning);
         self
     }
 
-    pub fn outline(mut self) -> Self {
+    #[must_use]
+    pub const fn outline(mut self) -> Self {
         self.variant = Some(ButtonVariant::Outline);
         self
     }
 
-    pub fn disabled(mut self, disabled: bool) -> Self {
+    #[must_use]
+    pub const fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self
     }
 
+    #[must_use]
     pub fn button_type(mut self, button_type: impl Into<String>) -> Self {
         self.button_type = button_type.into();
         self
     }
 
+    #[must_use]
     pub fn id(mut self, id: impl Into<String>) -> Self {
         self.id = Some(id.into());
         self
     }
 
+    #[must_use]
     pub fn build(self) -> Element {
         let mut btn = button().attr("type", &self.button_type).text(&self.text);
 

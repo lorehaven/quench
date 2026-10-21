@@ -12,6 +12,7 @@ pub struct InMemoryDb {
 }
 
 impl InMemoryDb {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -44,13 +45,20 @@ impl Database for InMemoryDb {
     }
 }
 
+impl<T: Model> std::fmt::Debug for InMemoryRepository<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InMemoryRepository").finish_non_exhaustive()
+    }
+}
+
 pub struct InMemoryRepository<T: Model> {
     db: InMemoryDb,
     _marker: std::marker::PhantomData<T>,
 }
 
 impl<T: Model> InMemoryRepository<T> {
-    pub fn new(db: InMemoryDb) -> Self {
+    #[must_use]
+    pub const fn new(db: InMemoryDb) -> Self {
         Self {
             db,
             _marker: std::marker::PhantomData,
@@ -65,21 +73,20 @@ where
 {
     async fn create(&self, model: &T) -> Result<T, DbError> {
         let table = self.db.get_table(&T::table_name());
-        let mut data = table.write().unwrap();
         let json = serde_json::to_value(model)?;
         let id = json
             .get(T::primary_key_name())
             .ok_or_else(|| DbError::Unknown("Missing primary key".to_string()))?
             .as_str()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| {
                 json.get(T::primary_key_name())
-                    .and_then(|v| v.as_i64())
+                    .and_then(serde_json::Value::as_i64)
                     .map(|n| n.to_string())
             })
             .ok_or_else(|| DbError::Unknown("Primary key must be string or number".to_string()))?;
 
-        data.insert(id, json);
+        table.write().unwrap().insert(id, json);
         Ok(model.clone())
     }
 
@@ -100,33 +107,33 @@ where
 
     async fn delete(&self, id: &str) -> Result<(), DbError> {
         let table = self.db.get_table(&T::table_name());
-        let mut data = table.write().unwrap();
-        data.remove(id);
+        table.write().unwrap().remove(id);
         Ok(())
     }
 
     async fn list(&self) -> Result<Vec<T>, DbError> {
         let table = self.db.get_table(&T::table_name());
-        let data = table.read().unwrap();
-        let mut results = Vec::new();
-        for json in data.values() {
-            results.push(serde_json::from_value(json.clone())?);
-        }
+        let results = table
+            .read()
+            .unwrap()
+            .values()
+            .map(|json| serde_json::from_value(json.clone()))
+            .collect::<Result<Vec<T>, _>>()?;
         Ok(results)
     }
 
     async fn find_by(&self, column: &str, value: &str) -> Result<Vec<T>, DbError> {
         let column = crate::checked_column::<T>(column)?;
         let table = self.db.get_table(&T::table_name());
-        let data = table.read().unwrap();
-        let mut results = Vec::new();
-        for json in data.values() {
-            // Only string-valued columns are comparable here; anything else
-            // never matches, mirroring a type mismatch in SQL.
-            if json.get(column).and_then(|found| found.as_str()) == Some(value) {
-                results.push(serde_json::from_value(json.clone())?);
-            }
-        }
+        // Only string-valued columns are comparable here; anything else
+        // never matches, mirroring a type mismatch in SQL.
+        let results = table
+            .read()
+            .unwrap()
+            .values()
+            .filter(|json| json.get(column).and_then(|found| found.as_str()) == Some(value))
+            .map(|json| serde_json::from_value(json.clone()))
+            .collect::<Result<Vec<T>, _>>()?;
         Ok(results)
     }
 }

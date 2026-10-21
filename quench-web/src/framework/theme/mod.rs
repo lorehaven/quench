@@ -10,6 +10,7 @@ pub mod default_light;
 pub trait ThemeSpec {
     fn colors() -> Vec<CssRule>;
 
+    #[must_use]
     fn render() -> String {
         Self::colors()
             .into_iter()
@@ -30,37 +31,39 @@ pub enum Theme {
 impl Display for Theme {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Theme::DefaultDark => write!(f, "default-dark"),
-            Theme::DefaultLight => write!(f, "default-light"),
-            Theme::BootstrapDark => write!(f, "bootstrap-dark"),
-            Theme::BootstrapLight => write!(f, "bootstrap-light"),
+            Self::DefaultDark => write!(f, "default-dark"),
+            Self::DefaultLight => write!(f, "default-light"),
+            Self::BootstrapDark => write!(f, "bootstrap-dark"),
+            Self::BootstrapLight => write!(f, "bootstrap-light"),
         }
     }
 }
 
 impl Theme {
     /// Every theme, in declaration order.
-    pub const ALL: [Theme; 4] = [
-        Theme::DefaultDark,
-        Theme::DefaultLight,
-        Theme::BootstrapDark,
-        Theme::BootstrapLight,
+    pub const ALL: [Self; 4] = [
+        Self::DefaultDark,
+        Self::DefaultLight,
+        Self::BootstrapDark,
+        Self::BootstrapLight,
     ];
 
-    pub fn iter() -> impl Iterator<Item = Theme> {
+    pub fn iter() -> impl Iterator<Item = Self> {
         Self::ALL.into_iter()
     }
 
+    #[must_use]
     pub fn theme(theme: Self) -> String {
         match theme {
-            Theme::DefaultDark => default_dark::DefaultDarkTheme::render(),
-            Theme::DefaultLight => default_light::DefaultLightTheme::render(),
-            Theme::BootstrapDark => bootstrap_dark::BootstrapDarkTheme::render(),
-            Theme::BootstrapLight => bootstrap_light::BootstrapLightTheme::render(),
+            Self::DefaultDark => default_dark::DefaultDarkTheme::render(),
+            Self::DefaultLight => default_light::DefaultLightTheme::render(),
+            Self::BootstrapDark => bootstrap_dark::BootstrapDarkTheme::render(),
+            Self::BootstrapLight => bootstrap_light::BootstrapLightTheme::render(),
         }
     }
 }
 
+#[must_use]
 pub fn theme_shared() -> String {
     vec![root(), header(), content(), footer(), elements(), modal()]
         .into_iter()

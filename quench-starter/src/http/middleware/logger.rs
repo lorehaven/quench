@@ -4,7 +4,7 @@
 use async_trait::async_trait;
 use quench_http::prelude::{Endpoint, Middleware, Request, Response};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct FilteredLogger {
     skip_prefixes: Vec<String>,
 }

@@ -21,14 +21,17 @@ impl Address {
         format!("{local}@{domain}").parse()
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.full
     }
 
+    #[must_use]
     pub fn local(&self) -> &str {
         &self.full[..self.at]
     }
 
+    #[must_use]
     pub fn domain(&self) -> &str {
         &self.full[self.at + 1..]
     }
@@ -88,7 +91,8 @@ pub struct Mailbox {
 }
 
 impl Mailbox {
-    pub fn new(name: Option<String>, address: Address) -> Self {
+    #[must_use]
+    pub const fn new(name: Option<String>, address: Address) -> Self {
         Self { name, address }
     }
 }

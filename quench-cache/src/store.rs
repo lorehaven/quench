@@ -15,7 +15,7 @@ use std::sync::Arc;
 use redis::AsyncCommands;
 
 /// Where cached values live.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum CacheStore {
     /// Per-process, backed by [`DataCache`]. Fast, and invisible to other
     /// replicas.
@@ -26,7 +26,14 @@ pub enum CacheStore {
     Redis(RedisStore),
 }
 
+// Without the `redis` feature no variant awaits anything, but the signatures are
+// the public API either way.
+#[cfg_attr(
+    not(feature = "redis"),
+    allow(clippy::unused_async, clippy::unused_async_trait_impl)
+)]
 impl CacheStore {
+    #[must_use]
     pub fn in_memory() -> Self {
         Self::InMemory(Arc::new(crate::data_cache::DataCache::new()))
     }
@@ -41,6 +48,7 @@ impl CacheStore {
     /// silent downgrade: a deployment that asked for a shared cache and got a
     /// per-process one would be wrong in a way nobody notices until two
     /// replicas disagree.
+    #[cfg_attr(not(feature = "redis"), allow(clippy::option_if_let_else))]
     pub async fn from_env(key_prefix: impl Into<String>) -> Result<Self, CacheError> {
         let url = ["CACHE_URL", "REDIS_URL"]
             .iter()
@@ -106,7 +114,7 @@ impl CacheStore {
         match self {
             Self::InMemory(cache) => {
                 let value = cache.get(key);
-                cache.delete(key);
+                let _ = cache.delete(key);
                 Ok(value)
             }
             #[cfg(feature = "redis")]
@@ -117,7 +125,7 @@ impl CacheStore {
     pub async fn remove(&self, key: &str) -> Result<(), CacheError> {
         match self {
             Self::InMemory(cache) => {
-                cache.delete(key);
+                let _ = cache.delete(key);
                 Ok(())
             }
             #[cfg(feature = "redis")]
@@ -182,6 +190,7 @@ impl CacheStore {
 
     /// Whether entries are visible to other processes. Worth checking before
     /// relying on this for anything that must be consistent estate-wide.
+    #[must_use]
     pub const fn is_shared(&self) -> bool {
         match self {
             Self::InMemory(_) => false,
@@ -192,6 +201,7 @@ impl CacheStore {
 
     /// What this store is talking to, for the startup log - an operator should
     /// be able to tell a clustered pod from a standalone one without guessing.
+    #[must_use]
     pub const fn topology(&self) -> &'static str {
         match self {
             Self::InMemory(_) => "in-process memory",
@@ -264,6 +274,15 @@ pub struct RedisStore {
 }
 
 #[cfg(feature = "redis")]
+impl std::fmt::Debug for RedisStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RedisStore")
+            .field("prefix", &self.prefix)
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(feature = "redis")]
 impl RedisStore {
     /// Connects, reading a comma-separated `url` as cluster seed nodes.
     pub async fn connect(url: &str, prefix: impl Into<String>) -> Result<Self, CacheError> {
@@ -311,6 +330,7 @@ impl RedisStore {
     }
 
     /// Whether this store is talking to a cluster.
+    #[must_use]
     pub const fn is_clustered(&self) -> bool {
         matches!(self.connection, Connection::Cluster(_))
     }
@@ -404,7 +424,7 @@ impl RedisStore {
 
         if let Some(ttl) = ttl_secs {
             connection
-                .expire::<_, ()>(&qualified, ttl as i64)
+                .expire::<_, ()>(&qualified, i64::try_from(ttl).unwrap_or(i64::MAX))
                 .await
                 .map_err(|err| CacheError::Backend(err.to_string()))?;
         }
@@ -545,6 +565,7 @@ impl RedisStore {
 /// `fail?` for a node the cluster has given up on.
 #[cfg(feature = "redis")]
 #[doc(hidden)]
+#[must_use]
 pub fn parse_primary(line: &str) -> Option<(String, u16)> {
     let mut fields = line.split_whitespace();
     let _id = fields.next()?;

@@ -147,7 +147,11 @@ fn envelope_defaults_to_the_from_address_and_lists_every_recipient_once() {
         .unwrap();
     let envelope = message.envelope();
     assert_eq!(envelope.from.as_str(), "noreply@example.com");
-    let to: Vec<&str> = envelope.to.iter().map(|a| a.as_str()).collect();
+    let to: Vec<&str> = envelope
+        .to
+        .iter()
+        .map(quench_mail::Address::as_str)
+        .collect();
     assert_eq!(
         to,
         [

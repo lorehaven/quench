@@ -2,6 +2,7 @@ use quench_web::dom::{on_dom_ready, set_select_value, toggle_modal, update_from_
 use quench_web::framework::app::available_locales;
 use quench_web::{Element, Theme, div, i, label, nav, option, script, select};
 
+#[must_use]
 pub fn nav_button() -> Element {
     nav()
         .class("q-shell-nav-trigger")
@@ -18,30 +19,36 @@ pub struct NavPanelBuilder {
 }
 
 impl NavPanelBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn default_theme(mut self, default_theme: Theme) -> Self {
+    #[must_use]
+    pub const fn default_theme(mut self, default_theme: Theme) -> Self {
         self.default_theme = Some(default_theme);
         self
     }
 
+    #[must_use]
     pub fn default_locale(mut self, default_locale: impl Into<String>) -> Self {
         self.default_locale = Some(default_locale.into());
         self
     }
 
+    #[must_use]
     pub fn supported_themes(mut self, supported_themes: Vec<Theme>) -> Self {
         self.supported_themes = Some(supported_themes);
         self
     }
 
+    #[must_use]
     pub fn supported_locales(mut self, supported_locales: Vec<String>) -> Self {
         self.supported_locales = Some(supported_locales);
         self
     }
 
+    #[must_use]
     pub fn build(self) -> Element {
         let toggle_modal_js = toggle_modal("modal-overlay", "modal-side", "show");
         let on_load_js = on_dom_ready(&[
@@ -107,12 +114,12 @@ impl NavPanelBuilder {
                 self.default_theme.unwrap_or(Theme::DefaultDark).to_string(),
             )
             .on_change(update_from_select("theme-select", "updateTheme"));
-        themes.into_iter().for_each(|theme| {
+        for theme in themes {
             let theme_str = theme.to_string();
             element = element
                 .clone()
                 .child(option().attr("value", &theme_str).text(&theme_str));
-        });
+        }
         element
     }
 }

@@ -83,7 +83,9 @@ fn route_impl(method: &str, attr: TokenStream, item: TokenStream) -> TokenStream
     expanded.into()
 }
 
-/// Discoverable `GET` route: `#[get("/users/{id}")]`. Path patterns are literal
+/// Discoverable `GET` route: `#[get("/users/{id}")]`.
+///
+/// Path patterns are literal
 /// text plus `{name}` (one segment) and the multi-segment captures
 /// `{name:.+}` / `{name:.*}`, for cases like the docker registry API where a captured
 /// segment has to swallow further `/`s.
@@ -149,8 +151,9 @@ fn result_inner(ty: &Type) -> (Type, bool) {
     (ty.clone(), false)
 }
 
-/// Registers a constructor function as a component in the dependency
-/// graph. Every parameter must be `Arc<Dep>` - the container resolves
+/// Registers a constructor function as a component in the dependency graph.
+///
+/// Every parameter must be `Arc<Dep>` - the container resolves
 /// `Dep` (another `#[injectable]`, or a value seeded via
 /// `ContainerBuilder::provide`) and passes it in; the return type (bare
 /// `T`, or `Result<T, E>` for a fallible constructor) is what other

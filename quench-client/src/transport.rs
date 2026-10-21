@@ -1,7 +1,11 @@
-//! The small HTTPS client the rest of the workspace builds on: connection
+//! The small HTTPS client the rest of the workspace builds on.
+//!
+//! Connection
 //! pooling, HTTP/1.1 + HTTP/2, JSON / form bodies, basic / bearer auth, a
 //! per-request timeout, redirect following, and an opt-out of certificate
-//! verification for development. Roots come from the operating system's
+//! verification for development.
+//!
+//! Roots come from the operating system's
 //! trust store (so a private CA installed there works).
 
 use bytes::Bytes;
@@ -43,7 +47,7 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Cheap to clone: clones share one connection pool.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Client {
     inner: Arc<Inner>,
 }
@@ -53,19 +57,30 @@ struct Inner {
     timeout: Option<Duration>,
 }
 
+impl std::fmt::Debug for Inner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Inner")
+            .field("timeout", &self.timeout)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Debug)]
 pub struct ClientBuilder {
     timeout: Option<Duration>,
     accept_invalid_certs: bool,
 }
 
 impl Client {
+    #[must_use]
     pub fn new() -> Self {
         Self::builder()
             .build()
             .expect("default client configuration is valid")
     }
 
-    pub fn builder() -> ClientBuilder {
+    #[must_use]
+    pub const fn builder() -> ClientBuilder {
         ClientBuilder {
             timeout: None,
             accept_invalid_certs: false,
@@ -112,13 +127,15 @@ impl Default for Client {
 
 impl ClientBuilder {
     /// Applies to every request from the built client unless overridden.
-    pub fn timeout(mut self, timeout: Duration) -> Self {
+    #[must_use]
+    pub const fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
 
     /// Skips certificate verification entirely - development only.
-    pub fn danger_accept_invalid_certs(mut self, accept: bool) -> Self {
+    #[must_use]
+    pub const fn danger_accept_invalid_certs(mut self, accept: bool) -> Self {
         self.accept_invalid_certs = accept;
         self
     }
@@ -215,7 +232,20 @@ pub struct RequestBuilder {
     error: Option<Error>,
 }
 
+// Hand-written: the headers can carry `Authorization`, so only their names are shown.
+impl std::fmt::Debug for RequestBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RequestBuilder")
+            .field("method", &self.method)
+            .field("url", &self.url)
+            .field("headers", &self.headers.keys().collect::<Vec<_>>())
+            .field("timeout", &self.timeout)
+            .finish_non_exhaustive()
+    }
+}
+
 impl RequestBuilder {
+    #[must_use]
     pub fn header(mut self, name: impl AsRef<str>, value: impl AsRef<str>) -> Self {
         match (
             HeaderName::from_bytes(name.as_ref().as_bytes()),
@@ -225,15 +255,15 @@ impl RequestBuilder {
                 self.headers.append(name, value);
             }
             _ => {
-                self.error.get_or_insert(Error::Request(format!(
-                    "invalid header `{}`",
-                    name.as_ref()
-                )));
+                self.error.get_or_insert_with(|| {
+                    Error::Request(format!("invalid header `{}`", name.as_ref()))
+                });
             }
         }
         self
     }
 
+    #[must_use]
     pub fn basic_auth(self, username: impl AsRef<str>, password: Option<&str>) -> Self {
         let credentials = format!("{}:{}", username.as_ref(), password.unwrap_or(""));
         self.header(
@@ -242,15 +272,18 @@ impl RequestBuilder {
         )
     }
 
+    #[must_use]
     pub fn bearer_auth(self, token: impl AsRef<str>) -> Self {
         self.header(AUTHORIZATION.as_str(), format!("Bearer {}", token.as_ref()))
     }
 
-    pub fn timeout(mut self, timeout: Duration) -> Self {
+    #[must_use]
+    pub const fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
 
+    #[must_use]
     pub fn json<T: Serialize + ?Sized>(mut self, body: &T) -> Self {
         match serde_json::to_vec(body) {
             Ok(bytes) => {
@@ -258,12 +291,14 @@ impl RequestBuilder {
                 self.header(CONTENT_TYPE.as_str(), "application/json")
             }
             Err(e) => {
-                self.error.get_or_insert(Error::Request(e.to_string()));
+                self.error
+                    .get_or_insert_with(|| Error::Request(e.to_string()));
                 self
             }
         }
     }
 
+    #[must_use]
     pub fn form<T: Serialize + ?Sized>(mut self, body: &T) -> Self {
         match serde_urlencoded::to_string(body) {
             Ok(encoded) => {
@@ -271,7 +306,8 @@ impl RequestBuilder {
                 self.header(CONTENT_TYPE.as_str(), "application/x-www-form-urlencoded")
             }
             Err(e) => {
-                self.error.get_or_insert(Error::Request(e.to_string()));
+                self.error
+                    .get_or_insert_with(|| Error::Request(e.to_string()));
                 self
             }
         }
@@ -372,14 +408,14 @@ fn resolve(base: &Uri, location: &str) -> Result<Uri> {
         format!(
             "{}://{}{location}",
             base.scheme_str().unwrap_or("http"),
-            base.authority().map(|a| a.as_str()).unwrap_or("")
+            base.authority().map_or("", http::uri::Authority::as_str)
         )
     } else {
         let dir = base.path().rsplit_once('/').map_or("", |(dir, _)| dir);
         format!(
             "{}://{}{dir}/{location}",
             base.scheme_str().unwrap_or("http"),
-            base.authority().map(|a| a.as_str()).unwrap_or("")
+            base.authority().map_or("", http::uri::Authority::as_str)
         )
     };
     target
@@ -398,18 +434,22 @@ fn error_chain(error: &dyn std::error::Error) -> String {
     out
 }
 
+#[derive(Debug)]
 pub struct Response {
     status: StatusCode,
     headers: HeaderMap,
     body: Bytes,
 }
 
+// The body is already buffered, so these never await - async keeps the signatures
+// stable if streaming is added later.
+#[allow(clippy::unused_async, clippy::unused_async_trait_impl)]
 impl Response {
-    pub fn status(&self) -> StatusCode {
+    pub const fn status(&self) -> StatusCode {
         self.status
     }
 
-    pub fn headers(&self) -> &HeaderMap {
+    pub const fn headers(&self) -> &HeaderMap {
         &self.headers
     }
 
@@ -434,7 +474,7 @@ fn base64_encode(input: &[u8]) -> String {
         let n = chunk
             .iter()
             .enumerate()
-            .fold(0u32, |acc, (i, b)| acc | (*b as u32) << (16 - 8 * i));
+            .fold(0u32, |acc, (i, b)| acc | u32::from(*b) << (16 - 8 * i));
         for i in 0..4 {
             if i <= chunk.len() {
                 out.push(ALPHABET[(n >> (18 - 6 * i) & 63) as usize] as char);

@@ -15,7 +15,7 @@ enum Token {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Pattern {
+pub struct Pattern {
     tokens: Vec<Token>,
 }
 
@@ -107,6 +107,7 @@ impl Pattern {
 }
 
 #[cfg(test)]
+#[allow(clippy::literal_string_with_formatting_args)] // `{name}` is route-pattern syntax
 mod tests {
     use super::*;
 
@@ -114,6 +115,7 @@ mod tests {
         Pattern::parse(pattern).matches(path)
     }
 
+    #[allow(clippy::unnecessary_wraps)] // compared against `Pattern::matches`, which returns an `Option`
     fn pairs(v: &[(&str, &str)]) -> Option<Vec<(String, String)>> {
         Some(
             v.iter()

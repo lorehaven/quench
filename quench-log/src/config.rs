@@ -8,7 +8,9 @@
 use std::fmt;
 use std::path::PathBuf;
 
-/// A file log line's encoding. Console output is always plain text - only
+/// A file log line's encoding.
+///
+/// Console output is always plain text - only
 /// the file sink's format is a choice, and it defaults to `Json` because a
 /// file is for a log shipper or `jq`, not a human staring at a terminal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -19,6 +21,7 @@ pub enum Format {
 }
 
 impl Format {
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Json => "json",
@@ -26,6 +29,7 @@ impl Format {
         }
     }
 
+    #[must_use]
     pub fn parse(raw: &str) -> Option<Self> {
         match raw.trim().to_ascii_lowercase().as_str() {
             "json" => Some(Self::Json),
@@ -54,6 +58,7 @@ pub enum Rotation {
 }
 
 impl Rotation {
+    #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Daily => "daily",
@@ -62,6 +67,7 @@ impl Rotation {
         }
     }
 
+    #[must_use]
     pub fn parse(raw: &str) -> Option<Self> {
         match raw.trim().to_ascii_lowercase().as_str() {
             "daily" => Some(Self::Daily),
@@ -174,11 +180,14 @@ impl Config {
     }
 }
 
-/// The file prefix `from_env` falls back through: an explicit
+/// The file prefix `from_env` falls back through.
+///
+/// An explicit
 /// `LOG_FILE_PREFIX`, then Cargo's own `CARGO_BIN_NAME` (set for whichever
 /// binary of a multi-binary crate is actually running), then a plain
 /// `"app"` so a caller that sets neither still gets a valid file name
 /// instead of an empty one.
+#[must_use]
 pub fn resolve_file_prefix(explicit: Option<&str>, cargo_bin_name: Option<&str>) -> String {
     for name in [explicit, cargo_bin_name].into_iter().flatten() {
         let trimmed = name.trim();
@@ -191,6 +200,7 @@ pub fn resolve_file_prefix(explicit: Option<&str>, cargo_bin_name: Option<&str>)
 
 /// `true`/`false` and the handful of spellings every other boolean env var
 /// in the estate already accepts.
+#[must_use]
 pub fn parse_bool(raw: &str) -> Option<bool> {
     match raw.trim().to_ascii_lowercase().as_str() {
         "1" | "true" | "yes" | "on" => Some(true),

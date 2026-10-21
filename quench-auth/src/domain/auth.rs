@@ -26,10 +26,12 @@ impl Role {
     ///
     /// Note this is about *service access* only. Managing users is `Admin`
     /// alone - see gatehouse's `AdminClaims`.
+    #[must_use]
     pub const fn is_wildcard(&self) -> bool {
         matches!(self, Self::Admin | Self::Service)
     }
 
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Admin => "admin",
@@ -38,6 +40,7 @@ impl Role {
         }
     }
 
+    #[must_use]
     pub fn parse(value: &str) -> Option<Self> {
         match value.trim().to_ascii_lowercase().as_str() {
             "admin" => Some(Self::Admin),
@@ -132,6 +135,7 @@ pub struct User {
 }
 
 impl User {
+    #[allow(clippy::needless_pass_by_value)] // public API, kept as-is for existing callers
     pub fn new(
         username: String,
         password: String,
@@ -169,6 +173,7 @@ impl User {
             .to_string())
     }
 
+    #[must_use]
     pub fn verify_password(&self, password: &str) -> bool {
         let Ok(hash) = PasswordHash::new(&self.password) else {
             return false;
@@ -178,6 +183,7 @@ impl User {
             .is_ok()
     }
 
+    #[must_use]
     pub fn get_roles(&self) -> Vec<Role> {
         serde_json::from_value(self.roles.clone()).unwrap_or_default()
     }
@@ -190,6 +196,7 @@ impl User {
     /// reads as no grants at all rather than failing the read: one bad row
     /// should not lock a user out of everything, and "no access" is the safe
     /// direction for that failure to go.
+    #[must_use]
     pub fn get_permissions(&self) -> Permissions {
         serde_json::from_value(self.permissions.clone()).unwrap_or_default()
     }
@@ -201,6 +208,7 @@ impl User {
     /// Whether this user may perform `action` on `service`. A wildcard role
     /// short-circuits, which is why `get_permissions` stays empty for one -
     /// there is nothing to enumerate.
+    #[must_use]
     pub fn can(&self, service: &str, action: &str) -> bool {
         if self.has_wildcard() {
             return true;
@@ -213,11 +221,13 @@ impl User {
     /// Whether an admin has turned this account off. Distinct from deletion -
     /// the row (and everything elsewhere that references the username) stays
     /// intact, it just can no longer authenticate anywhere in the realm.
-    pub fn is_disabled(&self) -> bool {
+    #[must_use]
+    pub const fn is_disabled(&self) -> bool {
         self.disabled_at.is_some()
     }
 
     /// Whether a lockout from repeated failed logins is still in effect.
+    #[must_use]
     pub fn is_locked(&self) -> bool {
         self.locked_until.is_some_and(|until| until > Utc::now())
     }
@@ -279,6 +289,7 @@ impl Model for User {
     }
 }
 
+#[derive(Debug)]
 pub enum UserDb {
     Base { repo: Repository<User> },
 }
@@ -289,6 +300,7 @@ pub enum UserDb {
 /// in warehouse's case, the registry token endpoint. Creating users is
 /// gatehouse's job, so there is deliberately no write method here.
 impl UserDb {
+    #[allow(clippy::unused_async, clippy::unused_async_trait_impl)] // async is the public contract callers `.await`
     pub async fn init(db: Db) -> Arc<Self> {
         Arc::new(Self::Base {
             repo: db.repository::<User>(),

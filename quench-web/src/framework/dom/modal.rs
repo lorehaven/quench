@@ -1,3 +1,4 @@
+#[must_use]
 pub fn toggle_modal(overlay_class: &str, panel_class: &str, show_class: &str) -> String {
     format!(
         "const overlay = document.getElementsByClassName('{overlay_class}');\

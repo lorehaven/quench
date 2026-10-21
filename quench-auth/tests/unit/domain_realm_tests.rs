@@ -4,7 +4,7 @@ use quench_auth::domain::realm::*;
 
 /// `envmnt` is process-global, so these assertions share one test to keep
 /// them from racing each other - and `GATEHOUSE_URL` is also touched by
-/// jwks/sso_client tests elsewhere in this binary, hence the shared lock.
+/// `jwks`/`sso_client` tests elsewhere in this binary, hence the shared lock.
 #[test]
 fn realm_names_come_from_the_environment() {
     let _guard = crate::env_lock::ENV_LOCK.lock().unwrap();

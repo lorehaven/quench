@@ -31,14 +31,11 @@ async fn main() -> anyhow::Result<()> {
     let db_url = env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/postgres".to_string());
 
-    println!("Connecting to database: {}", db_url);
+    println!("Connecting to database: {db_url}");
     let db = match PostgresDb::new(&db_url).await {
         Ok(db) => db,
         Err(e) => {
-            eprintln!(
-                "Failed to connect to database: {}. Ensure Postgres is running.",
-                e
-            );
+            eprintln!("Failed to connect to database: {e}. Ensure Postgres is running.");
             return Ok(());
         }
     };
@@ -66,7 +63,7 @@ async fn main() -> anyhow::Result<()> {
         priority: 10,
     };
     let created = repo.create(&task).await?;
-    println!("Created: {:?}", created);
+    println!("Created: {created:?}");
 
     // List
     println!("\n--- Listing All Tasks ---");
@@ -83,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
     let mut to_update = created;
     to_update.completed = true;
     let updated = repo.update(&to_update).await?;
-    println!("Updated: {:?}", updated);
+    println!("Updated: {updated:?}");
 
     // Delete
     println!("\n--- Deleting Task ---");

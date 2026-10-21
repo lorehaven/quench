@@ -17,3 +17,6 @@ path = "src/lib.rs"
 
 [dependencies]
 quench-web = { workspace = true }
+
+[lints]
+workspace = true

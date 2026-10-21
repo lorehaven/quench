@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 const CORRELATION_ID_HEADER: &str = "x-correlation-id";
 
+#[derive(Debug)]
 pub struct CorrelationId;
 
 #[async_trait]
@@ -18,8 +19,7 @@ impl Middleware for CorrelationId {
     async fn handle(&self, req: Request, next: &dyn Endpoint) -> Response {
         let correlation_id = req
             .header(CORRELATION_ID_HEADER)
-            .map(str::to_string)
-            .unwrap_or_else(|| Uuid::new_v4().to_string());
+            .map_or_else(|| Uuid::new_v4().to_string(), str::to_string);
 
         tracing::Span::current().record("correlation_id", &correlation_id);
 

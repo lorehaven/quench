@@ -1,5 +1,7 @@
 //! Framework-agnostic auth domain logic - JWT encode/decode, user/session
-//! storage, realm cookie/URL conventions, Ed25519 key handling. None of
+//! storage, realm cookie/URL conventions, Ed25519 key handling.
+//!
+//! None of
 //! this depends on an HTTP framework; `http::domain::*` re-exports from
 //! here.
 

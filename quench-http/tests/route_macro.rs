@@ -1,6 +1,8 @@
 //! End-to-end: `#[get]`-annotated handlers are discovered with no manual
 //! registration list, resolve a path parameter and an injected service,
 //! and dispatch through the real router.
+#![allow(clippy::items_after_statements)] // test-local helper types sit next to the code that uses them
+#![allow(clippy::unused_async)] // `#[injectable]` constructors are async by contract
 
 use bytes::Bytes;
 use http::{HeaderMap, Method, StatusCode, Uri};

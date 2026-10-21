@@ -96,9 +96,9 @@ fn head_link_static_attrs_are_merged_onto_every_link() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "called `Option::unwrap()` on a `None` value")]
 fn build_panics_without_content() {
-    PageBuilder::new().title("t").build();
+    let _ = PageBuilder::new().title("t").build();
 }
 
 #[test]

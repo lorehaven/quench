@@ -12,39 +12,48 @@ pub const DEFAULT_SESSION_COOKIE: &str = "forge_session";
 pub const DEFAULT_REFRESH_COOKIE: &str = "forge_refresh";
 /// Holds the PKCE verifier + `state` + return destination for the few seconds
 /// between a relying party redirecting to `/authorize` and the browser coming
-/// back to `/auth/callback`. Never leaves this service - gatehouse never sees it.
+/// back to `/auth/callback`.
+///
+/// Never leaves this service - gatehouse never sees it.
 pub const AUTHORIZE_STATE_COOKIE: &str = "forge_authorize_state";
 
 /// Schema holding `users` and `sessions`. Shared by every service; only
 /// gatehouse writes to it outside of session bookkeeping.
+#[must_use]
 pub fn auth_schema() -> String {
     envmnt::get_or("AUTH_DB_SCHEMA", DEFAULT_AUTH_SCHEMA)
 }
 
+#[must_use]
 pub fn session_cookie_name() -> String {
     envmnt::get_or("AUTH_COOKIE_NAME", DEFAULT_SESSION_COOKIE)
 }
 
+#[must_use]
 pub fn refresh_cookie_name() -> String {
     envmnt::get_or("AUTH_REFRESH_COOKIE_NAME", DEFAULT_REFRESH_COOKIE)
 }
 
 /// Parent domain the cookies are scoped to, e.g. `.forge.example.com`. Unset
 /// means host-only, which is what local development wants.
+#[must_use]
 pub fn cookie_domain() -> Option<String> {
-    non_empty(envmnt::get_or("AUTH_COOKIE_DOMAIN", ""))
+    non_empty(&envmnt::get_or("AUTH_COOKIE_DOMAIN", ""))
 }
 
 /// Base URL of the gatehouse service. When unset, a service falls back to its
 /// own login form - the pre-gatehouse behaviour.
+#[must_use]
 pub fn gatehouse_url() -> Option<String> {
-    non_empty(envmnt::get_or("GATEHOUSE_URL", "")).map(|url| url.trim_end_matches('/').to_string())
+    non_empty(&envmnt::get_or("GATEHOUSE_URL", "")).map(|url| url.trim_end_matches('/').to_string())
 }
 
+#[must_use]
 pub fn gatehouse_login_url(return_to: Option<&str>) -> Option<String> {
     gatehouse_endpoint("/ui/login", return_to)
 }
 
+#[must_use]
 pub fn gatehouse_logout_url(return_to: Option<&str>) -> Option<String> {
     gatehouse_endpoint("/ui/logout", return_to)
 }
@@ -71,9 +80,12 @@ pub fn session_cookie(token: impl Into<String>) -> Cookie<'static> {
     realm_cookie(session_cookie_name(), token.into(), None)
 }
 
-/// Carries a `Max-Age` matching `REFRESH_TOKEN_TTL_SECS` - the refresh token's
+/// Carries a `Max-Age` matching `REFRESH_TOKEN_TTL_SECS`.
+///
+/// That is the refresh token's
 /// own server-side validity - so the cookie survives a browser restart instead
 /// of vanishing as a session cookie while the token behind it is still good.
+///
 pub fn refresh_cookie(token: impl Into<String>) -> Cookie<'static> {
     realm_cookie(
         refresh_cookie_name(),
@@ -85,15 +97,17 @@ pub fn refresh_cookie(token: impl Into<String>) -> Cookie<'static> {
 fn refresh_cookie_max_age() -> Duration {
     let secs: i64 = envmnt::get_or("REFRESH_TOKEN_TTL_SECS", "604800")
         .parse()
-        .unwrap_or(604800);
+        .unwrap_or(604_800);
     Duration::seconds(secs)
 }
 
 /// Expired counterparts, for logout.
+#[must_use]
 pub fn cleared_session_cookie() -> Cookie<'static> {
     cleared_cookie(session_cookie_name())
 }
 
+#[must_use]
 pub fn cleared_refresh_cookie() -> Cookie<'static> {
     cleared_cookie(refresh_cookie_name())
 }
@@ -127,6 +141,7 @@ fn cleared_cookie(name: String) -> Cookie<'static> {
 }
 
 /// A short-lived, unnamed-elsewhere cookie for the authorize round trip.
+///
 /// Deliberately not domain-scoped even when `AUTH_COOKIE_DOMAIN` is set: it is
 /// read back by the exact host that set it, never another relying party.
 pub fn authorize_state_cookie(value: impl Into<String>) -> Cookie<'static> {
@@ -139,6 +154,7 @@ pub fn authorize_state_cookie(value: impl Into<String>) -> Cookie<'static> {
         .build()
 }
 
+#[must_use]
 pub fn cleared_authorize_state_cookie() -> Cookie<'static> {
     Cookie::build((AUTHORIZE_STATE_COOKIE, ""))
         .path("/")
@@ -151,6 +167,7 @@ pub fn cleared_authorize_state_cookie() -> Cookie<'static> {
 
 /// This service's own mount point (`BASE_PATH`), normalized to either `/` or
 /// a leading-slash, no-trailing-slash prefix.
+#[must_use]
 pub fn base_path() -> String {
     let raw = envmnt::get_or("BASE_PATH", "/");
     let trimmed = raw.trim();
@@ -169,6 +186,7 @@ pub fn base_path() -> String {
 }
 
 /// `path` under this service's own `/ui` scope, e.g. `ui_path("/home")`.
+#[must_use]
 pub fn ui_path(path: &str) -> String {
     let base = base_path();
     if base == "/" {
@@ -178,7 +196,7 @@ pub fn ui_path(path: &str) -> String {
     }
 }
 
-fn non_empty(value: String) -> Option<String> {
+fn non_empty(value: &str) -> Option<String> {
     let trimmed = value.trim();
     (!trimmed.is_empty()).then(|| trimmed.to_string())
 }

@@ -3,6 +3,7 @@ use std::sync::LazyLock;
 static BASE_PATH: LazyLock<String> =
     LazyLock::new(|| normalize_base_path(&envmnt::get_or("BASE_PATH", "/")));
 
+#[must_use]
 pub fn normalize_base_path(raw: &str) -> String {
     let trimmed = raw.trim();
     if trimmed.is_empty() || trimmed == "/" {
@@ -27,7 +28,7 @@ pub fn with_base_path(path: &str) -> String {
 
     match path {
         "" => BASE_PATH.clone(),
-        "/" => format!("{}/", base),
-        _ => format!("{}{}", base, path),
+        "/" => format!("{base}/"),
+        _ => format!("{base}{path}"),
     }
 }

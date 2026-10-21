@@ -19,10 +19,12 @@ struct AuthErrorEntry {
     detail: Value,
 }
 
+#[must_use]
 pub fn response(status: StatusCode, code: &'static str, message: &'static str) -> Response {
     response_with_detail(status, code, message, json!({}))
 }
 
+#[must_use]
 pub fn response_with_detail(
     status: StatusCode,
     code: &'static str,

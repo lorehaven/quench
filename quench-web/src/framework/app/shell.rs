@@ -45,77 +45,92 @@ impl Default for AppShellBuilder {
 }
 
 impl AppShellBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn title(mut self, value: impl Into<String>) -> Self {
         self.title = value.into();
         self
     }
 
-    pub fn default_theme(mut self, value: Theme) -> Self {
+    #[must_use]
+    pub const fn default_theme(mut self, value: Theme) -> Self {
         self.default_theme = value;
         self
     }
 
+    #[must_use]
     pub fn default_locale(mut self, value: impl Into<String>) -> Self {
         self.default_locale = Some(value.into());
         self
     }
 
+    #[must_use]
     pub fn header_label(mut self, value: impl Into<String>) -> Self {
         self.header_label = value.into();
         self
     }
 
+    #[must_use]
     pub fn footer_label(mut self, value: impl Into<String>) -> Self {
         self.footer_label = value.into();
         self
     }
 
-    pub fn with_nav(mut self, value: bool) -> Self {
+    #[must_use]
+    pub const fn with_nav(mut self, value: bool) -> Self {
         self.with_nav = value;
         self
     }
 
     /// Drops the top bar entirely. A page that carries its own chrome - the
     /// login card, for one - has nothing to put in it.
-    pub fn with_header(mut self, value: bool) -> Self {
+    #[must_use]
+    pub const fn with_header(mut self, value: bool) -> Self {
         self.with_header = value;
         self
     }
 
+    #[must_use]
     pub fn header(mut self, value: Element) -> Self {
         self.header = Some(value);
         self
     }
 
+    #[must_use]
     pub fn footer(mut self, value: Element) -> Self {
         self.footer = Some(value);
         self
     }
 
+    #[must_use]
     pub fn links(mut self, value: Vec<Link>) -> Self {
         self.links = value;
         self
     }
 
+    #[must_use]
     pub fn scripts(mut self, value: Vec<Script>) -> Self {
         self.scripts = value;
         self
     }
 
+    #[must_use]
     pub fn supported_themes(mut self, value: Vec<Theme>) -> Self {
         self.supported_themes = Some(value);
         self
     }
 
+    #[must_use]
     pub fn supported_locales(mut self, value: Vec<String>) -> Self {
         self.supported_locales = Some(value);
         self
     }
 
+    #[must_use]
     pub fn resources_prefix(mut self, value: String) -> Self {
         self.resources_prefix = value;
         self
@@ -181,7 +196,7 @@ impl AppShellBuilder {
             .supported_themes(supported_themes)
             .supported_locales(supported_locales)
             .default_theme(effective_default_theme)
-            .default_locale(effective_default_locale.clone().unwrap_or_default())
+            .default_locale(effective_default_locale.unwrap_or_default())
             .footer(footer)
             .resources_prefix(self.resources_prefix);
 
@@ -192,6 +207,7 @@ impl AppShellBuilder {
         Ok(AppShell { base })
     }
 
+    #[must_use]
     pub fn build(self) -> AppShell {
         self.try_build()
             .unwrap_or_else(|err| panic!("failed to build app shell: {err}"))
@@ -204,6 +220,7 @@ pub struct AppShell {
 }
 
 impl AppShell {
+    #[must_use]
     pub fn page(&self, content: Element) -> String {
         self.base.clone().page_content(content).build()
     }

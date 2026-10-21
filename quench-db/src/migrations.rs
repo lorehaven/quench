@@ -67,6 +67,7 @@ pub struct MigrationFile {
     pub migrations: Vec<Migration>,
 }
 
+#[derive(Debug)]
 pub struct MigrationLoader;
 
 impl MigrationLoader {
@@ -94,7 +95,7 @@ impl MigrationLoader {
             .collect();
 
         // Sort files by name (yyyy-mm-dd-0000.toml)
-        files.sort_by_key(|e| e.file_name());
+        files.sort_by_key(std::fs::DirEntry::file_name);
 
         let mut all_migrations = Vec::new();
 
@@ -111,9 +112,9 @@ impl MigrationLoader {
                 let prefix = migration.id.split('-').next().unwrap_or("");
                 if !ids.insert(prefix) {
                     anyhow::bail!(
-                        "Duplicate migration prefix '{}' in file {:?}",
+                        "Duplicate migration prefix '{}' in file {}",
                         prefix,
-                        entry.path()
+                        entry.path().display()
                     );
                 }
             }
@@ -158,28 +159,27 @@ impl ChangeSet {
         render(&self.to_sql(), vars)
     }
 
+    #[must_use]
     pub fn to_sql(&self) -> String {
         match self {
-            ChangeSet::Sql(sql) => sql.clone(),
+            Self::Sql(sql) => sql.clone(),
 
-            ChangeSet::CreateSchema { name } => {
-                format!("CREATE SCHEMA IF NOT EXISTS {}", name)
+            Self::CreateSchema { name } => {
+                format!("CREATE SCHEMA IF NOT EXISTS {name}")
             }
 
-            ChangeSet::CreateExtension { name } => {
-                format!("CREATE EXTENSION IF NOT EXISTS {}", name)
+            Self::CreateExtension { name } => {
+                format!("CREATE EXTENSION IF NOT EXISTS {name}")
             }
 
-            ChangeSet::CreateTable {
+            Self::CreateTable {
                 schema,
                 name,
                 columns,
             } => {
-                let full_name = if let Some(s) = schema {
-                    format!("{}.{}", s, name)
-                } else {
-                    name.clone()
-                };
+                let full_name = schema
+                    .as_ref()
+                    .map_or_else(|| name.clone(), |s| format!("{s}.{name}"));
                 let col_defs: Vec<String> = columns
                     .iter()
                     .map(|c| {

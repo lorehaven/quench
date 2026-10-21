@@ -1,4 +1,4 @@
-/// Initialize logging with configurable verbosity via RUST_LOG environment variable.
+/// Initialize logging with configurable verbosity via `RUST_LOG` environment variable.
 ///
 /// Loads `.env` files (project root, then any service-specific
 /// `docker/<bin>/.env`) before handing off to `quench_log::init()`, which
@@ -11,7 +11,7 @@ pub fn init() {
 
     // Try to load from service-specific .env file if it exists
     if let Ok(bin_name) = std::env::var("CARGO_BIN_NAME") {
-        let service_env_path = format!("docker/{}/", bin_name);
+        let service_env_path = format!("docker/{bin_name}/");
         let env_file = std::path::Path::new(&service_env_path).join(".env");
         if env_file.exists() {
             load_env_file(&env_file);
@@ -44,6 +44,7 @@ fn load_env_from_ancestors() {
 /// Sets every `KEY=VALUE` line of `path` that isn't already in the
 /// environment (a real variable always wins over the file). Understands
 /// `#` comments, an `export ` prefix, and single / double quoted values.
+#[allow(unsafe_code)] // `set_var`, see the SAFETY note below
 fn load_env_file(path: &std::path::Path) {
     let Ok(content) = std::fs::read_to_string(path) else {
         return;
@@ -73,10 +74,9 @@ fn parse_env(content: &str) -> Vec<(String, String)> {
             }
             let value = value.trim();
             let value = match value.chars().next() {
-                Some(q @ ('"' | '\'')) => match value[1..].find(q) {
-                    Some(end) => value[1..=end].to_string(),
-                    None => value[1..].to_string(),
-                },
+                Some(q @ ('"' | '\'')) => value[1..]
+                    .find(q)
+                    .map_or_else(|| value[1..].to_string(), |end| value[1..=end].to_string()),
                 _ => value
                     .split(" #")
                     .next()

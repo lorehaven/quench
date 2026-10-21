@@ -4,12 +4,15 @@ use rustyline::error::ReadlineError;
 /// What a REPL should do after handling one line, and what to prompt with
 /// next - carried here instead of a separate prompt closure, so a
 /// self-borrowing handler and a self-borrowing prompt never coexist.
+#[derive(Debug)]
 pub enum ReplControl {
     Continue(String),
     Exit,
 }
 
-/// Reads lines until Ctrl-C, Ctrl-D, or `on_line` asks to stop, handing each
+/// Reads lines until Ctrl-C, Ctrl-D, or `on_line` asks to stop.
+///
+/// Hands each
 /// non-empty one to `on_line` with history already recorded. Error reporting
 /// stays with `on_line` - each REPL keeps its own styling for that.
 pub fn run(

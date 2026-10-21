@@ -1,6 +1,9 @@
-//! Service bootstrap on `quench_http`: base-path scope, health/readiness,
+//! Service bootstrap on `quench_http`.
+//!
+//! Base-path scope, health/readiness,
 //! swagger redirect, UI base-path/root redirects, filtered logger +
 //! correlation-id middleware, TLS with an HTTP->HTTPS redirect server.
+//!
 
 pub mod domain;
 pub mod middleware;
@@ -17,7 +20,9 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-/// Boots a service on quench-http. Builds the dependency graph (every
+/// Boots a service on quench-http.
+///
+/// Builds the dependency graph (every
 /// `#[injectable]` linked into the binary, plus `Db` and `HealthState`
 /// seeded directly since they're constructed before the graph exists),
 /// discovers every `#[get]`/`#[post]`/... route, mounts the whole thing
@@ -52,7 +57,9 @@ where
     serve_app(&format!("{service_name}-service"), app, container).await
 }
 
-/// The TLS-detecting tail end of [`serve`]: HTTPS plus an HTTP->HTTPS
+/// The TLS-detecting tail end of [`serve`].
+///
+/// HTTPS plus an HTTP->HTTPS
 /// redirect server when `SERVER_CERT_PATH`/`SERVER_KEY_PATH` exist, plain
 /// HTTP on `SERVER_ADDR` otherwise - shared by every service that can't use
 /// [`serve`] directly because it needs extra DI providers or middleware
@@ -71,41 +78,39 @@ pub async fn serve_app(
 ) -> std::io::Result<()> {
     let _ = rustls::crypto::ring::default_provider().install_default();
 
-    let (https_addr, http_addr) = server_addrs();
+    let (tls_addr, redirect_addr) = server_addrs();
 
-    match load_tls(
+    if let Some(config) = load_tls(
         envmnt::get_or("SERVER_CERT_PATH", "cert.pem"),
         envmnt::get_or("SERVER_KEY_PATH", "key.pem"),
     ) {
-        Some(config) => {
-            print_status(
-                Tone::Success,
-                service_name,
-                &format!("starting HTTPS server on {https_addr}"),
-            );
-            print_status(
-                Tone::Info,
-                service_name,
-                &format!("starting HTTP redirect server on {http_addr}"),
-            );
+        print_status(
+            Tone::Success,
+            service_name,
+            &format!("starting HTTPS server on {tls_addr}"),
+        );
+        print_status(
+            Tone::Info,
+            service_name,
+            &format!("starting HTTP redirect server on {redirect_addr}"),
+        );
 
-            let redirect: Arc<dyn Endpoint> = Arc::new(RedirectToHttps {
-                https_port: https_addr.port(),
-            });
+        let redirect: Arc<dyn Endpoint> = Arc::new(RedirectToHttps {
+            https_port: tls_addr.port(),
+        });
 
-            let https = serve_https(app, container.clone(), https_addr, config);
-            let redirect = serve_http(redirect, container, http_addr);
-            tokio::try_join!(https, redirect)?;
-            Ok(())
-        }
-        None => {
-            print_status(Tone::Warn, service_name, "starting plain HTTP server");
-            serve_http(app, container, https_addr).await
-        }
+        let https = serve_https(app, container.clone(), tls_addr, config);
+        let redirect = serve_http(redirect, container, redirect_addr);
+        tokio::try_join!(https, redirect)?;
+        Ok(())
+    } else {
+        print_status(Tone::Warn, service_name, "starting plain HTTP server");
+        serve_http(app, container, tls_addr).await
     }
 }
 
 /// The composable half of [`serve`]: discovers every `#[get]`/`#[post]`/...
+///
 /// route linked into the binary (plus `quench-starter`'s own
 /// health/swagger/UI-redirect routes), mounts the whole thing under
 /// `base_path`, and wraps it in the correlation-id and filtered-logger
@@ -150,13 +155,13 @@ fn server_addrs() -> (SocketAddr, SocketAddr) {
     let addr_str: String = envmnt::get_or("SERVER_ADDR", "0.0.0.0:443");
     let addr_redir_str: String = envmnt::get_or("SERVER_HTTP_REDIRECT_ADDR", "0.0.0.0:80");
 
-    let https_addr: SocketAddr = addr_str
+    let tls_addr: SocketAddr = addr_str
         .parse()
         .expect("SERVER_ADDR must be a valid socket address");
-    let http_addr: SocketAddr = addr_redir_str
+    let redirect_addr: SocketAddr = addr_redir_str
         .parse()
         .expect("SERVER_HTTP_REDIRECT_ADDR must be a valid socket address");
-    (https_addr, http_addr)
+    (tls_addr, redirect_addr)
 }
 
 /// Answers the bare server root (`GET /`) with `routers::ui::server_root_redirect`
@@ -203,23 +208,22 @@ impl Endpoint for RedirectToHttps {
 }
 
 fn build_https_authority(host: &str, https_port: u16) -> String {
-    if let Ok(authority) = host.parse::<Authority>() {
-        let parsed_host = authority.host();
-        let rendered_host = if parsed_host.contains(':') {
-            format!("[{parsed_host}]")
-        } else {
-            parsed_host.to_string()
-        };
+    let rendered_host = host.parse::<Authority>().map_or_else(
+        |_| host.to_string(),
+        |authority| {
+            let parsed_host = authority.host();
+            if parsed_host.contains(':') {
+                format!("[{parsed_host}]")
+            } else {
+                parsed_host.to_string()
+            }
+        },
+    );
 
-        if https_port == 443 {
-            rendered_host
-        } else {
-            format!("{rendered_host}:{https_port}")
-        }
-    } else if https_port == 443 {
-        host.to_string()
+    if https_port == 443 {
+        rendered_host
     } else {
-        format!("{host}:{https_port}")
+        format!("{rendered_host}:{https_port}")
     }
 }
 
@@ -240,7 +244,7 @@ mod root_or_mounted_tests {
         }
     }
 
-    async fn request(path: &str, container: &Arc<quench_http::di::Container>) -> Request {
+    fn request(path: &str, container: &Arc<quench_http::di::Container>) -> Request {
         Request::new(
             Method::GET,
             path.parse::<Uri>().unwrap(),
@@ -266,7 +270,7 @@ mod root_or_mounted_tests {
             mounted: Arc::new(AlwaysOk),
         };
 
-        let resp = app.call(request("/", &container).await).await;
+        let resp = app.call(request("/", &container)).await;
         assert_eq!(resp.status(), StatusCode::FOUND);
         let hyper_resp = resp.into_hyper();
         assert!(hyper_resp.headers().contains_key("location"));
@@ -280,7 +284,7 @@ mod root_or_mounted_tests {
             mounted: Arc::new(AlwaysOk),
         };
 
-        let resp = app.call(request("/svc/health", &container).await).await;
+        let resp = app.call(request("/svc/health", &container)).await;
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
@@ -292,7 +296,7 @@ mod root_or_mounted_tests {
             mounted: Arc::new(AlwaysOk),
         };
 
-        let resp = app.call(request("/", &container).await).await;
+        let resp = app.call(request("/", &container)).await;
         assert_eq!(resp.status(), StatusCode::OK);
     }
 }

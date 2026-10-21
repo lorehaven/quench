@@ -31,6 +31,7 @@
 //! curl -H "Authorization: Bearer $WRITE_TOKEN" -X POST http://localhost:8080/api/notes \
 //!     -H 'content-type: application/json' -d '{"text":"hi"}'   # 200
 //! ```
+#![allow(clippy::unused_async)] // route handlers are async by contract
 
 use async_trait::async_trait;
 use quench_auth::domain::jwt::{Claims, JwtConfig};

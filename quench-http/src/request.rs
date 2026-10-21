@@ -3,7 +3,9 @@ use crate::di::Container;
 use http::{Extensions, HeaderMap, Method, Uri};
 use std::sync::Arc;
 
-/// An incoming HTTP request: headers/method/uri, captured path parameters
+/// An incoming HTTP request.
+///
+/// Holds headers/method/uri, captured path parameters
 /// (filled in by the router - see [`crate::router::Router`]), the streamed
 /// body, a handle to the application's dependency container so extractors
 /// can pull injected *services* out of it, and a per-request extension map
@@ -11,6 +13,7 @@ use std::sync::Arc;
 /// correlation id, ...) - the `Inject`/`Extension` split, for the
 /// reason that a service is one shared instance the container resolves
 /// once, a claims struct is fresh per request and has nowhere else to live.
+#[derive(Debug)]
 pub struct Request {
     method: Method,
     uri: Uri,
@@ -43,23 +46,23 @@ impl Request {
         }
     }
 
-    pub fn extensions(&self) -> &Extensions {
+    pub const fn extensions(&self) -> &Extensions {
         &self.extensions
     }
 
-    pub fn extensions_mut(&mut self) -> &mut Extensions {
+    pub const fn extensions_mut(&mut self) -> &mut Extensions {
         &mut self.extensions
     }
 
-    pub fn method(&self) -> &Method {
+    pub const fn method(&self) -> &Method {
         &self.method
     }
 
-    pub fn uri(&self) -> &Uri {
+    pub const fn uri(&self) -> &Uri {
         &self.uri
     }
 
-    pub fn headers(&self) -> &HeaderMap {
+    pub const fn headers(&self) -> &HeaderMap {
         &self.headers
     }
 
@@ -74,7 +77,7 @@ impl Request {
             .map(|(_, v)| v.as_str())
     }
 
-    pub fn container(&self) -> &Arc<Container> {
+    pub const fn container(&self) -> &Arc<Container> {
         &self.container
     }
 
@@ -87,7 +90,7 @@ impl Request {
     /// Skips the first `n` bytes of the path when the router matches it -
     /// what mounting a sub-app at a runtime-configured prefix (see
     /// [`crate::router::mount`]) needs under the hood.
-    pub fn skip_prefix(&mut self, n: usize) {
+    pub const fn skip_prefix(&mut self, n: usize) {
         self.prefix_skip += n;
     }
 

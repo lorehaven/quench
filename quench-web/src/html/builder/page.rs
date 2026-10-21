@@ -9,6 +9,7 @@ pub struct Link {
 }
 
 impl Link {
+    #[must_use]
     pub fn new(rel: &str, href: &str) -> Self {
         Self {
             rel: rel.to_string(),
@@ -17,6 +18,7 @@ impl Link {
         }
     }
 
+    #[must_use]
     pub fn attr(mut self, key: &str, value: &str) -> Self {
         self.attrs.insert(key.to_string(), value.to_string());
         self
@@ -31,7 +33,10 @@ pub struct Script {
     pub defer: bool,
 }
 
+// `impl ToString` lets callers pass `&str`, `String` or numbers alike; it only borrows them.
+#[allow(clippy::needless_pass_by_value)]
 impl Script {
+    #[must_use]
     pub fn new(src: &str) -> Self {
         Self {
             src: src.to_string(),
@@ -50,25 +55,30 @@ impl Script {
         }
     }
 
-    pub fn defer(mut self) -> Self {
+    #[must_use]
+    pub const fn defer(mut self) -> Self {
         self.defer = true;
         self
     }
 
-    pub fn immediate(mut self) -> Self {
+    #[must_use]
+    pub const fn immediate(mut self) -> Self {
         self.defer = false;
         self
     }
 
+    #[must_use]
     pub fn crossorigin(mut self, crossorigin: impl ToString) -> Self {
         self.crossorigin = Some(crossorigin.to_string());
         self
     }
 
-    pub fn is_inline(&self) -> bool {
+    #[must_use]
+    pub const fn is_inline(&self) -> bool {
         self.content.is_some()
     }
 
+    #[must_use]
     pub fn render(&self) -> String {
         let mut attrs = Vec::new();
         if !self.src.is_empty() {
@@ -78,7 +88,7 @@ impl Script {
             attrs.push("defer".to_string());
         }
         if let Some(co) = &self.crossorigin {
-            attrs.push(format!("crossorigin=\"{}\"", co));
+            attrs.push(format!("crossorigin=\"{co}\""));
         }
 
         let attrs_str = if attrs.is_empty() {
@@ -132,41 +142,49 @@ pub struct PageBuilder {
 }
 
 impl PageBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn title(mut self, value: impl Into<String>) -> Self {
         self.title = value.into();
         self
     }
 
+    #[must_use]
     pub fn links(mut self, value: Vec<Link>) -> Self {
         self.links = value;
         self
     }
 
+    #[must_use]
     pub fn head_link_static_attr(mut self, key: &str, value: &str) -> Self {
         self.head_link_static_attrs
             .insert(key.to_string(), value.to_string());
         self
     }
 
+    #[must_use]
     pub fn head_link_static_attrs(mut self, value: BTreeMap<String, String>) -> Self {
         self.head_link_static_attrs.extend(value);
         self
     }
 
+    #[must_use]
     pub fn scripts(mut self, value: Vec<Script>) -> Self {
         self.scripts = value;
         self
     }
 
+    #[must_use]
     pub fn content(mut self, value: Element) -> Self {
         self.content = Some(value);
         self
     }
 
+    #[must_use]
     pub fn build(self) -> String {
         let links = self.head_link_static_attrs;
         let links = self
@@ -217,6 +235,7 @@ fn render_head_link(link: Link, static_attrs: &BTreeMap<String, String>) -> Stri
     format!("<link {attrs}></link>")
 }
 
+#[must_use]
 pub fn pretty_print_html(html_string: &str) -> String {
     super::pretty::pretty_print(html_string)
 }

@@ -1,5 +1,7 @@
 //! Reading a named cookie back out of a quench-http [`Request`]'s `Cookie`
-//! header. quench-http has no cookie support at all, on purpose - it's a `quench-auth`-specific need,
+//! header.
+//!
+//! quench-http has no cookie support at all, on purpose - it's a `quench-auth`-specific need,
 //! not a core HTTP concern, so the `cookie` crate dependency and this
 //! parsing live here instead of in `quench-http` itself.
 

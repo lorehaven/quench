@@ -26,7 +26,8 @@ impl PostgresDb {
         Ok(Self { pool })
     }
 
-    pub fn pool(&self) -> &Pool<Postgres> {
+    #[must_use]
+    pub const fn pool(&self) -> &Pool<Postgres> {
         &self.pool
     }
 
@@ -38,13 +39,12 @@ impl PostgresDb {
         let table = Self::migration_table();
         let query = format!(
             "
-            CREATE TABLE IF NOT EXISTS {} (
+            CREATE TABLE IF NOT EXISTS {table} (
                 id TEXT PRIMARY KEY,
                 author TEXT NOT NULL,
                 applied_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
             )
-        ",
-            table
+        "
         );
         self.execute(&query).await
     }
@@ -70,7 +70,7 @@ impl Database for PostgresDb {
         let table = Self::migration_table();
 
         for migration in migrations {
-            let query = format!("SELECT EXISTS(SELECT 1 FROM {} WHERE id = $1)", table);
+            let query = format!("SELECT EXISTS(SELECT 1 FROM {table} WHERE id = $1)");
             let exists: (bool,) = sqlx::query_as(sqlx::AssertSqlSafe(query.as_str()))
                 .bind(&migration.id)
                 .fetch_one(&self.pool)
@@ -87,7 +87,7 @@ impl Database for PostgresDb {
                         .await?;
                 }
 
-                let insert_query = format!("INSERT INTO {} (id, author) VALUES ($1, $2)", table);
+                let insert_query = format!("INSERT INTO {table} (id, author) VALUES ($1, $2)");
                 sqlx::query(sqlx::AssertSqlSafe(insert_query.as_str()))
                     .bind(&migration.id)
                     .bind(&migration.author)
@@ -102,13 +102,20 @@ impl Database for PostgresDb {
     }
 }
 
+impl<T: Model> std::fmt::Debug for PostgresRepository<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PostgresRepository").finish_non_exhaustive()
+    }
+}
+
 pub struct PostgresRepository<T: Model> {
     db: PostgresDb,
     _marker: std::marker::PhantomData<T>,
 }
 
 impl<T: Model> PostgresRepository<T> {
-    pub fn new(db: PostgresDb) -> Self {
+    #[must_use]
+    pub const fn new(db: PostgresDb) -> Self {
         Self {
             db,
             _marker: std::marker::PhantomData,
@@ -125,8 +132,7 @@ where
         let table = T::table_name();
         let json = serde_json::to_value(model)?;
         let query = format!(
-            "INSERT INTO {} SELECT * FROM jsonb_populate_record(NULL::{}, $1) RETURNING *",
-            table, table
+            "INSERT INTO {table} SELECT * FROM jsonb_populate_record(NULL::{table}, $1) RETURNING *"
         );
 
         let result = sqlx::query_as::<_, T>(sqlx::AssertSqlSafe(query.as_str()))
@@ -158,23 +164,19 @@ where
         let cols_list = columns.join(", ");
 
         let query = format!(
-            "UPDATE {table} SET ({cols}) = (SELECT {cols} FROM jsonb_populate_record(NULL::{table}, $1)) WHERE {pk} = $2 RETURNING *",
-            table = table,
-            cols = cols_list,
-            pk = pk
+            "UPDATE {table} SET ({cols_list}) = (SELECT {cols_list} FROM jsonb_populate_record(NULL::{table}, $1)) WHERE {pk} = $2 RETURNING *"
         );
 
         let id_val = json
             .get(&pk)
-            .ok_or_else(|| DbError::Unknown(format!("Primary key '{}' not found in model", pk)))?;
+            .ok_or_else(|| DbError::Unknown(format!("Primary key '{pk}' not found in model")))?;
 
         let id = match id_val {
             serde_json::Value::String(s) => s.clone(),
             serde_json::Value::Number(n) => n.to_string(),
             _ => {
                 return Err(DbError::Unknown(format!(
-                    "Primary key '{}' is not a string or number",
-                    pk
+                    "Primary key '{pk}' is not a string or number"
                 )));
             }
         };

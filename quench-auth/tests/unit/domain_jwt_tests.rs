@@ -172,8 +172,7 @@ async fn test_jwt_expiration() {
     let result = config.decode_claims(&token).await;
     assert!(
         result.is_err(),
-        "Expired token should be rejected: {:?}",
-        result
+        "Expired token should be rejected: {result:?}"
     );
 }
 
@@ -182,8 +181,8 @@ async fn test_jwt_iat_future() {
     let config = JwtConfig::for_tests_with_signing();
 
     let now = chrono::Utc::now();
-    let iat = (now + chrono::Duration::seconds(300)).timestamp() as usize; // Issued 5 minutes in the future
-    let exp = (now + chrono::Duration::seconds(600)).timestamp() as usize;
+    let iat = usize::try_from((now + chrono::Duration::seconds(300)).timestamp()).unwrap(); // Issued 5 minutes in the future
+    let exp = usize::try_from((now + chrono::Duration::seconds(600)).timestamp()).unwrap();
 
     let claims = Claims {
         sub: "user".to_string(),
@@ -199,7 +198,6 @@ async fn test_jwt_iat_future() {
     let result = config.decode_claims(&token).await;
     assert!(
         result.is_err(),
-        "Token with future iat should be rejected: {:?}",
-        result
+        "Token with future iat should be rejected: {result:?}"
     );
 }

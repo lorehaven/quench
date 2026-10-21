@@ -21,15 +21,15 @@ pub enum DbError {
 impl From<sqlx::Error> for DbError {
     fn from(err: sqlx::Error) -> Self {
         match err {
-            sqlx::Error::RowNotFound => DbError::NotFound,
-            sqlx::Error::Io(e) => DbError::ConnectionError(e.to_string()),
-            _ => DbError::QueryError(err.to_string()),
+            sqlx::Error::RowNotFound => Self::NotFound,
+            sqlx::Error::Io(e) => Self::ConnectionError(e.to_string()),
+            _ => Self::QueryError(err.to_string()),
         }
     }
 }
 
 impl From<serde_json::Error> for DbError {
     fn from(err: serde_json::Error) -> Self {
-        DbError::SerializationError(err.to_string())
+        Self::SerializationError(err.to_string())
     }
 }

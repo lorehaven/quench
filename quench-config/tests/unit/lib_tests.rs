@@ -1,5 +1,7 @@
 //! Unit tests for `lib.rs`.
 
+#![allow(unsafe_code)] // tests mutate the process environment (`set_var` is unsafe in edition 2024)
+
 use quench_config::*;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

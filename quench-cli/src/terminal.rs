@@ -1,7 +1,7 @@
 use std::io::Write;
 
 /// `text` wrapped in the SGR `codes` (e.g. `"1;96"`), or untouched when the
-/// `NO_COLOR` convention (https://no-color.org) asks for plain output.
+/// `NO_COLOR` convention (<https://no-color.org>) asks for plain output.
 fn paint(codes: &str, text: impl std::fmt::Display) -> String {
     if std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()) {
         text.to_string()
@@ -10,6 +10,7 @@ fn paint(codes: &str, text: impl std::fmt::Display) -> String {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum Tone {
     Info,
     Success,
@@ -34,8 +35,8 @@ pub fn print_box_banner(title: &str, subtitle: &str) {
     let bottom = "└─────────────────────────────────────────────┘";
 
     println!("{}", paint("36", border));
-    println!("{}", paint("1;97", format!("│ {:<43} │", title)));
-    println!("{}", paint("90", format!("│ {:<43} │", subtitle)));
+    println!("{}", paint("1;97", format!("│ {title:<43} │")));
+    println!("{}", paint("90", format!("│ {subtitle:<43} │")));
     println!("{}", paint("36", bottom));
 }
 
@@ -55,6 +56,7 @@ pub fn print_component_preview(name: &str, description: &str) {
     println!("{} {}", head, paint("97", description));
 }
 
+#[must_use]
 pub fn repl_prompt(app: &str, context: &str) -> String {
     format!("{}({})> ", paint("1;96", app), paint("90", context))
 }

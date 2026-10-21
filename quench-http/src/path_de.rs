@@ -9,7 +9,7 @@ use serde::de::{self, DeserializeSeed, IntoDeserializer, MapAccess, SeqAccess, V
 use std::fmt;
 
 #[derive(Debug)]
-pub(crate) struct Error(String);
+pub struct Error(String);
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -21,16 +21,14 @@ impl std::error::Error for Error {}
 
 impl de::Error for Error {
     fn custom<T: fmt::Display>(msg: T) -> Self {
-        Error(msg.to_string())
+        Self(msg.to_string())
     }
 }
 
 /// Deserializes the captures into `T`. Values are percent-decoded first (a
 /// `%2f` in a capture becomes `/`, so a handler validating a name sees what
 /// the client meant, not the wire form); invalid UTF-8 is an error.
-pub(crate) fn from_params<T: de::DeserializeOwned>(
-    params: &[(String, String)],
-) -> Result<T, Error> {
+pub fn from_params<T: de::DeserializeOwned>(params: &[(String, String)]) -> Result<T, Error> {
     let decoded = params
         .iter()
         .map(|(name, value)| Ok((name.clone(), percent_decode(value)?)))
@@ -43,14 +41,14 @@ fn percent_decode(value: &str) -> Result<String, Error> {
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
-        let hex = |b: u8| (b as char).to_digit(16);
+        let hex = |b: u8| (b as char).to_digit(16).and_then(|d| u8::try_from(d).ok());
         if bytes[i] == b'%'
             && let (Some(h), Some(l)) = (
                 bytes.get(i + 1).and_then(|b| hex(*b)),
                 bytes.get(i + 2).and_then(|b| hex(*b)),
             )
         {
-            out.push((h * 16 + l) as u8);
+            out.push(h * 16 + l);
             i += 3;
         } else {
             out.push(bytes[i]);
@@ -275,10 +273,10 @@ where
     }
 
     fn next_value_seed<S: DeserializeSeed<'de>>(&mut self, seed: S) -> Result<S::Value, Error> {
-        match self.value.take() {
-            Some(value) => seed.deserialize(Value(value)),
-            None => Err(de::Error::custom("value is missing")),
-        }
+        self.value.take().map_or_else(
+            || Err(de::Error::custom("value is missing")),
+            |value| seed.deserialize(Value(value)),
+        )
     }
 }
 

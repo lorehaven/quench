@@ -12,26 +12,27 @@ pub struct CacheEntry {
 }
 
 impl CacheEntry {
+    #[must_use]
     pub fn is_expired(&self) -> bool {
-        if let Some(ttl) = self.ttl_secs {
+        self.ttl_secs.is_some_and(|ttl| {
             let now = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs();
             let age = now.saturating_sub(self.timestamp);
             age >= ttl
-        } else {
-            false
-        }
+        })
     }
 }
 
 /// General-purpose data cache supporting multiple backends
+#[derive(Debug)]
 pub struct DataCache {
     cache: Arc<DashMap<String, CacheEntry>>,
 }
 
 impl DataCache {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             cache: Arc::new(DashMap::new()),
@@ -73,6 +74,7 @@ impl DataCache {
     }
 
     /// Get cached value if it exists and hasn't expired
+    #[must_use]
     pub fn get(&self, key: &str) -> Option<Value> {
         if let Some(entry) = self.cache.get(key) {
             if !entry.is_expired() {
@@ -85,15 +87,13 @@ impl DataCache {
     }
 
     /// Check if key exists and is valid
+    #[must_use]
     pub fn has(&self, key: &str) -> bool {
-        if let Some(entry) = self.cache.get(key) {
-            !entry.is_expired()
-        } else {
-            false
-        }
+        self.cache.get(key).is_some_and(|entry| !entry.is_expired())
     }
 
     /// Delete a specific key
+    #[must_use]
     pub fn delete(&self, key: &str) -> bool {
         self.cache.remove(key).is_some()
     }
@@ -101,7 +101,7 @@ impl DataCache {
     /// Adds `member` to the set held at `key`, creating it when absent.
     ///
     /// Sets are stored as a JSON array. Unlike the plain value calls this one
-    /// goes through DashMap's entry API rather than get-then-set: two writers
+    /// goes through `DashMap`'s entry API rather than get-then-set: two writers
     /// adding to the same set concurrently must not lose each other's member,
     /// which is the whole reason a caller reaches for a set instead of a value.
     ///
@@ -134,6 +134,7 @@ impl DataCache {
 
     /// Members of the set at `key`; empty when it is missing, expired, or holds
     /// something that is not a set.
+    #[must_use]
     pub fn set_members(&self, key: &str) -> Vec<String> {
         match self.get(key) {
             Some(Value::Array(members)) => members
@@ -173,6 +174,7 @@ impl DataCache {
     }
 
     /// Get cache statistics
+    #[must_use]
     pub fn stats(&self) -> CacheStats {
         let mut total_size = 0;
         let mut expired_count = 0;
@@ -192,6 +194,7 @@ impl DataCache {
     }
 
     /// Remove all expired entries
+    #[must_use]
     pub fn cleanup_expired(&self) -> usize {
         let mut removed = 0;
         self.cache.retain(|_, entry| {
@@ -206,10 +209,12 @@ impl DataCache {
     }
 
     /// Get entry count
+    #[must_use]
     pub fn len(&self) -> usize {
         self.cache.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.cache.is_empty()
     }

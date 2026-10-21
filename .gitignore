@@ -6,3 +6,4 @@
 .cargo/*
 !.cargo/audit.toml
 .claude/
+cookies.txt

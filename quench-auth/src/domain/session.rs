@@ -43,6 +43,7 @@ use quench_cache::CacheStore;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
+use std::fmt::Write as _;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -60,6 +61,7 @@ pub struct Session {
 /// this module's own doc comment for why this exists at all.
 const REUSE_GRACE_SECS: u64 = 30;
 
+#[derive(Debug)]
 pub struct SessionDb {
     store: CacheStore,
 }
@@ -106,7 +108,7 @@ impl SessionDb {
             id: Uuid::new_v4().to_string(),
             username: username.to_string(),
         };
-        let ttl = ttl_secs.max(1) as u64;
+        let ttl = ttl_secs.max(1).cast_unsigned();
 
         self.store
             .set(
@@ -165,7 +167,7 @@ impl SessionDb {
 
         let next_token = new_refresh_token();
         let next_hash = hash_refresh_token(&next_token);
-        let ttl = ttl_secs.max(1) as u64;
+        let ttl = ttl_secs.max(1).cast_unsigned();
 
         self.store
             .set(
@@ -353,9 +355,8 @@ fn new_refresh_token() -> String {
 fn hash_refresh_token(token: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(token.as_bytes());
-    hasher
-        .finalize()
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    hasher.finalize().iter().fold(String::new(), |mut out, b| {
+        let _ = write!(out, "{b:02x}");
+        out
+    })
 }

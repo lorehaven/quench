@@ -21,6 +21,9 @@ fn run_returns_ok_immediately_on_eof_stdin_without_calling_on_line() {
 
 #[test]
 fn repl_control_variants_can_be_constructed() {
-    let _continue = ReplControl::Continue("next> ".to_string());
-    let _exit = ReplControl::Exit;
+    assert!(matches!(
+        ReplControl::Continue("next> ".to_string()),
+        ReplControl::Continue(_)
+    ));
+    assert!(matches!(ReplControl::Exit, ReplControl::Exit));
 }

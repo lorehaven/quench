@@ -13,15 +13,27 @@ struct RouteEntry {
     handlers: Vec<(Method, Arc<dyn Endpoint>)>,
 }
 
+impl std::fmt::Debug for RouteEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list()
+            .entries(self.handlers.iter().map(|(method, _)| method))
+            .finish()
+    }
+}
+
 /// Matches a request path (including the regex-constrained, multi-segment
 /// wildcards - `/{name:.+}/blobs/{digest}` and friends, see
-/// [`crate::pattern`]) to a registered handler. Patterns are tried in
+/// [`crate::pattern`]) to a registered handler.
+///
+/// Patterns are tried in
 /// registration order.
+#[derive(Debug)]
 pub struct Router {
     routes: Vec<(Pattern, RouteEntry)>,
 }
 
 impl Router {
+    #[must_use]
     pub fn builder() -> RouterBuilder {
         RouterBuilder::default()
     }
@@ -80,7 +92,9 @@ impl Endpoint for Mount {
     }
 }
 
-/// Mounts `inner` under `prefix` (e.g. `BASE_PATH` read from the
+/// Mounts `inner` under `prefix` (e.g.
+///
+/// `BASE_PATH` read from the
 /// environment at startup) - a request outside the prefix 404s before
 /// `inner` ever sees it, and one inside it is dispatched with the prefix
 /// stripped, so `inner`'s own routes are written as if it owned the root.
@@ -91,11 +105,13 @@ pub fn mount(prefix: impl Into<String>, inner: Arc<dyn Endpoint>) -> Arc<dyn End
     })
 }
 
-/// Builds a [`Router`]. Patterns that can overlap (a static route and a
+/// Builds a [`Router`].
+///
+/// Patterns that can overlap (a static route and a
 /// trailing wildcard covering the same prefix, as in the crates sparse
 /// index's `/config.json` vs `/{path:.*}`) are matched in *registration*
 /// order - register the specific ones first.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct RouterBuilder {
     // Path pattern -> index into `routes`, so registering a second method on
     // an already-seen pattern extends its handler list instead of shadowing
@@ -111,21 +127,21 @@ impl RouterBuilder {
         pattern: &'static str,
         endpoint: Arc<dyn Endpoint>,
     ) -> &mut Self {
-        match self.index.get(pattern) {
-            Some(&i) => self.routes[i].1.handlers.push((method, endpoint)),
-            None => {
-                self.index.insert(pattern, self.routes.len());
-                self.routes.push((
-                    pattern,
-                    RouteEntry {
-                        handlers: vec![(method, endpoint)],
-                    },
-                ));
-            }
+        if let Some(&i) = self.index.get(pattern) {
+            self.routes[i].1.handlers.push((method, endpoint));
+        } else {
+            self.index.insert(pattern, self.routes.len());
+            self.routes.push((
+                pattern,
+                RouteEntry {
+                    handlers: vec![(method, endpoint)],
+                },
+            ));
         }
         self
     }
 
+    #[must_use]
     pub fn finish(self) -> Router {
         Router {
             routes: self

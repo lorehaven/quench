@@ -1,5 +1,6 @@
 use crate::styling::css::CssRule;
 
+#[must_use]
 pub fn modal() -> Vec<CssRule> {
     vec![overlay(), modal_shared(), modal_side(), modal_center()]
 }

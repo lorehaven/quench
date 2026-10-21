@@ -1,5 +1,6 @@
 use crate::styling::css::CssRule;
 
+#[must_use]
 pub fn header() -> Vec<CssRule> {
     vec![
         CssRule::new("header,\n.q-shell-header")
@@ -39,6 +40,7 @@ pub fn header() -> Vec<CssRule> {
     ]
 }
 
+#[must_use]
 pub fn content() -> Vec<CssRule> {
     vec![
         CssRule::new(".content,\n.q-shell-content")
@@ -56,6 +58,7 @@ pub fn content() -> Vec<CssRule> {
     ]
 }
 
+#[must_use]
 pub fn footer() -> Vec<CssRule> {
     vec![
         CssRule::new("footer,\n.q-shell-footer")

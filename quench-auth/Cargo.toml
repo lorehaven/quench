@@ -42,3 +42,6 @@ uuid = { workspace = true }
 bytes = { version = "1.12" }
 http = { workspace = true }
 http-body-util = { workspace = true }
+
+[lints]
+workspace = true

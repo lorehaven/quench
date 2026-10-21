@@ -1,5 +1,7 @@
 //! Unit tests for `common/db.rs`.
 
+#![allow(unsafe_code)] // tests mutate the process environment (`set_var` is unsafe in edition 2024)
+
 use quench_db::prelude::Db;
 use quench_starter::common::db::DbWrapper;
 

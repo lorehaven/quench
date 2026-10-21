@@ -12,6 +12,7 @@ const FOLD_AT: usize = 78;
 const WORD_BYTES: usize = 45;
 
 /// CRLF line endings, whatever the input used (`\n`, `\r\n` or a stray `\r`).
+#[must_use]
 pub fn normalize_crlf(text: &str) -> String {
     let mut out = String::with_capacity(text.len() + text.len() / 40);
     let mut chars = text.chars().peekable();
@@ -32,11 +33,13 @@ pub fn normalize_crlf(text: &str) -> String {
 
 /// True for text that can appear in a header as-is: printable ASCII plus
 /// space and tab.
+#[must_use]
 pub fn is_plain_header_text(text: &str) -> bool {
     text.chars().all(|c| c == '\t' || (' '..='~').contains(&c))
 }
 
 /// UTF-8 base64 encoded words for `text`, split on character boundaries.
+#[must_use]
 pub fn encoded_words(text: &str) -> Vec<String> {
     let mut words = Vec::new();
     let mut chunk = String::new();
@@ -59,6 +62,7 @@ fn encode_word(chunk: &str) -> String {
 
 /// An unstructured header value (`Subject`): as-is when plain, otherwise
 /// encoded words separated by spaces (which folding may turn into line breaks).
+#[must_use]
 pub fn unstructured(text: &str) -> String {
     if is_plain_header_text(text) {
         text.to_string()
@@ -69,6 +73,7 @@ pub fn unstructured(text: &str) -> String {
 
 /// A display name (RFC 5322 `phrase`): bare when it is only atoms and spaces,
 /// a quoted string when it holds specials, encoded words when not ASCII.
+#[must_use]
 pub fn phrase(name: &str) -> String {
     if !is_plain_header_text(name) {
         return encoded_words(name).join(" ");
@@ -90,6 +95,7 @@ pub fn phrase(name: &str) -> String {
 
 /// `Name: value`, folded at spaces to at most [`FOLD_AT`] columns where a
 /// space allows it. A token longer than that is left whole rather than split.
+#[must_use]
 pub fn fold_header(name: &str, value: &str) -> String {
     let mut out = String::with_capacity(name.len() + value.len() + 8);
     out.push_str(name);
@@ -111,13 +117,17 @@ pub fn fold_header(name: &str, value: &str) -> String {
 
 /// Whether `text` (already CRLF-normalised) can travel as `7bit`: ASCII, no
 /// NUL, no line over 998 characters.
+#[must_use]
 pub fn is_7bit(text: &str) -> bool {
     text.is_ascii() && !text.contains('\0') && text.split("\r\n").all(|line| line.len() <= 998)
 }
 
-/// Quoted-printable (RFC 2045) of CRLF-normalised text: lines of at most 76
+/// Quoted-printable (RFC 2045) of CRLF-normalised text.
+///
+/// Lines of at most 76
 /// characters, `=` escapes for anything outside printable ASCII, and trailing
 /// whitespace on a line escaped so mail relays cannot strip it.
+#[must_use]
 pub fn quoted_printable(text: &str) -> String {
     let mut out = String::with_capacity(text.len() + text.len() / 8);
     let mut lines = text.split("\r\n").peekable();

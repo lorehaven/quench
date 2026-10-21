@@ -23,6 +23,7 @@ use bytes::Bytes;
 use http_body_util::BodyDataStream;
 
 /// A `multipart/form-data` request body, read one field at a time.
+///
 /// Extracting this consumes the request body (same rule as
 /// [`crate::extract::Json`]/[`crate::extract::Bytes`] - only one
 /// body-consuming extractor per handler).
@@ -31,6 +32,7 @@ use http_body_util::BodyDataStream;
 /// to [`DEFAULT_BODY_LIMIT`]), same knob `Json`/`Bytes` use - a service
 /// that accepts large uploads raises `BodyLimit` once and every
 /// body-consuming extractor, multipart included, respects it.
+#[derive(Debug)]
 pub struct Multipart {
     inner: multer::Multipart<'static>,
 }
@@ -47,6 +49,7 @@ impl Multipart {
 }
 
 /// One field of a [`Multipart`] body.
+#[derive(Debug)]
 pub struct Field {
     inner: multer::Field<'static>,
 }
@@ -54,19 +57,22 @@ pub struct Field {
 impl Field {
     /// The field's name (the `name` in its `Content-Disposition` header) -
     /// what a form's `<input name="...">` set it to.
+    #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.inner.name()
     }
 
     /// The original filename, present when this field came from a file
     /// input rather than a plain text one.
+    #[must_use]
     pub fn file_name(&self) -> Option<&str> {
         self.inner.file_name()
     }
 
     /// The field's own `Content-Type`, if the client sent one.
+    #[must_use]
     pub fn content_type(&self) -> Option<&str> {
-        self.inner.content_type().map(|m| m.as_ref())
+        self.inner.content_type().map(std::convert::AsRef::as_ref)
     }
 
     /// Buffers this field's whole value as bytes.
@@ -101,6 +107,6 @@ impl FromRequest for Multipart {
 
         let stream = BodyDataStream::new(req.take_body());
         let inner = multer::Multipart::with_constraints(stream, boundary, constraints);
-        Ok(Multipart { inner })
+        Ok(Self { inner })
     }
 }

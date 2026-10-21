@@ -42,15 +42,19 @@ pub fn ui_path(path: &str) -> String {
     result
 }
 
+#[must_use]
 pub fn ui_asset_path(path: &str) -> String {
     ui_path(&format!("/assets{path}"))
 }
 
+#[must_use]
 pub fn ui_login_redirect() -> Response {
     Response::new(StatusCode::FOUND).header("Location", ui_path("/login"))
 }
 
-/// The same redirect, in the form the caller can actually act on. A fragment
+/// The same redirect, in the form the caller can actually act on.
+///
+/// A fragment
 /// request is an XHR, and the browser follows a `302` below the point htmx
 /// can see it, so an htmx-driven request gets `HX-Redirect` (on a `200`, since
 /// htmx ignores the headers of a response it considers an error) and turns
@@ -68,6 +72,7 @@ fn ui_root_redirect() -> Response {
 
 /// Used directly by `crate::http::serve`, not auto-discovered - see this
 /// module's own doc comment.
+#[allow(clippy::unused_async)] // async is the public contract callers `.await`
 pub async fn server_root_redirect() -> Response {
     ui_root_redirect()
 }
@@ -91,6 +96,7 @@ pub(crate) fn register_routes() {
     let _ = base_path_slash_redirect as fn() -> _;
 }
 
+#[allow(clippy::unused_async)] // async is the public contract callers `.await`
 pub async fn serve_assets(path: &str, dist_path: &str) -> Response {
     let Some(relative) = sanitize_asset_path(path) else {
         return Response::new(StatusCode::BAD_REQUEST);
@@ -131,7 +137,7 @@ fn content_type_for_path(path: &FsPath) -> &'static str {
         Some("json") => "application/json; charset=utf-8",
         Some("svg") => "image/svg+xml",
         Some("png") => "image/png",
-        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("jpg" | "jpeg") => "image/jpeg",
         Some("ico") => "image/x-icon",
         _ => "application/octet-stream",
     }

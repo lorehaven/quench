@@ -8,12 +8,20 @@ use std::task::{Context, Poll};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
-/// A boxed, type-erased response body. Its error type isn't `Infallible`:
+/// A boxed, type-erased response body.
+///
+/// Its error type isn't `Infallible`:
 /// a fixed body (`from_bytes`/`json`/...) never fails, but a
 /// [`Response::streaming`] one can genuinely error mid-stream (the
 /// producer side closes, a broadcast channel lags), and both need to fit
 /// through the same box.
 pub struct BoxBody(Pin<Box<dyn HttpBody<Data = Bytes, Error = BoxError> + Send + Sync>>);
+
+impl std::fmt::Debug for BoxBody {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BoxBody").finish_non_exhaustive()
+    }
+}
 
 impl BoxBody {
     pub fn new<B>(body: B) -> Self
@@ -23,6 +31,7 @@ impl BoxBody {
         Self(Box::pin(body))
     }
 
+    #[must_use]
     pub fn empty() -> Self {
         Self::new(Full::new(Bytes::new()).map_err(|never: std::convert::Infallible| match never {}))
     }
@@ -41,11 +50,13 @@ impl HttpBody for BoxBody {
 }
 
 /// An outgoing HTTP response.
+#[derive(Debug)]
 pub struct Response {
     pub(crate) inner: http::Response<BoxBody>,
 }
 
 impl Response {
+    #[must_use]
     pub fn new(status: StatusCode) -> Self {
         let inner = http::Response::builder()
             .status(status)
@@ -54,6 +65,7 @@ impl Response {
         Self { inner }
     }
 
+    #[must_use]
     pub fn status(&self) -> StatusCode {
         self.inner.status()
     }
@@ -64,6 +76,7 @@ impl Response {
     /// conventional way) - a bad name or value is dropped rather than
     /// panicking, since header names are case-insensitive on the wire
     /// regardless of how a caller happened to capitalize them.
+    #[must_use]
     pub fn header(mut self, name: impl AsRef<str>, value: impl AsRef<str>) -> Self {
         if let (Ok(name), Ok(value)) = (
             HeaderName::from_bytes(name.as_ref().as_bytes()),
@@ -77,6 +90,7 @@ impl Response {
     /// Adds a header without replacing an existing one of the same name -
     /// what repeated `Set-Cookie` headers need (HTTP forbids folding those
     /// into one comma-joined value the way most headers can be combined).
+    #[must_use]
     pub fn append_header(mut self, name: impl AsRef<str>, value: impl AsRef<str>) -> Self {
         if let (Ok(name), Ok(value)) = (
             HeaderName::from_bytes(name.as_ref().as_bytes()),
@@ -142,21 +156,24 @@ impl Response {
         Self { inner }
     }
 
+    #[must_use]
     pub fn ok() -> Self {
         Self::new(StatusCode::OK)
     }
 
+    #[must_use]
     pub fn not_found() -> Self {
         Self::text(StatusCode::NOT_FOUND, "not found")
     }
 
+    #[must_use]
     pub fn into_hyper(self) -> http::Response<BoxBody> {
         self.inner
     }
 }
 
 impl From<()> for Response {
-    fn from(_: ()) -> Self {
+    fn from((): ()) -> Self {
         Self::new(StatusCode::NO_CONTENT)
     }
 }

@@ -53,6 +53,7 @@ pub struct ApplyReport {
 }
 
 impl ApplyReport {
+    #[must_use]
     pub fn count(&self, outcome: MigrationOutcome) -> usize {
         self.results
             .iter()
@@ -92,33 +93,39 @@ impl Default for MigrationRunner {
 }
 
 impl MigrationRunner {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use]
     pub fn ledger_schema(mut self, schema: impl Into<String>) -> Self {
         self.ledger_schema = schema.into();
         self
     }
 
+    #[must_use]
     pub fn ledger_table(mut self, table: impl Into<String>) -> Self {
         self.ledger_table = table.into();
         self
     }
 
+    #[must_use]
     pub fn module_table(mut self, table: impl Into<String>) -> Self {
         self.module_table = table.into();
         self
     }
 
     /// Accept migrations whose SQL changed after they were applied.
-    pub fn allow_drift(mut self, allow: bool) -> Self {
+    #[must_use]
+    pub const fn allow_drift(mut self, allow: bool) -> Self {
         self.allow_drift = allow;
         self
     }
 
     /// Report what would happen without writing anything.
-    pub fn dry_run(mut self, dry_run: bool) -> Self {
+    #[must_use]
+    pub const fn dry_run(mut self, dry_run: bool) -> Self {
         self.dry_run = dry_run;
         self
     }
@@ -364,6 +371,7 @@ impl MigrationRunner {
     /// Database-scoped modules (extensions) have no schema of their own, and
     /// dropping `public` or the ledger's own schema would take out far more
     /// than this plan owns.
+    #[must_use]
     pub fn resettable_schemas(&self, plan: &MigrationPlan) -> Vec<String> {
         let mut schemas: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
         for module in &plan.modules {
@@ -395,8 +403,7 @@ impl MigrationRunner {
         }
 
         let ledger = self.qualified(&self.ledger_table);
-        let mut forgotten = 0;
-        if table_exists(conn, &ledger).await? {
+        let forgotten = if table_exists(conn, &ledger).await? {
             let ids: Vec<String> = plan.migrations.iter().map(|m| m.id.clone()).collect();
             let deleted = sqlx::query(sqlx::AssertSqlSafe(
                 format!("DELETE FROM {ledger} WHERE id = ANY($1)").as_str(),
@@ -404,8 +411,10 @@ impl MigrationRunner {
             .bind(&ids)
             .execute(&mut *conn)
             .await?;
-            forgotten = deleted.rows_affected() as usize;
-        }
+            usize::try_from(deleted.rows_affected()).unwrap_or(usize::MAX)
+        } else {
+            0
+        };
 
         let modules = self.qualified(&self.module_table);
         if table_exists(conn, &modules).await? {
@@ -499,6 +508,7 @@ pub fn validate_identifier(kind: &str, value: &str) -> Result<(), DbError> {
 
 /// Stable 64-bit key for `pg_advisory_lock`.
 #[doc(hidden)]
+#[must_use]
 pub fn advisory_lock_key(name: &str) -> i64 {
     let digest = Sha256::digest(name.as_bytes());
     let mut bytes = [0u8; 8];

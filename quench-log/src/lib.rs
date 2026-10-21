@@ -50,8 +50,9 @@ pub enum Error {
     AlreadyInitialized,
 }
 
-/// Installs logging from `RUST_LOG` and the other variables `Config::from_env`
-/// reads. This is what every service's `main` calls; `init_with` and
+/// Installs logging from `RUST_LOG` and the other variables `Config::from_env` reads.
+///
+/// This is what every service's `main` calls; `init_with` and
 /// `try_init_with` exist for a caller that wants to build its own `Config`
 /// or handle the error itself (tests included, since a whole test binary
 /// panicking on the second `#[test]` to call `init()` would be worse than
@@ -76,6 +77,7 @@ pub fn init_with(config: Config) {
 }
 
 /// As [`init_with`], returning the error instead of panicking on it.
+#[allow(clippy::needless_pass_by_value)] // public API takes the config by value, like `init_with`
 pub fn try_init_with(config: Config) -> Result<(), Error> {
     let (built, guard) = subscriber(&config)?;
 
@@ -91,8 +93,9 @@ pub fn try_init_with(config: Config) -> Result<(), Error> {
     Ok(())
 }
 
-/// Builds the subscriber `init`/`try_init_with` install, without installing
-/// it - for a caller that wants to add its own layer on top (OpenTelemetry,
+/// Builds the subscriber `init`/`try_init_with` install, without installing it.
+///
+/// For a caller that wants to add its own layer on top (OpenTelemetry,
 /// say) before calling `tracing::subscriber::set_global_default` itself, and
 /// for this crate's own tests, which use `tracing::subscriber::with_default`
 /// to check what actually reaches a file rather than fighting over the one

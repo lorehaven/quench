@@ -1,5 +1,7 @@
 //! The quench-http half of the relying-party authorization-code + PKCE
-//! flow. See `crate::domain::sso_client` for the framework-agnostic
+//! flow.
+//!
+//! See `crate::domain::sso_client` for the framework-agnostic
 //! config/refresh logic; this module reads the request and builds the
 //! response.
 
@@ -80,12 +82,11 @@ pub async fn callback(request: &Request, config: &SsoConfig) -> Response {
     }
 
     let callback_url = absolute_url(request, &realm::ui_path("/auth/callback"));
-    let http = match quench_client::transport::Client::builder()
+    let Ok(http) = quench_client::transport::Client::builder()
         .danger_accept_invalid_certs(!config.tls_verify)
         .build()
-    {
-        Ok(client) => client,
-        Err(_) => return callback_failed("failed to build the token exchange client"),
+    else {
+        return callback_failed("failed to build the token exchange client");
     };
 
     let form = [

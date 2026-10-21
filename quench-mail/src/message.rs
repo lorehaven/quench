@@ -4,6 +4,7 @@ use crate::address::{Address, Mailbox};
 use crate::error::BuildError;
 use crate::mime;
 use chrono::{DateTime, Utc};
+use std::fmt::Write as _;
 
 /// Headers `quench-mail` writes itself; a caller cannot set them as custom ones.
 const RESERVED: [&str; 12] = [
@@ -41,22 +42,25 @@ pub struct Message {
     html: Option<String>,
     headers: Vec<(String, String)>,
     date: DateTime<Utc>,
-    message_id: String,
+    id: String,
     envelope_from: Option<Address>,
 }
 
 impl Message {
+    #[must_use]
     pub fn builder() -> MessageBuilder {
         MessageBuilder::default()
     }
 
     /// `<id@domain>`, as written in the `Message-ID` header.
+    #[must_use]
     pub fn message_id(&self) -> &str {
-        &self.message_id
+        &self.id
     }
 
     /// Sender is the `From` address unless [`MessageBuilder::envelope_from`]
     /// said otherwise; recipients are To, Cc and Bcc without duplicates.
+    #[must_use]
     pub fn envelope(&self) -> Envelope {
         let mut to: Vec<Address> = Vec::new();
         for mailbox in self.to.iter().chain(&self.cc).chain(&self.bcc) {
@@ -77,6 +81,7 @@ impl Message {
     }
 
     /// The message as it goes on the wire: CRLF line endings, 7-bit clean.
+    #[must_use]
     pub fn formatted(&self) -> Vec<u8> {
         let mut out = String::new();
         let mut header = |name: &str, value: &str| {
@@ -98,7 +103,7 @@ impl Message {
         if !self.subject.is_empty() {
             header("Subject", &mime::unstructured(&self.subject));
         }
-        header("Message-ID", &self.message_id);
+        header("Message-ID", &self.id);
         header("MIME-Version", "1.0");
         for (name, value) in &self.headers {
             header(name, &mime::unstructured(value));
@@ -117,17 +122,18 @@ impl Message {
             }
             (Some(text), Some(html)) => {
                 let boundary = format!("quench-{}", uuid::Uuid::new_v4().simple());
-                out.push_str(&format!(
+                let _ = write!(
+                    out,
                     "Content-Type: multipart/alternative;\r\n boundary=\"{boundary}\"\r\n\r\n"
-                ));
+                );
                 out.push_str("This is a multi-part message in MIME format.\r\n");
                 for (kind, body) in [("text/plain", text), ("text/html", html)] {
-                    out.push_str(&format!("--{boundary}\r\n"));
+                    let _ = write!(out, "--{boundary}\r\n");
                     out.push_str(&part_headers(kind, body));
                     out.push_str("\r\n");
                     out.push_str(&part_body(body));
                 }
-                out.push_str(&format!("--{boundary}--\r\n"));
+                let _ = write!(out, "--{boundary}--\r\n");
             }
             // `build` refuses a message with no body.
             (None, None) => out.push_str("\r\n"),
@@ -139,9 +145,11 @@ impl Message {
 fn mailbox_header(mailboxes: &[Mailbox]) -> String {
     mailboxes
         .iter()
-        .map(|m| match &m.name {
-            Some(name) => format!("{} <{}>", mime::phrase(name), m.address),
-            None => m.address.to_string(),
+        .map(|m| {
+            m.name.as_ref().map_or_else(
+                || m.address.to_string(),
+                |name| format!("{} <{}>", mime::phrase(name), m.address),
+            )
         })
         .collect::<Vec<_>>()
         .join(", ")
@@ -172,7 +180,7 @@ fn part_body(body: &str) -> String {
     encoded
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct MessageBuilder {
     from: Option<Mailbox>,
     reply_to: Vec<Mailbox>,
@@ -206,6 +214,7 @@ impl MessageBuilder {
 
     /// `"Name <user@host>"` or a bare address. A parse error is reported by
     /// [`build`](Self::build), so calls can be chained.
+    #[must_use]
     pub fn from(mut self, mailbox: &str) -> Self {
         self.from = self.mailbox(mailbox);
         self
@@ -213,17 +222,20 @@ impl MessageBuilder {
 
     /// [`from`](Self::from) for a mailbox that is already built, e.g. from
     /// configuration - a display name is taken as-is, never re-parsed.
+    #[must_use]
     pub fn from_mailbox(mut self, mailbox: Mailbox) -> Self {
         self.from = Some(mailbox);
         self
     }
 
     /// [`to`](Self::to) for an already-built mailbox.
+    #[must_use]
     pub fn to_mailbox(mut self, mailbox: Mailbox) -> Self {
         self.to.push(mailbox);
         self
     }
 
+    #[must_use]
     pub fn to(mut self, mailbox: &str) -> Self {
         if let Some(m) = self.mailbox(mailbox) {
             self.to.push(m);
@@ -231,6 +243,7 @@ impl MessageBuilder {
         self
     }
 
+    #[must_use]
     pub fn cc(mut self, mailbox: &str) -> Self {
         if let Some(m) = self.mailbox(mailbox) {
             self.cc.push(m);
@@ -239,6 +252,7 @@ impl MessageBuilder {
     }
 
     /// Delivered to, but named in no header.
+    #[must_use]
     pub fn bcc(mut self, mailbox: &str) -> Self {
         if let Some(m) = self.mailbox(mailbox) {
             self.bcc.push(m);
@@ -246,6 +260,7 @@ impl MessageBuilder {
         self
     }
 
+    #[must_use]
     pub fn reply_to(mut self, mailbox: &str) -> Self {
         if let Some(m) = self.mailbox(mailbox) {
             self.reply_to.push(m);
@@ -253,6 +268,7 @@ impl MessageBuilder {
         self
     }
 
+    #[must_use]
     pub fn subject(mut self, subject: &str) -> Self {
         if subject.chars().any(|c| c == '\r' || c == '\n' || c == '\0') {
             self.fail(BuildError::HeaderInjection("subject"));
@@ -262,12 +278,14 @@ impl MessageBuilder {
         self
     }
 
+    #[must_use]
     pub fn text(mut self, body: &str) -> Self {
         self.text = Some(body.to_string());
         self
     }
 
     /// With [`text`](Self::text) as well, the message is `multipart/alternative`.
+    #[must_use]
     pub fn html(mut self, body: &str) -> Self {
         self.html = Some(body.to_string());
         self
@@ -275,6 +293,7 @@ impl MessageBuilder {
 
     /// An extra header, e.g. `Auto-Submitted: auto-generated`. Headers the
     /// library writes itself (From, Subject, Content-Type, ...) are refused.
+    #[must_use]
     pub fn header(mut self, name: &str, value: &str) -> Self {
         let valid_name = !name.is_empty() && name.chars().all(|c| c.is_ascii_graphic() && c != ':');
         if !valid_name {
@@ -290,13 +309,15 @@ impl MessageBuilder {
     }
 
     /// Overrides the `Date` header (defaults to now) - mainly for tests.
-    pub fn date(mut self, date: DateTime<Utc>) -> Self {
+    #[must_use]
+    pub const fn date(mut self, date: DateTime<Utc>) -> Self {
         self.date = Some(date);
         self
     }
 
     /// The SMTP `MAIL FROM` when it should differ from the `From` header,
     /// e.g. a bounce address.
+    #[must_use]
     pub fn envelope_from(mut self, address: &str) -> Self {
         match address.parse() {
             Ok(address) => self.envelope_from = Some(address),
@@ -334,7 +355,7 @@ impl MessageBuilder {
             html: self.html,
             headers: self.headers,
             date: self.date.unwrap_or_else(Utc::now),
-            message_id,
+            id: message_id,
             envelope_from: self.envelope_from,
         })
     }

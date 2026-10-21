@@ -1,5 +1,6 @@
 use crate::styling::css::CssRule;
 
+#[must_use]
 pub fn root() -> Vec<CssRule> {
     vec![
         CssRule::new(":root")

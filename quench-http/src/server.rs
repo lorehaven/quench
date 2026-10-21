@@ -18,13 +18,16 @@ use tokio_rustls::TlsAcceptor;
 
 /// How long [`serve_http`]/[`serve_https`] wait, after a shutdown signal,
 /// for in-flight connections to drain on their own before forcing an exit.
+///
 /// Kept comfortably under Kubernetes' default 30s
 /// `terminationGracePeriodSeconds`, so the process exits on its own instead
-/// of being SIGKILLed mid-drain.
+/// of being `SIGKILLed` mid-drain.
 pub const DEFAULT_GRACEFUL_TIMEOUT: Duration = Duration::from_secs(25);
 
 /// How long a connection may take sending its request headers before it's
-/// dropped. Without this, a client that opens a connection and then sends
+/// dropped.
+///
+/// Without this, a client that opens a connection and then sends
 /// headers one byte at a time (or never finishes them) ties up a
 /// connection slot forever - the "slowloris" class of resource-exhaustion
 /// attack. Generous enough for a slow mobile client, tight enough that a
@@ -40,7 +43,9 @@ fn connection_builder() -> auto::Builder<TokioExecutor> {
     builder
 }
 
-/// Serves `app` over plain HTTP on `addr`. Each connection is handled on
+/// Serves `app` over plain HTTP on `addr`.
+///
+/// Each connection is handled on
 /// its own task and can pipeline HTTP/1.1 or negotiate HTTP/2
 /// automatically. Runs until a `SIGTERM`/`SIGINT` (or, on non-Unix,
 /// Ctrl+C) is received, at which point it stops accepting new connections
@@ -57,7 +62,9 @@ pub async fn serve_http(
 
 /// Like [`serve_http`], but takes an already-bound listener and an
 /// arbitrary shutdown future instead of binding `addr` itself and always
-/// waiting for a real OS signal. Binding separately is what lets a caller
+/// waiting for a real OS signal.
+///
+/// Binding separately is what lets a caller
 /// (tests, mainly) discover an OS-assigned ephemeral port before serving on
 /// it; a custom `shutdown` future is what lets anything - a test, another
 /// signal source, a coordinating supervisor - trigger the same drain
