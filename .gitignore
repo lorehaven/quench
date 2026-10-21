@@ -7,3 +7,4 @@
 !.cargo/audit.toml
 .claude/
 cookies.txt
+.anvil.secret.toml
