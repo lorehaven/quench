@@ -10,7 +10,7 @@ fn paint(codes: &str, text: impl std::fmt::Display) -> String {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub enum Tone {
     Info,
     Success,
@@ -40,6 +40,7 @@ pub fn print_box_banner(title: &str, subtitle: &str) {
     println!("{}", paint("36", bottom));
 }
 
+#[allow(clippy::needless_pass_by_value)] // public API takes `Tone` by value; making it `Copy` would be a semver break
 pub fn print_status(tone: Tone, label: &str, message: &str) {
     let styled_label = match tone {
         Tone::Info => paint("1;96", label),
