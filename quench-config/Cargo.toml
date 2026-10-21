@@ -1,6 +1,6 @@
 [package]
 name = "quench-config"
-version = "0.1.4"
+version = "0.1.5"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - flexible configuration management for multiple sources"
