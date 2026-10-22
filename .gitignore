@@ -1,5 +1,6 @@
 *.iml
 .idea
+plans/
 **/dist/
 **/target/
 .aider*
