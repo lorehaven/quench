@@ -332,3 +332,23 @@ fn in_current_span_carries_the_span_into_a_future() {
     assert_eq!(records[0].spans[0].name, "outer");
     assert!(format!("{:?}", async {}.instrument(Span::none())).contains("Instrumented"));
 }
+
+#[test]
+fn level_macros_and_spans_take_an_explicit_target() {
+    let records = capture(Level::Trace, || {
+        quench_log::trace!(target: "audit", "t");
+        quench_log::debug!(target: "audit", n = 1, "d");
+        quench_log::info!(target: "audit", user = %"ann", "i");
+        quench_log::warn!(target: "audit", "w");
+        quench_log::error!(target: "audit", "e");
+        let span = quench_log::info_span!(target: "audit", "step", id = 7);
+        span.in_scope(|| quench_log::info!("inside"));
+        quench_log::trace_span!(target: "audit", "a");
+        quench_log::debug_span!(target: "audit", "b");
+        quench_log::warn_span!(target: "audit", "c");
+        quench_log::error_span!(target: "audit", "d");
+    });
+    let audit: Vec<_> = records.iter().filter(|r| r.target == "audit").map(|r| r.message.as_str()).collect();
+    assert_eq!(audit, ["t", "d", "i", "w", "e"]);
+    assert_eq!(value(&records[2], "user"), &FieldValue::Text("ann".into()));
+}

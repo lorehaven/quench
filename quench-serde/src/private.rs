@@ -110,8 +110,11 @@ pub fn rest(object: &Map, known: &[&str]) -> Map {
 }
 
 /// A flattened field reads whatever the other fields left over.
+///
+/// Like serde, a flattened `Option<T>` that cannot be read from the leftovers (a required field of `T` is
+/// not there) is `None` rather than an error.
 pub fn flatten<T: Deserialize>(rest: &Map) -> Result<T> {
-    T::deserialize(&Value::Object(rest.clone()))
+    T::deserialize(&Value::Object(rest.clone())).or_else(|error| T::missing_field().ok_or(error))
 }
 
 /// Merges a serialised flattened field into the enclosing object.

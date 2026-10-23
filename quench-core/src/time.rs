@@ -245,6 +245,20 @@ impl fmt::Display for ParseTimeError {
 
 impl std::error::Error for ParseTimeError {}
 
+impl From<SystemTime> for Time {
+    /// The instant a `SystemTime` names (before the epoch too).
+    fn from(at: SystemTime) -> Self {
+        match at.duration_since(UNIX_EPOCH) {
+            Ok(after) => Self {
+                nanos: i128::try_from(after.as_nanos()).unwrap_or(i128::MAX),
+            },
+            Err(before) => Self {
+                nanos: -i128::try_from(before.duration().as_nanos()).unwrap_or(i128::MAX),
+            },
+        }
+    }
+}
+
 impl Time {
     pub const UNIX_EPOCH: Self = Self { nanos: 0 };
 
@@ -373,6 +387,97 @@ impl Time {
             let _ = write!(out, ".{value:0width$}");
         }
         out.push('Z');
+        out
+    }
+
+    /// A `strftime`-style rendering (always UTC): `%Y %y %m %d %e %H %M %S %j %a %A %b %B %F %T %s %f %% %Z %z`,
+    /// plus `%3f` / `%6f` for milliseconds / microseconds (`%f` is nine digits of nanoseconds). Text that is
+    /// not a known specifier is copied as written.
+    #[must_use]
+    pub fn format(&self, pattern: &str) -> String {
+        const FULL_MONTHS: [&str; 12] = [
+            "January", "February", "March", "April", "May", "June", "July", "August", "September",
+            "October", "November", "December",
+        ];
+        const FULL_DAYS: [&str; 7] = [
+            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+        ];
+        let c = self.civil();
+        let weekday = self.weekday();
+        let mut out = String::with_capacity(pattern.len() + 8);
+        let mut chars = pattern.chars().peekable();
+        while let Some(ch) = chars.next() {
+            if ch != '%' {
+                out.push(ch);
+                continue;
+            }
+            let Some(spec) = chars.next() else {
+                out.push('%');
+                break;
+            };
+            match spec {
+                'Y' => {
+                    let _ = write!(out, "{:04}", c.year);
+                }
+                'y' => {
+                    let _ = write!(out, "{:02}", c.year.rem_euclid(100));
+                }
+                'm' => {
+                    let _ = write!(out, "{:02}", c.month);
+                }
+                'd' => {
+                    let _ = write!(out, "{:02}", c.day);
+                }
+                'e' => {
+                    let _ = write!(out, "{:2}", c.day);
+                }
+                'H' => {
+                    let _ = write!(out, "{:02}", c.hour);
+                }
+                'M' => {
+                    let _ = write!(out, "{:02}", c.minute);
+                }
+                'S' => {
+                    let _ = write!(out, "{:02}", c.second);
+                }
+                'j' => {
+                    let jan1 = days_from_civil(i64::from(c.year), 1, 1);
+                    let today = days_from_civil(i64::from(c.year), i64::from(c.month), i64::from(c.day));
+                    let _ = write!(out, "{:03}", today - jan1 + 1);
+                }
+                'a' => out.push_str(weekday.name()),
+                'A' => out.push_str(FULL_DAYS[Weekday::ALL.iter().position(|d| *d == weekday).unwrap_or(0)]),
+                'b' => out.push_str(MONTHS[(c.month - 1) as usize]),
+                'B' => out.push_str(FULL_MONTHS[(c.month - 1) as usize]),
+                'F' => {
+                    let _ = write!(out, "{:04}-{:02}-{:02}", c.year, c.month, c.day);
+                }
+                'T' => {
+                    let _ = write!(out, "{:02}:{:02}:{:02}", c.hour, c.minute, c.second);
+                }
+                's' => {
+                    let _ = write!(out, "{}", self.timestamp());
+                }
+                'f' => {
+                    let _ = write!(out, "{:09}", c.nanosecond);
+                }
+                '3' | '6' if chars.peek() == Some(&'f') => {
+                    chars.next();
+                    if spec == '3' {
+                        let _ = write!(out, "{:03}", c.nanosecond / 1_000_000);
+                    } else {
+                        let _ = write!(out, "{:06}", c.nanosecond / 1_000);
+                    }
+                }
+                'Z' => out.push_str("UTC"),
+                'z' => out.push_str("+0000"),
+                '%' => out.push('%'),
+                other => {
+                    out.push('%');
+                    out.push(other);
+                }
+            }
+        }
         out
     }
 
@@ -854,5 +959,26 @@ mod tests {
         let now = Time::now().timestamp();
         assert!(now >= i64::try_from(before).unwrap());
         assert!(now - i64::try_from(before).unwrap() < 5);
+    }
+
+    #[test]
+    fn format_renders_strftime_specifiers() {
+        let t = Time::from_ymd_hms(2026, 3, 5, 7, 8, 9).unwrap();
+        assert_eq!(t.format("%Y-%m-%d %H:%M:%S"), "2026-03-05 07:08:09");
+        assert_eq!(t.format("%F %T"), "2026-03-05 07:08:09");
+        assert_eq!(t.format("%y|%e|%j|%a|%A|%b|%B|%Z|%z|%%"), "26| 5|064|Thu|Thursday|Mar|March|UTC|+0000|%");
+        assert_eq!(t.format("%s"), t.timestamp().to_string());
+        let t = Time::from_unix_nanos(0, 123_456_789);
+        assert_eq!(t.format("%f %3f %6f"), "123456789 123 123456");
+        assert_eq!(t.format("%Q 100%"), "%Q 100%");
+        assert_eq!(Time::from_ymd_hms(2024, 12, 31, 0, 0, 0).unwrap().format("%j"), "366");
+    }
+
+    #[test]
+    fn system_time_converts_both_sides_of_the_epoch() {
+        let after = UNIX_EPOCH + std::time::Duration::new(5, 7);
+        assert_eq!(Time::from(after), Time::from_unix_nanos(5, 7));
+        let before = UNIX_EPOCH - std::time::Duration::from_secs(10);
+        assert_eq!(Time::from(before), Time::from_unix(-10));
     }
 }

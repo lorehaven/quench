@@ -244,6 +244,32 @@ fn flatten_merges_and_collects_the_rest() {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct MaybeFlattened {
+    package: String,
+    #[serde(flatten)]
+    target: Option<Target>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct Target {
+    kind: String,
+    name: String,
+}
+
+#[test]
+fn a_flattened_option_is_none_when_its_fields_are_not_there() {
+    // serde's behaviour: the leftovers do not make a `Target`, so there is none - not an error.
+    let none = read::<MaybeFlattened>(r#"{"package":"ml"}"#);
+    assert_eq!(none, MaybeFlattened { package: "ml".into(), target: None });
+    let partial = read::<MaybeFlattened>(r#"{"package":"ml","kind":"Deployment"}"#);
+    assert_eq!(partial.target, None);
+    let some = read::<MaybeFlattened>(r#"{"package":"ml","kind":"Deployment","name":"sage"}"#);
+    assert_eq!(some.target, Some(Target { kind: "Deployment".into(), name: "sage".into() }));
+    assert_eq!(text(&some), r#"{"package":"ml","kind":"Deployment","name":"sage"}"#);
+    assert_eq!(text(&none), r#"{"package":"ml"}"#);
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct Newtype(u32);
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]

@@ -66,6 +66,26 @@ pub trait StreamExt: Stream {
         Map { stream: self, f }
     }
 
+    /// This stream's items, then `other`'s.
+    fn chain<U>(self, other: U) -> Chain<Self, U>
+    where
+        Self: Sized + Unpin,
+        U: Stream<Item = Self::Item> + Unpin,
+    {
+        Chain {
+            first: Some(self),
+            second: other,
+        }
+    }
+
+    /// Keeps the items `f` maps to `Some`, transformed.
+    fn filter_map<T, F: FnMut(Self::Item) -> Option<T>>(self, f: F) -> FilterMap<Self, F>
+    where
+        Self: Sized + Unpin,
+    {
+        FilterMap { stream: self, f }
+    }
+
     /// Collects every item. Never returns for an endless stream.
     fn collect_vec(self) -> CollectVec<Self>
     where
@@ -113,6 +133,69 @@ impl<S: Stream + Unpin, T, F: FnMut(S::Item) -> T + Unpin> Stream for Map<S, F> 
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.stream.size_hint()
+    }
+}
+
+/// Stream for [`StreamExt::chain`].
+#[derive(Debug)]
+pub struct Chain<A, B> {
+    first: Option<A>,
+    second: B,
+}
+
+impl<A: Stream + Unpin, B: Stream<Item = A::Item> + Unpin> Stream for Chain<A, B> {
+    type Item = A::Item;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<A::Item>> {
+        let this = &mut *self;
+        if let Some(first) = this.first.as_mut() {
+            match Pin::new(first).poll_next(cx) {
+                Poll::Ready(None) => this.first = None,
+                other => return other,
+            }
+        }
+        Pin::new(&mut this.second).poll_next(cx)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (second_low, second_high) = self.second.size_hint();
+        self.first.as_ref().map_or((second_low, second_high), |first| {
+            let (low, high) = first.size_hint();
+            (
+                low.saturating_add(second_low),
+                high.zip(second_high).and_then(|(a, b)| a.checked_add(b)),
+            )
+        })
+    }
+}
+
+/// Stream for [`StreamExt::filter_map`].
+#[derive(Debug)]
+pub struct FilterMap<S, F> {
+    stream: S,
+    f: F,
+}
+
+impl<S: Stream + Unpin, T, F: FnMut(S::Item) -> Option<T> + Unpin> Stream for FilterMap<S, F> {
+    type Item = T;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        let this = &mut *self;
+        loop {
+            match Pin::new(&mut this.stream).poll_next(cx) {
+                Poll::Ready(Some(item)) => {
+                    if let Some(mapped) = (this.f)(item) {
+                        return Poll::Ready(Some(mapped));
+                    }
+                }
+                Poll::Ready(None) => return Poll::Ready(None),
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, self.stream.size_hint().1)
     }
 }
 
@@ -179,6 +262,67 @@ pub fn once<T: Unpin>(item: T) -> Iter<std::option::IntoIter<T>> {
 /// A stream with no items.
 pub fn empty<T: Unpin>() -> Iter<std::option::IntoIter<T>> {
     iter(None)
+}
+
+/// A stream built from a state and an async step.
+///
+/// `f(state)` yields the next item and the state for the step after it, or `None` to finish. It wraps
+/// anything with an async `recv`, e.g. a tokio channel:
+/// `unfold(rx, |mut rx| async move { rx.recv().await.map(|item| (item, rx)) })`.
+pub const fn unfold<S, T, F, Fut>(state: S, f: F) -> Unfold<S, F, Fut>
+where
+    F: FnMut(S) -> Fut,
+    Fut: Future<Output = Option<(T, S)>>,
+{
+    Unfold {
+        state: Some(state),
+        f,
+        pending: None,
+    }
+}
+
+/// Stream for [`unfold`].
+pub struct Unfold<S, F, Fut> {
+    state: Option<S>,
+    f: F,
+    pending: Option<Pin<Box<Fut>>>,
+}
+
+impl<S, F, Fut> std::fmt::Debug for Unfold<S, F, Fut> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Unfold").finish_non_exhaustive()
+    }
+}
+
+impl<S: Unpin, T, F: FnMut(S) -> Fut + Unpin, Fut: Future<Output = Option<(T, S)>>> Stream
+    for Unfold<S, F, Fut>
+{
+    type Item = T;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        let this = &mut *self;
+        if this.pending.is_none() {
+            let Some(state) = this.state.take() else {
+                return Poll::Ready(None);
+            };
+            this.pending = Some(Box::pin((this.f)(state)));
+        }
+        let Some(pending) = this.pending.as_mut() else {
+            return Poll::Ready(None);
+        };
+        match pending.as_mut().poll(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(Some((item, next))) => {
+                this.pending = None;
+                this.state = Some(next);
+                Poll::Ready(Some(item))
+            }
+            Poll::Ready(None) => {
+                this.pending = None;
+                Poll::Ready(None)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -257,5 +401,65 @@ mod tests {
             vec![1, 4, 9, 16]
         );
         assert_eq!(block_on(empty::<u8>().collect_vec()), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn filter_map_drops_and_transforms() {
+        block_on(async {
+            let mut s = iter(1..=6).filter_map(|n| (n % 2 == 0).then_some(n * 10));
+            assert_eq!(s.size_hint(), (0, Some(6)));
+            assert_eq!(s.next().await, Some(20));
+            assert_eq!(s.next().await, Some(40));
+            assert_eq!(s.next().await, Some(60));
+            assert_eq!(s.next().await, None);
+        });
+    }
+
+    #[test]
+    fn unfold_runs_the_step_until_it_says_stop() {
+        let counting = unfold(0u32, |n| async move { (n < 3).then_some((n * 2, n + 1)) });
+        assert_eq!(block_on(counting.collect_vec()), vec![0, 2, 4]);
+        assert!(format!("{:?}", unfold((), |()| async { None::<((), ())> })).contains("Unfold"));
+    }
+
+    #[test]
+    fn unfold_stays_finished_and_waits_for_pending_steps() {
+        let mut s = unfold((), |()| async { None::<((), ())> });
+        block_on(async {
+            assert_eq!(s.next().await, None);
+            assert_eq!(s.next().await, None);
+        });
+        // A step that is not ready yet: the stream is pending, then yields.
+        let mut yielded = false;
+        let mut s = unfold(false, move |done| {
+            let first = !yielded;
+            yielded = true;
+            async move {
+                if first {
+                    std::future::pending::<()>().await;
+                }
+                (!done).then_some((7u8, true))
+            }
+        });
+        let waker = std::task::Waker::noop();
+        let mut cx = Context::from_waker(waker);
+        assert!(Pin::new(&mut s).poll_next(&mut cx).is_pending());
+    }
+
+    #[test]
+    fn chain_runs_one_stream_after_the_other() {
+        block_on(async {
+            let mut s = iter(vec![1, 2]).chain(iter(vec![3]));
+            assert_eq!(s.size_hint(), (3, Some(3)));
+            assert_eq!(s.next().await, Some(1));
+            assert_eq!(s.next().await, Some(2));
+            assert_eq!(s.size_hint(), (1, Some(1)));
+            assert_eq!(s.next().await, Some(3));
+            assert_eq!(s.size_hint(), (0, Some(0)));
+            assert_eq!(s.next().await, None);
+            assert_eq!(s.next().await, None);
+        });
+        let unbounded = iter(vec![1]).chain(unfold((), |()| async { None::<(i32, ())> }));
+        assert_eq!(unbounded.size_hint(), (1, None));
     }
 }

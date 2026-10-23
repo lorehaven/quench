@@ -22,6 +22,12 @@ tokio = { workspace = true, features = ["sync", "time", "net"] }
 default = ["tls"]
 # `https://` support (rustls). Without it every `https` URL fails with a transport error.
 tls = ["quench-proto/tls"]
+# `quench_client::blocking`: the same client for synchronous programs (a private tokio runtime per client).
+blocking = ["tokio/rt"]
+
+[[test]]
+name = "blocking"
+required-features = ["blocking"]
 
 [dev-dependencies]
 quench-http = { workspace = true, features = ["tls"] }

@@ -93,30 +93,35 @@ macro_rules! __event {
 /// `event!` at `Level::Trace`.
 #[macro_export]
 macro_rules! trace {
+    (target: $target:expr, $($arg:tt)+) => { $crate::event!(target: $target, $crate::Level::Trace, $($arg)+) };
     ($($arg:tt)+) => { $crate::event!($crate::Level::Trace, $($arg)+) };
 }
 
 /// `event!` at `Level::Debug`.
 #[macro_export]
 macro_rules! debug {
+    (target: $target:expr, $($arg:tt)+) => { $crate::event!(target: $target, $crate::Level::Debug, $($arg)+) };
     ($($arg:tt)+) => { $crate::event!($crate::Level::Debug, $($arg)+) };
 }
 
 /// `event!` at `Level::Info`.
 #[macro_export]
 macro_rules! info {
+    (target: $target:expr, $($arg:tt)+) => { $crate::event!(target: $target, $crate::Level::Info, $($arg)+) };
     ($($arg:tt)+) => { $crate::event!($crate::Level::Info, $($arg)+) };
 }
 
 /// `event!` at `Level::Warn`.
 #[macro_export]
 macro_rules! warn {
+    (target: $target:expr, $($arg:tt)+) => { $crate::event!(target: $target, $crate::Level::Warn, $($arg)+) };
     ($($arg:tt)+) => { $crate::event!($crate::Level::Warn, $($arg)+) };
 }
 
 /// `event!` at `Level::Error`.
 #[macro_export]
 macro_rules! error {
+    (target: $target:expr, $($arg:tt)+) => { $crate::event!(target: $target, $crate::Level::Error, $($arg)+) };
     ($($arg:tt)+) => { $crate::event!($crate::Level::Error, $($arg)+) };
 }
 
@@ -171,29 +176,34 @@ macro_rules! __span {
 /// `span!` at `Level::Trace`.
 #[macro_export]
 macro_rules! trace_span {
+    (target: $target:expr, $($arg:tt)+) => { $crate::span!(target: $target, $crate::Level::Trace, $($arg)+) };
     ($($arg:tt)+) => { $crate::span!($crate::Level::Trace, $($arg)+) };
 }
 
 /// `span!` at `Level::Debug`.
 #[macro_export]
 macro_rules! debug_span {
+    (target: $target:expr, $($arg:tt)+) => { $crate::span!(target: $target, $crate::Level::Debug, $($arg)+) };
     ($($arg:tt)+) => { $crate::span!($crate::Level::Debug, $($arg)+) };
 }
 
 /// `span!` at `Level::Info`.
 #[macro_export]
 macro_rules! info_span {
+    (target: $target:expr, $($arg:tt)+) => { $crate::span!(target: $target, $crate::Level::Info, $($arg)+) };
     ($($arg:tt)+) => { $crate::span!($crate::Level::Info, $($arg)+) };
 }
 
 /// `span!` at `Level::Warn`.
 #[macro_export]
 macro_rules! warn_span {
+    (target: $target:expr, $($arg:tt)+) => { $crate::span!(target: $target, $crate::Level::Warn, $($arg)+) };
     ($($arg:tt)+) => { $crate::span!($crate::Level::Warn, $($arg)+) };
 }
 
 /// `span!` at `Level::Error`.
 #[macro_export]
 macro_rules! error_span {
+    (target: $target:expr, $($arg:tt)+) => { $crate::span!(target: $target, $crate::Level::Error, $($arg)+) };
     ($($arg:tt)+) => { $crate::span!($crate::Level::Error, $($arg)+) };
 }

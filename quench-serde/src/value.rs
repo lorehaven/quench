@@ -1,7 +1,7 @@
 //! A dynamically typed value: what every format here parses into.
 
 use std::fmt;
-use std::ops::Index;
+use std::ops::{Index, IndexMut};
 use std::sync::LazyLock;
 
 use crate::Map;
@@ -214,6 +214,9 @@ pub trait ValueIndex: sealed::Sealed {
     fn get<'v>(&self, value: &'v Value) -> Option<&'v Value>;
     #[doc(hidden)]
     fn get_mut<'v>(&self, value: &'v mut Value) -> Option<&'v mut Value>;
+    /// For `value[index] = ..`: a missing object key is created (a `Null` becomes an object first).
+    #[doc(hidden)]
+    fn index_or_insert<'v>(&self, value: &'v mut Value) -> &'v mut Value;
 }
 
 mod sealed {
@@ -232,6 +235,20 @@ impl ValueIndex for str {
     fn get_mut<'v>(&self, value: &'v mut Value) -> Option<&'v mut Value> {
         value.as_object_mut().and_then(|map| map.get_mut(self))
     }
+
+    fn index_or_insert<'v>(&self, value: &'v mut Value) -> &'v mut Value {
+        if value.is_null() {
+            *value = Value::Object(Map::new());
+        }
+        let kind = value.type_name();
+        let Some(map) = value.as_object_mut() else {
+            panic!("cannot index a {kind} with the key `{self}`");
+        };
+        if !map.contains_key(self) {
+            map.insert(self, Value::Null);
+        }
+        map.get_mut(self).expect("the key was just inserted")
+    }
 }
 
 impl ValueIndex for String {
@@ -241,6 +258,10 @@ impl ValueIndex for String {
 
     fn get_mut<'v>(&self, value: &'v mut Value) -> Option<&'v mut Value> {
         ValueIndex::get_mut(self.as_str(), value)
+    }
+
+    fn index_or_insert<'v>(&self, value: &'v mut Value) -> &'v mut Value {
+        ValueIndex::index_or_insert(self.as_str(), value)
     }
 }
 
@@ -252,6 +273,15 @@ impl ValueIndex for usize {
     fn get_mut<'v>(&self, value: &'v mut Value) -> Option<&'v mut Value> {
         value.as_array_mut().and_then(|items| items.get_mut(*self))
     }
+
+    fn index_or_insert<'v>(&self, value: &'v mut Value) -> &'v mut Value {
+        let kind = value.type_name();
+        match value.as_array_mut() {
+            Some(items) if *self < items.len() => &mut items[*self],
+            Some(items) => panic!("index {self} is out of bounds for an array of {}", items.len()),
+            None => panic!("cannot index a {kind} with {self}"),
+        }
+    }
 }
 
 impl<T: ValueIndex + ?Sized> ValueIndex for &T {
@@ -262,6 +292,10 @@ impl<T: ValueIndex + ?Sized> ValueIndex for &T {
     fn get_mut<'v>(&self, value: &'v mut Value) -> Option<&'v mut Value> {
         (**self).get_mut(value)
     }
+
+    fn index_or_insert<'v>(&self, value: &'v mut Value) -> &'v mut Value {
+        (**self).index_or_insert(value)
+    }
 }
 
 impl<I: ValueIndex> Index<I> for Value {
@@ -270,6 +304,14 @@ impl<I: ValueIndex> Index<I> for Value {
     /// `value["key"]` / `value[0]`; a missing entry reads as `Null` instead of panicking.
     fn index(&self, index: I) -> &Self {
         index.get(self).unwrap_or(&NULL)
+    }
+}
+
+impl<I: ValueIndex> IndexMut<I> for Value {
+    /// `value["key"] = ..`: creates the key when it is missing (a `Null` value becomes an object).
+    /// Panics, like `serde_json`, when the value is not an object (or the array index is out of range).
+    fn index_mut(&mut self, index: I) -> &mut Self {
+        index.index_or_insert(self)
     }
 }
 
@@ -453,6 +495,31 @@ macro_rules! eq_unsigned {
             }
         }
     )*};
+}
+
+// `usize` / `isize` have no lossless `From` into 64 bits, so they compare through a checked conversion.
+impl PartialEq<usize> for Value {
+    fn eq(&self, other: &usize) -> bool {
+        u64::try_from(*other).is_ok_and(|n| self.as_u64() == Some(n))
+    }
+}
+
+impl PartialEq<Value> for usize {
+    fn eq(&self, other: &Value) -> bool {
+        other == self
+    }
+}
+
+impl PartialEq<isize> for Value {
+    fn eq(&self, other: &isize) -> bool {
+        i64::try_from(*other).is_ok_and(|n| self.as_i64() == Some(n))
+    }
+}
+
+impl PartialEq<Value> for isize {
+    fn eq(&self, other: &Value) -> bool {
+        other == self
+    }
 }
 
 eq_signed!(i8, i16, i32, i64);
@@ -691,5 +758,50 @@ mod tests {
     #[test]
     fn default_is_null() {
         assert_eq!(Value::default(), Value::Null);
+    }
+
+    #[test]
+    fn assigning_through_an_index_creates_keys() {
+        let mut v = Value::Null;
+        v["a"] = Value::from(1);
+        v["b"] = Value::from("x");
+        v["a"] = Value::from(2);
+        assert_eq!(v, crate::json!({"a": 2, "b": "x"}));
+        let mut nested = crate::json!({"list": [1, 2]});
+        nested["list"][1] = Value::from(9);
+        nested[String::from("k")] = Value::Bool(true);
+        assert_eq!(nested, crate::json!({"list": [1, 9], "k": true}));
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot index a string with the key `k`")]
+    fn assigning_a_key_into_a_scalar_panics() {
+        let mut v = Value::from("s");
+        v["k"] = Value::Null;
+    }
+
+    #[test]
+    #[should_panic(expected = "out of bounds")]
+    fn assigning_past_the_end_of_an_array_panics() {
+        let mut v = crate::json!([1]);
+        v[3] = Value::Null;
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot index a number with 0")]
+    fn assigning_an_index_into_a_scalar_panics() {
+        let mut v = Value::from(1);
+        v[0] = Value::Null;
+    }
+
+    #[test]
+    fn values_compare_with_pointer_sized_integers() {
+        let items = [1, 2, 3];
+        assert_eq!(Value::from(3u64), items.len());
+        assert_eq!(items.len(), Value::from(3u64));
+        assert_eq!(Value::from(-4i64), -4isize);
+        assert_eq!(-4isize, Value::from(-4i64));
+        assert_ne!(Value::from("3"), items.len());
+        assert_ne!(Value::from(-1i64), items.len());
     }
 }

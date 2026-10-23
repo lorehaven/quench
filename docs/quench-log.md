@@ -11,7 +11,7 @@ fn main() {
 }
 ```
 
-`error!`, `warn!`, `info!`, `debug!` and `trace!` (and `event!` with an explicit level, or `target: "audit"` to set the target) take fields first, then an optional format string:
+`error!`, `warn!`, `info!`, `debug!` and `trace!` (and `event!` with an explicit level; every one of them, and the span macros, also takes `target: "audit"` first to set the target) take fields first, then an optional format string:
 
 ```rust
 quench_log::warn!(attempts = 3, user = %name, "locked out: {reason}");
@@ -19,7 +19,7 @@ quench_log::debug!(?request, "incoming");
 quench_log::info!(user, "signed in"); // a bare `user` records the variable of that name
 ```
 
-`name = value` records numbers, booleans and strings as they are, `name = %value` uses `Display`, `name = ?value` uses `Debug`. The target defaults to the module path and is what `RUST_LOG` directives match against.
+`name = value` records numbers (128-bit ones saturate to 64), booleans and strings as they are, `name = %value` uses `Display`, `name = ?value` uses `Debug`. The target defaults to the module path and is what `RUST_LOG` directives match against.
 
 ### Spans
 

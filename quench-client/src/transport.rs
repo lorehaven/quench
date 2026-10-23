@@ -9,11 +9,15 @@
 
 use quench_core::base64;
 use quench_core::bytes::Bytes;
+use quench_core::stream::{BoxStream, StreamExt};
 use quench_proto::h1::client::{ClientConfig, ClientConn, send_request};
 use quench_proto::io::Io;
 #[cfg(feature = "tls")]
 use quench_proto::tls::{ClientOptions, TlsConnector, client_config, server_name};
-use quench_proto::{Body, HeaderMap, HeaderValue, Method, StatusCode, Uri};
+use quench_proto::Body;
+
+// The protocol types a request or response speaks, so callers need not depend on `quench-proto` for them.
+pub use quench_proto::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header};
 use quench_serde::{DeserializeOwned, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -69,6 +73,7 @@ struct Inner {
     pool: Mutex<HashMap<Origin, Vec<Idle>>>,
     timeout: Option<Duration>,
     max_response_bytes: Option<usize>,
+    user_agent: Option<HeaderValue>,
     config: ClientConfig,
 }
 
@@ -86,6 +91,7 @@ pub struct ClientBuilder {
     accept_invalid_certs: bool,
     extra_roots_pem: Vec<Vec<u8>>,
     max_response_bytes: Option<usize>,
+    user_agent: Option<String>,
 }
 
 impl Client {
@@ -103,6 +109,7 @@ impl Client {
             accept_invalid_certs: false,
             extra_roots_pem: Vec::new(),
             max_response_bytes: None,
+            user_agent: None,
         }
     }
 
@@ -118,8 +125,16 @@ impl Client {
         self.request(Method::PUT, url)
     }
 
+    pub fn patch(&self, url: impl AsRef<str>) -> RequestBuilder {
+        self.request(Method::PATCH, url)
+    }
+
     pub fn delete(&self, url: impl AsRef<str>) -> RequestBuilder {
         self.request(Method::DELETE, url)
+    }
+
+    pub fn head(&self, url: impl AsRef<str>) -> RequestBuilder {
+        self.request(Method::HEAD, url)
     }
 
     pub fn request(&self, method: Method, url: impl AsRef<str>) -> RequestBuilder {
@@ -132,11 +147,20 @@ impl Client {
             url: without_fragment
                 .parse::<Uri>()
                 .map_err(|e| Error::Request(format!("{text}: {e}"))),
-            headers: HeaderMap::new(),
+            headers: self.default_headers(),
             body: Bytes::new(),
             timeout: self.inner.timeout,
             error: None,
         }
+    }
+
+    /// What every request starts with: the client's `User-Agent`, if it has one.
+    fn default_headers(&self) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        if let Some(agent) = &self.inner.user_agent {
+            headers.insert("user-agent", agent.clone());
+        }
+        headers
     }
 
     fn take_idle(&self, origin: &Origin) -> Option<ClientConn<Box<dyn Io>>> {
@@ -247,6 +271,15 @@ impl ClientBuilder {
         self
     }
 
+    /// Sends `value` as the `User-Agent` of every request (some APIs, GitHub's among them, refuse a request
+    /// without one). A request can still set its own. A value that is not a valid header makes
+    /// [`build`](Self::build) fail.
+    #[must_use]
+    pub fn user_agent(mut self, value: impl Into<String>) -> Self {
+        self.user_agent = Some(value.into());
+        self
+    }
+
     /// Fails a request whose response body exceeds `limit` bytes (unlimited by default).
     #[must_use]
     pub const fn max_response_bytes(mut self, limit: usize) -> Self {
@@ -265,10 +298,18 @@ impl ClientBuilder {
             };
             TlsConnector::new(client_config(&options).map_err(Error::Build)?)
         };
+        let user_agent = self
+            .user_agent
+            .map(|agent| {
+                HeaderValue::from_str(&agent)
+                    .map_err(|_| Error::Build(format!("`{agent}` is not a valid User-Agent")))
+            })
+            .transpose()?;
         Ok(Client {
             inner: Arc::new(Inner {
                 #[cfg(feature = "tls")]
                 tls,
+                user_agent,
                 pool: Mutex::new(HashMap::new()),
                 timeout: self.timeout,
                 max_response_bytes: self.max_response_bytes,
@@ -308,13 +349,53 @@ impl RequestBuilder {
             HeaderValue::from_str(value.as_ref()),
         ) {
             (Ok(name), Ok(value)) => {
-                self.headers.append(name, value);
+                // The client-wide `User-Agent` is a default: a request's own replaces it.
+                if name.as_str() == "user-agent" {
+                    self.headers.insert(name, value);
+                } else {
+                    self.headers.append(name, value);
+                }
             }
             _ => {
                 self.error.get_or_insert_with(|| {
                     Error::Request(format!("invalid header `{}`", name.as_ref()))
                 });
             }
+        }
+        self
+    }
+
+    /// Appends `pairs` to the URL's query string, percent-encoded (`?a=1&b=x%20y`; `&` when it already has one).
+    #[must_use]
+    pub fn query<K: AsRef<str>, V: AsRef<str>>(mut self, pairs: &[(K, V)]) -> Self {
+        if pairs.is_empty() {
+            return self;
+        }
+        if let Ok(url) = &self.url {
+            let encoded: Vec<String> = pairs
+                .iter()
+                .map(|(key, value)| {
+                    format!(
+                        "{}={}",
+                        quench_serde::urlencoded::percent_encode(key.as_ref()),
+                        quench_serde::urlencoded::percent_encode(value.as_ref())
+                    )
+                })
+                .collect();
+            let text = url.as_str();
+            let separator = if text.contains('?') { '&' } else { '?' };
+            self.url = Uri::parse(&format!("{text}{separator}{}", encoded.join("&")))
+                .map_err(|e| Error::Request(format!("{text}: {e}")));
+        }
+        self
+    }
+
+    /// Adds every header of `headers` (several values of one name are all sent).
+    #[must_use]
+    #[allow(clippy::needless_pass_by_value)] // by value, like the other clients' `headers`, so call sites need no `&`
+    pub fn headers(mut self, headers: HeaderMap) -> Self {
+        for (name, value) in headers.iter() {
+            self.headers.append(name.clone(), value.clone());
         }
         self
     }
@@ -367,12 +448,29 @@ impl RequestBuilder {
         self
     }
 
+    /// Like [`send`](Self::send) but returns as soon as the status and headers are in, leaving the body to be
+    /// read with [`Response::bytes_stream`] (or `bytes` / `text` / `json`). The timeout covers getting the
+    /// headers, not the body, and the connection is not reused afterwards.
+    pub async fn send_streaming(self) -> Result<Response> {
+        if let Some(error) = self.error {
+            return Err(error);
+        }
+        let url = self.url?;
+        let exchange = exchange(&self.client, self.method, url, self.headers, self.body, true);
+        match self.timeout {
+            Some(limit) => tokio::time::timeout(limit, exchange)
+                .await
+                .map_err(|_| Error::Timeout)?,
+            None => exchange.await,
+        }
+    }
+
     pub async fn send(self) -> Result<Response> {
         if let Some(error) = self.error {
             return Err(error);
         }
         let url = self.url?;
-        let exchange = exchange(&self.client, self.method, url, self.headers, self.body);
+        let exchange = exchange(&self.client, self.method, url, self.headers, self.body, false);
         match self.timeout {
             Some(limit) => tokio::time::timeout(limit, exchange)
                 .await
@@ -442,6 +540,7 @@ async fn exchange(
     mut url: Uri,
     headers: HeaderMap,
     mut body: Bytes,
+    stream: bool,
 ) -> Result<Response> {
     let mut headers = headers;
     for _ in 0..=MAX_REDIRECTS {
@@ -486,6 +585,16 @@ async fn exchange(
             continue;
         }
 
+        if stream {
+            // The caller reads the body as it arrives; the connection is not pooled afterwards.
+            return Ok(Response {
+                status,
+                headers: response_headers,
+                body: ResponseBody::Streaming(result.response.body),
+                limit: client.inner.max_response_bytes.unwrap_or(usize::MAX),
+            });
+        }
+
         let limit = client.inner.max_response_bytes.unwrap_or(usize::MAX);
         let bytes = result
             .response
@@ -499,7 +608,8 @@ async fn exchange(
         return Ok(Response {
             status,
             headers: response_headers,
-            body: bytes,
+            body: ResponseBody::Buffered(bytes),
+            limit,
         });
     }
     Err(Error::Transport("too many redirects".to_string()))
@@ -520,7 +630,15 @@ fn error_chain(error: &dyn std::error::Error) -> String {
 pub struct Response {
     status: StatusCode,
     headers: HeaderMap,
-    body: Bytes,
+    body: ResponseBody,
+    /// The client's `max_response_bytes`, applied when a streamed body is collected after all.
+    limit: usize,
+}
+
+#[derive(Debug)]
+enum ResponseBody {
+    Buffered(Bytes),
+    Streaming(Body),
 }
 
 // The body is already buffered, so these never await - async keeps the signatures
@@ -537,15 +655,35 @@ impl Response {
         &self.headers
     }
 
+    /// The whole body. For a [`send_streaming`](RequestBuilder::send_streaming) response this reads the rest
+    /// of it (subject to the client's `max_response_bytes`).
     pub async fn bytes(self) -> Result<Bytes> {
-        Ok(self.body)
+        match self.body {
+            ResponseBody::Buffered(bytes) => Ok(bytes),
+            ResponseBody::Streaming(body) => body
+                .collect_limited(self.limit)
+                .await
+                .map_err(|e| Error::Transport(e.to_string())),
+        }
     }
 
     pub async fn text(self) -> Result<String> {
-        Ok(String::from_utf8_lossy(&self.body).into_owned())
+        Ok(String::from_utf8_lossy(&self.bytes().await?).into_owned())
     }
 
     pub async fn json<T: DeserializeOwned>(self) -> Result<T> {
-        quench_serde::json::from_slice(&self.body).map_err(|e| Error::Decode(e.to_string()))
+        quench_serde::json::from_slice(&self.bytes().await?).map_err(|e| Error::Decode(e.to_string()))
+    }
+
+    /// The body as it arrives, for responses that are long-lived or too big to hold (server-sent events, a
+    /// model's token stream). A buffered response is one chunk.
+    #[must_use]
+    pub fn bytes_stream(self) -> BoxStream<'static, Result<Bytes>> {
+        match self.body {
+            ResponseBody::Buffered(bytes) => Box::pin(quench_core::stream::once(Ok(bytes))),
+            ResponseBody::Streaming(body) => Box::pin(StreamExt::map(body, |chunk| {
+                chunk.map_err(|e| Error::Transport(e.to_string()))
+            })),
+        }
     }
 }

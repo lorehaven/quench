@@ -81,6 +81,19 @@ impl IntoFieldValue for usize {
     }
 }
 
+// 128-bit integers (`Duration::as_millis` is one) are recorded as 64-bit, saturating.
+impl IntoFieldValue for u128 {
+    fn field_value(&self) -> FieldValue {
+        FieldValue::U64(u64::try_from(*self).unwrap_or(u64::MAX))
+    }
+}
+
+impl IntoFieldValue for i128 {
+    fn field_value(&self) -> FieldValue {
+        FieldValue::I64(i64::try_from(*self).unwrap_or(if *self < 0 { i64::MIN } else { i64::MAX }))
+    }
+}
+
 impl IntoFieldValue for f32 {
     fn field_value(&self) -> FieldValue {
         FieldValue::F64(f64::from(*self))
@@ -157,6 +170,11 @@ mod tests {
         assert_eq!((-7_isize).field_value(), FieldValue::I64(-7));
         assert_eq!(true.field_value(), FieldValue::Bool(true));
         assert_eq!(1.5_f32.field_value(), FieldValue::F64(1.5));
+        assert_eq!(9_u128.field_value(), FieldValue::U64(9));
+        assert_eq!(u128::MAX.field_value(), FieldValue::U64(u64::MAX));
+        assert_eq!((-9_i128).field_value(), FieldValue::I64(-9));
+        assert_eq!(i128::MAX.field_value(), FieldValue::I64(i64::MAX));
+        assert_eq!(i128::MIN.field_value(), FieldValue::I64(i64::MIN));
         assert_eq!(2.5_f64.field_value(), FieldValue::F64(2.5));
         assert_eq!("s".field_value(), FieldValue::Str("s".into()));
         assert_eq!(String::from("s").field_value(), FieldValue::Str("s".into()));

@@ -6,7 +6,11 @@
 
 `tls` (default) enables `https://` and the certificate settings that go with it. Without it the client is built on the plain HTTP/1.1 driver alone, and a request to an `https` URL fails with `Error::Transport` ("built without its `tls` feature") before any bytes are sent. `danger_accept_invalid_certs` and `add_root_certificate_pem` still exist so calling code compiles unchanged, but they have nothing to configure. The client depends on `quench-proto`'s `client` feature only, never on the server side.
 
+`blocking` (off by default) adds `quench_client::blocking`: the same `Client` / `RequestBuilder` / `Response` for synchronous programs, each call blocking until the response is in. A blocking `Client` owns a small private tokio runtime that drives its connections (so the pool is reused between calls) and, like every blocking HTTP client, must not be used from inside an async runtime.
+
 ## Public API / Key Types
+
+`quench_client::transport` is the plain client the wrappers below are built on: `Client::builder()` (`timeout`, `danger_accept_invalid_certs`, `add_root_certificate_pem`, `max_response_bytes`, `user_agent`), `get`/`post`/`put`/`patch`/`delete`/`head`/`request`, and on the request `header`, `headers(HeaderMap)`, `query(&[(k, v)])` (percent-encoded), `basic_auth`, `bearer_auth`, `json`, `form`, `body`, `timeout`, then `send()` (the whole body, buffered) or `send_streaming()` (returns once the headers are in; read the body with `Response::bytes_stream()`, or `bytes`/`text`/`json`, and the connection is not reused). It re-exports `HeaderMap`, `HeaderName`, `HeaderValue`, `Method`, `StatusCode`, `Uri` and the `header` constants, so a caller needs no `quench-proto` dependency for them. `user_agent` is sent on every request (GitHub's API refuses requests without one); a request can still set its own.
 
 Re-exported from `quench_client::prelude`: `HttpClient`, `BasicAuthClient`, `BearerAuthClient`, `ClientCredentialsClient`.
 

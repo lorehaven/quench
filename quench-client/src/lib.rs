@@ -2,6 +2,8 @@ use quench_core::{Context, Error, Result, err};
 use quench_serde::{DeserializeOwned, Serialize};
 use transport::{Client, Response};
 
+#[cfg(feature = "blocking")]
+pub mod blocking;
 pub mod transport;
 
 #[derive(Error, Debug)]

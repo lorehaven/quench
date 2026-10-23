@@ -1,7 +1,8 @@
 //! The expansion of `#[instrument]`.
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{ToTokens, format_ident, quote};
+use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::{FnArg, Ident, ItemFn, LitStr, Pat, Token};
@@ -25,7 +26,8 @@ impl Parse for Options {
                 "skip" => {
                     let content;
                     syn::parenthesized!(content in input);
-                    options.skip = Punctuated::<Ident, Token![,]>::parse_terminated(&content)?
+                    // `parse_any`: `self` is a keyword, and `skip(self)` is how a method leaves its receiver out.
+                    options.skip = Punctuated::<Ident, Token![,]>::parse_terminated_with(&content, Ident::parse_any)?
                         .into_iter()
                         .collect();
                 }
@@ -148,8 +150,18 @@ fn try_expand(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
 fn arg_named(input: &FnArg, name: &Ident) -> bool {
     match input {
         FnArg::Receiver(_) => name == "self",
-        FnArg::Typed(typed) => matches!(&*typed.pat, Pat::Ident(pat) if pat.ident == *name),
+        // A name bound inside a pattern (`Inject(config): Inject<Config>`) can be skipped too, even
+        // though such an argument is not recorded under a name of its own.
+        FnArg::Typed(typed) => binds(typed.pat.to_token_stream(), name),
     }
+}
+
+fn binds(tokens: TokenStream, name: &Ident) -> bool {
+    tokens.into_iter().any(|tree| match tree {
+        proc_macro2::TokenTree::Ident(ident) => ident == *name,
+        proc_macro2::TokenTree::Group(group) => binds(group.stream(), name),
+        _ => false,
+    })
 }
 
 #[cfg(test)]
@@ -247,5 +259,26 @@ mod tests {
         assert!(run("skip(nope)", "fn f(a: u8) {}").contains("`nope` is not an argument"));
         assert!(run("", "struct S;").contains("compile_error"));
         assert!(run("skip(a) extra", "fn f(a: u8) {}").contains("compile_error"));
+    }
+
+    #[test]
+    fn skip_accepts_the_receiver() {
+        let out = run("skip(self, b)", "fn f(&self, a: u8, b: u8) {}");
+        assert!(out.contains("a = ? a"), "{out}");
+        assert!(!out.contains("self = ? self") && !out.contains("b = ? b"), "{out}");
+    }
+
+    #[test]
+    fn skip_accepts_names_bound_inside_a_pattern() {
+        let out = run(
+            "skip(claims, db)",
+            "async fn f(Wrapper(claims): Wrapper<Claims>, Inject(db): Inject<Db>, id: u8) {}",
+        );
+        assert!(out.contains("id = ? id"), "{out}");
+        let err = expand(
+            "skip(nope)".parse().unwrap(),
+            "fn f(Wrapper(claims): Wrapper<Claims>) {}".parse().unwrap(),
+        );
+        assert!(err.to_string().contains("not an argument"), "{err}");
     }
 }

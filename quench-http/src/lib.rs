@@ -33,6 +33,7 @@ pub mod response;
 pub mod route;
 pub mod router;
 pub mod server;
+pub mod stream;
 pub mod ws;
 
 pub mod prelude {

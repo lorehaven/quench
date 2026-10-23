@@ -16,7 +16,7 @@ async fn upload(db: &Db, body: Vec<u8>) { /* .. */ }
 
 | Option | Meaning |
 |---|---|
-| `skip(a, b)` | leave these arguments out (do this for anything that is not `Debug`, or is a secret) |
+| `skip(a, b)` | leave these arguments out (do this for anything that is not `Debug`, or is a secret). `self` and names bound inside a pattern (`Inject(config): Inject<Config>`) can be skipped too |
 | `skip_all` | leave out every argument |
 | `fields(name = expr, other = %expr)` | extra fields, with the same syntax as the `span!` macro (`%` for `Display`, `?` for `Debug`) |
 | `level = "debug"` | the span's level (default `info`) |

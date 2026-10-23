@@ -529,6 +529,33 @@ impl<K: FromKey + Ord, V: Deserialize> Deserialize for BTreeMap<K, V> {
     }
 }
 
+// 128-bit integers: stored as 64-bit when they fit; a larger value is an inexact float rather than an error.
+impl Serialize for u128 {
+    #[allow(clippy::cast_precision_loss)]
+    fn serialize(&self) -> Value {
+        u64::try_from(*self).map_or(Value::Float(*self as f64), Value::UInt)
+    }
+}
+
+impl Deserialize for u128 {
+    fn deserialize(value: &Value) -> Result<Self> {
+        u64::deserialize(value).map(Self::from)
+    }
+}
+
+impl Serialize for i128 {
+    #[allow(clippy::cast_precision_loss)]
+    fn serialize(&self) -> Value {
+        i64::try_from(*self).map_or(Value::Float(*self as f64), Value::from_i64)
+    }
+}
+
+impl Deserialize for i128 {
+    fn deserialize(value: &Value) -> Result<Self> {
+        i64::deserialize(value).map(Self::from)
+    }
+}
+
 macro_rules! tuples {
     ($(($len:expr; $($name:ident $index:tt),+)),*) => {$(
         impl<$($name: Serialize),+> Serialize for ($($name,)+) {
@@ -555,7 +582,13 @@ tuples!(
     (3; A 0, B 1, C 2),
     (4; A 0, B 1, C 2, D 3),
     (5; A 0, B 1, C 2, D 3, E 4),
-    (6; A 0, B 1, C 2, D 3, E 4, F 5)
+    (6; A 0, B 1, C 2, D 3, E 4, F 5),
+    (7; A 0, B 1, C 2, D 3, E 4, F 5, G 6),
+    (8; A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7),
+    (9; A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8),
+    (10; A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8, J 9),
+    (11; A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8, J 9, K 10),
+    (12; A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8, J 9, K 10, L 11)
 );
 
 impl Serialize for PathBuf {
@@ -826,10 +859,20 @@ mod tests {
     }
 
     #[test]
+    fn wide_integers_go_through_64_bits() {
+        round_trip(&7_u128);
+        round_trip(&-7_i128);
+        assert!(matches!(u128::MAX.serialize(), Value::Float(f) if f > 3.0e38));
+        assert!(matches!(i128::MIN.serialize(), Value::Float(f) if f < -1.0e38));
+        assert!(err::<u128>(Value::from(-1)).contains("u64") || !err::<u128>(Value::from(-1)).is_empty());
+    }
+
+    #[test]
     fn tuples() {
         round_trip(&(1_u8,));
         round_trip(&(1_u8, "two".to_string()));
         round_trip(&(1_u8, 2_i8, 3_u16, 4_u32, 5_i64, 6_usize));
+        round_trip(&(1_u8, 2_i8, 3_u16, 4_u32, 5_i64, 6_usize, 7_u8, 8_u8, 9_u8, 10_u8, 11_u8, "twelve".to_string()));
         assert_eq!(
             (1_u8, "a").serialize(),
             Value::Array(vec![Value::from(1), Value::from("a")])

@@ -15,7 +15,7 @@ Types do not implement a visitor protocol. They convert to and from a dynamic [`
 - **Canonical integers.** A non-negative integer is always `UInt`, a negative one `Int`, so equal numbers compare equal. A `Float` never equals an integer.
 - **Ordered objects.** `Map` keeps insertion order (a struct keeps its field order through JSON, a parsed document is not reshuffled). Equality ignores order. A repeated key keeps the last value in the first position.
 - **Non-finite floats** (NaN, infinities) have no JSON form and become `Null`.
-- Accessors (`as_str`, `as_i64`, ...), `get`/`get_mut` by key or position, `value["key"][0]` (a missing entry reads as `Null`), `pointer("/a/0")` (RFC 6901), `From` for the std scalar types, `Vec`, `Option`, `Map`.
+- Accessors (`as_str`, `as_i64`, ...), `get`/`get_mut` by key or position, `value["key"][0]` (a missing entry reads as `Null`), `pointer("/a/0")` (RFC 6901), `From` for the std scalar types, `Vec`, `Option`, `Map`. `value["key"] = ..` creates the key (a `Null` becomes an object; indexing a scalar panics, as in `serde_json`). A `Value` compares with `&str`, `String`, `bool`, `f64` and every integer type, `usize`/`isize` included.
 
 ## JSON (`json`)
 
@@ -31,6 +31,7 @@ Types do not implement a visitor protocol. They convert to and from a dynamic [`
 - Every value is text, so while a form is being read the scalar impls accept numeric and boolean text (`n=5` into a `u32`), and a lone value is a one-element list (`tags=a` into a `Vec`). JSON stays strict: `"5"` is not a number there.
 - A key that repeats becomes a list (`tags=a&tags=b`); `None` and `null` are left out when writing; nested objects have no form and are an error.
 - Output and decoding match `serde_urlencoded` on 200k generated and hostile inputs.
+- `urlencoded::percent_encode` / `percent_decode` are RFC 3986 percent-encoding for URL paths and query values (a space is `%20`, `+` is a plus), the replacement for the `urlencoding` crate; `encode` / `decode` are the form variant (space is `+`).
 
 ## TOML (`toml`)
 
@@ -65,7 +66,7 @@ pub trait Deserialize: Sized { fn deserialize(v: &Value) -> Result<Self>; }
 
 - container: `rename_all` (`lowercase`, `UPPERCASE`, `PascalCase`, `camelCase`, `snake_case`, `SCREAMING_SNAKE_CASE`, `kebab-case`, `SCREAMING-KEBAB-CASE`), `deny_unknown_fields`, `default` / `default = "path"`, `tag = ".."` (internally tagged enums), `untagged`;
 - variant: `rename`, `alias`, `rename_all` (for the variant's fields);
-- field: `rename`, `alias` (repeatable), `default` / `default = "path"`, `skip`, `skip_serializing`, `skip_deserializing`, `skip_serializing_if = "path"`, `flatten`.
+- field: `rename`, `alias` (repeatable), `default` / `default = "path"`, `skip`, `skip_serializing`, `skip_deserializing`, `skip_serializing_if = "path"`, `flatten`. A flattened `Option<T>` is `None` when the leftover keys do not make a `T`, as in serde.
 
 Anything else (`with`, `serialize_with`, `bound`, ...) is a compile error that names what is supported, never a silent no-op. Enums are externally tagged by default (`"Unit"`, `{"Newtype": ..}`, `{"Struct": {..}}`); a tuple variant cannot be internally tagged. Generic parameters get a `Serialize`/`Deserialize` bound; deserialising into borrowed data (`&str`) is not supported. Errors carry the path (`items[1].count: ..`, `Struct.a: ..`).
 

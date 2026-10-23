@@ -140,6 +140,45 @@ pub fn encode(text: &str) -> String {
     out
 }
 
+/// Percent-encodes text for a URL path segment or query value (RFC 3986).
+///
+/// A space is `%20`, the unreserved characters `A-Z a-z 0-9 - . _ ~` stay and every other byte is `%XX`.
+/// Unlike [`encode`] there is no `+`, which in a path is just a plus.
+#[must_use]
+pub fn percent_encode(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for &byte in text.as_bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+            out.push(char::from(byte));
+        } else {
+            let _ = write!(out, "%{byte:02X}");
+        }
+    }
+    out
+}
+
+/// Reverses [`percent_encode`]: `%XX` is a byte and `+` stays a plus; a malformed escape is kept as written
+/// and invalid UTF-8 becomes U+FFFD.
+#[must_use]
+pub fn percent_decode(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%'
+            && let (Some(&hi), Some(&lo)) = (bytes.get(i + 1), bytes.get(i + 2))
+            && let (Some(hi), Some(lo)) = (hex(hi), hex(lo))
+        {
+            out.push(hi << 4 | lo);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 fn hex(byte: u8) -> Option<u8> {
     char::from(byte)
         .to_digit(16)
@@ -315,5 +354,15 @@ mod tests {
                 .contains("(key, value) pairs")
         );
         assert!(to_string(&crate::json!([[{"x": 1}, 2]])).is_err());
+    }
+
+    #[test]
+    fn percent_encoding_is_for_paths_not_forms() {
+        assert_eq!(percent_encode("a b&c/d+e~f"), "a%20b%26c%2Fd%2Be~f");
+        assert_eq!(percent_encode("é"), "%C3%A9");
+        assert_eq!(encode("a b"), "a+b", "form encoding is unchanged");
+        assert_eq!(percent_decode("a%20b%2Bc+d"), "a b+c+d");
+        assert_eq!(percent_decode("%C3%A9%zz%4"), "é%zz%4");
+        assert_eq!(percent_decode(&percent_encode("x y/z?=&#é")), "x y/z?=&#é");
     }
 }

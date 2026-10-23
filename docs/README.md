@@ -55,7 +55,7 @@ Features are additive and, unless noted, on by default. Turn them off with `defa
 | --- | --- |
 | `quench-proto` | `server`, `client`, `ws`, `multipart`, `sse`, `tls` |
 | `quench-http` | `tls` (`serve_https`, `load_tls`) |
-| `quench-client` | `tls` (`https://`) |
+| `quench-client` | `tls` (`https://`), `blocking` (off by default: `quench_client::blocking`) |
 | `quench-pg` | `tls` (`sslmode=require`, `verify-full`) |
 | `quench-redis` | `tls` (`rediss://`) |
 | `quench-cache` | `request-cache`, `data-cache`, `tls`; `redis` is off by default |

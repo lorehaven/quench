@@ -20,6 +20,16 @@ pub fn get_any<K: AsRef<OsStr>>(keys: &[K], default: &str) -> String {
         .unwrap_or_else(|| default.to_string())
 }
 
+/// The variable parsed as a `T` (`get_parsed::<u64>("PORT", 8080)`), or `default` when it is unset, not
+/// valid UTF-8 or does not parse.
+#[must_use]
+pub fn get_parsed<T: std::str::FromStr>(key: impl AsRef<OsStr>, default: T) -> T {
+    std::env::var(key)
+        .ok()
+        .and_then(|value| value.trim().parse().ok())
+        .unwrap_or(default)
+}
+
 /// Reads a boolean variable; `default` when it is unset.
 #[must_use]
 pub fn is_or(key: impl AsRef<OsStr>, default: bool) -> bool {
@@ -56,6 +66,16 @@ mod tests {
     use super::*;
 
     // Each test owns distinctly named variables: tests run in parallel threads.
+
+    #[test]
+    fn get_parsed_falls_back_on_anything_unusable() {
+        assert_eq!(get_parsed::<u64>("QUENCH_TEST_PARSED_UNSET", 7), 7);
+        set("QUENCH_TEST_PARSED_OK", " 42 ");
+        assert_eq!(get_parsed::<u64>("QUENCH_TEST_PARSED_OK", 7), 42);
+        set("QUENCH_TEST_PARSED_BAD", "forty");
+        assert_eq!(get_parsed::<u64>("QUENCH_TEST_PARSED_BAD", 7), 7);
+        assert!((get_parsed::<f64>("QUENCH_TEST_PARSED_OK", 0.5) - 42.0).abs() < f64::EPSILON);
+    }
 
     #[test]
     fn get_or_falls_back() {

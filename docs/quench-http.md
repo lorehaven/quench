@@ -14,6 +14,10 @@ This page is a guide, not just a reference — it builds up feature by feature t
 quench-http = { version = "0.1", default-features = false } # plain HTTP only
 ```
 
+## Streaming bodies
+
+`Response::streaming(status, stream)` takes any `quench_core::stream::Stream` of `Result<Bytes, E>` that is `Send + Sync + 'static` (the `Sync` is needed because middleware holds a `&Response` across awaits). `quench_http::stream` turns tokio sources into such streams: `receiver_stream(mpsc::Receiver<T>)` (everything sent until every sender is gone) and `reader_stream(impl AsyncRead)` (64 KiB chunks; a read error is yielded once and ends the stream). For a broadcast channel or any other async source use `quench_core::stream::unfold`.
+
 ## Installation
 
 ```toml

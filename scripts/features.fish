@@ -12,7 +12,7 @@ cd (dirname (status filename))/..
 set -l matrix \
     "quench-proto:server client ws multipart sse tls" \
     "quench-http:tls" \
-    "quench-client:tls" \
+    "quench-client:tls blocking" \
     "quench-pg:tls" \
     "quench-redis:tls" \
     "quench-cache:request-cache data-cache redis tls" \
