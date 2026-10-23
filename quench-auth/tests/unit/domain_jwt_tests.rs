@@ -180,9 +180,11 @@ async fn test_jwt_expiration() {
 async fn test_jwt_iat_future() {
     let config = JwtConfig::for_tests_with_signing();
 
-    let now = chrono::Utc::now();
-    let iat = usize::try_from((now + chrono::Duration::seconds(300)).timestamp()).unwrap(); // Issued 5 minutes in the future
-    let exp = usize::try_from((now + chrono::Duration::seconds(600)).timestamp()).unwrap();
+    let now = quench_core::time::Time::now();
+    let iat =
+        usize::try_from((now + quench_core::time::Duration::seconds(300)).timestamp()).unwrap(); // Issued 5 minutes in the future
+    let exp =
+        usize::try_from((now + quench_core::time::Duration::seconds(600)).timestamp()).unwrap();
 
     let claims = Claims {
         sub: "user".to_string(),

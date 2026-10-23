@@ -1,5 +1,4 @@
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD;
+use quench_core::base64::STANDARD;
 use quench_mail::mime::*;
 
 /// Decodes `=?UTF-8?B?...?=` words back to text.

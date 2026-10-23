@@ -16,26 +16,21 @@ name = "quench_http"
 path = "src/lib.rs"
 
 [dependencies]
-async-trait = { workspace = true }
-bytes = { version = "1.12" }
-http = { workspace = true }
-futures-util = { workspace = true }
-http-body-util = { workspace = true }
-hyper = { workspace = true, features = ["server", "http1", "http2"] }
-hyper-util = { workspace = true, features = ["tokio", "server-auto", "server-graceful"] }
-inventory = { workspace = true }
-multer = { workspace = true }
+quench-log = { workspace = true }
+quench-core = { workspace = true }
 quench-http-macros = { workspace = true }
-rustls = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-serde_urlencoded = { workspace = true }
-thiserror = { workspace = true }
+quench-proto = { workspace = true, features = ["server", "ws", "multipart", "sse"] }
+quench-serde = { workspace = true }
+rustls = { workspace = true, optional = true }
 tokio = { workspace = true }
-tokio-rustls = { workspace = true }
-tracing = { workspace = true }
+
+[features]
+default = ["tls"]
+# `serve_https`, `load_tls` and the rustls types in their signatures.
+tls = ["dep:rustls", "quench-proto/tls"]
 
 [dev-dependencies]
+quench-proto = { workspace = true, features = ["client"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [lints]

@@ -6,7 +6,7 @@
 //! call.
 
 use crate::domain::jwt::{Claims, JwtConfig};
-use async_trait::async_trait;
+use quench_core::async_trait;
 use quench_http::prelude::http::{Method, StatusCode};
 use quench_http::prelude::{Endpoint, Middleware, Request, Response};
 
@@ -38,7 +38,7 @@ impl Middleware for RequireWrite {
         if allowed {
             next.call(req).await
         } else {
-            tracing::warn!(
+            quench_log::warn!(
                 "RequireWrite: {} {} refused - no write permission on {}",
                 req.method(),
                 req.uri().path(),

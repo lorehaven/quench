@@ -5,7 +5,7 @@
 //! survive a shutdown signal, does a new connection get refused once
 //! draining is done) only exists at the socket layer.
 
-use async_trait::async_trait;
+use quench_core::async_trait;
 use quench_http::di::ContainerBuilder;
 use quench_http::endpoint::Endpoint;
 use quench_http::request::Request;
@@ -28,7 +28,7 @@ struct SlowEcho {
 impl Endpoint for SlowEcho {
     async fn call(&self, _req: Request) -> Response {
         tokio::time::sleep(self.delay).await;
-        Response::text(http::StatusCode::OK, "slow-ok")
+        Response::text(quench_proto::StatusCode::OK, "slow-ok")
     }
 }
 

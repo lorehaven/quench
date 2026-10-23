@@ -1,7 +1,7 @@
 use crate::endpoint::Endpoint;
 use crate::request::Request;
 use crate::response::Response;
-use async_trait::async_trait;
+use quench_core::async_trait;
 use std::sync::Arc;
 
 /// Wraps one [`Endpoint`] in another - a plain `async fn`. `next.call(req)` runs the rest of

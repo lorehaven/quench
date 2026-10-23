@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 
 static BASE_PATH: LazyLock<String> =
-    LazyLock::new(|| normalize_base_path(&envmnt::get_or("BASE_PATH", "/")));
+    LazyLock::new(|| normalize_base_path(&quench_core::env::get_or("BASE_PATH", "/")));
 
 #[must_use]
 pub fn normalize_base_path(raw: &str) -> String {

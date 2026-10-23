@@ -9,7 +9,7 @@ pub struct DbWrapper {
 
 impl DbWrapper {
     pub async fn init_env() -> Arc<Self> {
-        let db_url = envmnt::get_any(&vec!["DATABASE_URL", "POSTGRES_URL"], "");
+        let db_url = quench_core::env::get_any(&["DATABASE_URL", "POSTGRES_URL"], "");
         Self::init(db_url).await
     }
 
@@ -25,7 +25,7 @@ impl DbWrapper {
         // starts that way looks healthy, serves requests, and loses everything
         // on restart - so it has to be asked for explicitly.
         assert!(
-            !db_url.trim().is_empty() || envmnt::is_or("ALLOW_IN_MEMORY_DB", false),
+            !db_url.trim().is_empty() || quench_core::env::is_or("ALLOW_IN_MEMORY_DB", false),
             "no database configured: set DATABASE_URL (or POSTGRES_URL). \
              Set ALLOW_IN_MEMORY_DB=true only for tests, where losing every \
              write on restart is the intent."

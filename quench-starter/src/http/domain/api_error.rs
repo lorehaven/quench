@@ -3,7 +3,7 @@
 
 use quench_http::prelude::Response;
 use quench_http::prelude::http::StatusCode;
-use serde_json::json;
+use quench_serde::json;
 
 #[must_use]
 pub fn json_error(status: StatusCode, message: &str) -> Response {
@@ -29,9 +29,10 @@ impl ApiError {
 
     /// Logs on the way out for a 5xx, so a server error doesn't disappear
     /// silently into a JSON body nobody reads.
+    #[must_use]
     pub fn into_response(self) -> Response {
         if self.status.is_server_error() {
-            tracing::error!("api error: {}", self.message);
+            quench_log::error!("api error: {}", self.message);
         }
         json_error(self.status, &self.message)
     }

@@ -12,26 +12,20 @@ license = { workspace = true }
 readme = { workspace = true }
 
 [dependencies]
-bytes = { version = "1.12" }
-http = { workspace = true }
-http-body-util = { workspace = true }
-hyper-rustls = { workspace = true }
-hyper-util = { workspace = true, features = ["client-legacy", "http1", "http2", "tokio"] }
-rustls = { workspace = true }
-rustls-platform-verifier = { workspace = true }
-serde_json = { workspace = true }
-serde_urlencoded = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-thiserror = { workspace = true }
-tokio = { workspace = true, features = ["sync", "time"] }
-tracing = { workspace = true }
-anyhow = { workspace = true }
+quench-log = { workspace = true }
+quench-core = { workspace = true }
+quench-proto = { workspace = true, features = ["client"] }
+quench-serde = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time", "net"] }
+
+[features]
+default = ["tls"]
+# `https://` support (rustls). Without it every `https` URL fails with a transport error.
+tls = ["quench-proto/tls"]
 
 [dev-dependencies]
-async-trait = { workspace = true }
-quench-http = { workspace = true }
-serde_json = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
+quench-http = { workspace = true, features = ["tls"] }
+tokio = { workspace = true }
 
 [lints]
 workspace = true

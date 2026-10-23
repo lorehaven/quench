@@ -1,7 +1,7 @@
 //! Request logging that skips noisy paths (health probes, assets).
 //! `quench_http::Middleware` is a single `async fn` around the endpoint.
 
-use async_trait::async_trait;
+use quench_core::async_trait;
 use quench_http::prelude::{Endpoint, Middleware, Request, Response};
 
 #[derive(Debug, Clone)]
@@ -11,7 +11,7 @@ pub struct FilteredLogger {
 
 impl Default for FilteredLogger {
     fn default() -> Self {
-        let skip = envmnt::get_or("LOG_SKIP_PREFIXES", "");
+        let skip = quench_core::env::get_or("LOG_SKIP_PREFIXES", "");
         let skip_prefixes = skip
             .split(',')
             .map(str::trim)
@@ -37,7 +37,7 @@ impl Middleware for FilteredLogger {
                 .iter()
                 .any(|prefix| path.starts_with(prefix.as_str()));
         if should_log {
-            tracing::info!("{method} {path} -> {status}");
+            quench_log::info!("{method} {path} -> {status}");
         }
 
         response

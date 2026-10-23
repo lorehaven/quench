@@ -3,7 +3,7 @@ use super::i18n::{available_locales, validate_locales_exist};
 use crate::{
     AppBuilder, Element, FooterBuilder, HeaderBuilder, Link, NavPanelBuilder, Script, Theme,
 };
-use anyhow::Result;
+use quench_core::Result;
 
 #[derive(Clone, Debug)]
 pub struct AppShellBuilder {

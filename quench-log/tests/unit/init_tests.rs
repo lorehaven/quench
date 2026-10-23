@@ -1,19 +1,19 @@
 //! Unit tests for `lib.rs`'s actual logging behaviour: does a line reach
 //! the file, in the right format, at the right path.
 //!
-//! `tracing_subscriber`'s global default can be installed exactly once per
-//! process, so a suite that wants more than one independent case can't just
-//! call `try_init_with` repeatedly - only the first would succeed. Every
-//! test below except the one that specifically exercises that installs
-//! nothing globally: it builds a subscriber with `quench_log::subscriber`
-//! and scopes it to the closure with `tracing::subscriber::with_default`,
-//! which never touches process-wide state and so never collides with a
-//! sibling test running in the same binary.
+//! The global dispatcher can be installed exactly once per process, so a
+//! suite that wants more than one independent case can't just call
+//! `try_init_with` repeatedly - only the first would succeed. Every test
+//! below except the one that specifically exercises that installs nothing
+//! globally: it builds a dispatcher with `quench_log::subscriber` and scopes
+//! it to the closure with `quench_log::with_default`, which never touches
+//! process-wide state and so never collides with a sibling test running in
+//! the same binary.
 
+use quench_core::tmp::TempDir;
 use quench_log::{Config, Format, Rotation};
 use std::fs;
 use std::path::Path;
-use tempfile::tempdir;
 
 fn read_the_one_log_file(dir: &Path) -> String {
     let entry = fs::read_dir(dir)
@@ -25,7 +25,7 @@ fn read_the_one_log_file(dir: &Path) -> String {
 
 #[test]
 fn file_sink_writes_json_by_default() {
-    let dir = tempdir().unwrap();
+    let dir = TempDir::new().unwrap();
     let config = Config {
         console_enabled: false,
         file_enabled: true,
@@ -37,8 +37,8 @@ fn file_sink_writes_json_by_default() {
     };
 
     let (subscriber, guard) = quench_log::subscriber(&config).expect("build subscriber");
-    tracing::subscriber::with_default(subscriber, || {
-        tracing::info!(count = 42, "hello test");
+    quench_log::with_default(subscriber, || {
+        quench_log::info!(count = 42, "hello test");
     });
     drop(guard); // flushes the background writer before the file is read below
 
@@ -53,7 +53,7 @@ fn file_sink_writes_json_by_default() {
 
 #[test]
 fn file_sink_writes_plain_text_when_configured() {
-    let dir = tempdir().unwrap();
+    let dir = TempDir::new().unwrap();
     let config = Config {
         console_enabled: false,
         file_enabled: true,
@@ -65,8 +65,8 @@ fn file_sink_writes_plain_text_when_configured() {
     };
 
     let (subscriber, guard) = quench_log::subscriber(&config).expect("build subscriber");
-    tracing::subscriber::with_default(subscriber, || {
-        tracing::info!("hello plain");
+    quench_log::with_default(subscriber, || {
+        quench_log::info!("hello plain");
     });
     drop(guard);
 
@@ -80,7 +80,7 @@ fn file_sink_writes_plain_text_when_configured() {
 
 #[test]
 fn rotation_never_names_the_file_after_prefix_and_suffix_only() {
-    let dir = tempdir().unwrap();
+    let dir = TempDir::new().unwrap();
     let config = Config {
         console_enabled: false,
         file_enabled: true,
@@ -91,8 +91,8 @@ fn rotation_never_names_the_file_after_prefix_and_suffix_only() {
     };
 
     let (subscriber, guard) = quench_log::subscriber(&config).expect("build subscriber");
-    tracing::subscriber::with_default(subscriber, || {
-        tracing::info!("just to make sure the file actually gets created");
+    quench_log::with_default(subscriber, || {
+        quench_log::info!("just to make sure the file actually gets created");
     });
     drop(guard);
 
@@ -101,7 +101,7 @@ fn rotation_never_names_the_file_after_prefix_and_suffix_only() {
 
 #[test]
 fn creates_the_log_directory_if_it_does_not_exist_yet() {
-    let dir = tempdir().unwrap();
+    let dir = TempDir::new().unwrap();
     let nested = dir.path().join("nested").join("logs");
     assert!(!nested.exists());
 
@@ -128,8 +128,8 @@ fn file_disabled_builds_a_subscriber_with_no_guard() {
     // Should not panic even with nowhere to send the console layer's output
     // meaningfully checked - the point here is just that building and using
     // a console-only subscriber works.
-    tracing::subscriber::with_default(subscriber, || {
-        tracing::info!("console only, nothing to assert on");
+    quench_log::with_default(subscriber, || {
+        quench_log::info!("console only, nothing to assert on");
     });
 }
 
@@ -143,8 +143,8 @@ fn both_sinks_disabled_still_builds_a_usable_subscriber() {
 
     let (subscriber, guard) = quench_log::subscriber(&config).expect("build subscriber");
     assert!(guard.is_none());
-    tracing::subscriber::with_default(subscriber, || {
-        tracing::info!("goes nowhere, should not panic");
+    quench_log::with_default(subscriber, || {
+        quench_log::info!("goes nowhere, should not panic");
     });
 }
 
@@ -154,7 +154,7 @@ fn both_sinks_disabled_still_builds_a_usable_subscriber() {
 /// one, in any order, in the same test binary.
 #[test]
 fn try_init_with_installs_a_real_global_default_and_a_second_call_fails() {
-    let dir = tempdir().unwrap();
+    let dir = TempDir::new().unwrap();
     let config = Config {
         console_enabled: false,
         file_enabled: true,
@@ -175,4 +175,118 @@ fn try_init_with_installs_a_real_global_default_and_a_second_call_fails() {
     // wins, every later one must fail rather than silently doing nothing.
     let _ = first;
     assert!(matches!(second, Err(quench_log::Error::AlreadyInitialized)));
+}
+
+#[test]
+fn the_directory_error_names_the_path() {
+    let dir = TempDir::new().unwrap();
+    let blocker = dir.path().join("file");
+    fs::write(&blocker, "x").unwrap();
+    let config = Config {
+        file_dir: blocker.join("under-a-file"),
+        ..Config::default()
+    };
+    let error = quench_log::subscriber(&config).unwrap_err();
+    assert!(matches!(error, quench_log::Error::CreateLogDir { .. }));
+    assert!(error.to_string().contains("under-a-file"), "{error}");
+}
+
+#[test]
+fn an_unparseable_level_falls_back_to_info() {
+    let dir = TempDir::new().unwrap();
+    let config = Config {
+        console_enabled: false,
+        file_dir: dir.path().to_path_buf(),
+        file_prefix: "fallback".to_string(),
+        rotation: Rotation::Never,
+        level: "this is not a filter".to_string(),
+        ..Config::default()
+    };
+    let (subscriber, guard) = quench_log::subscriber(&config).unwrap();
+    quench_log::with_default(subscriber, || {
+        quench_log::debug!("hidden at info");
+        quench_log::info!("shown at info");
+    });
+    drop(guard);
+    let content = read_the_one_log_file(dir.path());
+    assert!(
+        content.contains("shown at info") && !content.contains("hidden at info"),
+        "{content}"
+    );
+}
+
+#[test]
+fn the_filter_decides_what_reaches_the_file() {
+    let dir = TempDir::new().unwrap();
+    let config = Config {
+        console_enabled: false,
+        file_dir: dir.path().to_path_buf(),
+        file_prefix: "filtered".to_string(),
+        file_format: Format::Plain,
+        rotation: Rotation::Never,
+        level: "warn".to_string(),
+        ..Config::default()
+    };
+    let (subscriber, guard) = quench_log::subscriber(&config).unwrap();
+    quench_log::with_default(subscriber, || {
+        quench_log::info!("too quiet");
+        quench_log::warn!("loud enough");
+        quench_log::error!(code = 500, "worse");
+    });
+    drop(guard);
+    let content = read_the_one_log_file(dir.path());
+    assert!(
+        !content.contains("too quiet")
+            && content.contains("loud enough")
+            && content.contains("code=500"),
+        "{content}"
+    );
+    assert_eq!(content.lines().count(), 2);
+}
+
+#[test]
+fn init_with_panics_on_a_second_install_and_names_the_crate() {
+    let dir = TempDir::new().unwrap();
+    let config = Config {
+        console_enabled: false,
+        file_dir: dir.path().to_path_buf(),
+        rotation: Rotation::Never,
+        ..Config::default()
+    };
+    let _ = quench_log::try_init_with(config.clone());
+    let result = std::panic::catch_unwind(|| quench_log::init_with(config));
+    let message = result
+        .unwrap_err()
+        .downcast_ref::<String>()
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        message.starts_with("quench-log:") && message.contains("already installed"),
+        "{message}"
+    );
+    let _ = quench_log::global_is_set();
+}
+
+#[test]
+fn error_variants_describe_themselves() {
+    use std::error::Error as _;
+    let create = quench_log::Error::CreateLogDir {
+        path: "/logs".into(),
+        source: std::io::Error::other("denied"),
+    };
+    assert_eq!(
+        create.to_string(),
+        "could not create log directory /logs: denied"
+    );
+    assert!(create.source().is_some());
+    let appender = quench_log::Error::from(std::io::Error::other("disk full"));
+    assert_eq!(
+        appender.to_string(),
+        "could not set up the rolling file appender: disk full"
+    );
+    assert!(appender.source().is_some());
+    let twice = quench_log::Error::AlreadyInitialized;
+    assert!(twice.to_string().contains("already installed"));
+    assert!(twice.source().is_none());
+    assert!(format!("{twice:?}").contains("AlreadyInitialized"));
 }

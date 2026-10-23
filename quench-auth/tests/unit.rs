@@ -10,3 +10,7 @@ mod domain_realm_tests;
 mod domain_session_tests;
 #[path = "unit/env_lock.rs"]
 mod env_lock;
+#[path = "unit/signing_tests.rs"]
+mod signing_tests;
+#[path = "unit/user_db_tests.rs"]
+mod user_db_tests;

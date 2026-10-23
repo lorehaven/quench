@@ -1,6 +1,6 @@
 use crate::request::Request;
 use crate::response::Response;
-use async_trait::async_trait;
+use quench_core::async_trait;
 
 /// The unit of request handling - poem/tower-flavored (a plain async `call`).
 ///
@@ -54,12 +54,15 @@ impl IntoResponse for crate::error::HttpError {
 
 impl<T> IntoResponse for crate::extract::Json<T>
 where
-    T: serde::Serialize,
+    T: quench_serde::Serialize,
 {
     fn into_response(self) -> Response {
-        match Response::json(http::StatusCode::OK, &self.0) {
+        match Response::json(quench_proto::StatusCode::OK, &self.0) {
             Ok(resp) => resp,
-            Err(e) => Response::text(http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+            Err(e) => Response::text(
+                quench_proto::StatusCode::INTERNAL_SERVER_ERROR,
+                e.to_string(),
+            ),
         }
     }
 }

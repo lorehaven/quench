@@ -3,10 +3,8 @@
 //! exist for `quench-auth`'s middleware, which stashes claims in the
 //! request's extensions and sets two cookies on one response.
 
-use async_trait::async_trait;
-use bytes::Bytes;
-use http::{HeaderMap, Method, StatusCode, Uri};
-use http_body_util::BodyExt;
+use quench_core::async_trait;
+use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
 use quench_http::endpoint::Endpoint;
@@ -14,6 +12,7 @@ use quench_http::extract::{Extension, FromRequest};
 use quench_http::middleware::{Middleware, wrap};
 use quench_http::request::Request;
 use quench_http::response::Response;
+use quench_proto::{HeaderMap, Method, StatusCode, Uri};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -64,12 +63,11 @@ async fn extension_set_by_middleware_is_readable_by_the_handler() {
     let resp = app.call(get(&container)).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp
-        .into_hyper()
-        .into_body()
-        .collect()
+        .into_inner()
+        .body
+        .collect_limited(1 << 20)
         .await
-        .unwrap()
-        .to_bytes();
+        .unwrap();
     assert_eq!(&body[..], b"alice");
 }
 
@@ -88,11 +86,10 @@ async fn append_header_keeps_both_values_where_a_plain_header_would_overwrite() 
         .append_header("set-cookie", "session=a")
         .append_header("set-cookie", "refresh=b");
 
-    let hyper_resp = resp.into_hyper();
+    let hyper_resp = resp.into_inner();
     let values: Vec<&str> = hyper_resp
-        .headers()
+        .headers
         .get_all("set-cookie")
-        .iter()
         .map(|v| v.to_str().unwrap())
         .collect();
     assert_eq!(values, vec!["session=a", "refresh=b"]);

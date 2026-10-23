@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use quench_core::Error;
+use quench_serde::{Deserialize, DeserializeOwned, Serialize};
 use std::fs;
 use std::path::Path;
-use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ConfigError {
@@ -36,7 +36,7 @@ impl ConfigLoader {
         let content =
             fs::read_to_string(path).map_err(|e| ConfigError::ReadError(format!("{path}: {e}")))?;
 
-        serde_json::from_str(&content)
+        quench_serde::json::from_str(&content)
             .map_err(|e| ConfigError::ParseError(format!("JSON parse error: {e}")))
     }
 
@@ -45,7 +45,7 @@ impl ConfigLoader {
         let content =
             fs::read_to_string(path).map_err(|e| ConfigError::ReadError(format!("{path}: {e}")))?;
 
-        serde_norway::from_str(&content)
+        quench_serde::yaml::from_str(&content)
             .map_err(|e| ConfigError::ParseError(format!("YAML parse error: {e}")))
     }
 
@@ -54,7 +54,7 @@ impl ConfigLoader {
         let content =
             fs::read_to_string(path).map_err(|e| ConfigError::ReadError(format!("{path}: {e}")))?;
 
-        toml::from_str(&content)
+        quench_serde::toml::from_str(&content)
             .map_err(|e| ConfigError::ParseError(format!("TOML parse error: {e}")))
     }
 
@@ -80,7 +80,7 @@ impl ConfigLoader {
         }
 
         if let Ok(content) = std::env::var(env_var)
-            && let Ok(config) = serde_json::from_str::<T>(&content)
+            && let Ok(config) = quench_serde::json::from_str::<T>(&content)
         {
             return Ok(config);
         }

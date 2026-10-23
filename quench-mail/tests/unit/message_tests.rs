@@ -1,4 +1,4 @@
-use chrono::{TimeZone, Utc};
+use quench_core::time::Time;
 use quench_mail::{BuildError, Message, MessageBuilder};
 
 fn base() -> MessageBuilder {
@@ -7,7 +7,7 @@ fn base() -> MessageBuilder {
         .to("alice@example.org")
         .subject("Confirm your address")
         .text("Follow the link.")
-        .date(Utc.with_ymd_and_hms(2026, 9, 29, 12, 0, 0).unwrap())
+        .date(Time::from_ymd_hms(2026, 9, 29, 12, 0, 0).unwrap())
 }
 
 fn wire(message: &Message) -> String {

@@ -99,7 +99,7 @@ fn the_plain_user_role_is_not_a_wildcard() {
 #[test]
 fn an_unreadable_permissions_column_reads_as_no_grants() {
     let mut user = user(vec![Role::User], &[("sage", &["read"])]);
-    user.permissions = serde_json::json!("not an object");
+    user.permissions = quench_serde::json!("not an object");
 
     assert!(user.get_permissions().is_empty());
     assert!(!user.can("sage", "read"));
@@ -123,7 +123,7 @@ fn a_fresh_user_is_neither_disabled_nor_locked() {
 fn failed_logins_below_the_threshold_do_not_lock() {
     let mut u = user(vec![Role::User], &[]);
     for _ in 0..4 {
-        u.record_failed_login(5, chrono::Duration::minutes(15));
+        u.record_failed_login(5, quench_core::time::Duration::minutes(15));
     }
     assert_eq!(u.failed_login_attempts, 4);
     assert!(!u.is_locked());
@@ -133,7 +133,7 @@ fn failed_logins_below_the_threshold_do_not_lock() {
 fn the_nth_failed_login_locks_and_resets_the_counter() {
     let mut u = user(vec![Role::User], &[]);
     for _ in 0..5 {
-        u.record_failed_login(5, chrono::Duration::minutes(15));
+        u.record_failed_login(5, quench_core::time::Duration::minutes(15));
     }
     assert!(u.is_locked());
     // The count is "failures since the last lock", not a running total - it
@@ -144,15 +144,15 @@ fn the_nth_failed_login_locks_and_resets_the_counter() {
 #[test]
 fn a_lock_expires_on_its_own_once_the_duration_passes() {
     let mut u = user(vec![Role::User], &[]);
-    u.locked_until = Some(chrono::Utc::now() - chrono::Duration::seconds(1));
+    u.locked_until = Some(quench_core::time::Time::now() - quench_core::time::Duration::seconds(1));
     assert!(!u.is_locked());
 }
 
 #[test]
 fn a_successful_login_clears_the_failure_count_and_stamps_last_login() {
     let mut u = user(vec![Role::User], &[]);
-    u.record_failed_login(5, chrono::Duration::minutes(15));
-    u.record_failed_login(5, chrono::Duration::minutes(15));
+    u.record_failed_login(5, quench_core::time::Duration::minutes(15));
+    u.record_failed_login(5, quench_core::time::Duration::minutes(15));
     assert!(u.last_login_at.is_none());
 
     u.record_successful_login();
@@ -165,7 +165,7 @@ fn a_successful_login_clears_the_failure_count_and_stamps_last_login() {
 fn disabled_is_driven_by_disabled_at_alone() {
     let mut u = user(vec![Role::User], &[]);
     assert!(!u.is_disabled());
-    u.disabled_at = Some(chrono::Utc::now());
+    u.disabled_at = Some(quench_core::time::Time::now());
     assert!(u.is_disabled());
 }
 

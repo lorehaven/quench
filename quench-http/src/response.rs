@@ -1,88 +1,40 @@
-use bytes::Bytes;
-use futures_util::Stream;
-use http::{HeaderName, HeaderValue, StatusCode};
-use http_body_util::{BodyExt, Full, StreamBody};
-use hyper::body::{Body as HttpBody, Frame};
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
-type BoxError = Box<dyn std::error::Error + Send + Sync>;
-
-/// A boxed, type-erased response body.
-///
-/// Its error type isn't `Infallible`:
-/// a fixed body (`from_bytes`/`json`/...) never fails, but a
-/// [`Response::streaming`] one can genuinely error mid-stream (the
-/// producer side closes, a broadcast channel lags), and both need to fit
-/// through the same box.
-pub struct BoxBody(Pin<Box<dyn HttpBody<Data = Bytes, Error = BoxError> + Send + Sync>>);
-
-impl std::fmt::Debug for BoxBody {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BoxBody").finish_non_exhaustive()
-    }
-}
-
-impl BoxBody {
-    pub fn new<B>(body: B) -> Self
-    where
-        B: HttpBody<Data = Bytes, Error = BoxError> + Send + Sync + 'static,
-    {
-        Self(Box::pin(body))
-    }
-
-    #[must_use]
-    pub fn empty() -> Self {
-        Self::new(Full::new(Bytes::new()).map_err(|never: std::convert::Infallible| match never {}))
-    }
-}
-
-impl HttpBody for BoxBody {
-    type Data = Bytes;
-    type Error = BoxError;
-
-    fn poll_frame(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
-        self.get_mut().0.as_mut().poll_frame(cx)
-    }
-}
+use quench_core::bytes::Bytes;
+use quench_core::stream::Stream;
+use quench_proto::body::{Body, BoxError};
+use quench_proto::{HeaderValue, StatusCode};
 
 /// An outgoing HTTP response.
 #[derive(Debug)]
 pub struct Response {
-    pub(crate) inner: http::Response<BoxBody>,
+    pub(crate) inner: quench_proto::Response,
 }
 
 impl Response {
     #[must_use]
     pub fn new(status: StatusCode) -> Self {
-        let inner = http::Response::builder()
-            .status(status)
-            .body(BoxBody::empty())
-            .expect("status is always a valid response head");
-        Self { inner }
+        Self {
+            inner: quench_proto::Response::new(status),
+        }
     }
 
     #[must_use]
-    pub fn status(&self) -> StatusCode {
-        self.inner.status()
+    pub const fn status(&self) -> StatusCode {
+        self.inner.status
     }
 
-    /// Sets a response header. Takes `&str` rather than requiring an
-    /// already-lowercase `&'static str` (`HeaderName::from_static`'s
-    /// requirement, which panics on a name like `"Location"` written the
-    /// conventional way) - a bad name or value is dropped rather than
-    /// panicking, since header names are case-insensitive on the wire
-    /// regardless of how a caller happened to capitalize them.
+    /// Read access to the headers.
+    #[must_use]
+    pub const fn headers(&self) -> &quench_proto::HeaderMap {
+        &self.inner.headers
+    }
+
+    /// Sets a response header, replacing earlier values. Header names are
+    /// case-insensitive, so `"Location"` is fine; a bad name or value is
+    /// dropped rather than panicking.
     #[must_use]
     pub fn header(mut self, name: impl AsRef<str>, value: impl AsRef<str>) -> Self {
-        if let (Ok(name), Ok(value)) = (
-            HeaderName::from_bytes(name.as_ref().as_bytes()),
-            HeaderValue::from_str(value.as_ref()),
-        ) {
-            self.inner.headers_mut().insert(name, value);
+        if let Ok(value) = HeaderValue::from_str(value.as_ref()) {
+            self.inner.headers.insert(name.as_ref(), value);
         }
         self
     }
@@ -92,20 +44,21 @@ impl Response {
     /// into one comma-joined value the way most headers can be combined).
     #[must_use]
     pub fn append_header(mut self, name: impl AsRef<str>, value: impl AsRef<str>) -> Self {
-        if let (Ok(name), Ok(value)) = (
-            HeaderName::from_bytes(name.as_ref().as_bytes()),
-            HeaderValue::from_str(value.as_ref()),
-        ) {
-            self.inner.headers_mut().append(name, value);
+        if let Ok(value) = HeaderValue::from_str(value.as_ref()) {
+            self.inner.headers.append(name.as_ref(), value);
         }
         self
     }
 
+    /// Adds a `Set-Cookie` header for `cookie`.
+    #[must_use]
+    pub fn cookie(self, cookie: &quench_proto::cookie::Cookie) -> Self {
+        self.append_header("set-cookie", cookie.to_string())
+    }
+
     pub fn text(status: StatusCode, body: impl Into<String>) -> Self {
-        let body = body.into();
-        let mut resp = Self::from_bytes(status, Bytes::from(body));
-        resp = resp.header("content-type", "text/plain; charset=utf-8");
-        resp
+        Self::from_bytes(status, Bytes::from(body.into()))
+            .header("content-type", "text/plain; charset=utf-8")
     }
 
     pub fn html(status: StatusCode, body: impl Into<String>) -> Self {
@@ -113,31 +66,31 @@ impl Response {
             .header("content-type", "text/html; charset=utf-8")
     }
 
-    pub fn json<T: serde::Serialize>(
+    /// A JSON response. Serialising cannot fail; the `Result` stays so call
+    /// sites written for a fallible serialiser keep compiling.
+    #[allow(clippy::unnecessary_wraps)]
+    pub fn json<T: quench_serde::Serialize>(
         status: StatusCode,
         value: &T,
-    ) -> Result<Self, serde_json::Error> {
-        let bytes = serde_json::to_vec(value)?;
+    ) -> Result<Self, quench_serde::Error> {
+        let bytes = quench_serde::json::to_vec(value);
         Ok(Self::from_bytes(status, Bytes::from(bytes)).header("content-type", "application/json"))
     }
 
+    #[must_use]
     pub fn from_bytes(status: StatusCode, bytes: Bytes) -> Self {
-        let inner = http::Response::builder()
-            .status(status)
-            .body(BoxBody::new(
-                Full::new(bytes).map_err(|never: std::convert::Infallible| match never {}),
-            ))
-            .expect("status is always a valid response head");
+        let mut inner = quench_proto::Response::new(status);
+        inner.body = Body::from_bytes(bytes);
         Self { inner }
     }
 
     /// A chunked response body driven by `stream`: each `Ok` item becomes
-    /// one chunk, an `Err` ends the stream (hyper closes the connection
+    /// one chunk, an `Err` ends the stream (the connection is closed
     /// having already sent the headers). What
     /// `GpuBroadcaster`/`VllmBroadcaster`-style SSE endpoints port to -
     /// format each item as `event: ...\ndata: ...\n\n` before handing it
     /// in, and set `content-type: text/event-stream` via
-    /// [`header`](Self::header).
+    /// [`header`](Self::header), or use [`sse`](Self::sse).
     ///
     /// This is a *response* body - unrelated to
     /// [`crate::body::InboundBody`], which streams a *request* body in.
@@ -146,14 +99,19 @@ impl Response {
         S: Stream<Item = Result<Bytes, E>> + Send + Sync + 'static,
         E: Into<BoxError> + 'static,
     {
-        use futures_util::StreamExt;
-
-        let frames = stream.map(|item| item.map(Frame::data).map_err(Into::into));
-        let inner = http::Response::builder()
-            .status(status)
-            .body(BoxBody::new(StreamBody::new(frames)))
-            .expect("status is always a valid response head");
+        let mut inner = quench_proto::Response::new(status);
+        inner.body = Body::from_stream(stream);
         Self { inner }
+    }
+
+    /// A server-sent-events response (`text/event-stream`) streaming `events`.
+    pub fn sse<S>(events: S) -> Self
+    where
+        S: Stream<Item = quench_proto::sse::Event> + Unpin + Send + Sync + 'static,
+    {
+        Self {
+            inner: quench_proto::sse::response(events),
+        }
     }
 
     #[must_use]
@@ -166,9 +124,16 @@ impl Response {
         Self::text(StatusCode::NOT_FOUND, "not found")
     }
 
+    /// The protocol-level response, for the connection driver.
     #[must_use]
-    pub fn into_hyper(self) -> http::Response<BoxBody> {
+    pub fn into_inner(self) -> quench_proto::Response {
         self.inner
+    }
+}
+
+impl From<quench_proto::Response> for Response {
+    fn from(inner: quench_proto::Response) -> Self {
+        Self { inner }
     }
 }
 

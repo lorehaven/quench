@@ -2,14 +2,14 @@
 //! methods always pass, a write needs the permission, and mounting order
 //! (`Auth` outermost) is what makes `Claims` visible to this middleware.
 
-use bytes::Bytes;
-use http::{HeaderMap, Method, StatusCode, Uri};
 use quench_auth::domain::jwt::JwtConfig;
 use quench_auth::http::middleware::auth::Auth;
 use quench_auth::http::middleware::require_write::RequireWrite;
+use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
 use quench_http::endpoint::Endpoint;
+use quench_http::http::{HeaderMap, Method, StatusCode, Uri};
 use quench_http::middleware::wrap;
 use quench_http::request::Request;
 use quench_http::response::Response;
@@ -25,7 +25,7 @@ fn config() -> JwtConfig {
 
 struct Ok200;
 
-#[async_trait::async_trait]
+#[quench_core::async_trait]
 impl Endpoint for Ok200 {
     async fn call(&self, _req: Request) -> Response {
         Response::new(StatusCode::OK)

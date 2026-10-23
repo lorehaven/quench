@@ -1,7 +1,7 @@
 //! Quench's own HTTP framework: a lightweight (poem-shaped) core,
 //! routing with regex-style wildcard path segments (`{name:.+}`) (needed for the docker registry / cargo sparse
 //! index APIs), annotation-driven route and component discovery
-//! (`#[get]`/`#[post]`/... and `#[injectable]`, via `inventory` - no
+//! (`#[get]`/`#[post]`/... and `#[injectable]`, via a link-time registry - no
 //! per-service `.service(...)` registration list to maintain), and a real
 //! dependency-injection container that resolves the whole component graph
 //! at startup (topological order, missing-dependency and cycle detection)
@@ -14,9 +14,10 @@
 
 // Re-exported so `#[get]`/`#[post]`/`#[injectable]`-generated code only
 // needs `quench-http` itself as a dependency, not each of these directly.
-pub use async_trait;
-pub use http;
-pub use inventory;
+pub use quench_core::async_trait;
+pub use quench_core::registry;
+pub use quench_core::submit;
+pub use quench_proto as http;
 
 pub mod body;
 pub mod di;
@@ -32,6 +33,7 @@ pub mod response;
 pub mod route;
 pub mod router;
 pub mod server;
+pub mod ws;
 
 pub mod prelude {
     pub use crate::di::{Container, ContainerBuilder};
@@ -47,8 +49,8 @@ pub mod prelude {
     pub use crate::response::Response;
     pub use crate::route::{RouteRegistration, discover_routes};
     pub use crate::router::{Router, RouterBuilder, mount};
-    pub use crate::server::{
-        DEFAULT_GRACEFUL_TIMEOUT, load_tls, serve_http, serve_http_on, serve_https, serve_https_on,
-    };
+    pub use crate::server::{DEFAULT_GRACEFUL_TIMEOUT, serve_http, serve_http_on};
+    #[cfg(feature = "tls")]
+    pub use crate::server::{load_tls, serve_https, serve_https_on};
     pub use quench_http_macros::{delete, get, injectable, patch, post, put};
 }

@@ -1,33 +1,33 @@
 use crate::{Crud, Database, DbError, Migration, Model};
-use async_trait::async_trait;
-use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
+use quench_core::async_trait;
+use quench_pg::{Config, Pool, PoolOptions, Row};
+use quench_serde::Value;
 use std::fmt::Debug;
-use tracing;
 
 #[derive(Clone)]
 pub struct PostgresDb {
-    pool: Pool<Postgres>,
+    pool: Pool,
 }
 
 impl PostgresDb {
     pub async fn new(url: &str) -> Result<Self, DbError> {
-        // Install default crypto provider for rustls 0.23+
-        let _ = rustls::crypto::ring::default_provider().install_default();
-
-        let max_connections = std::env::var("DB_POOL_MAX_SIZE")
+        let max_size = std::env::var("DB_POOL_MAX_SIZE")
             .unwrap_or_else(|_| "5".to_string())
             .parse()
             .unwrap_or(5);
-
-        let pool = PgPoolOptions::new()
-            .max_connections(max_connections)
-            .connect(url)
-            .await?;
+        let pool = Pool::connect_with(
+            Config::from_url(url)?,
+            PoolOptions {
+                max_size,
+                ..PoolOptions::default()
+            },
+        )
+        .await?;
         Ok(Self { pool })
     }
 
     #[must_use]
-    pub const fn pool(&self) -> &Pool<Postgres> {
+    pub const fn pool(&self) -> &Pool {
         &self.pool
     }
 
@@ -59,9 +59,8 @@ impl Debug for PostgresDb {
 #[async_trait]
 impl Database for PostgresDb {
     async fn execute(&self, query: &str) -> Result<(), DbError> {
-        sqlx::query(sqlx::AssertSqlSafe(query))
-            .execute(&self.pool)
-            .await?;
+        // The simple protocol, so a statement list (a migration script) is fine.
+        self.pool.batch_execute(query).await?;
         Ok(())
     }
 
@@ -71,30 +70,27 @@ impl Database for PostgresDb {
 
         for migration in migrations {
             let query = format!("SELECT EXISTS(SELECT 1 FROM {table} WHERE id = $1)");
-            let exists: (bool,) = sqlx::query_as(sqlx::AssertSqlSafe(query.as_str()))
-                .bind(&migration.id)
-                .fetch_one(&self.pool)
-                .await?;
+            let exists = self
+                .pool
+                .query_one(&query, &[&migration.id])
+                .await?
+                .get::<bool, _>(&0usize)?;
 
-            if !exists.0 {
-                tracing::info!("Applying migration: {}", migration.id);
-                let mut tx = self.pool.begin().await?;
+            if !exists {
+                quench_log::info!("Applying migration: {}", migration.id);
+                let mut conn = self.pool.get().await?;
+                let mut tx = conn.begin().await?;
 
                 for change in migration.changes {
-                    let sql = change.to_sql();
-                    sqlx::query(sqlx::AssertSqlSafe(sql.as_str()))
-                        .execute(&mut *tx)
-                        .await?;
+                    tx.batch_execute(&change.to_sql()).await?;
                 }
 
                 let insert_query = format!("INSERT INTO {table} (id, author) VALUES ($1, $2)");
-                sqlx::query(sqlx::AssertSqlSafe(insert_query.as_str()))
-                    .bind(&migration.id)
-                    .bind(&migration.author)
-                    .execute(&mut *tx)
+                tx.execute(&insert_query, &[&migration.id, &migration.author])
                     .await?;
 
                 tx.commit().await?;
+                drop(conn);
             }
         }
 
@@ -123,23 +119,24 @@ impl<T: Model> PostgresRepository<T> {
     }
 }
 
+fn model_from_row<T: Model>(row: &Row) -> Result<T, DbError> {
+    Ok(row.deserialize::<T>()?)
+}
+
 #[async_trait]
 impl<T> Crud<T> for PostgresRepository<T>
 where
-    T: Model + for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>,
+    T: Model,
 {
     async fn create(&self, model: &T) -> Result<T, DbError> {
         let table = T::table_name();
-        let json = serde_json::to_value(model)?;
+        let json = quench_serde::to_value(model);
         let query = format!(
             "INSERT INTO {table} SELECT * FROM jsonb_populate_record(NULL::{table}, $1) RETURNING *"
         );
 
-        let result = sqlx::query_as::<_, T>(sqlx::AssertSqlSafe(query.as_str()))
-            .bind(json)
-            .fetch_one(&self.db.pool)
-            .await?;
-        Ok(result)
+        let row = self.db.pool.query_one(&query, &[&json]).await?;
+        model_from_row(&row)
     }
 
     async fn read(&self, id: &str) -> Result<Option<T>, DbError> {
@@ -148,18 +145,20 @@ where
             T::table_name(),
             T::primary_key_name()
         );
-        let row = sqlx::query_as::<_, T>(sqlx::AssertSqlSafe(query.as_str()))
-            .bind(id)
-            .fetch_optional(&self.db.pool)
-            .await?;
-        Ok(row)
+        self.db
+            .pool
+            .query_opt(&query, &[&id])
+            .await?
+            .as_ref()
+            .map(model_from_row)
+            .transpose()
     }
 
     async fn update(&self, model: &T) -> Result<T, DbError> {
         let table = T::table_name();
         let pk = T::primary_key_name();
         let columns = T::columns();
-        let json = serde_json::to_value(model)?;
+        let json = quench_serde::to_value(model);
 
         let cols_list = columns.join(", ");
 
@@ -168,12 +167,13 @@ where
         );
 
         let id_val = json
-            .get(&pk)
+            .get(pk.as_str())
             .ok_or_else(|| DbError::Unknown(format!("Primary key '{pk}' not found in model")))?;
 
         let id = match id_val {
-            serde_json::Value::String(s) => s.clone(),
-            serde_json::Value::Number(n) => n.to_string(),
+            Value::String(s) => s.clone(),
+            Value::Int(n) => n.to_string(),
+            Value::UInt(n) => n.to_string(),
             _ => {
                 return Err(DbError::Unknown(format!(
                     "Primary key '{pk}' is not a string or number"
@@ -181,12 +181,8 @@ where
             }
         };
 
-        let result = sqlx::query_as::<_, T>(sqlx::AssertSqlSafe(query.as_str()))
-            .bind(json)
-            .bind(id)
-            .fetch_one(&self.db.pool)
-            .await?;
-        Ok(result)
+        let row = self.db.pool.query_one(&query, &[&json, &id]).await?;
+        model_from_row(&row)
     }
 
     async fn delete(&self, id: &str) -> Result<(), DbError> {
@@ -195,28 +191,30 @@ where
             T::table_name(),
             T::primary_key_name()
         );
-        sqlx::query(sqlx::AssertSqlSafe(query.as_str()))
-            .bind(id)
-            .execute(&self.db.pool)
-            .await?;
+        self.db.pool.execute(&query, &[&id]).await?;
         Ok(())
     }
 
     async fn list(&self) -> Result<Vec<T>, DbError> {
         let query = format!("SELECT * FROM {}", T::table_name());
-        let rows = sqlx::query_as::<_, T>(sqlx::AssertSqlSafe(query.as_str()))
-            .fetch_all(&self.db.pool)
-            .await?;
-        Ok(rows)
+        self.db
+            .pool
+            .query(&query, &[])
+            .await?
+            .iter()
+            .map(model_from_row)
+            .collect()
     }
 
     async fn find_by(&self, column: &str, value: &str) -> Result<Vec<T>, DbError> {
         let column = crate::checked_column::<T>(column)?;
         let query = format!("SELECT * FROM {} WHERE {} = $1", T::table_name(), column);
-        let rows = sqlx::query_as::<_, T>(sqlx::AssertSqlSafe(query.as_str()))
-            .bind(value)
-            .fetch_all(&self.db.pool)
-            .await?;
-        Ok(rows)
+        self.db
+            .pool
+            .query(&query, &[&value])
+            .await?
+            .iter()
+            .map(model_from_row)
+            .collect()
     }
 }

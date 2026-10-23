@@ -5,7 +5,7 @@
 //!
 //! Each scenario (this file, `di_missing_dependency.rs`,
 //! `di_provided_value.rs`, `di_cycle.rs`) lives in its own `tests/*.rs`
-//! file deliberately: `inventory`'s registry is global *per test binary*,
+//! file deliberately: the registry is global *per test binary*,
 //! and cargo compiles every integration test file as a separate binary, so
 //! putting unrelated `#[injectable]`s in the same file would have them all
 //! show up in the same graph.

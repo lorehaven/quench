@@ -1,5 +1,5 @@
-use dashmap::DashMap;
-use serde_json::Value;
+use quench_core::map::ShardedMap;
+use quench_serde::Value;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -28,14 +28,14 @@ impl CacheEntry {
 /// General-purpose data cache supporting multiple backends
 #[derive(Debug)]
 pub struct DataCache {
-    cache: Arc<DashMap<String, CacheEntry>>,
+    cache: Arc<ShardedMap<String, CacheEntry>>,
 }
 
 impl DataCache {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            cache: Arc::new(DashMap::new()),
+            cache: Arc::new(ShardedMap::new()),
         }
     }
 
@@ -76,20 +76,25 @@ impl DataCache {
     /// Get cached value if it exists and hasn't expired
     #[must_use]
     pub fn get(&self, key: &str) -> Option<Value> {
-        if let Some(entry) = self.cache.get(key) {
-            if !entry.is_expired() {
-                return Some(entry.value.clone());
+        match self.cache.with(key, |entry| {
+            (!entry.is_expired()).then(|| entry.value.clone())
+        }) {
+            Some(Some(value)) => Some(value),
+            // Expired: drop it, unless a writer refreshed it in the meantime.
+            Some(None) => {
+                self.cache.remove_if(key, CacheEntry::is_expired);
+                None
             }
-            drop(entry);
-            self.cache.remove(key);
+            None => None,
         }
-        None
     }
 
     /// Check if key exists and is valid
     #[must_use]
     pub fn has(&self, key: &str) -> bool {
-        self.cache.get(key).is_some_and(|entry| !entry.is_expired())
+        self.cache
+            .with(key, |entry| !entry.is_expired())
+            .unwrap_or(false)
     }
 
     /// Delete a specific key
@@ -101,35 +106,37 @@ impl DataCache {
     /// Adds `member` to the set held at `key`, creating it when absent.
     ///
     /// Sets are stored as a JSON array. Unlike the plain value calls this one
-    /// goes through `DashMap`'s entry API rather than get-then-set: two writers
-    /// adding to the same set concurrently must not lose each other's member,
-    /// which is the whole reason a caller reaches for a set instead of a value.
+    /// updates in place under the map's entry lock rather than get-then-set:
+    /// two writers adding to the same set concurrently must not lose each
+    /// other's member, which is the whole reason a caller reaches for a set
+    /// instead of a value.
     ///
     /// Adding refreshes the set's lifetime, matching Redis `SADD` followed by
     /// `EXPIRE`.
     pub fn add_to_set(&self, key: &str, member: &str, ttl_secs: Option<u64>) {
         let member = Value::String(member.to_string());
-        let mut entry = self.cache.entry(key.to_string()).or_insert(CacheEntry {
+        let fresh = || CacheEntry {
             value: Value::Array(Vec::new()),
             timestamp: now(),
             ttl_secs,
+        };
+        self.cache.update(key.to_string(), fresh, |entry| {
+            // An expired set is a new set: `get` reports it gone, so adding to
+            // what is left behind would resurrect members that every reader
+            // already considers absent.
+            let stale = entry.is_expired() || !entry.value.is_array();
+            if stale {
+                entry.value = Value::Array(Vec::new());
+            }
+            if let Value::Array(members) = &mut entry.value
+                && !members.contains(&member)
+            {
+                members.push(member);
+            }
+
+            entry.timestamp = now();
+            entry.ttl_secs = ttl_secs;
         });
-
-        // An expired set is a new set: `get` reports it gone, so adding to what
-        // is left behind would resurrect members that every reader already
-        // considers absent.
-        let stale = entry.is_expired() || !entry.value.is_array();
-        if stale {
-            entry.value = Value::Array(Vec::new());
-        }
-        if let Value::Array(members) = &mut entry.value
-            && !members.contains(&member)
-        {
-            members.push(member);
-        }
-
-        entry.timestamp = now();
-        entry.ttl_secs = ttl_secs;
     }
 
     /// Members of the set at `key`; empty when it is missing, expired, or holds
@@ -148,23 +155,23 @@ impl DataCache {
     /// Removes `member` from the set at `key`, dropping the key once the set is
     /// empty so it does not outlive its members.
     pub fn remove_from_set(&self, key: &str, member: &str) {
-        // The guard is released before `remove`: DashMap shards by key, and
-        // holding a reference into the shard while removing from it deadlocks.
-        let emptied = {
-            let Some(mut entry) = self.cache.get_mut(key) else {
-                return;
-            };
-            match &mut entry.value {
+        let emptied = self
+            .cache
+            .update_existing(key, |entry| match &mut entry.value {
                 Value::Array(members) => {
                     members.retain(|held| held.as_str() != Some(member));
                     members.is_empty()
                 }
                 _ => false,
-            }
-        };
+            })
+            .unwrap_or(false);
 
         if emptied {
-            self.cache.remove(key);
+            // Only if it is still empty: a writer may have added a member since.
+            self.cache.remove_if(
+                key,
+                |entry| matches!(&entry.value, Value::Array(members) if members.is_empty()),
+            );
         }
     }
 
@@ -179,12 +186,12 @@ impl DataCache {
         let mut total_size = 0;
         let mut expired_count = 0;
 
-        for entry in self.cache.iter() {
+        self.cache.for_each(|_, entry| {
             if entry.is_expired() {
                 expired_count += 1;
             }
             total_size += entry.value.to_string().len();
-        }
+        });
 
         CacheStats {
             total_entries: self.cache.len(),

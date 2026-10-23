@@ -40,12 +40,9 @@
 //! session to a crash.
 
 use quench_cache::CacheStore;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use sha2::{Digest, Sha256};
-use std::fmt::Write as _;
+use quench_core::uuid::Uuid;
+use quench_serde::{Deserialize, Serialize, json};
 use std::sync::Arc;
-use uuid::Uuid;
 
 /// A session, as much of it as anything outside this module needs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,11 +64,12 @@ pub struct SessionDb {
 }
 
 impl SessionDb {
+    #[must_use]
     pub fn init(store: CacheStore) -> Arc<Self> {
         if store.is_shared() {
-            tracing::info!("sessions are held in {}", store.topology());
+            quench_log::info!("sessions are held in {}", store.topology());
         } else {
-            tracing::warn!(
+            quench_log::warn!(
                 "sessions are held in-process: a second replica will not see them, \
                  and they are lost on restart. Set REDIS_URL for a shared store."
             );
@@ -80,7 +78,7 @@ impl SessionDb {
     }
 
     /// Reads `REDIS_URL`/`CACHE_URL`, falling back to an in-process store.
-    pub async fn from_env() -> anyhow::Result<Arc<Self>> {
+    pub async fn from_env() -> quench_core::Result<Arc<Self>> {
         let store = CacheStore::from_env("forge-session").await?;
         Ok(Self::init(store))
     }
@@ -101,7 +99,11 @@ impl SessionDb {
         format!("user:{username}")
     }
 
-    pub async fn create(&self, username: &str, ttl_secs: i64) -> anyhow::Result<(Session, String)> {
+    pub async fn create(
+        &self,
+        username: &str,
+        ttl_secs: i64,
+    ) -> quench_core::Result<(Session, String)> {
         let refresh_token = new_refresh_token();
         let refresh_hash = hash_refresh_token(&refresh_token);
         let session = Session {
@@ -128,7 +130,7 @@ impl SessionDb {
             .add_to_set(&Self::user_key(username), &session.id, Some(ttl))
             .await?;
 
-        tracing::info!("created session {} for {username}", session.id);
+        quench_log::info!("created session {} for {username}", session.id);
         Ok((session, refresh_token))
     }
 
@@ -144,7 +146,7 @@ impl SessionDb {
         &self,
         refresh_token: &str,
         ttl_secs: i64,
-    ) -> anyhow::Result<Option<(Session, String)>> {
+    ) -> quench_core::Result<Option<(Session, String)>> {
         let old_hash = hash_refresh_token(refresh_token);
         let Some(session_id) = self.store.take(&Self::refresh_key(&old_hash)).await? else {
             return self.rotate_from_reuse(&old_hash).await;
@@ -222,7 +224,10 @@ impl SessionDb {
     /// `rotate`'s own primary path gives the *current* token. Without this, a
     /// captured old token would stay replayable for the whole grace window
     /// instead of exactly the one recovery it exists for.
-    async fn rotate_from_reuse(&self, old_hash: &str) -> anyhow::Result<Option<(Session, String)>> {
+    async fn rotate_from_reuse(
+        &self,
+        old_hash: &str,
+    ) -> quench_core::Result<Option<(Session, String)>> {
         let Some(reuse) = self.store.take(&Self::reuse_key(old_hash)).await? else {
             return Ok(None);
         };
@@ -245,7 +250,7 @@ impl SessionDb {
 
     /// Ends the session behind a refresh token. Takes effect everywhere at
     /// once, because every service reads the same store.
-    pub async fn revoke_by_refresh_token(&self, refresh_token: &str) -> anyhow::Result<bool> {
+    pub async fn revoke_by_refresh_token(&self, refresh_token: &str) -> quench_core::Result<bool> {
         let hash = hash_refresh_token(refresh_token);
         let Some(session_id) = self.store.take(&Self::refresh_key(&hash)).await? else {
             return Ok(false);
@@ -269,13 +274,13 @@ impl SessionDb {
                     .remove_from_set(&Self::user_key(&username), id)
                     .await?;
             }
-            tracing::info!("revoked session {id}");
+            quench_log::info!("revoked session {id}");
         }
         Ok(true)
     }
 
     /// Ends a session by id, provided it belongs to `username`.
-    pub async fn revoke(&self, id: &str, username: &str) -> anyhow::Result<bool> {
+    pub async fn revoke(&self, id: &str, username: &str) -> quench_core::Result<bool> {
         let Some(record) = self.store.get(&Self::session_key(id)).await? else {
             // Still worth clearing: the index may hold an id whose session has
             // expired underneath it.
@@ -295,7 +300,7 @@ impl SessionDb {
         self.store
             .remove_from_set(&Self::user_key(username), id)
             .await?;
-        tracing::info!("revoked session {id}");
+        quench_log::info!("revoked session {id}");
         Ok(true)
     }
 
@@ -306,7 +311,7 @@ impl SessionDb {
     /// to `ACCESS_TOKEN_TTL_SECS`. Best effort per session - one that fails does
     /// not stop the rest, because leaving the remainder alive is the worse
     /// outcome.
-    pub async fn revoke_all(&self, username: &str) -> anyhow::Result<usize> {
+    pub async fn revoke_all(&self, username: &str) -> quench_core::Result<usize> {
         let key = Self::user_key(username);
         let ids = self.store.set_members(&key).await?;
         let mut revoked = 0;
@@ -315,7 +320,9 @@ impl SessionDb {
             match self.revoke(id, username).await {
                 Ok(true) => revoked += 1,
                 Ok(false) => {}
-                Err(err) => tracing::warn!("failed to revoke session {id} for {username}: {err}"),
+                Err(err) => {
+                    quench_log::warn!("failed to revoke session {id} for {username}: {err}");
+                }
             }
         }
 
@@ -324,7 +331,7 @@ impl SessionDb {
         self.store.remove(&key).await?;
 
         if revoked > 0 {
-            tracing::info!("revoked {revoked} session(s) for {username}");
+            quench_log::info!("revoked {revoked} session(s) for {username}");
         }
         Ok(revoked)
     }
@@ -333,15 +340,15 @@ impl SessionDb {
     /// have expired; callers that need certainty should check [`is_active`].
     ///
     /// [`is_active`]: Self::is_active
-    pub async fn sessions_for(&self, username: &str) -> anyhow::Result<Vec<String>> {
+    pub async fn sessions_for(&self, username: &str) -> quench_core::Result<Vec<String>> {
         Ok(self.store.set_members(&Self::user_key(username)).await?)
     }
 
     /// Whether the session is still usable. Called on every authenticated
     /// request, so it is a single point read.
-    pub async fn is_active(&self, id: &str, username: &str) -> anyhow::Result<bool> {
+    pub async fn is_active(&self, id: &str, username: &str) -> quench_core::Result<bool> {
         let Some(record) = self.store.get(&Self::session_key(id)).await? else {
-            tracing::debug!("session {id} is gone (expired or revoked)");
+            quench_log::debug!("session {id} is gone (expired or revoked)");
             return Ok(false);
         };
         Ok(record.get("username").and_then(|v| v.as_str()) == Some(username))
@@ -353,10 +360,5 @@ fn new_refresh_token() -> String {
 }
 
 fn hash_refresh_token(token: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(token.as_bytes());
-    hasher.finalize().iter().fold(String::new(), |mut out, b| {
-        let _ = write!(out, "{b:02x}");
-        out
-    })
+    quench_core::hex::encode(quench_crypto::hash::sha256(token))
 }

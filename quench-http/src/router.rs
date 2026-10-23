@@ -2,8 +2,8 @@ use crate::endpoint::Endpoint;
 use crate::pattern::Pattern;
 use crate::request::Request;
 use crate::response::Response;
-use async_trait::async_trait;
-use http::{Method, StatusCode};
+use quench_core::async_trait;
+use quench_proto::{Method, StatusCode};
 use std::collections::HashMap;
 use std::sync::Arc;
 

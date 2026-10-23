@@ -1,0 +1,36 @@
+[package]
+name = "quench-pg"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - a PostgreSQL client: the v3 wire protocol with SCRAM-SHA-256 and TLS, typed rows through quench-serde, transactions and a connection pool"
+keywords = ["postgres", "database", "async"]
+categories = ["database"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_pg"
+path = "src/lib.rs"
+
+[dependencies]
+quench-core = { workspace = true }
+quench-crypto = { workspace = true }
+quench-log = { workspace = true }
+quench-serde = { workspace = true }
+quench-tls = { workspace = true, optional = true }
+tokio = { workspace = true, features = ["io-util", "net", "sync", "time"] }
+
+[features]
+default = ["tls"]
+# `sslmode=require|verify-full` (rustls). Without it those modes fail to connect and `prefer`
+# stays on a plain connection.
+tls = ["dep:quench-tls"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+
+[lints]
+workspace = true

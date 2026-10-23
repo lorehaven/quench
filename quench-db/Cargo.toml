@@ -16,20 +16,29 @@ name = "quench_db"
 path = "src/lib.rs"
 
 [dependencies]
-async-trait = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-semver = { workspace = true, features = ["serde"] }
-sha2 = { workspace = true }
-sqlx = { workspace = true }
-thiserror = { workspace = true }
-rustls = { workspace = true }
-anyhow = { workspace = true }
-tracing = { workspace = true }
-toml = { workspace = true }
+quench-log = { workspace = true }
+quench-core = { workspace = true }
+quench-crypto = { workspace = true }
+quench-serde = { workspace = true }
+quench-pg = { workspace = true, optional = true }
+
+[features]
+default = ["postgres", "tls"]
+# The Postgres backend, `Db::Postgres` and the migration runner. Without it only the in-memory
+# backend, the catalog and the migration planner are built.
+postgres = ["dep:quench-pg"]
+# `sslmode=require|verify-full` for Postgres; has no effect without `postgres`.
+tls = ["quench-pg?/tls"]
+
+[[test]]
+name = "postgres_backend"
+required-features = ["postgres"]
+
+[[test]]
+name = "postgres_runner"
+required-features = ["postgres"]
 
 [dev-dependencies]
-tempfile = { workspace = true }
 tokio = { workspace = true }
 
 [lints]

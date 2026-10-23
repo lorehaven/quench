@@ -11,8 +11,8 @@
 use crate::backends::postgres::PostgresDb;
 use crate::error::DbError;
 use crate::plan::{MigrationPlan, PlannedMigration};
-use sha2::{Digest, Sha256};
-use sqlx::Connection;
+use quench_crypto::hash::sha256;
+use quench_pg::{Connection, PgArray, Transaction};
 use std::collections::HashMap;
 
 /// Dedicated schema holding the ledger tables.
@@ -148,13 +148,11 @@ impl MigrationRunner {
     ) -> Result<ApplyReport, DbError> {
         self.validate()?;
 
-        let mut conn = db.pool().acquire().await?;
+        let mut conn = db.pool().get().await?;
         let lock_key = advisory_lock_key(&self.qualified(&self.ledger_table));
 
         if !self.dry_run {
-            sqlx::query(sqlx::AssertSqlSafe("SELECT pg_advisory_lock($1)"))
-                .bind(lock_key)
-                .execute(&mut *conn)
+            conn.execute("SELECT pg_advisory_lock($1)", &[&lock_key])
                 .await?;
         }
 
@@ -163,19 +161,18 @@ impl MigrationRunner {
         if !self.dry_run {
             // Session locks outlive the transaction and the pooled connection,
             // so release explicitly on both the happy and the error path.
-            sqlx::query(sqlx::AssertSqlSafe("SELECT pg_advisory_unlock($1)"))
-                .bind(lock_key)
-                .execute(&mut *conn)
+            conn.execute("SELECT pg_advisory_unlock($1)", &[&lock_key])
                 .await
                 .ok();
         }
+        drop(conn);
 
         outcome
     }
 
     async fn run(
         &self,
-        conn: &mut sqlx::PgConnection,
+        conn: &mut Connection,
         plan: &MigrationPlan,
     ) -> Result<ApplyReport, DbError> {
         if !self.dry_run {
@@ -199,7 +196,7 @@ impl MigrationRunner {
                     if !self.allow_drift {
                         return Err(DbError::Unknown(message));
                     }
-                    tracing::warn!("{message}");
+                    quench_log::warn!("{message}");
                 }
                 MigrationOutcome::Skipped
             } else if self.dry_run {
@@ -228,15 +225,11 @@ impl MigrationRunner {
         Ok(report)
     }
 
-    async fn ensure_tables(&self, conn: &mut sqlx::PgConnection) -> Result<(), DbError> {
-        sqlx::query(sqlx::AssertSqlSafe(
-            format!(
-                "CREATE SCHEMA IF NOT EXISTS {schema}",
-                schema = self.ledger_schema
-            )
-            .as_str(),
+    async fn ensure_tables(&self, conn: &mut Connection) -> Result<(), DbError> {
+        conn.batch_execute(&format!(
+            "CREATE SCHEMA IF NOT EXISTS {schema}",
+            schema = self.ledger_schema
         ))
-        .execute(&mut *conn)
         .await?;
 
         let statements = [
@@ -267,16 +260,14 @@ impl MigrationRunner {
         ];
 
         for statement in statements {
-            sqlx::query(sqlx::AssertSqlSafe(statement.as_str()))
-                .execute(&mut *conn)
-                .await?;
+            conn.batch_execute(&statement).await?;
         }
         Ok(())
     }
 
     async fn applied_checksums(
         &self,
-        conn: &mut sqlx::PgConnection,
+        conn: &mut Connection,
     ) -> Result<HashMap<String, String>, DbError> {
         let table = self.qualified(&self.ledger_table);
         if !table_exists(conn, &table).await? {
@@ -284,23 +275,28 @@ impl MigrationRunner {
         }
 
         let query = format!("SELECT id, checksum FROM {table}");
-        let rows: Vec<(String, String)> = sqlx::query_as(sqlx::AssertSqlSafe(query.as_str()))
-            .fetch_all(&mut *conn)
-            .await?;
-        Ok(rows.into_iter().collect())
+        let rows = conn.query(&query, &[]).await?;
+        let mut applied = HashMap::new();
+        for row in rows {
+            applied.insert(
+                row.get::<String, _>(&0usize)?,
+                row.get::<String, _>(&1usize)?,
+            );
+        }
+        Ok(applied)
     }
 
     async fn execute(
         &self,
-        conn: &mut sqlx::PgConnection,
+        conn: &mut Connection,
         migration: &PlannedMigration,
     ) -> Result<(), DbError> {
-        tracing::info!("applying migration {}", migration.id);
+        quench_log::info!("applying migration {}", migration.id);
         let mut tx = conn.begin().await?;
 
+        // Each statement runs through the simple protocol, so a script holding several commands is fine.
         for statement in &migration.statements {
-            sqlx::query(sqlx::AssertSqlSafe(statement.as_str()))
-                .execute(&mut *tx)
+            tx.batch_execute(statement)
                 .await
                 .map_err(|e| DbError::QueryError(format!("migration '{}': {e}", migration.id)))?;
         }
@@ -313,10 +309,10 @@ impl MigrationRunner {
 
     async fn record_module(
         &self,
-        conn: &mut sqlx::PgConnection,
+        conn: &mut Connection,
         module: &str,
         schema: &str,
-        version: &semver::Version,
+        version: &quench_core::version::Version,
     ) -> Result<(), DbError> {
         let query = format!(
             "INSERT INTO {table} (module, target_schema, version, updated_at)
@@ -325,11 +321,7 @@ impl MigrationRunner {
              DO UPDATE SET version = EXCLUDED.version, updated_at = CURRENT_TIMESTAMP",
             table = self.qualified(&self.module_table)
         );
-        sqlx::query(sqlx::AssertSqlSafe(query.as_str()))
-            .bind(module)
-            .bind(schema)
-            .bind(version.to_string())
-            .execute(&mut *conn)
+        conn.execute(&query, &[&module, &schema, &version.to_string()])
             .await?;
         Ok(())
     }
@@ -347,20 +339,17 @@ impl MigrationRunner {
     ) -> Result<ResetReport, DbError> {
         self.validate()?;
 
-        let mut conn = db.pool().acquire().await?;
+        let mut conn = db.pool().get().await?;
         let lock_key = advisory_lock_key(&self.qualified(&self.ledger_table));
-        sqlx::query(sqlx::AssertSqlSafe("SELECT pg_advisory_lock($1)"))
-            .bind(lock_key)
-            .execute(&mut *conn)
+        conn.execute("SELECT pg_advisory_lock($1)", &[&lock_key])
             .await?;
 
         let outcome = self.run_reset(&mut conn, plan).await;
 
-        sqlx::query(sqlx::AssertSqlSafe("SELECT pg_advisory_unlock($1)"))
-            .bind(lock_key)
-            .execute(&mut *conn)
+        conn.execute("SELECT pg_advisory_unlock($1)", &[&lock_key])
             .await
             .ok();
+        drop(conn);
 
         outcome
     }
@@ -387,31 +376,28 @@ impl MigrationRunner {
 
     async fn run_reset(
         &self,
-        conn: &mut sqlx::PgConnection,
+        conn: &mut Connection,
         plan: &MigrationPlan,
     ) -> Result<ResetReport, DbError> {
         let schemas = self.resettable_schemas(plan);
 
         for schema in &schemas {
             validate_identifier("target schema", schema)?;
-            tracing::warn!("dropping schema {schema}");
-            sqlx::query(sqlx::AssertSqlSafe(
-                format!("DROP SCHEMA IF EXISTS {schema} CASCADE").as_str(),
-            ))
-            .execute(&mut *conn)
-            .await?;
+            quench_log::warn!("dropping schema {schema}");
+            conn.batch_execute(&format!("DROP SCHEMA IF EXISTS {schema} CASCADE"))
+                .await?;
         }
 
         let ledger = self.qualified(&self.ledger_table);
         let forgotten = if table_exists(conn, &ledger).await? {
             let ids: Vec<String> = plan.migrations.iter().map(|m| m.id.clone()).collect();
-            let deleted = sqlx::query(sqlx::AssertSqlSafe(
-                format!("DELETE FROM {ledger} WHERE id = ANY($1)").as_str(),
-            ))
-            .bind(&ids)
-            .execute(&mut *conn)
-            .await?;
-            usize::try_from(deleted.rows_affected()).unwrap_or(usize::MAX)
+            let deleted = conn
+                .execute(
+                    &format!("DELETE FROM {ledger} WHERE id = ANY($1)"),
+                    &[&PgArray(ids)],
+                )
+                .await?;
+            usize::try_from(deleted).unwrap_or(usize::MAX)
         } else {
             0
         };
@@ -419,13 +405,10 @@ impl MigrationRunner {
         let modules = self.qualified(&self.module_table);
         if table_exists(conn, &modules).await? {
             for module in &plan.modules {
-                sqlx::query(sqlx::AssertSqlSafe(
-                    format!("DELETE FROM {modules} WHERE module = $1 AND target_schema = $2")
-                        .as_str(),
-                ))
-                .bind(&module.module)
-                .bind(&module.schema)
-                .execute(&mut *conn)
+                conn.execute(
+                    &format!("DELETE FROM {modules} WHERE module = $1 AND target_schema = $2"),
+                    &[&module.module, &module.schema],
+                )
                 .await?;
             }
         }
@@ -442,22 +425,23 @@ impl MigrationRunner {
         db: &PostgresDb,
     ) -> Result<Vec<(String, String, String)>, DbError> {
         self.validate()?;
-        let mut conn = db.pool().acquire().await?;
+        let mut conn = db.pool().get().await?;
         let table = self.qualified(&self.module_table);
         if !table_exists(&mut conn, &table).await? {
             return Ok(Vec::new());
         }
 
         let query = format!("SELECT module, target_schema, version FROM {table} ORDER BY 1, 2");
-        let rows = sqlx::query_as(sqlx::AssertSqlSafe(query.as_str()))
-            .fetch_all(&mut *conn)
-            .await?;
-        Ok(rows)
+        let rows = conn.query(&query, &[]).await?;
+        drop(conn);
+        rows.iter()
+            .map(|row| Ok((row.get(&0usize)?, row.get(&1usize)?, row.get(&2usize)?)))
+            .collect()
     }
 }
 
 async fn insert_ledger_row(
-    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    tx: &mut Transaction<'_>,
     table: &str,
     migration: &PlannedMigration,
 ) -> Result<(), DbError> {
@@ -467,26 +451,28 @@ async fn insert_ledger_row(
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (id) DO NOTHING"
     );
-    sqlx::query(sqlx::AssertSqlSafe(query.as_str()))
-        .bind(&migration.id)
-        .bind(&migration.module)
-        .bind(&migration.schema)
-        .bind(&migration.migration_id)
-        .bind(migration.since.to_string())
-        .bind(migration.module_version.to_string())
-        .bind(&migration.author)
-        .bind(&migration.checksum)
-        .execute(&mut **tx)
-        .await?;
+    tx.execute(
+        &query,
+        &[
+            &migration.id,
+            &migration.module,
+            &migration.schema,
+            &migration.migration_id,
+            &migration.since.to_string(),
+            &migration.module_version.to_string(),
+            &migration.author,
+            &migration.checksum,
+        ],
+    )
+    .await?;
     Ok(())
 }
 
-async fn table_exists(conn: &mut sqlx::PgConnection, table: &str) -> Result<bool, DbError> {
-    let exists: (bool,) = sqlx::query_as(sqlx::AssertSqlSafe("SELECT to_regclass($1) IS NOT NULL"))
-        .bind(table)
-        .fetch_one(&mut *conn)
+async fn table_exists(conn: &mut Connection, table: &str) -> Result<bool, DbError> {
+    let exists = conn
+        .query_one("SELECT to_regclass($1) IS NOT NULL", &[&table])
         .await?;
-    Ok(exists.0)
+    Ok(exists.get::<bool, _>(&0usize)?)
 }
 
 /// Ledger table names come from configuration and are interpolated into DDL,
@@ -510,7 +496,7 @@ pub fn validate_identifier(kind: &str, value: &str) -> Result<(), DbError> {
 #[doc(hidden)]
 #[must_use]
 pub fn advisory_lock_key(name: &str) -> i64 {
-    let digest = Sha256::digest(name.as_bytes());
+    let digest = sha256(name);
     let mut bytes = [0u8; 8];
     bytes.copy_from_slice(&digest[..8]);
     i64::from_be_bytes(bytes)

@@ -3,7 +3,7 @@
 //! way a real service would end up serving them: through
 //! `discover_routes()` mounted under a base path.
 //!
-//! `inventory`'s registrations only survive linking if this binary
+//! registrations only survive linking if this binary
 //! actually references something real from the crate that defines them:
 //! `quench_starter`'s rlib is an archive, and an archive member the linker
 //! never has a reason to pull in - because nothing in this binary calls
@@ -12,10 +12,10 @@
 //! `JwtConfig`, `HealthState`, ...), but a test that only talks to
 //! `quench_http` needs a real touch too - see `base_path()` below.
 
-use bytes::Bytes;
-use http::{HeaderMap, Method, StatusCode, Uri};
+use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
+use quench_http::http::{HeaderMap, Method, StatusCode, Uri};
 use quench_http::prelude::{Endpoint, discover_routes, mount};
 use quench_http::request::Request;
 use std::sync::Arc;

@@ -4,15 +4,15 @@
 #![allow(clippy::items_after_statements)] // test-local helper types sit next to the code that uses them
 #![allow(clippy::unused_async)] // `#[injectable]` constructors are async by contract
 
-use bytes::Bytes;
-use http::{HeaderMap, Method, StatusCode, Uri};
+use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
 use quench_http::error::HttpError;
 use quench_http::extract::{Inject, Path};
 use quench_http::prelude::{get, injectable};
 use quench_http::request::Request;
-use serde::Deserialize;
+use quench_proto::{HeaderMap, Method, StatusCode, Uri};
+use quench_serde::Deserialize;
 use std::sync::Arc;
 
 struct Greeter {
@@ -58,13 +58,11 @@ async fn discovered_route_extracts_path_param_and_injected_service() {
     let resp = quench_http::endpoint::Endpoint::call(&router, req).await;
     assert_eq!(resp.status(), StatusCode::OK);
 
-    use http_body_util::BodyExt;
     let body = resp
-        .into_hyper()
-        .into_body()
-        .collect()
+        .into_inner()
+        .body
+        .collect_limited(1 << 20)
         .await
-        .unwrap()
-        .to_bytes();
+        .unwrap();
     assert_eq!(&body[..], b"hello, 42");
 }

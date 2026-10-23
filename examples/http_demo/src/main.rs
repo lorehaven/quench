@@ -27,9 +27,9 @@
 //! cutting it off.
 #![allow(clippy::unused_async)] // route handlers and `#[injectable]` constructors are async by contract
 
-use async_trait::async_trait;
+use quench_core::async_trait;
 use quench_http::prelude::*;
-use serde::{Deserialize, Serialize};
+use quench_serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -154,7 +154,7 @@ async fn upload(mut form: Multipart) -> Result<String, HttpError> {
 /// service raises this instead (see `BodyLimit`'s own doc comment for the
 /// warehouse-service upload case that motivated it).
 #[post("/big")]
-async fn big(Json(_body): Json<serde_json::Value>) -> &'static str {
+async fn big(Json(_body): Json<quench_serde::Value>) -> &'static str {
     "somehow made it under the 2KB demo limit"
 }
 
@@ -170,14 +170,14 @@ impl Middleware for RequestLogger {
         let method = req.method().clone();
         let path = req.uri().path().to_string();
         let response = next.call(req).await;
-        tracing::info!("{method} {path} -> {}", response.status());
+        quench_log::info!("{method} {path} -> {}", response.status());
         response
     }
 }
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    tracing_subscriber::fmt::init();
+    quench_log::init_console();
 
     // Every #[injectable]/#[get]/#[post] linked into this binary is
     // discovered automatically - nothing above this line is registered by

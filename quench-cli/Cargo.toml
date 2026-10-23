@@ -15,8 +15,23 @@ readme = "README.md"
 name = "quench_cli"
 path = "src/lib.rs"
 
-[dependencies]
-rustyline = { workspace = true }
+[features]
+default = ["repl"]
+# The interactive line editor and REPL loop; on Unix this is what pulls in `libc` for raw mode.
+repl = ["dep:libc"]
+
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true, optional = true }
+
+[[test]]
+name = "pty"
+required-features = ["repl"]
+
+[dev-dependencies]
+quench-core = { workspace = true }
+
+[target.'cfg(unix)'.dev-dependencies]
+libc = { workspace = true }
 
 [lints]
 workspace = true

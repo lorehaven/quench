@@ -1,6 +1,15 @@
 # Quench Db
 
-`quench-db` (crate `quench_db`) is a small ORM and database abstraction layer used across the Forge estate's services. It provides a generic `Database` trait plus a `Model`/`Crud` pair for simple CRUD access over Postgres (via `sqlx`) or an in-memory backend, and — separately — a versioned migration catalog, planner and runner used to install and evolve database schemas. `quench-starter` re-exports `quench-db` as part of its `DbWrapper` bootstrap, and `foundry-service` is the dedicated job that drives the migration catalog against a real database.
+`quench-db` (crate `quench_db`) is a small ORM and database abstraction layer used across the Forge estate's services. It provides a generic `Database` trait plus a `Model`/`Crud` pair for simple CRUD access over Postgres (via [Quench PG](./quench-pg.md)) or an in-memory backend, and — separately — a versioned migration catalog, planner and runner used to install and evolve database schemas. `quench-starter` re-exports `quench-db` as part of its `DbWrapper` bootstrap, and `foundry-service` is the dedicated job that drives the migration catalog against a real database.
+
+## Features
+
+| Feature | Default | Adds |
+| --- | --- | --- |
+| `postgres` | yes | `PostgresDb`, `PostgresRepository`, `Db::Postgres`, `Repository::Postgres`, the migration `runner` and the `From<quench_pg::Error>` conversion; depends on [`quench-pg`](./quench-pg.md) |
+| `tls` | yes | `quench-pg`'s `tls`, so `sslmode=require` works; no effect without `postgres` |
+
+Without `postgres` you get the in-memory backend, the module catalog, the migration planner and `Db::connect("")`; `Db::connect` with a URL returns `DbError::ConnectionError` ("built without its `postgres` feature"). That build has 9 third-party crates (`ring` for the plan hashes, `getrandom`, `libc` and the proc-macro stack) instead of 25.
 
 ## Public API / Key Types
 
@@ -8,9 +17,9 @@
 - `Model` trait — `table_name() -> String`, `columns() -> Vec<&'static str>`, `primary_key_name() -> String` (defaults to `"id"`).
 - `Crud<T: Model>` trait — `create`, `read`, `update`, `delete`, `list`, `find_by(column, value)`.
 - `Db` enum — `Db::Postgres(PostgresDb)` / `Db::InMemory(InMemoryDb)`, built with `Db::connect(url)` (an empty URL yields an in-memory database); `Db::repository::<T>()` returns a `Repository<T>` that dispatches to the right backend.
-- `PostgresDb` / `PostgresRepository<T>` — the Postgres-backed `Database` and `Crud` implementations, built on a `sqlx::Pool<Postgres>`. Pool size is controlled by `DB_POOL_MAX_SIZE` (default 5); the migration ledger table used by `Database::migrate` is named by `DB_MIGRATION_TABLE` (default `quench_migrations`).
+- `PostgresDb` / `PostgresRepository<T>` — the Postgres-backed `Database` and `Crud` implementations, built on a `quench_pg::Pool`; rows become models through `Row::deserialize`, so a model needs only `quench_serde` `Serialize` + `Deserialize` (no `FromRow`), and `Time`, `Uuid`, `Value`, `Vec<_>` and `Option<_>` fields map to `timestamptz`, `uuid`, `jsonb`, arrays and nullable columns. Pool size is controlled by `DB_POOL_MAX_SIZE` (default 5); the migration ledger table used by `Database::migrate` is named by `DB_MIGRATION_TABLE` (default `quench_migrations`).
 - `InMemoryDb` / `InMemoryRepository<T>` — a `HashMap`-backed implementation for tests and local development.
-- `DbError` — `ConnectionError`, `QueryError`, `SerializationError`, `NotFound`, `Unknown`, with `From<sqlx::Error>` and `From<serde_json::Error>` conversions.
+- `DbError` — `ConnectionError`, `QueryError`, `SerializationError`, `NotFound`, `Unknown`, with `From<quench_pg::Error>` and `From<quench_serde::Error>` conversions.
 
 ### Migration catalog (`catalog`, `plan`, `runner`, `migrations`)
 
@@ -26,15 +35,15 @@
 
 ## Testing
 
-`libs/quench-db/tests/unit.rs` wires unit tests under `tests/unit/` (`lib_tests.rs`, `runner_tests.rs`) covering `Db`/`checked_column` behavior and runner identifier validation. `libs/quench-db/tests/catalog_plan.rs` exercises catalog loading, requirement resolution and plan generation end-to-end.
+`libs/quench-db/tests/unit.rs` wires unit tests under `tests/unit/` (`lib_tests.rs`, `runner_tests.rs`) covering `Db`/`checked_column` behavior, error mapping and runner identifier validation; `tests/postgres_backend.rs` and `tests/postgres_runner.rs` run against a real server when `DB_TEST_POSTGRES_URL` is set (CRUD, numeric keys, `jsonb`/array/timestamp columns, migrations applied once and rolled back on failure, the ledger runner including multi-statement scripts); `tests/catalog_errors.rs` covers the ways a catalog or plan can be wrong. `libs/quench-db/tests/catalog_plan.rs` exercises catalog loading, requirement resolution and plan generation end-to-end.
 
 ## Usage example
 
 ```rust
 use quench_db::{Crud, Model, PostgresDb, PostgresRepository};
-use serde::{Deserialize, Serialize};
+use quench_serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, Deserialize)]
 struct User {
     id: String,
     name: String,

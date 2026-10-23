@@ -8,13 +8,14 @@
 //! touch the request / response types.
 
 use crate::domain::realm;
-use base64::Engine as _;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use serde::{Deserialize, Serialize};
+use quench_core::base64::URL_SAFE_NO_PAD;
+use quench_serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 pub struct SsoConfig {
     pub client_id: String,
+    #[cfg_attr(not(feature = "http"), allow(dead_code))]
+    // only the http layer drives the sign-in flow
     pub(crate) client_secret: String,
     pub(crate) tls_verify: bool,
 }
@@ -33,9 +34,9 @@ impl std::fmt::Debug for SsoConfig {
 impl SsoConfig {
     #[must_use]
     pub fn init() -> Self {
-        let client_id = envmnt::get_or("GATEHOUSE_CLIENT_ID", "");
-        let client_secret = envmnt::get_or("GATEHOUSE_CLIENT_SECRET", "");
-        let tls_verify = envmnt::get_or("GATEHOUSE_TLS_VERIFY", "true")
+        let client_id = quench_core::env::get_or("GATEHOUSE_CLIENT_ID", "");
+        let client_secret = quench_core::env::get_or("GATEHOUSE_CLIENT_SECRET", "");
+        let tls_verify = quench_core::env::get_or("GATEHOUSE_TLS_VERIFY", "true")
             .parse()
             .unwrap_or(true);
         Self {
@@ -45,6 +46,7 @@ impl SsoConfig {
         }
     }
 
+    #[cfg_attr(not(feature = "http"), allow(dead_code))] // only the http layer drives the sign-in flow
     pub(crate) fn configured(&self) -> bool {
         !self.client_id.is_empty()
             && !self.client_secret.is_empty()
@@ -53,6 +55,7 @@ impl SsoConfig {
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(not(feature = "http"), allow(dead_code))] // only the http layer drives the sign-in flow
 pub(crate) struct AuthorizeState {
     pub(crate) state: String,
     pub(crate) code_verifier: String,
@@ -83,7 +86,7 @@ impl std::fmt::Debug for RefreshedTokens {
 /// `None` on any failure, so the caller just falls back to a full sign-in.
 pub async fn refresh(refresh_token: &str) -> Option<RefreshedTokens> {
     let base = realm::gatehouse_url()?;
-    let tls_verify: bool = envmnt::get_or("GATEHOUSE_TLS_VERIFY", "true")
+    let tls_verify: bool = quench_core::env::get_or("GATEHOUSE_TLS_VERIFY", "true")
         .parse()
         .unwrap_or(true);
     let client = quench_client::transport::Client::builder()
@@ -92,7 +95,7 @@ pub async fn refresh(refresh_token: &str) -> Option<RefreshedTokens> {
         .ok()?;
     let response = client
         .post(format!("{base}/api/v1/auth/refresh"))
-        .json(&serde_json::json!({ "refresh_token": refresh_token }))
+        .json(&quench_serde::json!({ "refresh_token": refresh_token }))
         .send()
         .await
         .ok()?;
@@ -106,8 +109,9 @@ pub async fn refresh(refresh_token: &str) -> Option<RefreshedTokens> {
     })
 }
 
+#[cfg_attr(not(feature = "http"), allow(dead_code))] // only the http layer drives the sign-in flow
 pub(crate) fn random_urlsafe(bytes: usize) -> String {
     let mut buf = vec![0u8; bytes];
-    getrandom::fill(&mut buf).expect("the OS random source is available");
+    quench_core::random::fill(&mut buf);
     URL_SAFE_NO_PAD.encode(buf)
 }

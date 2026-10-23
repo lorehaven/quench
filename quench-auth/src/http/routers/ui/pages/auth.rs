@@ -7,7 +7,7 @@ use crate::domain::sso_client::{self, SsoConfig};
 use crate::http::domain::cookies::cookie_value;
 use quench_http::prelude::http::StatusCode;
 use quench_http::prelude::{Request, Response};
-use serde::{Deserialize, Serialize};
+use quench_serde::{Deserialize, Serialize};
 
 /// `?err=1` on the login page. Gatehouse renders the error; a relying party
 /// only ever passes the parameter through.
@@ -135,13 +135,13 @@ pub fn logout_delegation(request: &Request) -> Response {
     })
 }
 
-fn json<T: serde::Serialize>(value: &T) -> Response {
+fn json<T: quench_serde::Serialize>(value: &T) -> Response {
     Response::json(StatusCode::OK, value)
         .unwrap_or_else(|_| Response::new(StatusCode::INTERNAL_SERVER_ERROR))
 }
 
 fn gatehouse_not_configured() -> Response {
-    tracing::error!(
+    quench_log::error!(
         "GATEHOUSE_URL is not set: this service cannot sign anyone in, because \
          gatehouse owns the login form and the realm session"
     );
@@ -166,6 +166,7 @@ fn absolute_url(request: &Request, path: &str) -> String {
 /// `?redirect=` target, accepted only as a rooted same-origin path or a prefix
 /// listed in `AUTH_REDIRECT_HOSTS` - an open redirect here would be a phishing
 /// primitive.
+#[must_use]
 pub fn redirect_target(request: &Request) -> Option<String> {
     let query = request.uri().query().unwrap_or("");
     let raw = query.split('&').find_map(|pair| {
@@ -181,16 +182,20 @@ pub fn validated_redirect(target: &str) -> Option<String> {
     let same_origin =
         target.starts_with('/') && !target.starts_with("//") && !target.starts_with("/\\");
     let allowed = same_origin
-        || allowed_redirect_hosts()
-            .iter()
-            .any(|prefix| target.starts_with(prefix));
+        || allowed_redirect_hosts().iter().any(|prefix| {
+            // The prefix must end at a boundary: `https://app.example.com` must not admit
+            // `https://app.example.com.evil.net/`.
+            target
+                .strip_prefix(prefix.as_str())
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with(['/', '?', '#']))
+        });
     allowed.then(|| target.to_string())
 }
 
 /// Prefixes a `?redirect=` may point at, from `AUTH_REDIRECT_HOSTS`
 /// (comma-separated). Empty means same-origin paths only.
 pub fn allowed_redirect_hosts() -> Vec<String> {
-    envmnt::get_or("AUTH_REDIRECT_HOSTS", "")
+    quench_core::env::get_or("AUTH_REDIRECT_HOSTS", "")
         .split(',')
         .map(str::trim)
         .filter(|value| !value.is_empty())

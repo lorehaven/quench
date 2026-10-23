@@ -1,15 +1,16 @@
+#![cfg_attr(not(feature = "tls"), allow(unused_imports))] // the https tests carry most of the TLS imports
 //! `quench_client::transport` against a real quench-http server, over plain
 //! HTTP and over TLS with a self-signed certificate (`tests/fixtures`).
 
-use async_trait::async_trait;
-use http::{HeaderMap, Method, StatusCode};
 use quench_client::transport::{Client, Error};
+use quench_core::async_trait;
 use quench_http::di::ContainerBuilder;
 use quench_http::endpoint::Endpoint;
+use quench_http::http::{HeaderMap, Method, StatusCode};
 use quench_http::request::Request;
 use quench_http::response::Response;
 use quench_http::server::{load_tls, serve_http_on, serve_https_on};
-use serde_json::{Value, json};
+use quench_serde::{Value, json};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -73,9 +74,8 @@ async fn plain_server() -> String {
     format!("http://{addr}")
 }
 
+#[cfg(feature = "tls")]
 async fn tls_server() -> String {
-    // The server side (`load_tls`) builds its config from the process default.
-    let _ = rustls::crypto::ring::default_provider().install_default();
     let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
     let config = load_tls(
         format!("{dir}/localhost.pem"),
@@ -218,6 +218,23 @@ async fn timeouts_and_connection_failures_are_errors() {
     ));
 }
 
+#[cfg(not(feature = "tls"))]
+#[tokio::test]
+async fn https_is_refused_without_the_tls_feature() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let error = Client::new()
+        .get(format!("https://127.0.0.1:{port}/"))
+        .send()
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(&error, Error::Transport(m) if m.contains("`tls` feature")),
+        "{error}"
+    );
+}
+
+#[cfg(feature = "tls")]
 #[tokio::test]
 async fn self_signed_tls_is_rejected_unless_verification_is_disabled() {
     let base = tls_server().await;
@@ -238,4 +255,396 @@ async fn self_signed_tls_is_rejected_unless_verification_is_disabled() {
         .await
         .unwrap();
     assert_eq!(echoed["method"], Method::GET.as_str());
+}
+
+// ---- pooling, TLS roots, limits ------------------------------------------------
+
+mod pool {
+    use super::{App, Client, Error};
+    use quench_core::async_trait;
+    use quench_http::di::ContainerBuilder;
+    use quench_http::endpoint::Endpoint;
+    use quench_http::request::Request;
+    use quench_http::response::Response;
+    use quench_http::server::serve_https_on;
+    use quench_proto::StatusCode;
+    use quench_proto::h1::server::{ServerConfig, Shutdown, serve_connection};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    /// Serves `App` and counts how many connections were opened.
+    async fn counting_server() -> (String, Arc<AtomicUsize>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let accepted = Arc::new(AtomicUsize::new(0));
+        let count = accepted.clone();
+        tokio::spawn(async move {
+            struct Echo;
+            #[async_trait]
+            impl Endpoint for Echo {
+                async fn call(&self, req: Request) -> Response {
+                    match req.uri().path() {
+                        "/big" => Response::text(StatusCode::OK, "x".repeat(10_000)),
+                        "/to-hello" => Response::new(StatusCode::FOUND)
+                            .header("location", "hello?from=redirect"),
+                        "/hello" => Response::text(StatusCode::OK, "hello"),
+                        _ => Response::text(StatusCode::OK, "ok"),
+                    }
+                }
+            }
+            let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
+            loop {
+                let (stream, _) = listener.accept().await.unwrap();
+                count.fetch_add(1, Ordering::SeqCst);
+                let container = container.clone();
+                tokio::spawn(async move {
+                    struct Svc(Arc<quench_http::di::Container>);
+                    impl quench_proto::h1::server::Service for Svc {
+                        fn call(
+                            &self,
+                            req: quench_proto::Request,
+                        ) -> quench_core::future::BoxFuture<'_, quench_proto::Response>
+                        {
+                            Box::pin(async move {
+                                let quench_proto::Request {
+                                    method,
+                                    uri,
+                                    headers,
+                                    body,
+                                    ..
+                                } = req;
+                                let request = Request::new(
+                                    method,
+                                    uri,
+                                    headers,
+                                    quench_http::body::InboundBody::from(body),
+                                    self.0.clone(),
+                                );
+                                Echo.call(request).await.into_inner()
+                            })
+                        }
+                    }
+                    let _ = serve_connection(
+                        stream,
+                        &Svc(container),
+                        &ServerConfig::default(),
+                        Shutdown::never(),
+                    )
+                    .await;
+                });
+            }
+        });
+        (format!("http://{addr}"), accepted)
+    }
+
+    #[tokio::test]
+    async fn sequential_requests_share_one_connection() {
+        let (base, accepted) = counting_server().await;
+        let client = Client::new();
+        for _ in 0..5 {
+            let text = client
+                .get(format!("{base}/hello"))
+                .send()
+                .await
+                .unwrap()
+                .text()
+                .await
+                .unwrap();
+            assert_eq!(text, "hello");
+        }
+        assert_eq!(accepted.load(Ordering::SeqCst), 1, "keep-alive reuse");
+    }
+
+    #[tokio::test]
+    async fn redirects_reuse_the_connection_and_resolve_relative_targets() {
+        let (base, accepted) = counting_server().await;
+        let response = Client::new()
+            .get(format!("{base}/to-hello#ignored-fragment"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.text().await.unwrap(), "hello");
+        assert_eq!(accepted.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn a_connection_the_server_closed_while_idle_is_replaced() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let accepted = Arc::new(AtomicUsize::new(0));
+        let count = accepted.clone();
+        tokio::spawn(async move {
+            loop {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                count.fetch_add(1, Ordering::SeqCst);
+                tokio::spawn(async move {
+                    let mut buf = [0u8; 1024];
+                    let _ = stream.read(&mut buf).await;
+                    // A keep-alive response, then the socket is closed behind the client's back.
+                    stream
+                        .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok")
+                        .await
+                        .unwrap();
+                });
+            }
+        });
+        let client = Client::new();
+        for _ in 0..3 {
+            assert_eq!(
+                client
+                    .get(format!("http://{addr}/"))
+                    .send()
+                    .await
+                    .unwrap()
+                    .text()
+                    .await
+                    .unwrap(),
+                "ok"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert_eq!(
+            accepted.load(Ordering::SeqCst),
+            3,
+            "dead pooled connections are noticed, not reused"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_request_that_dies_on_a_reused_connection_is_retried_once() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let accepted = Arc::new(AtomicUsize::new(0));
+        let count = accepted.clone();
+        tokio::spawn(async move {
+            loop {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                count.fetch_add(1, Ordering::SeqCst);
+                tokio::spawn(async move {
+                    let mut buf = [0u8; 1024];
+                    let _ = stream.read(&mut buf).await;
+                    stream
+                        .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok")
+                        .await
+                        .unwrap();
+                    // A second request on this connection is read and then hung up on, unanswered.
+                    let _ = stream.read(&mut buf).await;
+                });
+            }
+        });
+        let client = Client::new();
+        assert_eq!(
+            client
+                .get(format!("http://{addr}/"))
+                .send()
+                .await
+                .unwrap()
+                .text()
+                .await
+                .unwrap(),
+            "ok"
+        );
+        // The first connection is pooled and looks alive; the server drops it on use.
+        assert_eq!(
+            client
+                .get(format!("http://{addr}/"))
+                .send()
+                .await
+                .unwrap()
+                .text()
+                .await
+                .unwrap(),
+            "ok"
+        );
+        assert_eq!(accepted.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn non_idempotent_requests_are_not_replayed_on_a_dead_connection() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            loop {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                tokio::spawn(async move {
+                    let mut buf = [0u8; 1024];
+                    let _ = stream.read(&mut buf).await;
+                    stream
+                        .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok")
+                        .await
+                        .unwrap();
+                    let _ = stream.read(&mut buf).await;
+                });
+            }
+        });
+        let client = Client::new();
+        client.get(format!("http://{addr}/")).send().await.unwrap();
+        let err = client
+            .post(format!("http://{addr}/"))
+            .body("x")
+            .send()
+            .await
+            .err()
+            .unwrap();
+        assert!(matches!(err, Error::Transport(_)), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn response_size_limits_are_enforced() {
+        let (base, _) = counting_server().await;
+        let limited = Client::builder().max_response_bytes(100).build().unwrap();
+        let err = limited
+            .get(format!("{base}/big"))
+            .send()
+            .await
+            .err()
+            .unwrap();
+        assert!(
+            matches!(&err, Error::Transport(m) if m.contains("exceeds")),
+            "{err:?}"
+        );
+        assert_eq!(
+            limited
+                .get(format!("{base}/hello"))
+                .send()
+                .await
+                .unwrap()
+                .bytes()
+                .await
+                .unwrap(),
+            "hello"
+        );
+    }
+
+    #[tokio::test]
+    async fn bad_urls_are_request_errors() {
+        let client = Client::new();
+        for url in [
+            "ftp://example.com/file",
+            "/relative/only",
+            "http://",
+            "http://host:notaport/",
+        ] {
+            let err = client.get(url).send().await.err().unwrap();
+            assert!(matches!(err, Error::Request(_)), "{url}: {err:?}");
+        }
+        let err = client
+            .get("http://example.com/")
+            .header("bad name", "v")
+            .send()
+            .await
+            .err()
+            .unwrap();
+        assert!(matches!(err, Error::Request(m) if m.contains("invalid header")));
+        let err = client
+            .post("http://example.com/")
+            .form(&1u8)
+            .send()
+            .await
+            .err()
+            .unwrap();
+        assert!(matches!(err, Error::Request(_)));
+    }
+
+    #[tokio::test]
+    async fn raw_bodies_and_text_decoding() {
+        let (base, _) = counting_server().await;
+        let response = Client::new()
+            .put(format!("{base}/anything"))
+            .body(&b"raw"[..])
+            .header("content-type", "application/octet-stream")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "text/plain; charset=utf-8"
+        );
+        assert_eq!(response.text().await.unwrap(), "ok");
+        let deleted = Client::new()
+            .delete(format!("{base}/anything"))
+            .send()
+            .await
+            .unwrap();
+        assert!(deleted.status().is_success());
+        assert!(
+            format!("{:?}", Client::new().get("http://x/").bearer_auth("secret"))
+                .contains("authorization")
+        );
+        assert!(
+            !format!("{:?}", Client::new().get("http://x/").bearer_auth("secret"))
+                .contains("secret")
+        );
+    }
+
+    #[cfg(feature = "tls")]
+    #[tokio::test]
+    async fn a_private_ca_can_be_trusted_explicitly() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../quench-tls/tests/fixtures");
+        let config =
+            quench_http::server::load_tls(format!("{dir}/server.pem"), format!("{dir}/server.key"))
+                .unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
+        tokio::spawn(serve_https_on(
+            Arc::new(App),
+            container,
+            listener,
+            config,
+            std::future::pending(),
+        ));
+
+        let ca = std::fs::read(format!("{dir}/ca.pem")).unwrap();
+        let trusting = Client::builder()
+            .add_root_certificate_pem(ca)
+            .build()
+            .unwrap();
+        let response = trusting
+            .get(format!("https://localhost:{port}/echo"))
+            .send()
+            .await
+            .unwrap();
+        assert!(response.status().is_success());
+        // Same server, different client without the CA: rejected.
+        assert!(
+            Client::new()
+                .get(format!("https://localhost:{port}/echo"))
+                .send()
+                .await
+                .is_err()
+        );
+        // Right CA, wrong name: rejected.
+        assert!(
+            trusting
+                .get(format!("https://127.0.0.2:{port}/echo"))
+                .send()
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn ipv6_literals_are_connectable() {
+        let Ok(listener) = TcpListener::bind("[::1]:0").await else {
+            return;
+        };
+        let port = listener.local_addr().unwrap().port();
+        let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
+        tokio::spawn(quench_http::server::serve_http_on(
+            Arc::new(App),
+            container,
+            listener,
+            std::future::pending(),
+        ));
+        let response = Client::new()
+            .get(format!("http://[::1]:{port}/echo"))
+            .send()
+            .await
+            .unwrap();
+        assert!(response.status().is_success());
+    }
 }

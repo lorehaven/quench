@@ -16,32 +16,44 @@ name = "quench_auth"
 path = "src/lib.rs"
 
 [dependencies]
-anyhow = { workspace = true }
-argon2 = { workspace = true }
-async-trait = { workspace = true }
-base64 = { workspace = true }
-chrono = { workspace = true }
-cookie = { workspace = true }
-ed25519-dalek = { version = "3", features = ["alloc", "pkcs8"] }
-envmnt = { workspace = true }
-getrandom = { version = "0.4" }
-jsonwebtoken = { workspace = true }
-quench-cache = { workspace = true, features = ["redis"] }
+quench-log = { workspace = true }
+quench-cache = { workspace = true }
+quench-core = { workspace = true }
+quench-crypto = { workspace = true, features = ["argon2", "jwt"] }
 quench-db = { workspace = true }
-quench-http = { workspace = true }
+quench-proto = { workspace = true }
+quench-serde = { workspace = true }
+quench-http = { workspace = true, optional = true }
 quench-client = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-sha2 = { workspace = true }
-sqlx = { workspace = true }
 tokio = { workspace = true }
-tracing = { workspace = true }
-uuid = { workspace = true }
 
-[dev-dependencies]
-bytes = { version = "1.12" }
-http = { workspace = true }
-http-body-util = { workspace = true }
+[features]
+default = ["http", "redis", "postgres", "tls"]
+# The quench-http layer: `Auth`/`RequireWrite` middleware, the UI routers and the SSO request
+# helpers. The framework-agnostic `domain` is always built.
+http = ["dep:quench-http"]
+# Redis-backed session and data caches.
+redis = ["quench-cache/redis"]
+# The Postgres user store.
+postgres = ["quench-db/postgres"]
+# `https://` for the SSO and JWKS clients, `rediss://` and `sslmode=require` for the stores.
+tls = ["quench-client/tls", "quench-http?/tls", "quench-db/tls", "quench-cache/tls"]
+
+[[test]]
+name = "http_middleware_auth"
+required-features = ["http"]
+
+[[test]]
+name = "http_middleware_require_write"
+required-features = ["http"]
+
+[[test]]
+name = "http_sso_client"
+required-features = ["http"]
+
+[[test]]
+name = "http_ui"
+required-features = ["http"]
 
 [lints]
 workspace = true

@@ -7,7 +7,7 @@
 Gated by Cargo features (`default = ["request-cache", "data-cache"]`):
 
 - **`store::CacheStore`** (feature `data-cache`) — the main entry point. An enum over `InMemory` (wraps `DataCache`) and, with the `redis` feature, `Redis` (wraps `RedisStore`). Construct with `CacheStore::in_memory()` or `CacheStore::from_env(key_prefix)`, which reads `CACHE_URL`/`REDIS_URL` and falls back to in-process when neither is set. Methods: `get`, `set` (with optional TTL), `take` (atomic get-and-delete), `remove`, `add_to_set`/`set_members`/`remove_from_set` (Redis-set semantics for values written concurrently, e.g. session ids per user), `clear`, `is_shared()`, `topology()`.
-- **`store::RedisStore`** (feature `redis`) — the Redis-backed implementation `CacheStore::Redis` wraps. Supports both a single server (via `redis::aio::ConnectionManager`, which reconnects automatically) and a cluster (comma-separated seed URLs, or `CACHE_CLUSTER=true`/`REDIS_CLUSTER=true` to force cluster mode for a single seed). `clear()` walks the keyspace with `SCAN` (not `KEYS`, so it doesn't block the server), and on a cluster sweeps every primary in turn.
+- **`store::RedisStore`** (feature `redis`) — the Redis-backed implementation `CacheStore::Redis` wraps. Supports both a single server (a [Quench Redis](./quench-redis.md) pool that reconnects on demand) and a cluster (comma-separated seed URLs, or `CACHE_CLUSTER=true`/`REDIS_CLUSTER=true` to force cluster mode for a single seed). `clear()` walks the keyspace with `SCAN` (not `KEYS`, so it doesn't block the server), and on a cluster sweeps every primary in turn.
 - **`data_cache::DataCache`** (feature `data-cache`) — the in-process backend, a `DashMap<String, CacheEntry>` with per-entry TTL. Methods: `set`, `set_with_ttl`, `get`, `has`, `delete`, `add_to_set`/`set_members`/`remove_from_set`, `clear`, `stats()` (returns `CacheStats`), `cleanup_expired()`, `len`/`is_empty`.
 - **`request_cache::RequestCache`** (feature `request-cache`) — a separate, simpler cache keyed for caching request/response pairs (e.g. LLM calls): `CachedResponse { content, model, timestamp, tokens_used }`, a single cache-wide TTL (`new()` defaults to 24h, or `with_ttl(secs)`), `generate_key(parts)` to hash inputs into a key, `get`/`set`/`has`/`clear`/`stats`/`cleanup_expired`.
 - **`CacheError`** / **`Result<T>`** — `Miss`, `SerializationError`, `Backend` variants (`thiserror`-derived).
@@ -18,6 +18,7 @@ All three are re-exported from `quench_cache::prelude`.
 
 - `data-cache` (default) — `DataCache`, `CacheStore`, `store` module.
 - `request-cache` (default) — `RequestCache`.
+- `tls` (default) — `rediss://` for the Redis store; has no effect without `redis`.
 - `redis` — adds the `Redis` variant to `CacheStore` and the `RedisStore` type; implies `data-cache`. Without this feature, pointing `CACHE_URL`/`REDIS_URL` at a cache is a hard error from `CacheStore::from_env` rather than a silent downgrade to in-process.
 
 ## Configuration
@@ -33,7 +34,7 @@ All three are re-exported from `quench_cache::prelude`.
 
 ```rust
 use quench_cache::CacheStore;
-use serde_json::json;
+use quench_serde::json;
 
 let store = CacheStore::from_env("my-service").await?;
 store.set("greeting", json!({ "text": "hello" }), Some(60)).await?;

@@ -16,8 +16,8 @@
 //! `sage`, `switchboard` and `warehouse` at once).
 
 use crate::migrations::{Migration, MigrationLoader};
-use semver::{Version, VersionReq};
-use serde::{Deserialize, Serialize};
+use quench_core::version::{Version, VersionReq};
+use quench_serde::{Deserialize, Serialize, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -78,35 +78,36 @@ impl Requirement {
     }
 }
 
-impl<'de> Deserialize<'de> for Requirement {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+impl Deserialize for Requirement {
+    fn deserialize(value: &Value) -> quench_serde::Result<Self> {
         #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Raw {
-            Short(String),
-            Table {
-                module: String,
-                #[serde(default)]
-                version: Option<String>,
-                #[serde(default)]
-                schema: Option<String>,
-            },
+        struct Table {
+            module: String,
+            #[serde(default)]
+            version: Option<String>,
+            #[serde(default)]
+            schema: Option<String>,
         }
 
-        match Raw::deserialize(deserializer)? {
-            Raw::Short(spec) => Self::parse_short(&spec).map_err(serde::de::Error::custom),
-            Raw::Table {
-                module,
-                version,
-                schema,
-            } => {
+        match value {
+            Value::String(spec) => Self::parse_short(spec).map_err(quench_serde::Error::new),
+            Value::Object(_) => {
+                let Table {
+                    module,
+                    version,
+                    schema,
+                } = Table::deserialize(value)?;
                 let version = version.unwrap_or_else(|| "*".to_string());
                 Ok(Self {
                     module,
-                    version: VersionReq::parse(&version).map_err(serde::de::Error::custom)?,
+                    version: VersionReq::parse(&version).map_err(quench_serde::Error::new)?,
                     schema,
                 })
             }
+            other => Err(quench_serde::invalid_type(
+                "a requirement string or table",
+                other,
+            )),
         }
     }
 }
@@ -236,7 +237,7 @@ impl Catalog {
             source: e,
         })?;
         let manifest: ModuleManifest =
-            toml::from_str(&raw).map_err(|e| CatalogError::BadManifest {
+            quench_serde::toml::from_str(&raw).map_err(|e| CatalogError::BadManifest {
                 path: manifest_path.clone(),
                 reason: e.to_string(),
             })?;
@@ -323,7 +324,7 @@ impl Catalog {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, quench_core::Error)]
 pub enum CatalogError {
     #[error("migration catalog not found at {path}")]
     MissingCatalog { path: PathBuf },

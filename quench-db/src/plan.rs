@@ -4,10 +4,9 @@
 
 use crate::catalog::{Catalog, CatalogError, ModuleScope, migration_since};
 use crate::migrations::{Migration, RenderError};
-use semver::Version;
-use sha2::{Digest, Sha256};
+use quench_core::version::Version;
+use quench_crypto::hash::{Algorithm, Hasher};
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap};
-use std::fmt::Write as _;
 
 /// Schema placeholder used as the instance key of database-scoped modules, so
 /// they resolve to a single instance no matter how many schemas pull them in.
@@ -172,15 +171,12 @@ fn plan_migration(
             source,
         })?;
 
-    let mut hasher = Sha256::new();
+    let mut hasher = Hasher::new(Algorithm::Sha256);
     for statement in &statements {
         hasher.update(statement.as_bytes());
         hasher.update(b";\n");
     }
-    let checksum = hasher.finalize().iter().fold(String::new(), |mut out, b| {
-        let _ = write!(out, "{b:02x}");
-        out
-    });
+    let checksum = quench_core::hex::encode(hasher.finish());
 
     Ok(PlannedMigration {
         id: format!("{}:{}", resolved.instance(), migration.id),
@@ -200,7 +196,7 @@ fn plan_migration(
 struct Edge {
     from: String,
     to: String,
-    wanted: semver::VersionReq,
+    wanted: quench_core::version::VersionReq,
 }
 
 #[allow(clippy::too_many_lines)] // one resolution pass; the phases share a lot of state
@@ -405,7 +401,7 @@ fn topological_order(
         .collect())
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, quench_core::Error)]
 pub enum PlanError {
     #[error("no modules requested")]
     NothingToInstall,

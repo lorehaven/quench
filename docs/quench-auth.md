@@ -2,6 +2,17 @@
 
 `quench-auth` (crate `quench_auth`) is the relying-party half of Forge's realm authentication. It gives every service the pieces needed to *verify* a token or session that gatehouse issued — JWT decode/verify, permission checks, session-revocation lookups, and the middleware and UI helpers that wire those into a service's request pipeline, for either of Forge's two HTTP stacks. It deliberately does not include a login form, a token-issuing API, or user administration: those live in gatehouse (`docker/gatehouse-service`), the one service in the realm allowed to mint tokens and manage accounts. Relying parties that depend on it include gatehouse itself (which also uses it to verify its own tokens), sage-service, switchboard-service, warehouse-service, and conveyor-service.
 
+## Features
+
+| Feature | Default | Adds |
+| --- | --- | --- |
+| `http` | yes | the `http` module: `Auth` and `RequireWrite` middleware, the UI routers and the SSO request helpers, built on `quench-http` |
+| `redis` | yes | Redis-backed sessions and data caches (`quench-cache/redis`) |
+| `postgres` | yes | the Postgres user store (`quench-db/postgres`) |
+| `tls` | yes | `https://` for the SSO and JWKS clients, `rediss://` and `sslmode=require` for the stores |
+
+`default-features = false` leaves the framework-agnostic `domain` (JWT, sessions, realm conventions, signing keys, the JWKS verifier and SSO refresh). It still depends on `quench-client`, because verifying a token against a remote JWKS and refreshing an SSO session are HTTP calls, but not on `quench-http`.
+
 ## Layout
 
 `quench_auth::domain::*` (`auth`, `jwt`, `jwks`, `realm`, `session`, `signing`, `sso_client`, `percent`) is framework-agnostic — JWT encode/decode, session storage, realm cookie/URL conventions, Ed25519 signing. `quench_auth::http::*` builds the middleware, UI helpers and SSO redirect flow on [`quench-http`](./quench-http.md).

@@ -14,7 +14,7 @@ async fn swagger_index_redirect() -> Response {
 }
 
 /// Referencing these by name (as opposed to only through the `#[get]`
-/// macro's `inventory::submit!`) is what guarantees this module's object
+/// macro's `submit!`) is what guarantees this module's object
 /// code - and with it, the `#[used]` statics the routes are registered
 /// through - actually gets linked into a binary that calls
 /// `crate::http::serve`. `quench-starter` is a dependency, so its `.rlib`

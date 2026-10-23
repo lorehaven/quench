@@ -1,7 +1,7 @@
 use crate::error::{ExtractError, HttpError};
 use crate::request::Request;
-use async_trait::async_trait;
-use serde::de::DeserializeOwned;
+use quench_core::async_trait;
+use quench_serde::DeserializeOwned;
 use std::any::Any;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -53,7 +53,7 @@ impl<T> Deref for Query<T> {
 impl<T: DeserializeOwned + Send> FromRequest for Query<T> {
     async fn from_request(req: &mut Request) -> Result<Self, HttpError> {
         let query = req.uri().query().unwrap_or("");
-        serde_urlencoded::from_str(query)
+        quench_serde::urlencoded::from_str(query)
             .map(Query)
             .map_err(|e| ExtractError::InvalidQuery(e.to_string()).into())
     }
@@ -110,7 +110,7 @@ impl<T: DeserializeOwned + Send> FromRequest for Json<T> {
     async fn from_request(req: &mut Request) -> Result<Self, HttpError> {
         let limit = resolve_body_limit(req);
         let bytes = req.take_body().collect_limited(limit).await?;
-        serde_json::from_slice(&bytes)
+        quench_serde::json::from_slice(&bytes)
             .map(Json)
             .map_err(|e| ExtractError::InvalidJson(e.to_string()).into())
     }
@@ -139,7 +139,7 @@ impl<T: DeserializeOwned + Send> FromRequest for Form<T> {
     async fn from_request(req: &mut Request) -> Result<Self, HttpError> {
         let limit = resolve_body_limit(req);
         let bytes = req.take_body().collect_limited(limit).await?;
-        serde_urlencoded::from_bytes(&bytes)
+        quench_serde::urlencoded::from_bytes(&bytes)
             .map(Form)
             .map_err(|e| ExtractError::InvalidForm(e.to_string()).into())
     }
@@ -155,11 +155,11 @@ impl<T: DeserializeOwned + Send> FromRequest for Form<T> {
 /// instead should go through [`crate::body::InboundBody`] via
 /// `Request::take_body` directly, uncapped.
 #[derive(Debug)]
-pub struct Bytes(pub bytes::Bytes);
+pub struct Bytes(pub quench_core::bytes::Bytes);
 
 impl Deref for Bytes {
-    type Target = bytes::Bytes;
-    fn deref(&self) -> &bytes::Bytes {
+    type Target = quench_core::bytes::Bytes;
+    fn deref(&self) -> &quench_core::bytes::Bytes {
         &self.0
     }
 }
@@ -200,7 +200,7 @@ impl<T, const LIMIT: usize> Deref for Limited<T, LIMIT> {
 impl<T: DeserializeOwned + Send, const LIMIT: usize> FromRequest for Limited<Json<T>, LIMIT> {
     async fn from_request(req: &mut Request) -> Result<Self, HttpError> {
         let bytes = req.take_body().collect_limited(LIMIT).await?;
-        serde_json::from_slice(&bytes)
+        quench_serde::json::from_slice(&bytes)
             .map(|value| Self(Json(value)))
             .map_err(|e| ExtractError::InvalidJson(e.to_string()).into())
     }
@@ -243,7 +243,7 @@ impl<T: Clone + Send + Sync + 'static> FromRequest for Extension<T> {
             .map(Extension)
             .ok_or_else(|| {
                 HttpError::status(
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    quench_proto::StatusCode::INTERNAL_SERVER_ERROR,
                     format!(
                         "`{}` was not set on this request",
                         std::any::type_name::<T>()
@@ -275,9 +275,11 @@ impl<T: ?Sized> Clone for Inject<T> {
 #[async_trait]
 impl<T: Any + Send + Sync + 'static> FromRequest for Inject<T> {
     async fn from_request(req: &mut Request) -> Result<Self, HttpError> {
-        req.container()
-            .get::<T>()
-            .map(Inject)
-            .map_err(|e| HttpError::status(http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        req.container().get::<T>().map(Inject).map_err(|e| {
+            HttpError::status(
+                quench_proto::StatusCode::INTERNAL_SERVER_ERROR,
+                e.to_string(),
+            )
+        })
     }
 }

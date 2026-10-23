@@ -1,10 +1,9 @@
 use quench_db::prelude::{Crud, Database, MigrationLoader, Model, PostgresDb, PostgresRepository};
-use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use quench_serde::{Deserialize, Serialize};
 use std::env;
 
 // 1. Define your Model
-#[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct Task {
     id: String,
     title: String,
@@ -23,9 +22,9 @@ impl Model for Task {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> quench_core::Result<()> {
     // Initialize logging
-    tracing_subscriber::fmt::init();
+    quench_log::init_console();
 
     // Get database URL
     let db_url = env::var("DATABASE_URL")

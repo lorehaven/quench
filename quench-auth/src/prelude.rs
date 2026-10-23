@@ -5,6 +5,7 @@ pub use crate::domain::session::{Session, SessionDb};
 pub mod jwt {
     pub use crate::domain::jwt::*;
 }
+#[cfg(feature = "http")]
 pub mod routers {
     pub use crate::http::routers::*;
 }

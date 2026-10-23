@@ -3,13 +3,13 @@
 //! field plus optional `conversation_id`/`project_id` text fields - see
 //! `docker/sage-service/src/routers/files.rs`'s `FileUploadForm`).
 
-use bytes::Bytes as RawBytes;
-use http::{HeaderMap, Method, StatusCode, Uri};
+use quench_core::bytes::Bytes as RawBytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
 use quench_http::extract::{BodyLimit, FromRequest};
 use quench_http::multipart::Multipart;
 use quench_http::request::Request;
+use quench_proto::{HeaderMap, Method, StatusCode, Uri};
 use std::sync::Arc;
 
 const BOUNDARY: &str = "quench-test-boundary";

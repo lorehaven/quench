@@ -42,7 +42,7 @@ targets = [
 # If true, metadata will be collected with `--all-features`. Note that this can't
 # be toggled off if true, if you want to conditionally enable `--all-features` it
 # is recommended to pass `--all-features` on the cmd line instead
-all-features = false
+all-features = true
 # If true, metadata will be collected with `--no-default-features`. The same
 # caveat with `all-features` applies
 no-default-features = false
@@ -172,15 +172,66 @@ workspace-default-features = "allow"
 # members of the workspace. This can be overridden by allowing/denying `default`
 # on a crate-by-crate basis if desired.
 external-default-features = "allow"
-# List of crates that are allowed. Use with care!
+# DEPENDENCY ALLOWLIST (plans/FULLSTACK_ROADMAP.md, Stage 0).
+#
+# Everything not listed here is rejected, so a new third-party crate fails
+# `cargo deny check bans` until someone adds it on purpose.
+#
+# Final state - the only crates that may remain after Stage 0:
+#   libc, getrandom, tokio (+ its own support crates), rustls, ring, webpki-roots,
+#   proc-macro2, syn, quote (derive macros only).
+#
+# Everything else below is the *current* graph (all features, all targets),
+# kept so the check passes today. Each Stage 0 task deletes the entries it
+# makes unnecessary; cargo-deny warns about allowed crates that no longer
+# appear, which is the to-do list for pruning this file.
 allow = [
-    #"ansi_term@0.11.0",
-    #{ crate = "ansi_term@0.11.0", reason = "you can specify a reason it is allowed" },
+    "bytes",
+    "cc",
+    "cfg-if",
+    "errno",
+    "find-msvc-tools",
+    "getrandom",
+    "libc",
+    "log",
+    "mio",
+    "once_cell",
+    "pin-project-lite",
+    "proc-macro2",
+    "quote",
+    "r-efi",
+    "ring",
+    "rustls",
+    "rustls-pki-types",
+    "rustls-webpki",
+    "shlex",
+    "signal-hook-registry",
+    "socket2",
+    "subtle",
+    "syn",
+    "tokio",
+    "tokio-macros",
+    "unicode-ident",
+    "untrusted",
+    "wasi",
+    "webpki-roots",
+    "windows-link",
+    "windows-sys",
+    "windows-targets",
+    "windows_aarch64_gnullvm",
+    "windows_aarch64_msvc",
+    "windows_i686_gnu",
+    "windows_i686_gnullvm",
+    "windows_i686_msvc",
+    "windows_x86_64_gnu",
+    "windows_x86_64_gnullvm",
+    "windows_x86_64_msvc",
+    "zeroize",
 ]
 # If true, workspace members are automatically allowed even when using deny-by-default
 # This is useful for organizations that want to deny all external dependencies by default
 # but allow their own workspace crates without having to explicitly list them
-allow-workspace = false
+allow-workspace = true
 # List of crates to deny
 deny = [
     #"ansi_term@0.11.0",

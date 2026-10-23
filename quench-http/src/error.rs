@@ -2,7 +2,7 @@ use crate::response::Response;
 use std::fmt;
 
 /// Error produced while resolving the dependency graph.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, quench_core::Error)]
 pub enum DiError {
     #[error(
         "component `{component}` depends on `{dependency}`, which is not registered (no #[injectable] or Container::provide for it)"
@@ -34,15 +34,15 @@ pub trait IntoHttpError: fmt::Debug + Send + Sync + 'static {
     fn into_response(self: Box<Self>) -> Response;
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, quench_core::Error)]
 pub enum HttpError {
-    #[error("{0}")]
-    Status(http::StatusCode, String),
+    #[error("{1}")]
+    Status(quench_proto::StatusCode, String),
     #[error(transparent)]
     Extraction(#[from] ExtractError),
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, quench_core::Error)]
 pub enum ExtractError {
     #[error("missing path parameter `{0}`")]
     MissingPathParam(&'static str),
@@ -65,7 +65,7 @@ pub enum ExtractError {
 }
 
 impl HttpError {
-    pub fn status(code: http::StatusCode, msg: impl Into<String>) -> Self {
+    pub fn status(code: quench_proto::StatusCode, msg: impl Into<String>) -> Self {
         Self::Status(code, msg.into())
     }
 
@@ -73,7 +73,7 @@ impl HttpError {
     pub fn into_response(self) -> Response {
         let status = match &self {
             Self::Status(code, _) => *code,
-            Self::Extraction(_) => http::StatusCode::BAD_REQUEST,
+            Self::Extraction(_) => quench_proto::StatusCode::BAD_REQUEST,
         };
         Response::text(status, self.to_string())
     }

@@ -23,28 +23,45 @@ fn display_messages_match_the_declared_format() {
     );
 }
 
+#[cfg(feature = "postgres")]
 #[test]
-fn sqlx_row_not_found_maps_to_not_found() {
-    let err: DbError = sqlx::Error::RowNotFound.into();
-    assert!(matches!(err, DbError::NotFound));
+fn pg_errors_map_by_kind() {
+    let none: DbError = quench_pg::Error::RowCount {
+        expected: "exactly one",
+        got: 0,
+    }
+    .into();
+    assert!(matches!(none, DbError::NotFound));
+    let many: DbError = quench_pg::Error::RowCount {
+        expected: "exactly one",
+        got: 2,
+    }
+    .into();
+    assert!(matches!(many, DbError::QueryError(_)));
+    for err in [
+        quench_pg::Error::Io(std::io::Error::other("connection reset")),
+        quench_pg::Error::Closed,
+        quench_pg::Error::Timeout("connecting"),
+        quench_pg::Error::Tls("handshake".into()),
+        quench_pg::Error::Auth("denied".into()),
+        quench_pg::Error::Config("bad url".into()),
+    ] {
+        assert!(matches!(DbError::from(err), DbError::ConnectionError(_)));
+    }
+    assert!(matches!(
+        DbError::from(quench_pg::Error::Decode("int".into())),
+        DbError::SerializationError(_)
+    ));
+    assert!(matches!(
+        DbError::from(quench_pg::Error::Protocol("odd".into())),
+        DbError::QueryError(_)
+    ));
+    let server = quench_pg::Error::Server(Box::default());
+    assert!(matches!(DbError::from(server), DbError::QueryError(_)));
 }
 
 #[test]
-fn sqlx_io_error_maps_to_connection_error() {
-    let io = std::io::Error::other("connection reset");
-    let err: DbError = sqlx::Error::Io(io).into();
-    assert!(matches!(err, DbError::ConnectionError(_)));
-}
-
-#[test]
-fn other_sqlx_errors_map_to_query_error() {
-    let err: DbError = sqlx::Error::Protocol("garbled frame".to_string()).into();
-    assert!(matches!(err, DbError::QueryError(_)));
-}
-
-#[test]
-fn serde_json_errors_map_to_serialization_error() {
-    let parse_err = serde_json::from_str::<serde_json::Value>("{not json").unwrap_err();
-    let err: DbError = parse_err.into();
+fn serde_errors_map_to_serialization_error() {
+    let err: DbError = quench_serde::Error::new("bad json").into();
     assert!(matches!(err, DbError::SerializationError(_)));
 }

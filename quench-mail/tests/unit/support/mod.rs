@@ -2,14 +2,12 @@
 //! TLS (with the throwaway certificate in `tests/fixtures`), records what it got.
 #![allow(dead_code)]
 
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
+use quench_core::base64::STANDARD;
+use quench_tls::TlsAcceptor;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
-use tokio_rustls::TlsAcceptor;
 
 pub const CERT_PEM: &str = include_str!("../../fixtures/localhost.crt");
 const KEY_PEM: &str = include_str!("../../fixtures/localhost.key");
@@ -99,25 +97,9 @@ impl FakeServer {
 }
 
 fn acceptor() -> TlsAcceptor {
-    let cert_body: String = CERT_PEM
-        .lines()
-        .filter(|l| !l.starts_with("-----"))
-        .collect();
-    let key_body: String = KEY_PEM
-        .lines()
-        .filter(|l| !l.starts_with("-----"))
-        .collect();
-    let cert = CertificateDer::from(STANDARD.decode(cert_body).unwrap());
-    let key = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(STANDARD.decode(key_body).unwrap()));
-    let config = rustls::ServerConfig::builder_with_provider(Arc::new(
-        rustls::crypto::ring::default_provider(),
-    ))
-    .with_safe_default_protocol_versions()
-    .unwrap()
-    .with_no_client_auth()
-    .with_single_cert(vec![cert], key)
-    .unwrap();
-    TlsAcceptor::from(Arc::new(config))
+    let cert: Vec<_> = quench_tls::pem_certificates(CERT_PEM.as_bytes()).unwrap();
+    let key = quench_tls::pem_private_key(KEY_PEM.as_bytes()).unwrap();
+    TlsAcceptor::from(quench_tls::server_config(cert, key).unwrap())
 }
 
 pub async fn start(behavior: Behavior) -> FakeServer {

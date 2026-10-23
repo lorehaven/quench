@@ -16,15 +16,14 @@ name = "quench-example-forge-service"
 path = "src/main.rs"
 
 [dependencies]
-async-trait = { workspace = true }
-envmnt = { workspace = true }
-quench-auth = { workspace = true }
+quench-log = { workspace = true }
+quench-core = { workspace = true }
+quench-serde = { workspace = true }
+quench-auth = { workspace = true, features = ["http", "redis", "postgres", "tls"] }
 quench-cache = { workspace = true }
-quench-http = { workspace = true }
+quench-http = { workspace = true, features = ["tls"] }
 quench-starter = { workspace = true }
-serde = { workspace = true }
 tokio = { workspace = true }
-tracing-subscriber = { workspace = true }
 
 [lints]
 workspace = true

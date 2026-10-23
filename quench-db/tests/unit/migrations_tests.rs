@@ -141,7 +141,7 @@ fn write_migration_file(dir: &Path, name: &str, body: &str) {
 
 #[test]
 fn migration_loader_loads_and_sorts_files_and_their_migrations() {
-    let temp = tempfile::TempDir::new().expect("tempdir");
+    let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     write_migration_file(
         temp.path(),
         "0002-second.toml",
@@ -175,7 +175,7 @@ changes = [{ sql = "SELECT 1" }]
 
 #[test]
 fn migration_loader_excludes_named_files() {
-    let temp = tempfile::TempDir::new().expect("tempdir");
+    let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     write_migration_file(temp.path(), "module.toml", "name = \"x\"\n");
     write_migration_file(
         temp.path(),
@@ -195,7 +195,7 @@ changes = []
 
 #[test]
 fn migration_loader_rejects_a_duplicate_prefix_within_one_file() {
-    let temp = tempfile::TempDir::new().expect("tempdir");
+    let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     write_migration_file(
         temp.path(),
         "0001-dup.toml",
@@ -225,7 +225,7 @@ author = "a"
 since = "0.2.0"
 changes = [{ sql = "SELECT 1" }]
 "#;
-    let file: MigrationFile = toml::from_str(raw).expect("parse");
+    let file: MigrationFile = quench_serde::toml::from_str(raw).expect("parse");
     assert_eq!(file.migrations.len(), 1);
     assert_eq!(file.migrations[0].since.as_deref(), Some("0.2.0"));
 }

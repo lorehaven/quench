@@ -44,7 +44,7 @@ async fn session_is_active(req: &Request, claims: &Claims) -> bool {
             .await
             .unwrap_or(false)
     } else {
-        tracing::debug!("no SessionDb registered; trusting token validity alone");
+        quench_log::debug!("no SessionDb registered; trusting token validity alone");
         true
     }
 }

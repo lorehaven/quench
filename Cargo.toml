@@ -5,14 +5,24 @@ members = [
   "quench-cli",
   "quench-client",
   "quench-config",
+  "quench-core",
+  "quench-core-macros",
+  "quench-crypto",
   "quench-db",
   "quench-http",
   "quench-http-macros",
   "quench-log",
+  "quench-log-macros",
+  "quench-serde",
+  "quench-serde-macros",
   "quench-mail",
   "quench-starter",
   "quench-web",
   "quench-web-components",
+  "quench-proto",
+  "quench-tls",
+  "quench-pg",
+  "quench-redis",
   "examples/*",
 ]
 resolver = "2"
@@ -26,61 +36,42 @@ license = "MIT"
 readme = "README.md"
 
 [workspace.dependencies]
-anyhow = { version = "1.0" }
-argon2 = { version = "0.6" }
-async-trait = { version = "0.1" }
-base64 = { version = "0.23" }
-chrono = { version = "0.4", features = ["serde"] }
-cookie = { version = "0.18" }
-dashmap = { version = "6.2" }
-envmnt = { version = "0.10" }
-fluent-syntax = { version = "0.12" }
-futures-util = { version = "0.3" }
-http = { version = "1.5" }
-http-body-util = { version = "0.1" }
-hyper = { version = "1.12" }
-hyper-rustls = { version = "0.27", default-features = false, features = ["http1", "http2", "tls12", "ring"] }
-hyper-util = { version = "0.1" }
-inventory = { version = "0.3" }
-jsonwebtoken = { version = "11.1", features = ["aws_lc_rs"] }
-multer = { version = "3.1" }
+libc = { version = "0.2" }
+getrandom = { version = "0.4" }
 proc-macro2 = { version = "1.0" }
-quench-auth = { path = "quench-auth", registry = "ennor", version = "0.4.0" }
+quench-auth = { path = "quench-auth", registry = "ennor", version = "0.4.0", default-features = false }
 quench-cache = { path = "quench-cache", registry = "ennor", version = "0.1.7" }
-quench-cli = { path = "quench-cli", registry = "ennor", version = "0.1.2" }
-quench-client = { path = "quench-client", registry = "ennor", version = "0.2.2" }
+quench-cli = { path = "quench-cli", registry = "ennor", version = "0.1.2", default-features = false }
+quench-client = { path = "quench-client", registry = "ennor", version = "0.2.2", default-features = false }
 quench-config = { path = "quench-config", registry = "ennor", version = "0.1.2" }
-quench-db = { path = "quench-db", registry = "ennor", version = "0.2.1" }
-quench-http = { path = "quench-http", registry = "ennor", version = "0.1.0" }
+quench-core = { path = "quench-core", registry = "ennor", version = "0.1.0" }
+quench-crypto = { path = "quench-crypto", registry = "ennor", version = "0.1.0", default-features = false }
+quench-core-macros = { path = "quench-core-macros", registry = "ennor", version = "0.1.0" }
+quench-db = { path = "quench-db", registry = "ennor", version = "0.2.1", default-features = false }
+quench-http = { path = "quench-http", registry = "ennor", version = "0.1.0", default-features = false }
 quench-http-macros = { path = "quench-http-macros", registry = "ennor", version = "0.1.0" }
 quench-log = { path = "quench-log", registry = "ennor", version = "0.1.0" }
+quench-log-macros = { path = "quench-log-macros", registry = "ennor", version = "0.1.0" }
+quench-serde = { path = "quench-serde", registry = "ennor", version = "0.1.0" }
+quench-serde-macros = { path = "quench-serde-macros", registry = "ennor", version = "0.1.0" }
 quench-mail = { path = "quench-mail", registry = "ennor", version = "0.1.0" }
 quench-starter = { path = "quench-starter", registry = "ennor", version = "0.4.0" }
 quench-web = { path = "quench-web", registry = "ennor", version = "0.1.11" }
+quench-proto = { path = "quench-proto", registry = "ennor", version = "0.1.0", default-features = false }
+quench-tls = { path = "quench-tls", registry = "ennor", version = "0.1.0" }
+quench-pg = { path = "quench-pg", registry = "ennor", version = "0.1.0", default-features = false }
+quench-redis = { path = "quench-redis", registry = "ennor", version = "0.1.0", default-features = false }
 quench-web-components = { path = "quench-web-components", registry = "ennor", version = "0.1.5" }
 quote = { version = "1.0" }
-redis = { version = "1.7", features = ["tokio-comp", "cluster-async", "connection-manager"] }
-rustls = { version = "0.23", features = ["ring"] }
-rustls-platform-verifier = { version = "0.7" }
-rustyline = { version = "18.0" }
-semver = { version = "1.0" }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0" }
-serde_urlencoded = { version = "0.7" }
-serde_norway = { version = "0.9" }
-sha2 = { version = "0.11" }
-sqlx = { version = "0.9", features = ["runtime-tokio", "tls-rustls-ring", "postgres", "derive", "json", "chrono", "uuid"] }
+ring = { version = "0.17", default-features = false, features = ["alloc", "std"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 syn = { version = "3.0", features = ["full"] }
-tempfile = { version = "3.27" }
-thiserror = { version = "2.0" }
 tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "net", "io-util", "signal", "sync", "time"] }
-tokio-rustls = { version = "0.26" }
-toml = { version = "1.1" }
-tracing = { version = "0.1" }
-tracing-appender = { version = "0.2" }
-tracing-subscriber = { version = "0.3" }
-uuid = { version = "1.28", features = ["v4"] }
 webpki-roots = { version = "1.0" }
+
+# Password hashing is memory-hard on purpose; run it optimised even in tests.
+[profile.dev.package.quench-crypto]
+opt-level = 3
 
 [profile.release]
 strip = "debuginfo"

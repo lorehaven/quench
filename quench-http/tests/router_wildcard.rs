@@ -3,15 +3,15 @@
 //! radix-tree one. These patterns are
 //! lifted verbatim from `warehouse-service`'s docker registry routes.
 
-use async_trait::async_trait;
-use bytes::Bytes;
-use http::{HeaderMap, Method, StatusCode, Uri};
+use quench_core::async_trait;
+use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
 use quench_http::endpoint::Endpoint;
 use quench_http::request::Request;
 use quench_http::response::Response;
 use quench_http::router::RouterBuilder;
+use quench_proto::{HeaderMap, Method, StatusCode, Uri};
 use std::sync::Arc;
 
 struct Echo(&'static str);

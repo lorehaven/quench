@@ -9,7 +9,6 @@
 //! nothing else can deadlock on it.
 #![allow(clippy::await_holding_lock)]
 
-use base64::Engine;
 use quench_auth::domain::jwks::JwksVerifier;
 use quench_auth::domain::jwt::KeyResolver;
 use quench_auth::domain::signing::generate_signing_key;
@@ -19,7 +18,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 fn encode_x(public_key: &[u8]) -> String {
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(public_key)
+    quench_core::base64::URL_SAFE_NO_PAD.encode(public_key)
 }
 
 /// Serves `body` as a 200 JSON response to every request it receives, and
@@ -52,7 +51,7 @@ fn spawn_server(body: String) -> (String, Arc<AtomicUsize>) {
 #[tokio::test]
 async fn resolves_a_known_kid_from_the_published_set_and_then_from_cache() {
     let key = generate_signing_key();
-    let body = serde_json::json!({
+    let body = quench_serde::json!({
         "keys": [{"kid": "abc", "x": encode_x(&key.public_key)}]
     })
     .to_string();
@@ -70,7 +69,7 @@ async fn resolves_a_known_kid_from_the_published_set_and_then_from_cache() {
 #[tokio::test]
 async fn an_unknown_kid_is_none_and_the_miss_itself_is_cached() {
     let key = generate_signing_key();
-    let body = serde_json::json!({
+    let body = quench_serde::json!({
         "keys": [{"kid": "someone-else", "x": encode_x(&key.public_key)}]
     })
     .to_string();
@@ -105,7 +104,7 @@ async fn an_unreachable_gatehouse_resolves_to_none_instead_of_panicking() {
 #[tokio::test]
 async fn new_accepts_both_tls_verify_settings() {
     let key = generate_signing_key();
-    let body = serde_json::json!({
+    let body = quench_serde::json!({
         "keys": [{"kid": "abc", "x": encode_x(&key.public_key)}]
     })
     .to_string();
@@ -120,6 +119,6 @@ async fn from_env_requires_gatehouse_url_to_be_set() {
     // `GATEHOUSE_URL` is also touched by realm/sso_client tests in this
     // binary - shared lock to keep this from racing them.
     let _guard = crate::env_lock::ENV_LOCK.lock().unwrap();
-    envmnt::remove("GATEHOUSE_URL");
+    quench_core::env::remove("GATEHOUSE_URL");
     assert!(JwksVerifier::from_env().await.is_err());
 }

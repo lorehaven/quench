@@ -44,7 +44,7 @@ where
                     return Err(err);
                 }
 
-                tracing::warn!(
+                quench_log::warn!(
                     "Attempt {} failed: {}. Retrying in {}ms...",
                     attempt,
                     err,
@@ -139,7 +139,7 @@ impl CircuitBreaker {
                         .store(0, std::sync::atomic::Ordering::Relaxed);
                     self.success_count
                         .store(0, std::sync::atomic::Ordering::Relaxed);
-                    tracing::info!("Circuit breaker recovered - back to Closed state");
+                    quench_log::info!("Circuit breaker recovered - back to Closed state");
                 }
             }
             CircuitState::Closed => {
@@ -165,7 +165,7 @@ impl CircuitBreaker {
 
         if failures >= self.failure_threshold && *state != CircuitState::Open {
             *state = CircuitState::Open;
-            tracing::warn!("Circuit breaker opened after {} failures", failures);
+            quench_log::warn!("Circuit breaker opened after {} failures", failures);
         }
     }
 
@@ -184,7 +184,7 @@ impl CircuitBreaker {
                     *state = CircuitState::HalfOpen;
                     self.success_count
                         .store(0, std::sync::atomic::Ordering::Relaxed);
-                    tracing::info!("Circuit breaker entering HalfOpen state");
+                    quench_log::info!("Circuit breaker entering HalfOpen state");
                     return true;
                 }
                 false

@@ -3,10 +3,10 @@
 //! (`crate::domain::jwt`) uses one of these.
 
 use crate::domain::jwt::KeyResolver;
-use async_trait::async_trait;
-use jsonwebtoken::DecodingKey;
 use quench_cache::CacheStore;
-use serde::Deserialize;
+use quench_core::async_trait;
+use quench_crypto::jwt::DecodingKey;
+use quench_serde::Deserialize;
 use std::time::Duration;
 
 const POSITIVE_TTL_SECS: u64 = 3600;
@@ -37,19 +37,19 @@ pub struct JwksVerifier {
 }
 
 impl JwksVerifier {
-    pub async fn from_env() -> anyhow::Result<Self> {
-        let base = envmnt::get_or("GATEHOUSE_URL", "");
-        anyhow::ensure!(
+    pub async fn from_env() -> quench_core::Result<Self> {
+        let base = quench_core::env::get_or("GATEHOUSE_URL", "");
+        quench_core::ensure!(
             !base.is_empty(),
             "GATEHOUSE_URL must be set - every service verifies realm tokens against gatehouse's JWKS"
         );
-        let tls_verify = envmnt::get_or("GATEHOUSE_TLS_VERIFY", "true")
+        let tls_verify = quench_core::env::get_or("GATEHOUSE_TLS_VERIFY", "true")
             .parse()
             .unwrap_or(true);
         Self::new(&base, tls_verify).await
     }
 
-    pub async fn new(gatehouse_base_url: &str, tls_verify: bool) -> anyhow::Result<Self> {
+    pub async fn new(gatehouse_base_url: &str, tls_verify: bool) -> quench_core::Result<Self> {
         let http = quench_client::transport::Client::builder()
             .danger_accept_invalid_certs(!tls_verify)
             .timeout(Duration::from_secs(5))
@@ -81,7 +81,7 @@ impl JwksVerifier {
                 .cache
                 .set(
                     &Self::cache_key(&jwk.kid),
-                    serde_json::Value::String(jwk.x.clone()),
+                    quench_serde::Value::String(jwk.x.clone()),
                     Some(POSITIVE_TTL_SECS),
                 )
                 .await;
@@ -94,7 +94,7 @@ impl JwksVerifier {
                 .cache
                 .set(
                     &Self::cache_key(kid),
-                    serde_json::Value::Null,
+                    quench_serde::Value::Null,
                     Some(NEGATIVE_TTL_SECS),
                 )
                 .await;
@@ -108,8 +108,8 @@ impl KeyResolver for JwksVerifier {
     async fn resolve(&self, kid: &str) -> Option<DecodingKey> {
         let cached = self.cache.get(&Self::cache_key(kid)).await.ok().flatten();
         let x = match cached {
-            Some(serde_json::Value::String(x)) => Some(x),
-            Some(serde_json::Value::Null) => return None, // cached miss
+            Some(quench_serde::Value::String(x)) => Some(x),
+            Some(quench_serde::Value::Null) => return None, // cached miss
             _ => self.refetch(kid).await,
         }?;
         DecodingKey::from_ed_components(&x).ok()

@@ -26,7 +26,10 @@ fn migration_since_defaults_to_zero_when_untagged() {
         since: None,
         changes: vec![],
     };
-    assert_eq!(migration_since(&migration), semver::Version::new(0, 0, 0));
+    assert_eq!(
+        migration_since(&migration),
+        quench_core::version::Version::new(0, 0, 0)
+    );
 }
 
 #[test]
@@ -37,7 +40,10 @@ fn migration_since_parses_a_tagged_version() {
         since: Some("1.2.3".to_string()),
         changes: vec![],
     };
-    assert_eq!(migration_since(&migration), semver::Version::new(1, 2, 3));
+    assert_eq!(
+        migration_since(&migration),
+        quench_core::version::Version::new(1, 2, 3)
+    );
 }
 
 #[test]
@@ -48,7 +54,7 @@ fn load_rejects_a_missing_root() {
 
 #[test]
 fn load_finds_modules_and_exposes_them() {
-    let temp = tempfile::TempDir::new().expect("tempdir");
+    let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     module(
         temp.path(),
         "core",
@@ -69,13 +75,13 @@ changes = [{ sql = "SELECT 1" }]
     assert!(!catalog.is_empty());
     let core = catalog.get("core").expect("core module");
     assert_eq!(core.name(), "core");
-    assert_eq!(core.version(), &semver::Version::new(0, 1, 0));
+    assert_eq!(core.version(), &quench_core::version::Version::new(0, 1, 0));
     assert_eq!(catalog.modules().count(), 1);
 }
 
 #[test]
 fn fallback_schema_uses_the_module_name_for_schema_scoped_modules() {
-    let temp = tempfile::TempDir::new().expect("tempdir");
+    let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     module(
         temp.path(),
         "sage",
@@ -89,7 +95,7 @@ fn fallback_schema_uses_the_module_name_for_schema_scoped_modules() {
 
 #[test]
 fn fallback_schema_is_public_for_database_scoped_modules() {
-    let temp = tempfile::TempDir::new().expect("tempdir");
+    let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     module(
         temp.path(),
         "pgvector",
@@ -103,7 +109,7 @@ fn fallback_schema_is_public_for_database_scoped_modules() {
 
 #[test]
 fn migrations_up_to_excludes_migrations_tagged_after_the_requested_version() {
-    let temp = tempfile::TempDir::new().expect("tempdir");
+    let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     module(
         temp.path(),
         "core",
@@ -128,17 +134,17 @@ changes = []
     let catalog = Catalog::load(temp.path()).expect("load");
     let module = catalog.get("core").expect("module");
 
-    let up_to_0_2 = module.migrations_up_to(&semver::Version::new(0, 2, 0));
+    let up_to_0_2 = module.migrations_up_to(&quench_core::version::Version::new(0, 2, 0));
     assert_eq!(up_to_0_2.len(), 1);
     assert_eq!(up_to_0_2[0].id, "0001-a");
 
-    let up_to_0_3 = module.migrations_up_to(&semver::Version::new(0, 3, 0));
+    let up_to_0_3 = module.migrations_up_to(&quench_core::version::Version::new(0, 3, 0));
     assert_eq!(up_to_0_3.len(), 2);
 }
 
 #[test]
 fn load_rejects_a_migration_since_ahead_of_its_module_version() {
-    let temp = tempfile::TempDir::new().expect("tempdir");
+    let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     module(
         temp.path(),
         "core",
@@ -160,7 +166,7 @@ changes = []
 
 #[test]
 fn load_rejects_an_unsatisfied_requirement() {
-    let temp = tempfile::TempDir::new().expect("tempdir");
+    let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     module(
         temp.path(),
         "core",
@@ -173,7 +179,7 @@ fn load_rejects_an_unsatisfied_requirement() {
 
 #[test]
 fn load_rejects_a_version_mismatched_requirement() {
-    let temp = tempfile::TempDir::new().expect("tempdir");
+    let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     module(
         temp.path(),
         "dep",
@@ -193,7 +199,7 @@ fn load_rejects_a_version_mismatched_requirement() {
 #[test]
 fn requirement_table_form_deserializes_with_an_explicit_schema() {
     use quench_db::catalog::ModuleManifest;
-    let manifest: ModuleManifest = toml::from_str(
+    let manifest: ModuleManifest = quench_serde::toml::from_str(
         "name = \"core\"\nversion = \"0.1.0\"\nrequires = [{ module = \"dep\", version = \"^1\", schema = \"shared\" }]\n",
     )
     .expect("parse");

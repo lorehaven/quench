@@ -5,7 +5,7 @@
 pub use crate::common::health::HealthState;
 use quench_http::prelude::http::StatusCode;
 use quench_http::prelude::{Inject, Response, get};
-use serde_json::json;
+use quench_serde::json;
 
 #[get("/health")]
 pub async fn health() -> Response {

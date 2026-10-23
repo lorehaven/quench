@@ -1,39 +1,62 @@
-//! Serde deserializer over captured path parameters, backing
+//! Reads captured path parameters into a type, backing
 //! [`crate::extract::Path`]: a single value (`Path<String>`, `Path<u64>`)
 //! reads the only capture, a tuple reads captures positionally, and a
-//! struct / map reads them by name. Values are the raw (not
-//! percent-decoded) path text, parsed into numbers / bools on demand.
+//! struct / map reads them by name. Values are the percent-decoded path text,
+//! parsed into numbers / bools on demand.
 
-use serde::Deserializer;
-use serde::de::{self, DeserializeSeed, IntoDeserializer, MapAccess, SeqAccess, Visitor};
-use std::fmt;
+use quench_serde::{DeserializeOwned, Map, Value};
 
-#[derive(Debug)]
-pub struct Error(String);
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::error::Error for Error {}
-
-impl de::Error for Error {
-    fn custom<T: fmt::Display>(msg: T) -> Self {
-        Self(msg.to_string())
-    }
-}
+pub use quench_serde::Error;
 
 /// Deserializes the captures into `T`. Values are percent-decoded first (a
 /// `%2f` in a capture becomes `/`, so a handler validating a name sees what
 /// the client meant, not the wire form); invalid UTF-8 is an error.
-pub fn from_params<T: de::DeserializeOwned>(params: &[(String, String)]) -> Result<T, Error> {
+pub fn from_params<T: DeserializeOwned>(params: &[(String, String)]) -> Result<T, Error> {
     let decoded = params
         .iter()
         .map(|(name, value)| Ok((name.clone(), percent_decode(value)?)))
         .collect::<Result<Vec<_>, Error>>()?;
-    T::deserialize(Params(&decoded))
+
+    // The type decides which shape it reads, so offer each in turn: by name
+    // (structs, maps), the lone capture (strings, numbers), then by position
+    // (tuples). The first that fits wins.
+    let _lenient = quench_serde::private::Lenient::enter();
+    let by_name = Value::Object(
+        decoded
+            .iter()
+            .map(|(k, v)| (k.clone(), Value::String(v.clone())))
+            .collect::<Map>(),
+    );
+    let positional = Value::Array(
+        decoded
+            .iter()
+            .map(|(_, v)| Value::String(v.clone()))
+            .collect(),
+    );
+    let mut shapes = vec![by_name];
+    if let [(_, only)] = decoded.as_slice() {
+        shapes.push(Value::String(only.clone()));
+    }
+    shapes.push(positional);
+
+    let mut first_error = None;
+    let mut content_error = None;
+    for shape in &shapes {
+        match T::deserialize(shape) {
+            Ok(value) => return Ok(value),
+            Err(error) => {
+                // "invalid type: expected .." means this shape was the wrong
+                // one; anything else is about the data and worth reporting.
+                if content_error.is_none() && !error.message().starts_with("invalid type:") {
+                    content_error = Some(error.clone());
+                }
+                first_error.get_or_insert(error);
+            }
+        }
+    }
+    Err(content_error
+        .or(first_error)
+        .unwrap_or_else(|| Error::new("no path parameters")))
 }
 
 fn percent_decode(value: &str) -> Result<String, Error> {
@@ -55,259 +78,18 @@ fn percent_decode(value: &str) -> Result<String, Error> {
             i += 1;
         }
     }
-    String::from_utf8(out).map_err(|_| de::Error::custom("path parameter is not valid UTF-8"))
-}
-
-struct Params<'a>(&'a [(String, String)]);
-
-macro_rules! forward_scalar {
-    ($($method:ident)*) => {$(
-        fn $method<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
-            self.single()?.$method(visitor)
-        }
-    )*};
-}
-
-impl<'de, 'a> Deserializer<'de> for Params<'a>
-where
-    'a: 'de,
-{
-    type Error = Error;
-
-    fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
-        self.deserialize_map(visitor)
-    }
-
-    fn deserialize_map<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
-        visitor.visit_map(ParamsMap {
-            iter: self.0.iter(),
-            value: None,
-        })
-    }
-
-    fn deserialize_struct<V: Visitor<'de>>(
-        self,
-        _: &'static str,
-        _: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value, Error> {
-        self.deserialize_map(visitor)
-    }
-
-    fn deserialize_seq<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
-        visitor.visit_seq(ParamsSeq(self.0.iter()))
-    }
-
-    fn deserialize_tuple<V: Visitor<'de>>(self, len: usize, visitor: V) -> Result<V::Value, Error> {
-        if self.0.len() < len {
-            return Err(de::Error::custom(format!(
-                "wrong number of path parameters: expected {len}, got {}",
-                self.0.len()
-            )));
-        }
-        self.deserialize_seq(visitor)
-    }
-
-    fn deserialize_tuple_struct<V: Visitor<'de>>(
-        self,
-        _: &'static str,
-        len: usize,
-        visitor: V,
-    ) -> Result<V::Value, Error> {
-        self.deserialize_tuple(len, visitor)
-    }
-
-    fn deserialize_newtype_struct<V: Visitor<'de>>(
-        self,
-        _: &'static str,
-        visitor: V,
-    ) -> Result<V::Value, Error> {
-        visitor.visit_newtype_struct(self)
-    }
-
-    fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
-        visitor.visit_some(self)
-    }
-
-    fn deserialize_unit<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
-        visitor.visit_unit()
-    }
-
-    /// Any scalar: read the single capture.
-    fn deserialize_str<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
-        self.single()?.deserialize_str(visitor)
-    }
-
-    fn deserialize_string<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
-        self.deserialize_str(visitor)
-    }
-
-    fn deserialize_enum<V: Visitor<'de>>(
-        self,
-        _: &'static str,
-        _: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value, Error> {
-        visitor.visit_enum(self.single()?.0.into_deserializer())
-    }
-
-    fn deserialize_identifier<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
-        self.deserialize_str(visitor)
-    }
-
-    forward_scalar! {
-        deserialize_bool deserialize_i8 deserialize_i16 deserialize_i32 deserialize_i64
-        deserialize_i128 deserialize_u8 deserialize_u16 deserialize_u32 deserialize_u64
-        deserialize_u128 deserialize_f32 deserialize_f64 deserialize_char
-    }
-
-    serde::forward_to_deserialize_any! {
-        bytes byte_buf ignored_any unit_struct
-    }
-}
-
-impl<'a> Params<'a> {
-    fn single(&self) -> Result<Value<'a>, Error> {
-        match self.0 {
-            [(_, value)] => Ok(Value(value)),
-            _ => Err(de::Error::custom(format!(
-                "expected exactly one path parameter, got {}",
-                self.0.len()
-            ))),
-        }
-    }
-}
-
-/// One captured value; parses itself as whatever scalar the target asks for.
-struct Value<'a>(&'a str);
-
-macro_rules! parse_value {
-    ($($method:ident => $visit:ident,)*) => {$(
-        fn $method<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
-            match self.0.parse() {
-                Ok(v) => visitor.$visit(v),
-                Err(_) => Err(de::Error::custom(format!(
-                    "can not parse `{}` as {}",
-                    self.0,
-                    stringify!($visit).trim_start_matches("visit_")
-                ))),
-            }
-        }
-    )*};
-}
-
-impl<'de, 'a> Deserializer<'de> for Value<'a>
-where
-    'a: 'de,
-{
-    type Error = Error;
-
-    fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
-        visitor.visit_borrowed_str(self.0)
-    }
-
-    parse_value! {
-        deserialize_bool => visit_bool,
-        deserialize_i8 => visit_i8,
-        deserialize_i16 => visit_i16,
-        deserialize_i32 => visit_i32,
-        deserialize_i64 => visit_i64,
-        deserialize_i128 => visit_i128,
-        deserialize_u8 => visit_u8,
-        deserialize_u16 => visit_u16,
-        deserialize_u32 => visit_u32,
-        deserialize_u64 => visit_u64,
-        deserialize_u128 => visit_u128,
-        deserialize_f32 => visit_f32,
-        deserialize_f64 => visit_f64,
-        deserialize_char => visit_char,
-    }
-
-    fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
-        visitor.visit_some(self)
-    }
-
-    fn deserialize_newtype_struct<V: Visitor<'de>>(
-        self,
-        _: &'static str,
-        visitor: V,
-    ) -> Result<V::Value, Error> {
-        visitor.visit_newtype_struct(self)
-    }
-
-    fn deserialize_enum<V: Visitor<'de>>(
-        self,
-        _: &'static str,
-        _: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value, Error> {
-        visitor.visit_enum(self.0.into_deserializer())
-    }
-
-    serde::forward_to_deserialize_any! {
-        str string bytes byte_buf unit unit_struct seq tuple tuple_struct
-        map struct identifier ignored_any
-    }
-}
-
-struct ParamsMap<'a> {
-    iter: std::slice::Iter<'a, (String, String)>,
-    value: Option<&'a str>,
-}
-
-impl<'de, 'a> MapAccess<'de> for ParamsMap<'a>
-where
-    'a: 'de,
-{
-    type Error = Error;
-
-    fn next_key_seed<K: DeserializeSeed<'de>>(
-        &mut self,
-        seed: K,
-    ) -> Result<Option<K::Value>, Error> {
-        let Some((key, value)) = self.iter.next() else {
-            return Ok(None);
-        };
-        self.value = Some(value);
-        seed.deserialize(Value(key)).map(Some)
-    }
-
-    fn next_value_seed<S: DeserializeSeed<'de>>(&mut self, seed: S) -> Result<S::Value, Error> {
-        self.value.take().map_or_else(
-            || Err(de::Error::custom("value is missing")),
-            |value| seed.deserialize(Value(value)),
-        )
-    }
-}
-
-struct ParamsSeq<'a>(std::slice::Iter<'a, (String, String)>);
-
-impl<'de, 'a> SeqAccess<'de> for ParamsSeq<'a>
-where
-    'a: 'de,
-{
-    type Error = Error;
-
-    fn next_element_seed<T: DeserializeSeed<'de>>(
-        &mut self,
-        seed: T,
-    ) -> Result<Option<T::Value>, Error> {
-        match self.0.next() {
-            Some((_, value)) => seed.deserialize(Value(value)).map(Some),
-            None => Ok(None),
-        }
-    }
+    String::from_utf8(out).map_err(|_| Error::new("path parameter is not valid UTF-8"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde::Deserialize;
+    use quench_serde::Deserialize;
 
     fn p(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
         pairs
             .iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
             .collect()
     }
 
@@ -316,6 +98,13 @@ mod tests {
         assert_eq!(from_params::<String>(&p(&[("a", "x/y")])).unwrap(), "x/y");
         assert_eq!(from_params::<u64>(&p(&[("id", "42")])).unwrap(), 42);
         assert!(from_params::<u64>(&p(&[("id", "nope")])).is_err());
+        assert!(
+            from_params::<u64>(&p(&[("id", "nope")]))
+                .unwrap_err()
+                .to_string()
+                .contains("invalid integer")
+        );
+        assert!(from_params::<bool>(&p(&[("flag", "true")])).unwrap());
     }
 
     #[test]
@@ -323,6 +112,8 @@ mod tests {
         let v: (String, i64) = from_params(&p(&[("a", "n"), ("b", "-7")])).unwrap();
         assert_eq!(v, ("n".to_string(), -7));
         assert!(from_params::<(String, String)>(&p(&[("a", "n")])).is_err());
+        let single: (String,) = from_params(&p(&[("a", "only")])).unwrap();
+        assert_eq!(single.0, "only");
     }
 
     #[test]
@@ -332,17 +123,53 @@ mod tests {
             "../etc x"
         );
         assert_eq!(from_params::<String>(&p(&[("n", "100%")])).unwrap(), "100%");
+        assert_eq!(from_params::<String>(&p(&[("n", "a+b")])).unwrap(), "a+b");
         assert!(from_params::<String>(&p(&[("n", "%ff")])).is_err());
+        assert!(
+            from_params::<String>(&p(&[("n", "%ff")]))
+                .unwrap_err()
+                .to_string()
+                .contains("UTF-8")
+        );
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct Blob {
+        name: String,
+        digest: String,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct Numbered {
+        id: u32,
     }
 
     #[test]
     fn struct_reads_by_name() {
-        #[derive(Deserialize)]
-        struct Blob {
-            name: String,
-            digest: String,
-        }
         let b: Blob = from_params(&p(&[("name", "a/b"), ("digest", "sha256:1")])).unwrap();
         assert_eq!((b.name.as_str(), b.digest.as_str()), ("a/b", "sha256:1"));
+        // a struct with one field works with one capture too
+        let n: Numbered = from_params(&p(&[("id", "9")])).unwrap();
+        assert_eq!(n.id, 9);
+    }
+
+    #[test]
+    fn struct_errors_describe_the_data_not_the_shape() {
+        let e = from_params::<Numbered>(&p(&[("id", "x")])).unwrap_err();
+        assert!(
+            e.to_string().contains("id") && e.to_string().contains("invalid integer"),
+            "{e}"
+        );
+        let e = from_params::<Blob>(&p(&[("name", "a")])).unwrap_err();
+        assert!(e.to_string().contains("missing field `digest`"), "{e}");
+    }
+
+    #[test]
+    fn no_captures() {
+        assert!(from_params::<String>(&[]).is_err());
+        assert_eq!(
+            from_params::<Vec<String>>(&[]).unwrap(),
+            Vec::<String>::new()
+        );
     }
 }

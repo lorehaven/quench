@@ -1,12 +1,10 @@
-use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
-use chrono::{DateTime, Duration, Utc};
+use quench_core::time::{Duration, Time};
 use quench_db::prelude::{Crud, Db, Model, Repository};
-use serde::{Deserialize, Serialize};
+use quench_serde::{Deserialize, Serialize, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, sqlx::Type)]
-#[sqlx(rename_all = "lowercase")]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
     Admin,
@@ -73,21 +71,21 @@ pub type Actions = BTreeSet<String>;
 /// A user's grants, as `{service: {action, action, ...}}`.
 pub type Permissions = BTreeMap<String, Actions>;
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub username: String,
     pub password: String,
-    pub roles: serde_json::Value,
+    pub roles: Value,
     /// `{"sage": ["read", "write"], "switchboard": ["launch"]}`. Empty for a
     /// wildcard role, which grants everything without enumerating it.
-    pub permissions: serde_json::Value,
+    pub permissions: Value,
     /// Set by self-service registration; `None` for an admin-created account,
     /// which has no reason to collect one.
     pub email: Option<String>,
     /// When the address in `email` was confirmed via a verification link.
     /// `None` either because there is no address, or because it has not been
     /// confirmed yet - the two are told apart by checking `email` itself.
-    pub email_verified_at: Option<DateTime<Utc>>,
+    pub email_verified_at: Option<Time>,
 
     // ---------------------------------------------------------------------
     // Profile - self-service or admin-set, never required for login.
@@ -105,13 +103,13 @@ pub struct User {
     /// `docker/foundry-service/migrations/auth/0008-user-lifecycle.toml`.
     /// Not the account's real creation date for those rows, but a value from
     /// here on is still better than none.
-    pub created_at: DateTime<Utc>,
-    pub last_login_at: Option<DateTime<Utc>>,
+    pub created_at: Time,
+    pub last_login_at: Option<Time>,
     /// A disabled account keeps its row (and everything it's attached to
     /// elsewhere - issues reported, runs triggered) but cannot authenticate;
     /// see [`User::is_disabled`].
-    pub disabled_at: Option<DateTime<Utc>>,
-    pub password_changed_at: Option<DateTime<Utc>>,
+    pub disabled_at: Option<Time>,
+    pub password_changed_at: Option<Time>,
 
     // ---------------------------------------------------------------------
     // Security
@@ -125,7 +123,7 @@ pub struct User {
     pub failed_login_attempts: i32,
     /// Set once `failed_login_attempts` crosses the caller's configured
     /// threshold; see [`User::record_failed_login`].
-    pub locked_until: Option<DateTime<Utc>>,
+    pub locked_until: Option<Time>,
 
     // ---------------------------------------------------------------------
     // Contact / locale
@@ -142,18 +140,18 @@ impl User {
         roles: Vec<Role>,
         permissions: Permissions,
         email: Option<String>,
-    ) -> anyhow::Result<Self> {
+    ) -> quench_core::Result<Self> {
         Ok(Self {
             username,
             password: Self::hash_password(&password)?,
-            roles: serde_json::to_value(roles).unwrap(),
-            permissions: serde_json::to_value(permissions).unwrap(),
+            roles: quench_serde::to_value(&roles),
+            permissions: quench_serde::to_value(&permissions),
             email,
             email_verified_at: None,
             display_name: None,
             avatar_url: None,
             title: None,
-            created_at: Utc::now(),
+            created_at: Time::now(),
             last_login_at: None,
             disabled_at: None,
             password_changed_at: None,
@@ -166,26 +164,19 @@ impl User {
         })
     }
 
-    pub fn hash_password(password: &str) -> anyhow::Result<String> {
-        Ok(Argon2::default()
-            .hash_password(password.as_bytes())
-            .map_err(|err| anyhow::anyhow!("failed to hash password: {err}"))?
-            .to_string())
+    pub fn hash_password(password: &str) -> quench_core::Result<String> {
+        quench_crypto::argon2::hash_password(password, &quench_crypto::argon2::Params::default())
+            .map_err(|err| quench_core::err!("failed to hash password: {err}"))
     }
 
     #[must_use]
     pub fn verify_password(&self, password: &str) -> bool {
-        let Ok(hash) = PasswordHash::new(&self.password) else {
-            return false;
-        };
-        Argon2::default()
-            .verify_password(password.as_bytes(), &hash)
-            .is_ok()
+        quench_crypto::argon2::verify_password(password, &self.password).unwrap_or(false)
     }
 
     #[must_use]
     pub fn get_roles(&self) -> Vec<Role> {
-        serde_json::from_value(self.roles.clone()).unwrap_or_default()
+        quench_serde::from_value(&self.roles).unwrap_or_default()
     }
 
     /// The grants written against this user, ignoring any wildcard role.
@@ -198,7 +189,7 @@ impl User {
     /// direction for that failure to go.
     #[must_use]
     pub fn get_permissions(&self) -> Permissions {
-        serde_json::from_value(self.permissions.clone()).unwrap_or_default()
+        quench_serde::from_value(&self.permissions).unwrap_or_default()
     }
 
     pub fn has_wildcard(&self) -> bool {
@@ -229,7 +220,7 @@ impl User {
     /// Whether a lockout from repeated failed logins is still in effect.
     #[must_use]
     pub fn is_locked(&self) -> bool {
-        self.locked_until.is_some_and(|until| until > Utc::now())
+        self.locked_until.is_some_and(|until| until > Time::now())
     }
 
     /// Call after a failed password check. Past `max_attempts`, locks the
@@ -241,7 +232,7 @@ impl User {
     pub fn record_failed_login(&mut self, max_attempts: i32, lockout_duration: Duration) {
         self.failed_login_attempts += 1;
         if self.failed_login_attempts >= max_attempts {
-            self.locked_until = Some(Utc::now() + lockout_duration);
+            self.locked_until = Some(Time::now() + lockout_duration);
             self.failed_login_attempts = 0;
         }
     }
@@ -251,7 +242,7 @@ impl User {
     /// and stamps when the session started.
     pub fn record_successful_login(&mut self) {
         self.failed_login_attempts = 0;
-        self.last_login_at = Some(Utc::now());
+        self.last_login_at = Some(Time::now());
     }
 }
 
@@ -325,17 +316,17 @@ impl UserDb {
     /// gatehouse's login page asks for, never something a Basic-auth caller
     /// through here is challenged with.
     pub async fn validate(&self, username: &str, password: &str) -> Option<User> {
-        tracing::debug!("UserDb::validate: Looking up user: {}", username);
+        quench_log::debug!("UserDb::validate: Looking up user: {}", username);
         let user = self.get_user(username).await?;
         if user.is_disabled() {
-            tracing::warn!("UserDb::validate: account is disabled: {}", username);
+            quench_log::warn!("UserDb::validate: account is disabled: {}", username);
             return None;
         }
         if user.is_locked() {
-            tracing::warn!("UserDb::validate: account is locked: {}", username);
+            quench_log::warn!("UserDb::validate: account is locked: {}", username);
             return None;
         }
-        tracing::debug!(
+        quench_log::debug!(
             "UserDb::validate: User found, verifying password for: {}",
             username
         );
@@ -345,10 +336,10 @@ impl UserDb {
             .await
             .ok()?;
         if verified {
-            tracing::debug!("UserDb::validate: Password verified for user: {}", username);
+            quench_log::debug!("UserDb::validate: Password verified for user: {}", username);
             Some(user)
         } else {
-            tracing::warn!("UserDb::validate: Invalid password for user: {}", username);
+            quench_log::warn!("UserDb::validate: Invalid password for user: {}", username);
             None
         }
     }

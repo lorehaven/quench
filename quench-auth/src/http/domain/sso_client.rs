@@ -8,22 +8,21 @@
 use crate::domain::realm;
 use crate::domain::sso_client::{AuthorizeState, TokenResponse, random_urlsafe};
 use crate::http::domain::cookies::cookie_value;
-use base64::Engine as _;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use quench_core::base64::URL_SAFE_NO_PAD;
 use quench_http::prelude::http::StatusCode;
 use quench_http::prelude::{Request, Response};
-use sha2::{Digest, Sha256};
 
 pub use crate::domain::sso_client::{RefreshedTokens, SsoConfig, refresh};
 
 /// Redirects the browser to gatehouse's `/authorize`, starting the code
 /// exchange.
+#[must_use]
 pub fn authorize_redirect(request: &Request, config: &SsoConfig) -> Response {
     let Some(base) = realm::gatehouse_url() else {
         return gatehouse_not_configured();
     };
     if !config.configured() {
-        tracing::error!(
+        quench_log::error!(
             "GATEHOUSE_CLIENT_ID / GATEHOUSE_CLIENT_SECRET not set: this service cannot start \
              the sign-in redirect"
         );
@@ -34,14 +33,13 @@ pub fn authorize_redirect(request: &Request, config: &SsoConfig) -> Response {
     let callback_url = absolute_url(request, &realm::ui_path("/auth/callback"));
     let state = random_urlsafe(24);
     let code_verifier = random_urlsafe(48);
-    let code_challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(code_verifier.as_bytes()));
+    let code_challenge = URL_SAFE_NO_PAD.encode(quench_crypto::hash::sha256(&code_verifier));
 
-    let cookie_value = serde_json::to_string(&AuthorizeState {
+    let cookie_value = quench_serde::json::to_string(&AuthorizeState {
         state: state.clone(),
         code_verifier,
         redirect: destination,
-    })
-    .unwrap_or_default();
+    });
 
     let url = format!(
         "{base}/api/v1/authorize?client_id={client_id}&redirect_uri={redirect_uri}&state={state}&code_challenge={code_challenge}&code_challenge_method=S256",
@@ -69,7 +67,7 @@ pub async fn callback(request: &Request, config: &SsoConfig) -> Response {
     let Some(cookie) = cookie_value(request, realm::AUTHORIZE_STATE_COOKIE) else {
         return callback_failed("missing authorize state");
     };
-    let Ok(saved) = serde_json::from_str::<AuthorizeState>(&cookie) else {
+    let Ok(saved) = quench_serde::json::from_str::<AuthorizeState>(&cookie) else {
         return callback_failed("corrupt authorize state");
     };
 
@@ -130,7 +128,7 @@ pub async fn callback(request: &Request, config: &SsoConfig) -> Response {
 }
 
 fn callback_failed(reason: &str) -> Response {
-    tracing::warn!("sso callback failed: {reason}");
+    quench_log::warn!("sso callback failed: {reason}");
     Response::new(StatusCode::FOUND)
         .header("Location", realm::ui_path("/login"))
         .append_header(
@@ -140,7 +138,7 @@ fn callback_failed(reason: &str) -> Response {
 }
 
 fn gatehouse_not_configured() -> Response {
-    tracing::error!(
+    quench_log::error!(
         "GATEHOUSE_URL is not set: this service cannot sign anyone in, because gatehouse owns \
          the login form and the realm session"
     );

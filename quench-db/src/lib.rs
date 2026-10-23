@@ -1,5 +1,5 @@
-use async_trait::async_trait;
-use serde::{Serialize, de::DeserializeOwned};
+use quench_core::async_trait;
+use quench_serde::{DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
 pub mod backends;
@@ -8,14 +8,17 @@ pub mod error;
 pub mod migrations;
 pub mod plan;
 pub mod prelude;
+#[cfg(feature = "postgres")]
 pub mod runner;
 
 pub use backends::in_memory::{InMemoryDb, InMemoryRepository};
+#[cfg(feature = "postgres")]
 pub use backends::postgres::{PostgresDb, PostgresRepository};
 pub use catalog::{Catalog, CatalogError, CatalogModule, ModuleManifest, ModuleScope, Requirement};
 pub use error::DbError;
 pub use migrations::{ChangeSet, ColumnDef, Migration, MigrationFile, MigrationLoader};
 pub use plan::{InstallRequest, MigrationPlan, PlanError, PlannedMigration, ResolvedModule};
+#[cfg(feature = "postgres")]
 pub use runner::{ApplyReport, MigrationOutcome, MigrationResult, MigrationRunner, ResetReport};
 
 #[async_trait]
@@ -65,22 +68,32 @@ pub(crate) fn checked_column<T: Model>(column: &str) -> Result<&'static str, DbE
 
 #[derive(Clone, Debug)]
 pub enum Db {
+    #[cfg(feature = "postgres")]
     Postgres(PostgresDb),
     InMemory(InMemoryDb),
 }
 
 impl Db {
+    #[cfg_attr(
+        not(feature = "postgres"),
+        allow(clippy::unused_async, clippy::unused_async_trait_impl)
+    )] // only Postgres connects asynchronously
     pub async fn connect(url: &str) -> Result<Self, DbError> {
         if url.is_empty() {
-            Ok(Self::InMemory(InMemoryDb::new()))
-        } else {
-            Ok(Self::Postgres(PostgresDb::new(url).await?))
+            return Ok(Self::InMemory(InMemoryDb::new()));
         }
+        #[cfg(feature = "postgres")]
+        return Ok(Self::Postgres(PostgresDb::new(url).await?));
+        #[cfg(not(feature = "postgres"))]
+        Err(DbError::ConnectionError(format!(
+            "cannot connect to {url}: quench-db was built without its `postgres` feature"
+        )))
     }
 
     #[must_use]
     pub fn repository<T: Model>(&self) -> Repository<T> {
         match self {
+            #[cfg(feature = "postgres")]
             Self::Postgres(db) => Repository::Postgres(PostgresRepository::new(db.clone())),
             Self::InMemory(db) => Repository::InMemory(InMemoryRepository::new(db.clone())),
         }
@@ -91,6 +104,7 @@ impl Db {
 impl Database for Db {
     async fn execute(&self, query: &str) -> Result<(), DbError> {
         match self {
+            #[cfg(feature = "postgres")]
             Self::Postgres(db) => db.execute(query).await,
             Self::InMemory(db) => db.execute(query).await,
         }
@@ -98,6 +112,7 @@ impl Database for Db {
 
     async fn migrate(&self, migrations: Vec<Migration>) -> Result<(), DbError> {
         match self {
+            #[cfg(feature = "postgres")]
             Self::Postgres(db) => db.migrate(migrations).await,
             Self::InMemory(db) => db.migrate(migrations).await,
         }
@@ -107,6 +122,7 @@ impl Database for Db {
 impl<T: Model> std::fmt::Debug for Repository<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            #[cfg(feature = "postgres")]
             Self::Postgres(repo) => f.debug_tuple("Postgres").field(repo).finish(),
             Self::InMemory(repo) => f.debug_tuple("InMemory").field(repo).finish(),
         }
@@ -114,6 +130,7 @@ impl<T: Model> std::fmt::Debug for Repository<T> {
 }
 
 pub enum Repository<T: Model> {
+    #[cfg(feature = "postgres")]
     Postgres(PostgresRepository<T>),
     InMemory(InMemoryRepository<T>),
 }
@@ -121,10 +138,11 @@ pub enum Repository<T: Model> {
 #[async_trait]
 impl<T> Crud<T> for Repository<T>
 where
-    T: Model + for<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow>,
+    T: Model,
 {
     async fn create(&self, model: &T) -> Result<T, DbError> {
         match self {
+            #[cfg(feature = "postgres")]
             Self::Postgres(repo) => repo.create(model).await,
             Self::InMemory(repo) => repo.create(model).await,
         }
@@ -132,6 +150,7 @@ where
 
     async fn read(&self, id: &str) -> Result<Option<T>, DbError> {
         match self {
+            #[cfg(feature = "postgres")]
             Self::Postgres(repo) => repo.read(id).await,
             Self::InMemory(repo) => repo.read(id).await,
         }
@@ -139,6 +158,7 @@ where
 
     async fn update(&self, model: &T) -> Result<T, DbError> {
         match self {
+            #[cfg(feature = "postgres")]
             Self::Postgres(repo) => repo.update(model).await,
             Self::InMemory(repo) => repo.update(model).await,
         }
@@ -146,6 +166,7 @@ where
 
     async fn delete(&self, id: &str) -> Result<(), DbError> {
         match self {
+            #[cfg(feature = "postgres")]
             Self::Postgres(repo) => repo.delete(id).await,
             Self::InMemory(repo) => repo.delete(id).await,
         }
@@ -153,6 +174,7 @@ where
 
     async fn list(&self) -> Result<Vec<T>, DbError> {
         match self {
+            #[cfg(feature = "postgres")]
             Self::Postgres(repo) => repo.list().await,
             Self::InMemory(repo) => repo.list().await,
         }
@@ -160,6 +182,7 @@ where
 
     async fn find_by(&self, column: &str, value: &str) -> Result<Vec<T>, DbError> {
         match self {
+            #[cfg(feature = "postgres")]
             Self::Postgres(repo) => repo.find_by(column, value).await,
             Self::InMemory(repo) => repo.find_by(column, value).await,
         }

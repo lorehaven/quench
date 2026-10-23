@@ -7,7 +7,7 @@ use tokio::time::sleep;
 /// meaningfully ready until it is reachable.
 #[must_use]
 pub fn gatehouse_health_url() -> String {
-    let gatehouse_url = envmnt::get_or("GATEHOUSE_URL", "");
+    let gatehouse_url = quench_core::env::get_or("GATEHOUSE_URL", "");
     format!("{}/health/ready", gatehouse_url.trim_end_matches('/'))
 }
 

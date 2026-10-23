@@ -4,7 +4,7 @@ use std::fmt;
 use std::io;
 
 /// Why a message could not be built. Nothing has touched the network yet.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, quench_core::Error)]
 pub enum BuildError {
     #[error("invalid email address {0:?}")]
     InvalidAddress(String),
@@ -50,7 +50,7 @@ impl fmt::Display for Reply {
 }
 
 /// Why a delivery attempt failed.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, quench_core::Error)]
 pub enum Error {
     #[error("network error: {0}")]
     Io(#[from] io::Error),

@@ -8,11 +8,11 @@
 //! configuration rather than a rewrite.
 
 use crate::CacheError;
-use serde_json::Value;
+use quench_serde::Value;
 use std::sync::Arc;
 
 #[cfg(feature = "redis")]
-use redis::AsyncCommands;
+use quench_redis::{Redis, cmd};
 
 /// Where cached values live.
 #[derive(Clone, Debug)]
@@ -213,61 +213,10 @@ impl CacheStore {
     }
 }
 
-/// One server or a cluster.
-///
-/// The single-server case holds a [`redis::aio::ConnectionManager`] rather
-/// than a bare `MultiplexedConnection`: the latter never recovers once its
-/// socket dies, so a Redis pod restart would wedge every holder of one until
-/// their process restarted too. `ConnectionManager` wraps the same
-/// multiplexed connection but reconnects in the background on I/O errors.
-///
-/// Implementing `ConnectionLike` over the pair is what keeps the commands below
-/// written once: `AsyncCommands` is blanket-implemented for anything that is
-/// `ConnectionLike`, so `get`/`set`/`del` do not care which we hold. Only
-/// [`RedisStore::clear`] has to know, because `SCAN` is per-node.
-#[cfg(feature = "redis")]
-#[derive(Clone)]
-enum Connection {
-    Single(redis::aio::ConnectionManager),
-    Cluster(redis::cluster_async::ClusterConnection),
-}
-
-#[cfg(feature = "redis")]
-impl redis::aio::ConnectionLike for Connection {
-    fn req_packed_command<'a>(
-        &'a mut self,
-        cmd: &'a redis::Cmd,
-    ) -> redis::RedisFuture<'a, redis::Value> {
-        match self {
-            Self::Single(connection) => connection.req_packed_command(cmd),
-            Self::Cluster(connection) => connection.req_packed_command(cmd),
-        }
-    }
-
-    fn req_packed_commands<'a>(
-        &'a mut self,
-        cmd: &'a redis::Pipeline,
-        offset: usize,
-        count: usize,
-    ) -> redis::RedisFuture<'a, Vec<redis::Value>> {
-        match self {
-            Self::Single(connection) => connection.req_packed_commands(cmd, offset, count),
-            Self::Cluster(connection) => connection.req_packed_commands(cmd, offset, count),
-        }
-    }
-
-    fn get_db(&self) -> i64 {
-        match self {
-            Self::Single(connection) => connection.get_db(),
-            Self::Cluster(connection) => connection.get_db(),
-        }
-    }
-}
-
 #[cfg(feature = "redis")]
 #[derive(Clone)]
 pub struct RedisStore {
-    connection: Connection,
+    redis: Redis,
     /// Namespaces every key, so several services can share one Redis without
     /// colliding, and `clear` has something to scope itself to.
     prefix: String,
@@ -280,6 +229,11 @@ impl std::fmt::Debug for RedisStore {
             .field("prefix", &self.prefix)
             .finish_non_exhaustive()
     }
+}
+
+#[cfg(feature = "redis")]
+fn backend(err: &quench_redis::Error) -> CacheError {
+    CacheError::Backend(err.to_string())
 }
 
 #[cfg(feature = "redis")]
@@ -307,24 +261,18 @@ impl RedisStore {
             return Err(CacheError::Backend("no Redis URL configured".into()));
         }
 
-        let connection = if cluster || seeds.len() > 1 {
-            let client = redis::cluster::ClusterClient::new(seeds)
-                .map_err(|err| CacheError::Backend(format!("invalid Redis cluster URL: {err}")))?;
-            Connection::Cluster(client.get_async_connection().await.map_err(|err| {
+        let redis = if cluster || seeds.len() > 1 {
+            Redis::connect_cluster(&seeds).await.map_err(|err| {
                 CacheError::Backend(format!("Redis cluster connection failed: {err}"))
-            })?)
+            })?
         } else {
-            let client = redis::Client::open(seeds[0])
-                .map_err(|err| CacheError::Backend(format!("invalid Redis URL: {err}")))?;
-            Connection::Single(
-                client.get_connection_manager().await.map_err(|err| {
-                    CacheError::Backend(format!("Redis connection failed: {err}"))
-                })?,
-            )
+            Redis::connect(seeds[0])
+                .await
+                .map_err(|err| CacheError::Backend(format!("Redis connection failed: {err}")))?
         };
 
         Ok(Self {
-            connection,
+            redis,
             prefix: prefix.into(),
         })
     }
@@ -332,7 +280,7 @@ impl RedisStore {
     /// Whether this store is talking to a cluster.
     #[must_use]
     pub const fn is_clustered(&self) -> bool {
-        matches!(self.connection, Connection::Cluster(_))
+        self.redis.is_cluster()
     }
 
     fn qualified(&self, key: &str) -> String {
@@ -343,18 +291,21 @@ impl RedisStore {
         }
     }
 
-    pub async fn get(&self, key: &str) -> Result<Option<Value>, CacheError> {
-        let mut connection = self.connection.clone();
-        let raw: Option<String> = connection
-            .get(self.qualified(key))
-            .await
-            .map_err(|err| CacheError::Backend(err.to_string()))?;
-
+    fn decode(raw: Option<String>) -> Result<Option<Value>, CacheError> {
         raw.map(|value| {
-            serde_json::from_str(&value)
+            quench_serde::json::from_str(&value)
                 .map_err(|err| CacheError::SerializationError(err.to_string()))
         })
         .transpose()
+    }
+
+    pub async fn get(&self, key: &str) -> Result<Option<Value>, CacheError> {
+        let raw: Option<String> = self
+            .redis
+            .exec(&cmd("GET").arg(&self.qualified(key)))
+            .await
+            .map_err(|err| backend(&err))?;
+        Self::decode(raw)
     }
 
     pub async fn set(
@@ -363,43 +314,32 @@ impl RedisStore {
         value: Value,
         ttl_secs: Option<u64>,
     ) -> Result<(), CacheError> {
-        let mut connection = self.connection.clone();
-        let encoded = serde_json::to_string(&value)
-            .map_err(|err| CacheError::SerializationError(err.to_string()))?;
-
-        match ttl_secs {
-            Some(ttl) => connection
-                .set_ex::<_, _, ()>(self.qualified(key), encoded, ttl)
-                .await
-                .map_err(|err| CacheError::Backend(err.to_string())),
-            None => connection
-                .set::<_, _, ()>(self.qualified(key), encoded)
-                .await
-                .map_err(|err| CacheError::Backend(err.to_string())),
+        let encoded = quench_serde::json::to_string(&value);
+        let mut command = cmd("SET").arg(&self.qualified(key)).arg(&encoded);
+        if let Some(ttl) = ttl_secs {
+            command = command.arg("EX").arg(&ttl);
         }
+        self.redis
+            .exec::<()>(&command)
+            .await
+            .map_err(|err| backend(&err))
     }
 
     /// `GETDEL`: atomic on the server, so concurrent callers cannot both win.
     pub async fn take(&self, key: &str) -> Result<Option<Value>, CacheError> {
-        let mut connection = self.connection.clone();
-        let raw: Option<String> = connection
-            .get_del(self.qualified(key))
+        let raw: Option<String> = self
+            .redis
+            .exec(&cmd("GETDEL").arg(&self.qualified(key)))
             .await
-            .map_err(|err| CacheError::Backend(err.to_string()))?;
-
-        raw.map(|value| {
-            serde_json::from_str(&value)
-                .map_err(|err| CacheError::SerializationError(err.to_string()))
-        })
-        .transpose()
+            .map_err(|err| backend(&err))?;
+        Self::decode(raw)
     }
 
     pub async fn remove(&self, key: &str) -> Result<(), CacheError> {
-        let mut connection = self.connection.clone();
-        connection
-            .del::<_, ()>(self.qualified(key))
+        self.redis
+            .exec::<()>(&cmd("DEL").arg(&self.qualified(key)))
             .await
-            .map_err(|err| CacheError::Backend(err.to_string()))
+            .map_err(|err| backend(&err))
     }
 
     /// `SADD`, then `EXPIRE` when a lifetime is given.
@@ -414,39 +354,36 @@ impl RedisStore {
         member: &str,
         ttl_secs: Option<u64>,
     ) -> Result<(), CacheError> {
-        let mut connection = self.connection.clone();
         let qualified = self.qualified(key);
 
-        connection
-            .sadd::<_, _, ()>(&qualified, member)
+        self.redis
+            .exec::<()>(&cmd("SADD").arg(&qualified).arg(member))
             .await
-            .map_err(|err| CacheError::Backend(err.to_string()))?;
+            .map_err(|err| backend(&err))?;
 
         if let Some(ttl) = ttl_secs {
-            connection
-                .expire::<_, ()>(&qualified, i64::try_from(ttl).unwrap_or(i64::MAX))
+            self.redis
+                .exec::<()>(&cmd("EXPIRE").arg(&qualified).arg(&ttl))
                 .await
-                .map_err(|err| CacheError::Backend(err.to_string()))?;
+                .map_err(|err| backend(&err))?;
         }
         Ok(())
     }
 
     pub async fn set_members(&self, key: &str) -> Result<Vec<String>, CacheError> {
-        let mut connection = self.connection.clone();
-        connection
-            .smembers(self.qualified(key))
+        self.redis
+            .exec(&cmd("SMEMBERS").arg(&self.qualified(key)))
             .await
-            .map_err(|err| CacheError::Backend(err.to_string()))
+            .map_err(|err| backend(&err))
     }
 
     /// `SREM`. Redis drops a set once its last member leaves, so there is no
     /// empty key left behind to clean up.
     pub async fn remove_from_set(&self, key: &str, member: &str) -> Result<(), CacheError> {
-        let mut connection = self.connection.clone();
-        connection
-            .srem::<_, _, ()>(self.qualified(key), member)
+        self.redis
+            .exec::<()>(&cmd("SREM").arg(&self.qualified(key)).arg(member))
             .await
-            .map_err(|err| CacheError::Backend(err.to_string()))
+            .map_err(|err| backend(&err))
     }
 
     /// Deletes this store's keys with `SCAN`, which - unlike `KEYS` - does not
@@ -458,18 +395,18 @@ impl RedisStore {
     pub async fn clear(&self) -> Result<(), CacheError> {
         let pattern = self.qualified("*");
 
-        match &self.connection {
-            Connection::Single(_) => {
-                let mut connection = self.connection.clone();
-                Self::sweep(&mut connection, &pattern, None).await
+        if self.redis.is_cluster() {
+            let primaries = self
+                .redis
+                .primaries()
+                .await
+                .map_err(|err| CacheError::Backend(format!("CLUSTER NODES failed: {err}")))?;
+            for node in primaries {
+                self.sweep(&pattern, Some(&node)).await?;
             }
-            Connection::Cluster(cluster) => {
-                let mut connection = self.connection.clone();
-                for node in Self::primaries(&mut cluster.clone()).await? {
-                    Self::sweep(&mut connection, &pattern, Some(node)).await?;
-                }
-                Ok(())
-            }
+            Ok(())
+        } else {
+            self.sweep(&pattern, None).await
         }
     }
 
@@ -478,51 +415,30 @@ impl RedisStore {
     /// `node` picks the primary to scan; without it the command goes wherever
     /// the connection would normally send it, which is the whole keyspace on a
     /// standalone server.
-    async fn sweep(
-        connection: &mut Connection,
-        pattern: &str,
-        node: Option<(String, u16)>,
-    ) -> Result<(), CacheError> {
+    async fn sweep(&self, pattern: &str, node: Option<&str>) -> Result<(), CacheError> {
         let mut cursor: u64 = 0;
 
         loop {
-            let mut scan = redis::cmd("SCAN");
-            scan.arg(cursor)
+            let scan = cmd("SCAN")
+                .arg(&cursor)
                 .arg("MATCH")
                 .arg(pattern)
                 .arg("COUNT")
-                .arg(500);
+                .arg(&500);
 
-            let (next, keys): (u64, Vec<String>) = match (&mut *connection, node.clone()) {
-                (Connection::Cluster(cluster), Some((host, port))) => {
-                    let value = cluster
-                        .route_command(
-                            scan,
-                            redis::cluster_routing::RoutingInfo::SingleNode(
-                                redis::cluster_routing::SingleNodeRoutingInfo::ByAddress {
-                                    host,
-                                    port,
-                                },
-                            ),
-                        )
-                        .await
-                        .map_err(|err| CacheError::Backend(err.to_string()))?;
-                    redis::from_redis_value(value)
-                        .map_err(|err| CacheError::Backend(err.to_string()))?
-                }
-                (connection, _) => scan
-                    .query_async(connection)
-                    .await
-                    .map_err(|err| CacheError::Backend(err.to_string()))?,
-            };
+            let (next, keys): (u64, Vec<String>) = match node {
+                Some(node) => self.redis.exec_on(node, &scan).await,
+                None => self.redis.exec(&scan).await,
+            }
+            .map_err(|err| backend(&err))?;
 
             // One key per `DEL`: on a cluster a multi-key delete is rejected
             // outright unless every key hashes to the same slot.
             for key in keys {
-                connection
-                    .del::<_, ()>(key)
+                self.redis
+                    .exec::<()>(&cmd("DEL").arg(&key))
                     .await
-                    .map_err(|err| CacheError::Backend(err.to_string()))?;
+                    .map_err(|err| backend(&err))?;
             }
 
             cursor = next;
@@ -531,56 +447,12 @@ impl RedisStore {
             }
         }
     }
-
-    /// The cluster's primaries, from `CLUSTER NODES`.
-    ///
-    /// Asking the cluster rather than trusting the configured seeds means a
-    /// node that joined after startup is still swept.
-    async fn primaries(
-        cluster: &mut redis::cluster_async::ClusterConnection,
-    ) -> Result<Vec<(String, u16)>, CacheError> {
-        let mut cmd = redis::cmd("CLUSTER");
-        cmd.arg("NODES");
-        let value = cluster
-            .route_command(
-                cmd,
-                redis::cluster_routing::RoutingInfo::SingleNode(
-                    redis::cluster_routing::SingleNodeRoutingInfo::RandomPrimary,
-                ),
-            )
-            .await
-            .map_err(|err| CacheError::Backend(format!("CLUSTER NODES failed: {err}")))?;
-
-        let raw: String =
-            redis::from_redis_value(value).map_err(|err| CacheError::Backend(err.to_string()))?;
-
-        Ok(raw.lines().filter_map(parse_primary).collect())
-    }
 }
 
 /// Reads one `CLUSTER NODES` line, keeping healthy primaries.
-///
-/// The address field is `host:port@cport[,hostname[,aux=…]]`; the flags field
-/// is a comma-separated list that contains `master` or `slave`, plus `fail` or
-/// `fail?` for a node the cluster has given up on.
 #[cfg(feature = "redis")]
 #[doc(hidden)]
 #[must_use]
 pub fn parse_primary(line: &str) -> Option<(String, u16)> {
-    let mut fields = line.split_whitespace();
-    let _id = fields.next()?;
-    let address = fields.next()?;
-    let flags = fields.next()?;
-
-    let healthy_primary = flags
-        .split(',')
-        .any(|flag| flag == "master" || flag == "primary")
-        && !flags.split(',').any(|flag| flag.starts_with("fail"));
-    if !healthy_primary {
-        return None;
-    }
-
-    let address = address.split('@').next()?;
-    let (host, port) = address.rsplit_once(':')?;
-    Some((host.to_string(), port.parse().ok()?))
+    quench_redis::parse_primary(line)
 }

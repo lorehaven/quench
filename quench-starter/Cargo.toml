@@ -16,26 +16,16 @@ name = "quench_starter"
 path = "src/lib.rs"
 
 [dependencies]
-async-trait = { workspace = true }
-bytes = { version = "1.12" }
-envmnt = { workspace = true }
-quench-cli = { workspace = true }
-quench-auth = { workspace = true }
-quench-db = { workspace = true }
-quench-http = { workspace = true }
+quench-cli = { workspace = true, features = ["repl"] }
+quench-core = { workspace = true }
+quench-serde = { workspace = true }
+quench-auth = { workspace = true, features = ["http", "redis", "postgres", "tls"] }
+quench-db = { workspace = true, features = ["postgres", "tls"] }
+quench-http = { workspace = true, features = ["tls"] }
 quench-log = { workspace = true }
 quench-web = { workspace = true }
-quench-client = { workspace = true }
-rustls = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
+quench-client = { workspace = true, features = ["tls"] }
 tokio = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-uuid = { workspace = true }
-
-[dev-dependencies]
-http = { workspace = true }
 
 [lints]
 workspace = true

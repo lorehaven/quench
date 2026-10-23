@@ -1,0 +1,30 @@
+[package]
+name = "quench-serde"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - JSON/TOML/urlencoded codecs and a dynamic Value model, without serde"
+keywords = ["json", "serialization", "toml"]
+categories = ["encoding", "parser-implementations"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_serde"
+path = "src/lib.rs"
+
+[dependencies]
+quench-core = { workspace = true }
+quench-serde-macros = { workspace = true }
+
+[features]
+default = ["toml"]
+# TOML 1.0 reader and writer.
+toml = []
+# YAML 1.2 reader and writer.
+yaml = []
+
+[lints]
+workspace = true

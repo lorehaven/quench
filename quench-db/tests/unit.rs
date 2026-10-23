@@ -8,5 +8,6 @@ mod error_tests;
 mod lib_tests;
 #[path = "unit/migrations_tests.rs"]
 mod migrations_tests;
+#[cfg(feature = "postgres")]
 #[path = "unit/runner_tests.rs"]
 mod runner_tests;

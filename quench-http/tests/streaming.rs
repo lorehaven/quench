@@ -5,9 +5,9 @@
 //! concern `Endpoint::call` dispatch alone can't exercise.
 #![allow(clippy::items_after_statements)] // test-local helper types sit next to the code that uses them
 
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures_util::stream;
+use quench_core::async_trait;
+use quench_core::bytes::Bytes;
+use quench_core::stream;
 use quench_http::di::ContainerBuilder;
 use quench_http::endpoint::Endpoint;
 use quench_http::request::Request;
@@ -31,7 +31,7 @@ impl Endpoint for SseEndpoint {
             Ok(Bytes::from_static(b"event: status\ndata: two\n\n")),
             Ok(Bytes::from_static(b"event: status\ndata: three\n\n")),
         ];
-        Response::streaming(http::StatusCode::OK, stream::iter(items))
+        Response::streaming(quench_proto::StatusCode::OK, stream::iter(items))
             .header("content-type", "text/event-stream")
     }
 }
@@ -117,25 +117,24 @@ async fn a_mid_stream_error_ends_the_response_instead_of_hanging() {
                 Ok(Bytes::from_static(b"first")),
                 Err(std::io::Error::other("producer closed")),
             ];
-            Response::streaming(http::StatusCode::OK, stream::iter(items))
+            Response::streaming(quench_proto::StatusCode::OK, stream::iter(items))
         }
     }
 
     let resp = FailsOnSecondItem.call(Request::new(
-        http::Method::GET,
+        quench_proto::Method::GET,
         "/".parse().unwrap(),
-        http::HeaderMap::new(),
+        quench_proto::HeaderMap::new(),
         quench_http::body::InboundBody::from_bytes(Bytes::new()),
         container,
     ));
     let resp = resp.await;
-    assert_eq!(resp.status(), http::StatusCode::OK);
+    assert_eq!(resp.status(), quench_proto::StatusCode::OK);
 
     // Collecting the body should surface the error rather than hang -
     // proves the mapped error actually propagates through `BoxBody`
     // instead of being silently swallowed.
-    use http_body_util::BodyExt;
-    let collected = resp.into_hyper().into_body().collect().await;
+    let collected = resp.into_inner().body.collect_limited(1 << 20).await;
     assert!(
         collected.is_err(),
         "expected the mid-stream error to surface"

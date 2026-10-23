@@ -16,8 +16,8 @@ name = "quench-example-basic"
 path = "src/main.rs"
 
 [dependencies]
-async-trait = { workspace = true }
-quench-http = { workspace = true }
+quench-core = { workspace = true }
+quench-http = { workspace = true, features = ["tls"] }
 quench-starter = { workspace = true }
 quench-web = { workspace = true }
 tokio = { workspace = true }

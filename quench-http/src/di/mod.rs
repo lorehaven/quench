@@ -6,6 +6,7 @@
 //! topological sort - detecting missing dependencies and cycles at startup
 //! rather than leaving them to surface as a panic on first use.
 pub use crate::error::DiError;
+use quench_core::registry::Registry;
 use std::any::{Any, TypeId};
 use std::collections::{HashMap, VecDeque};
 use std::future::Future;
@@ -21,8 +22,7 @@ pub type ConstructFuture = Pin<Box<dyn Future<Output = Result<BoxedAny, DiError>
 /// Registered by `#[injectable]` for every discovered component. Not meant
 /// to be constructed by hand.
 ///
-/// `inventory::submit!` places its argument inside a `static` initializer
-/// (see the `inventory` crate's expansion), so every field here has to be
+/// `submit!` places its argument inside a `static` initializer, so every field here has to be
 /// const-constructible - that's why `type_id` and `dependencies` are
 /// function pointers rather than a `TypeId`/`Vec` computed up front: a bare
 /// `TypeId::of::<T>()` or `vec![...]` call isn't valid in that position, but
@@ -42,7 +42,8 @@ pub struct ComponentFactory {
     pub construct: fn(&Container) -> ConstructFuture,
 }
 
-inventory::collect!(ComponentFactory);
+/// Every `#[injectable]` in the linked binary registers itself here before `main`.
+pub static COMPONENTS: Registry<ComponentFactory> = Registry::new();
 
 /// Shared, read-through store of resolved components. Cheap to clone (an
 /// `Arc` around the map) and safe to hand to request handlers.
@@ -135,8 +136,7 @@ impl ContainerBuilder {
     }
 
     pub async fn build(self) -> Result<Container, DiError> {
-        let factories: Vec<&'static ComponentFactory> =
-            inventory::iter::<ComponentFactory>().collect();
+        let factories: Vec<&'static ComponentFactory> = COMPONENTS.iter().collect();
         let by_id: HashMap<TypeId, &'static ComponentFactory> =
             factories.iter().map(|f| ((f.type_id)(), *f)).collect();
 

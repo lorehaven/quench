@@ -2,13 +2,13 @@
 //! HTML `<form method="post">` (no JS/htmx) sends, and what
 //! `switchboard-service`'s `delete_model_form` needs.
 
-use bytes::Bytes as RawBytes;
-use http::{HeaderMap, Method, StatusCode, Uri};
+use quench_core::bytes::Bytes as RawBytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
 use quench_http::extract::{Form, FromRequest};
 use quench_http::request::Request;
-use serde::Deserialize;
+use quench_proto::{HeaderMap, Method, StatusCode, Uri};
+use quench_serde::Deserialize;
 use std::sync::Arc;
 
 #[derive(Deserialize)]

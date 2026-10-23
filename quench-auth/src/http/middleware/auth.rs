@@ -15,7 +15,7 @@ use crate::domain::realm;
 use crate::domain::session::SessionDb;
 use crate::domain::sso_client;
 use crate::http::domain::cookies::cookie_value;
-use async_trait::async_trait;
+use quench_core::async_trait;
 use quench_http::prelude::http::StatusCode;
 use quench_http::prelude::{Endpoint, Middleware, Request, Response};
 
@@ -65,7 +65,7 @@ impl Middleware for Auth {
         } else {
             let Some(refresh_token) = refresh_token else {
                 if token.is_none() {
-                    tracing::warn!("Auth: no token found in header or cookie");
+                    quench_log::warn!("Auth: no token found in header or cookie");
                 }
                 return unauthorized(&req);
             };
@@ -102,13 +102,13 @@ async fn authenticate(token: &str, config: &JwtConfig, req: &Request) -> Option<
     let claims = match config.decode_claims(token).await {
         Ok(claims) => claims,
         Err(e) => {
-            tracing::warn!("Auth: failed to decode claims: {e:?}");
+            quench_log::warn!("Auth: failed to decode claims: {e:?}");
             return None;
         }
     };
 
     if !claims.allows(&config.service_name) {
-        tracing::warn!(
+        quench_log::warn!(
             "Auth: token audience mismatch. Expected {}, got {:?}",
             config.service_name,
             claims.aud
@@ -123,11 +123,11 @@ async fn authenticate(token: &str, config: &JwtConfig, req: &Request) -> Option<
                 .await
                 .unwrap_or(false)
         } else {
-            tracing::warn!("Auth: SessionDb not found in the container");
+            quench_log::warn!("Auth: SessionDb not found in the container");
             false
         };
         if !active {
-            tracing::warn!(
+            quench_log::warn!(
                 "Auth: session {session_id} is not active for user {}",
                 claims.sub
             );

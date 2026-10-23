@@ -1,0 +1,46 @@
+# Test infrastructure for quench.
+#
+#   foreman db               start postgres and redis (no services in this project)
+#   foreman status           what is up, and on which port
+#   foreman stop all         stop the containers
+#
+# The integration tests skip themselves unless these are set, so source the
+# environment first (fish):
+#
+#   source scripts/test-env.fish
+#   cargo test --workspace
+#
+# Ports differ from forge's estate (5432/6379) on purpose, so both can run at once.
+
+[project]
+name = "quench"
+description = "quench integration-test infrastructure"
+run_dir = ".run"
+
+[[containers]]
+name = "postgres"
+container_name = "quench-postgres"
+image = "postgres:18-alpine"
+ports = ["15432:5432"]
+env = { POSTGRES_USER = "postgres", POSTGRES_PASSWORD = "postgres", POSTGRES_DB = "quench_test" }
+ready = ["pg_isready", "-U", "postgres"]
+ready_timeout_secs = 30
+address = "localhost:15432"
+
+[[containers]]
+name = "redis"
+container_name = "quench-redis"
+image = "redis:7-alpine"
+ports = ["16379:6379"]
+ready = ["redis-cli", "ping"]
+ready_timeout_secs = 15
+address = "localhost:16379"
+
+# Containers only come up for a task or service that needs them; with no
+# services in this project, this no-op migrate task is what `foreman db` runs.
+[tasks.infra]
+role = "migrate"
+description = "bringing up postgres and redis"
+containers = ["postgres", "redis"]
+command = ["true"]
+done = "test infrastructure ready"

@@ -56,9 +56,9 @@ let message = Message::builder()
     .build()?;
 
 match mailer.send(&message).await {
-    Ok(response) => tracing::info!("accepted: {}", response.message()),
+    Ok(response) => quench_log::info!("accepted: {}", response.message()),
     Err(err) if err.is_transient() => { /* try again later */ }
-    Err(err) => tracing::error!("mail refused: {err}"),
+    Err(err) => quench_log::error!("mail refused: {err}"),
 }
 ```
 

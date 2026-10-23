@@ -12,7 +12,7 @@ async fn an_in_memory_store_is_not_shared_and_reports_its_topology() {
 #[tokio::test]
 async fn an_in_memory_store_round_trips_a_value() {
     let store = CacheStore::in_memory();
-    let value = serde_json::json!({"id": 1});
+    let value = quench_serde::json!({"id": 1});
 
     assert!(store.get("key").await.unwrap().is_none());
     store.set("key", value.clone(), None).await.unwrap();
@@ -23,13 +23,13 @@ async fn an_in_memory_store_round_trips_a_value() {
 async fn take_reads_and_removes_in_one_step() {
     let store = CacheStore::in_memory();
     store
-        .set("key", serde_json::json!("v"), None)
+        .set("key", quench_serde::json!("v"), None)
         .await
         .unwrap();
 
     assert_eq!(
         store.take("key").await.unwrap(),
-        Some(serde_json::json!("v"))
+        Some(quench_serde::json!("v"))
     );
     assert!(store.get("key").await.unwrap().is_none());
 }
@@ -38,7 +38,7 @@ async fn take_reads_and_removes_in_one_step() {
 async fn remove_deletes_a_value() {
     let store = CacheStore::in_memory();
     store
-        .set("key", serde_json::json!("v"), None)
+        .set("key", quench_serde::json!("v"), None)
         .await
         .unwrap();
     store.remove("key").await.unwrap();
@@ -63,7 +63,7 @@ async fn sets_are_added_to_listed_and_removed_from() {
 async fn clear_drops_every_entry() {
     let store = CacheStore::in_memory();
     store
-        .set("key", serde_json::json!("v"), None)
+        .set("key", quench_serde::json!("v"), None)
         .await
         .unwrap();
     store.clear().await.unwrap();

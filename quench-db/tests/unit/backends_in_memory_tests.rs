@@ -1,7 +1,7 @@
 //! Unit tests for `backends/in_memory.rs`.
 
 use quench_db::{Crud, Database, InMemoryDb, InMemoryRepository, Model};
-use serde::{Deserialize, Serialize};
+use quench_serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 struct Widget {

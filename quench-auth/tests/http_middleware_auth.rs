@@ -1,15 +1,15 @@
 //! `Auth` middleware scenarios against quench-http.
 
-use bytes::Bytes;
-use http::{HeaderMap, Method, StatusCode, Uri};
 use quench_auth::domain::jwt::JwtConfig;
 use quench_auth::domain::session::SessionDb;
 use quench_auth::http::middleware::auth::Auth;
 use quench_cache::CacheStore;
+use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
 use quench_http::endpoint::Endpoint;
 use quench_http::extract::{Extension, FromRequest};
+use quench_http::http::{HeaderMap, Method, StatusCode, Uri};
 use quench_http::middleware::wrap;
 use quench_http::request::Request;
 use quench_http::response::Response;
@@ -29,7 +29,7 @@ fn config() -> JwtConfig {
 
 struct Ok200;
 
-#[async_trait::async_trait]
+#[quench_core::async_trait]
 impl Endpoint for Ok200 {
     async fn call(&self, mut req: Request) -> Response {
         // Proves claims actually landed in extensions, not just that the
@@ -69,7 +69,7 @@ fn request(container: &Arc<quench_http::di::Container>, headers: &[(&str, &str)]
     let mut map = HeaderMap::new();
     for (k, v) in headers {
         map.insert(
-            http::HeaderName::from_bytes(k.as_bytes()).unwrap(),
+            quench_http::http::HeaderName::from_bytes(k.as_bytes()).unwrap(),
             v.parse().unwrap(),
         );
     }
@@ -100,9 +100,9 @@ async fn no_token_at_all_is_unauthorized_with_a_www_authenticate_challenge() {
 
     let resp = app.call(request(&container, &[])).await;
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
-    let hyper_resp = resp.into_hyper();
+    let hyper_resp = resp.into_inner();
     assert_eq!(
-        hyper_resp.headers().get("www-authenticate").unwrap(),
+        hyper_resp.headers.get("www-authenticate").unwrap(),
         "Bearer"
     );
 }
@@ -115,7 +115,7 @@ async fn a_browser_with_no_token_is_redirected_to_the_gatehouse_login_when_confi
     // second one is added, not a correctness requirement today.
     {
         let _guard = ENV_LOCK.lock().unwrap();
-        envmnt::set("GATEHOUSE_URL", "https://gate.example.com");
+        quench_core::env::set("GATEHOUSE_URL", "https://gate.example.com");
     }
 
     let app = app(config()).await;
@@ -125,16 +125,16 @@ async fn a_browser_with_no_token_is_redirected_to_the_gatehouse_login_when_confi
         .await;
 
     assert_eq!(resp.status(), StatusCode::FOUND);
-    let hyper_resp = resp.into_hyper();
+    let hyper_resp = resp.into_inner();
     let location = hyper_resp
-        .headers()
+        .headers
         .get("location")
         .unwrap()
         .to_str()
         .unwrap();
     assert!(location.starts_with("https://gate.example.com/ui/login"));
 
-    envmnt::remove("GATEHOUSE_URL");
+    quench_core::env::remove("GATEHOUSE_URL");
 }
 
 #[tokio::test]
@@ -168,11 +168,12 @@ async fn a_valid_bearer_token_for_this_service_is_accepted_and_claims_reach_the_
         .await;
     assert_eq!(resp.status(), StatusCode::OK);
 
-    let hyper_resp = resp.into_hyper();
-    let body = http_body_util::BodyExt::collect(hyper_resp.into_body())
+    let body = resp
+        .into_inner()
+        .body
+        .collect_limited(1 << 20)
         .await
-        .unwrap()
-        .to_bytes();
+        .unwrap();
     assert_eq!(&body[..], b"someone");
 }
 

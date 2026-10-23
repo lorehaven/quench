@@ -1,3 +1,4 @@
+#[cfg(feature = "repl")]
 pub use crate::repl::{ReplControl, run as repl_run};
 pub use crate::require::{MissingBinary, require_binary};
 pub use crate::terminal::{

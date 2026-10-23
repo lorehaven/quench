@@ -1,0 +1,52 @@
+[package]
+name = "quench-proto"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - HTTP types, an HTTP/1.1 codec, cookies, WebSocket framing and a thin rustls glue, shared by quench-http and quench-client"
+keywords = ["http", "protocol", "websocket"]
+categories = ["network-programming", "web-programming"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_proto"
+path = "src/lib.rs"
+
+[dependencies]
+quench-core = { workspace = true }
+quench-crypto = { workspace = true, optional = true }
+quench-tls = { workspace = true, optional = true }
+tokio = { workspace = true, features = ["io-util", "net", "sync", "time"] }
+
+[features]
+default = ["server", "client", "ws", "multipart", "sse", "tls"]
+# The HTTP/1.1 connection drivers; the codec in `h1::{parse, decode, reader}` is always built.
+server = []
+client = []
+# RFC 6455 framing and handshake.
+ws = ["dep:quench-crypto"]
+multipart = []
+sse = []
+# Re-exports `quench-tls` as `quench_proto::tls`; pulls in rustls and ring.
+tls = ["dep:quench-tls"]
+
+[[test]]
+name = "h1_client"
+required-features = ["client", "server"]
+
+[[test]]
+name = "h1_server"
+required-features = ["server"]
+
+[[test]]
+name = "throughput"
+required-features = ["client", "server"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+
+[lints]
+workspace = true

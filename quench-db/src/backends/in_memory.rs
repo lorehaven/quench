@@ -1,10 +1,10 @@
 use crate::{Crud, Database, DbError, Migration, Model};
-use async_trait::async_trait;
+use quench_core::async_trait;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::{Arc, RwLock};
 
-type TableMap = HashMap<String, Arc<RwLock<HashMap<String, serde_json::Value>>>>;
+type TableMap = HashMap<String, Arc<RwLock<HashMap<String, quench_serde::Value>>>>;
 
 #[derive(Clone, Default)]
 pub struct InMemoryDb {
@@ -17,7 +17,7 @@ impl InMemoryDb {
         Self::default()
     }
 
-    fn get_table(&self, name: &str) -> Arc<RwLock<HashMap<String, serde_json::Value>>> {
+    fn get_table(&self, name: &str) -> Arc<RwLock<HashMap<String, quench_serde::Value>>> {
         let mut tables = self.tables.write().unwrap();
         tables
             .entry(name.to_string())
@@ -73,7 +73,7 @@ where
 {
     async fn create(&self, model: &T) -> Result<T, DbError> {
         let table = self.db.get_table(&T::table_name());
-        let json = serde_json::to_value(model)?;
+        let json = quench_serde::to_value(model);
         let id = json
             .get(T::primary_key_name())
             .ok_or_else(|| DbError::Unknown("Missing primary key".to_string()))?
@@ -81,7 +81,7 @@ where
             .map(std::string::ToString::to_string)
             .or_else(|| {
                 json.get(T::primary_key_name())
-                    .and_then(serde_json::Value::as_i64)
+                    .and_then(quench_serde::Value::as_i64)
                     .map(|n| n.to_string())
             })
             .ok_or_else(|| DbError::Unknown("Primary key must be string or number".to_string()))?;
@@ -94,7 +94,7 @@ where
         let table = self.db.get_table(&T::table_name());
         let data = table.read().unwrap();
         if let Some(json) = data.get(id) {
-            let model = serde_json::from_value(json.clone())?;
+            let model: T = quench_serde::from_value(json)?;
             Ok(Some(model))
         } else {
             Ok(None)
@@ -117,7 +117,7 @@ where
             .read()
             .unwrap()
             .values()
-            .map(|json| serde_json::from_value(json.clone()))
+            .map(|json| quench_serde::from_value::<T>(json))
             .collect::<Result<Vec<T>, _>>()?;
         Ok(results)
     }
@@ -132,7 +132,7 @@ where
             .unwrap()
             .values()
             .filter(|json| json.get(column).and_then(|found| found.as_str()) == Some(value))
-            .map(|json| serde_json::from_value(json.clone()))
+            .map(|json| quench_serde::from_value::<T>(json))
             .collect::<Result<Vec<T>, _>>()?;
         Ok(results)
     }

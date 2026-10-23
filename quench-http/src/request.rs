@@ -1,6 +1,6 @@
 use crate::body::InboundBody;
 use crate::di::Container;
-use http::{Extensions, HeaderMap, Method, Uri};
+use quench_proto::{Extensions, HeaderMap, Method, Uri};
 use std::sync::Arc;
 
 /// An incoming HTTP request.
@@ -27,6 +27,7 @@ pub struct Request {
 }
 
 impl Request {
+    #[must_use]
     pub fn new(
         method: Method,
         uri: Uri,
@@ -46,6 +47,7 @@ impl Request {
         }
     }
 
+    #[must_use]
     pub const fn extensions(&self) -> &Extensions {
         &self.extensions
     }
@@ -54,22 +56,27 @@ impl Request {
         &mut self.extensions
     }
 
+    #[must_use]
     pub const fn method(&self) -> &Method {
         &self.method
     }
 
+    #[must_use]
     pub const fn uri(&self) -> &Uri {
         &self.uri
     }
 
+    #[must_use]
     pub const fn headers(&self) -> &HeaderMap {
         &self.headers
     }
 
+    #[must_use]
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers.get(name).and_then(|v| v.to_str().ok())
     }
 
+    #[must_use]
     pub fn path_param(&self, name: &str) -> Option<&str> {
         self.params
             .iter()
@@ -77,6 +84,7 @@ impl Request {
             .map(|(_, v)| v.as_str())
     }
 
+    #[must_use]
     pub const fn container(&self) -> &Arc<Container> {
         &self.container
     }

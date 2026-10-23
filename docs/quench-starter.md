@@ -28,15 +28,14 @@ Everything below is reachable through `quench_starter::prelude::*` or `quench_st
 - `http::middleware::correlation::CorrelationId` — reads or generates `X-Correlation-ID`, stores it on the request and echoes it on the response. `http::middleware::logger::FilteredLogger` logs method/path/status, skipping paths under `LOG_SKIP_PREFIXES` unless the response was an error.
 - `common::routes` — `normalize_base_path(raw)`, `with_base_path(path)`.
 - `common::wait` — `gatehouse_health_url()`, `wait_for_services(service_name, urls)` (polls each URL until it answers 2xx).
-- `logging::init()` — loads `.env` (root, then `docker/<CARGO_BIN_NAME>/.env`), initializes `tracing_subscriber` from `RUST_LOG` (default `info`).
+- `logging::init()` — loads `.env` (root, then `docker/<CARGO_BIN_NAME>/.env`), installs [Quench Log](./quench-log.md) (`quench_log::init()`), which reads `RUST_LOG` (default `info`) and the other `LOG_*` variables.
 - `metrics::RequestMetrics` / `MetricsSnapshot` / `TimedBlock` — counters for inter-service HTTP calls, with `MetricsSnapshot::to_prometheus(name)` rendering real Prometheus text.
 - `resilience::RetryConfig` / `retry_with_backoff` — exponential backoff retry helper; `CircuitBreaker` — closed/open/half-open breaker; `format_error_message` — turns a raw error string into a user-facing message based on keyword sniffing (timeout, connection, rate limit, unauthorized, not found).
 
-Note: `src/tracing.rs` (OpenTelemetry/Jaeger setup, gated behind a `jaeger` feature that isn't declared in `Cargo.toml`) exists in the source tree but is **not** declared as a module in `lib.rs`, so it is not compiled or reachable — treat it as dead code rather than part of the API.
 
 ### A registration-order caveat on the quench-http stack
 
-`http::routers::health`/`swagger`/`ui`'s `base_path_redirect`/`base_path_slash_redirect` routes go through the same `#[get]`/`discover_routes()` path as any service's own routes — there's no *guaranteed* precedence between these and a route a service registers at the same pattern (a root-mounted `{path:.*}` catch-all can match the bare `""`/`"/"` patterns too). In practice `quench-starter`'s own `inventory` registrations link before a dependent service's, so `quench-starter`'s routes win — but that rests on linker behavior, not something enforced by the framework. A service whose own routing needs to win at the literal base path should register more specifically than a bare root wildcard. See `http::routers::ui`'s module doc comment (`src/http/routers/ui.rs`) for the full explanation, and [Quench Http](./quench-http.md#routing) for how registration order works generally.
+`http::routers::health`/`swagger`/`ui`'s `base_path_redirect`/`base_path_slash_redirect` routes go through the same `#[get]`/`discover_routes()` path as any service's own routes — there's no *guaranteed* precedence between these and a route a service registers at the same pattern (a root-mounted `{path:.*}` catch-all can match the bare `""`/`"/"` patterns too). In practice `quench-starter`'s own registrations link before a dependent service's, so `quench-starter`'s routes win — but that rests on linker behavior, not something enforced by the framework. A service whose own routing needs to win at the literal base path should register more specifically than a bare root wildcard. See `http::routers::ui`'s module doc comment (`src/http/routers/ui.rs`) for the full explanation, and [Quench Http](./quench-http.md#routing) for how registration order works generally.
 
 ## Configuration
 
@@ -49,7 +48,7 @@ Read via `envmnt`/`std::env`, all optional unless stated:
 - `DATABASE_URL` / `POSTGRES_URL` — passed to `quench_db::Db::connect`; `ALLOW_IN_MEMORY_DB` must be `true` to allow an empty URL.
 - `GATEHOUSE_URL` — base URL `gatehouse_health_url()` appends `/health/ready` to.
 - `LOG_SKIP_PREFIXES` — comma-separated path prefixes `FilteredLogger` won't log on success.
-- `RUST_LOG` — verbosity passed to `tracing_subscriber` by `logging::init()`.
+- `RUST_LOG` — verbosity read by `quench_log` through `logging::init()`.
 
 ## Testing
 

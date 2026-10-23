@@ -1,0 +1,25 @@
+[package]
+name = "quench-core"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - dependency-free foundations: time, uuid, base64/hex, errors, env, collections, versions"
+keywords = ["time", "uuid", "base64", "error", "utilities"]
+categories = ["rust-patterns", "date-and-time", "encoding"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_core"
+path = "src/lib.rs"
+
+[dependencies]
+quench-core-macros = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+getrandom = { workspace = true }
+
+[lints]
+workspace = true

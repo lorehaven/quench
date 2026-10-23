@@ -2,19 +2,27 @@ use crate::body::InboundBody;
 use crate::di::Container;
 use crate::endpoint::Endpoint;
 use crate::request::Request;
-use hyper::service::service_fn;
-use hyper_util::rt::{TokioExecutor, TokioIo, TokioTimer};
-use hyper_util::server::conn::auto;
-use hyper_util::server::graceful::GracefulShutdown;
+use quench_core::future::BoxFuture;
+use quench_proto::h1::server::{
+    ServerConfig as ConnConfig, Service, Shutdown, serve_connection, shutdown_channel,
+};
+use quench_proto::io::Io;
+#[cfg(feature = "tls")]
+use quench_proto::tls::TlsAcceptor as Acceptor;
+#[cfg(feature = "tls")]
 use rustls::ServerConfig as TlsConfig;
-use rustls::pki_types::pem::PemObject;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
-use tokio_rustls::TlsAcceptor;
+use tokio::sync::mpsc;
+
+/// Stands in for the TLS acceptor when the `tls` feature is off: no value of it can exist, so the
+/// server loop's TLS branch compiles away without a second code path.
+#[cfg(not(feature = "tls"))]
+#[derive(Clone)]
+enum Acceptor {}
 
 /// How long [`serve_http`]/[`serve_https`] wait, after a shutdown signal,
 /// for in-flight connections to drain on their own before forcing an exit.
@@ -34,20 +42,10 @@ pub const DEFAULT_GRACEFUL_TIMEOUT: Duration = Duration::from_secs(25);
 /// deliberately stalled connection can't accumulate.
 pub const DEFAULT_HEADER_READ_TIMEOUT: Duration = Duration::from_secs(30);
 
-fn connection_builder() -> auto::Builder<TokioExecutor> {
-    let mut builder = auto::Builder::new(TokioExecutor::new());
-    builder
-        .http1()
-        .timer(TokioTimer::new())
-        .header_read_timeout(DEFAULT_HEADER_READ_TIMEOUT);
-    builder
-}
-
-/// Serves `app` over plain HTTP on `addr`.
+/// Serves `app` over plain HTTP/1.1 on `addr`.
 ///
-/// Each connection is handled on
-/// its own task and can pipeline HTTP/1.1 or negotiate HTTP/2
-/// automatically. Runs until a `SIGTERM`/`SIGINT` (or, on non-Unix,
+/// Each connection is handled on its own task and may pipeline and reuse the
+/// connection. Runs until a `SIGTERM`/`SIGINT` (or, on non-Unix,
 /// Ctrl+C) is received, at which point it stops accepting new connections
 /// and waits up to [`DEFAULT_GRACEFUL_TIMEOUT`] for in-flight ones to
 /// finish before returning.
@@ -75,45 +73,12 @@ pub async fn serve_http_on(
     listener: TcpListener,
     shutdown: impl Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
-    let addr = listener.local_addr().ok();
-    tracing::info!(
-        "listening on http://{}",
-        addr.map(|a| a.to_string()).unwrap_or_default()
-    );
-
-    let graceful = GracefulShutdown::new();
-    let mut shutdown = std::pin::pin!(shutdown);
-
-    loop {
-        tokio::select! {
-            accepted = listener.accept() => {
-                let (stream, _) = accepted?;
-                let app = app.clone();
-                let container = container.clone();
-                let watcher = graceful.watcher();
-                tokio::spawn(async move {
-                    let io = TokioIo::new(stream);
-                    let builder = connection_builder();
-                    let conn = builder.serve_connection(io, service_fn(move |req| handle(app.clone(), container.clone(), req)));
-                    let conn = watcher.watch(conn);
-                    if let Err(err) = conn.await {
-                        tracing::debug!("connection error: {err}");
-                    }
-                });
-            }
-            () = shutdown.as_mut() => {
-                tracing::info!("shutdown signal received, draining connections");
-                break;
-            }
-        }
-    }
-
-    drain(graceful).await;
-    Ok(())
+    serve_loop(app, container, listener, None, shutdown).await
 }
 
 /// Serves `app` over TLS (via rustls) on `addr`. `config` is typically
 /// produced by [`load_tls`]. Same shutdown behavior as [`serve_http`].
+#[cfg(feature = "tls")]
 pub async fn serve_https(
     app: Arc<dyn Endpoint>,
     container: Arc<Container>,
@@ -126,6 +91,7 @@ pub async fn serve_https(
 
 /// Like [`serve_https`], but takes an already-bound listener and an
 /// arbitrary shutdown future - see [`serve_http_on`]'s doc comment for why.
+#[cfg(feature = "tls")]
 pub async fn serve_https_on(
     app: Arc<dyn Endpoint>,
     container: Arc<Container>,
@@ -133,64 +99,136 @@ pub async fn serve_https_on(
     config: TlsConfig,
     shutdown: impl Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
-    let acceptor = TlsAcceptor::from(Arc::new(config));
-    let addr = listener.local_addr().ok();
-    tracing::info!(
-        "listening on https://{}",
-        addr.map(|a| a.to_string()).unwrap_or_default()
+    serve_loop(
+        app,
+        container,
+        listener,
+        Some(Acceptor::from(config)),
+        shutdown,
+    )
+    .await
+}
+
+/// Adapts an [`Endpoint`] to the protocol layer's [`Service`].
+struct App {
+    endpoint: Arc<dyn Endpoint>,
+    container: Arc<Container>,
+}
+
+impl Service for App {
+    fn call(&self, req: quench_proto::Request) -> BoxFuture<'_, quench_proto::Response> {
+        Box::pin(async move {
+            let quench_proto::Request {
+                method,
+                uri,
+                headers,
+                body,
+                ..
+            } = req;
+            let request = Request::new(
+                method,
+                uri,
+                headers,
+                InboundBody::from(body),
+                self.container.clone(),
+            );
+            self.endpoint.call(request).await.into_inner()
+        })
+    }
+}
+
+async fn serve_loop(
+    endpoint: Arc<dyn Endpoint>,
+    container: Arc<Container>,
+    listener: TcpListener,
+    tls: Option<Acceptor>,
+    shutdown: impl Future<Output = ()> + Send + 'static,
+) -> std::io::Result<()> {
+    let addr = listener
+        .local_addr()
+        .ok()
+        .map(|a| a.to_string())
+        .unwrap_or_default();
+    quench_log::info!(
+        "listening on {}://{addr}",
+        if tls.is_some() { "https" } else { "http" }
     );
 
-    let graceful = GracefulShutdown::new();
+    let config = Arc::new(ConnConfig {
+        header_read_timeout: DEFAULT_HEADER_READ_TIMEOUT,
+        ..ConnConfig::default()
+    });
+    let app = Arc::new(App {
+        endpoint,
+        container,
+    });
+    let (signal, conn_shutdown) = shutdown_channel();
+    // Each connection task holds a sender; the channel closes once the last one ends.
+    let (done_tx, mut done_rx) = mpsc::channel::<()>(1);
     let mut shutdown = std::pin::pin!(shutdown);
 
     loop {
         tokio::select! {
             accepted = listener.accept() => {
-                let (stream, _) = accepted?;
-                let app = app.clone();
-                let container = container.clone();
-                let acceptor = acceptor.clone();
-                let watcher = graceful.watcher();
-                tokio::spawn(async move {
-                    let tls_stream = match acceptor.accept(stream).await {
-                        Ok(s) => s,
-                        Err(err) => {
-                            tracing::debug!("TLS handshake failed: {err}");
-                            return;
-                        }
-                    };
-                    let io = TokioIo::new(tls_stream);
-                    let builder = connection_builder();
-                    let conn = builder.serve_connection(io, service_fn(move |req| handle(app.clone(), container.clone(), req)));
-                    let conn = watcher.watch(conn);
-                    if let Err(err) = conn.await {
-                        tracing::debug!("connection error: {err}");
+                let stream = match accepted {
+                    Ok((stream, _)) => stream,
+                    Err(err) => {
+                        quench_log::warn!("accept failed: {err}");
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                        continue;
                     }
+                };
+                let _ = stream.set_nodelay(true);
+                let task = connection(stream, tls.clone(), app.clone(), config.clone(), conn_shutdown.clone());
+                let done = done_tx.clone();
+                tokio::spawn(async move {
+                    task.await;
+                    drop(done);
                 });
             }
             () = shutdown.as_mut() => {
-                tracing::info!("shutdown signal received, draining connections");
+                quench_log::info!("shutdown signal received, draining connections");
                 break;
             }
         }
     }
 
-    drain(graceful).await;
+    signal.signal();
+    drop(done_tx);
+    tokio::select! {
+        _ = done_rx.recv() => quench_log::info!("all connections drained"),
+        () = tokio::time::sleep(DEFAULT_GRACEFUL_TIMEOUT) => {
+            quench_log::warn!("graceful shutdown timed out after {DEFAULT_GRACEFUL_TIMEOUT:?}, forcing exit");
+        }
+    }
     Ok(())
 }
 
-/// Waits for every watched connection to finish, up to
-/// [`DEFAULT_GRACEFUL_TIMEOUT`] - past which it gives up and returns
-/// anyway, so a client that never closes its connection can't wedge
-/// shutdown forever.
-async fn drain(graceful: GracefulShutdown) {
-    tokio::select! {
-        () = graceful.shutdown() => {
-            tracing::info!("all connections drained");
+async fn connection(
+    stream: tokio::net::TcpStream,
+    tls: Option<Acceptor>,
+    app: Arc<App>,
+    config: Arc<ConnConfig>,
+    shutdown: Shutdown,
+) {
+    match tls {
+        None => run(stream, &app, &config, shutdown).await,
+        #[cfg(feature = "tls")]
+        Some(acceptor) => {
+            match tokio::time::timeout(config.header_read_timeout, acceptor.accept(stream)).await {
+                Ok(Ok(stream)) => run(stream, &app, &config, shutdown).await,
+                Ok(Err(err)) => quench_log::debug!("TLS handshake failed: {err}"),
+                Err(_) => quench_log::debug!("TLS handshake timed out"),
+            }
         }
-        () = tokio::time::sleep(DEFAULT_GRACEFUL_TIMEOUT) => {
-            tracing::warn!("graceful shutdown timed out after {DEFAULT_GRACEFUL_TIMEOUT:?}, forcing exit");
-        }
+        #[cfg(not(feature = "tls"))]
+        Some(never) => match never {},
+    }
+}
+
+async fn run<I: Io>(io: I, app: &App, config: &ConnConfig, shutdown: Shutdown) {
+    if let Err(err) = serve_connection(io, app, config, shutdown).await {
+        quench_log::debug!("connection error: {err}");
     }
 }
 
@@ -221,38 +259,15 @@ async fn shutdown_signal() {
     }
 }
 
-async fn handle(
-    app: Arc<dyn Endpoint>,
-    container: Arc<Container>,
-    req: http::Request<hyper::body::Incoming>,
-) -> Result<http::Response<crate::response::BoxBody>, std::convert::Infallible> {
-    let (parts, body) = req.into_parts();
-    let request = Request::new(
-        parts.method,
-        parts.uri,
-        parts.headers,
-        InboundBody::from(body),
-        container,
-    );
-    let response = app.call(request).await;
-    Ok(response.into_hyper())
-}
-
-/// Loads a TLS server config from a PEM cert chain + private key, mirroring
+/// Loads a TLS server config from a PEM cert chain + private key, returning
 /// `None` on missing/unreadable files so callers can fall back to plain
 /// HTTP in dev.
+#[cfg(feature = "tls")]
 pub fn load_tls(
     cert_path: impl AsRef<std::path::Path>,
     key_path: impl AsRef<std::path::Path>,
 ) -> Option<TlsConfig> {
-    let cert_chain: Vec<CertificateDer<'static>> = CertificateDer::pem_file_iter(cert_path)
-        .ok()?
-        .collect::<Result<_, _>>()
-        .ok()?;
-    let key: PrivateKeyDer<'static> = PrivateKeyDer::from_pem_file(key_path).ok()?;
-
-    TlsConfig::builder()
-        .with_no_client_auth()
-        .with_single_cert(cert_chain, key)
-        .ok()
+    let mut config = quench_proto::tls::load_server_config(cert_path, key_path)?;
+    config.alpn_protocols = vec![b"http/1.1".to_vec()];
+    Some(config)
 }

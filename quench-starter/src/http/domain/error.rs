@@ -1,7 +1,6 @@
 use quench_http::prelude::Response;
 use quench_http::prelude::http::StatusCode;
-use serde::Serialize;
-use serde_json::{Value, json};
+use quench_serde::{Serialize, Value, json};
 
 pub const UNAUTHORIZED: &str = "UNAUTHORIZED";
 pub const DENIED: &str = "DENIED";

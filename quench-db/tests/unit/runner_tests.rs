@@ -29,7 +29,7 @@ fn advisory_lock_key_is_stable() {
 fn resolved(module: &str, schema: &str, scope: ModuleScope) -> ResolvedModule {
     ResolvedModule {
         module: module.to_string(),
-        version: semver::Version::new(0, 1, 0),
+        version: quench_core::version::Version::new(0, 1, 0),
         schema: schema.to_string(),
         scope,
         required_by: None,

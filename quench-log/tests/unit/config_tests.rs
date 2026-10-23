@@ -134,3 +134,126 @@ fn resolve_file_prefix_treats_a_blank_explicit_value_as_absent() {
     );
     assert_eq!(resolve_file_prefix(Some("   "), None), "app");
 }
+
+// ---------------------------------------------------------------------------
+// The environment. One test owns every variable it touches, set and cleared in
+// sequence: tests in a binary run on parallel threads, and the process
+// environment is shared between them.
+// ---------------------------------------------------------------------------
+
+const VARS: [&str; 9] = [
+    "LOG_CONSOLE_ENABLED",
+    "LOG_FILE_ENABLED",
+    "RUST_LOG",
+    "LOG_DIR",
+    "LOG_FILE_PREFIX",
+    "CARGO_BIN_NAME",
+    "LOG_FILE_FORMAT",
+    "LOG_ROTATION",
+    "LOG_MAX_FILES",
+];
+
+fn clear_env() {
+    for var in VARS {
+        quench_core::env::remove(var);
+    }
+}
+
+#[test]
+fn from_env_reads_every_variable_and_falls_back_to_the_defaults() {
+    clear_env();
+    // Nothing set (CARGO_BIN_NAME is set by cargo for binaries, not for tests): defaults.
+    assert_eq!(
+        Config::from_env(),
+        Config {
+            file_prefix: Config::default().file_prefix,
+            ..Config::default()
+        }
+    );
+
+    for (name, value) in [
+        ("LOG_CONSOLE_ENABLED", "off"),
+        ("LOG_FILE_ENABLED", "no"),
+        ("RUST_LOG", "debug,hyper=warn"),
+        ("LOG_DIR", "/var/log/svc"),
+        ("LOG_FILE_PREFIX", "  svc  "),
+        ("LOG_FILE_FORMAT", "plain"),
+        ("LOG_ROTATION", "hourly"),
+        ("LOG_MAX_FILES", "30"),
+    ] {
+        quench_core::env::set(name, value);
+    }
+    let config = Config::from_env();
+    assert!(!config.console_enabled && !config.file_enabled);
+    assert_eq!(config.level, "debug,hyper=warn");
+    assert_eq!(config.file_dir, PathBuf::from("/var/log/svc"));
+    assert_eq!(config.file_prefix, "svc");
+    assert_eq!(config.file_format, Format::Plain);
+    assert_eq!(config.rotation, Rotation::Hourly);
+    assert_eq!(config.max_files, 30);
+
+    // the binary name stands in for a missing prefix; junk values fall back
+    quench_core::env::remove("LOG_FILE_PREFIX");
+    quench_core::env::set("CARGO_BIN_NAME", "widget");
+    quench_core::env::set("LOG_FILE_FORMAT", "yaml");
+    quench_core::env::set("LOG_ROTATION", "weekly");
+    quench_core::env::set("LOG_MAX_FILES", "many");
+    quench_core::env::set("LOG_CONSOLE_ENABLED", "maybe");
+    quench_core::env::set("RUST_LOG", "   ");
+    let config = Config::from_env();
+    assert_eq!(config.file_prefix, "widget");
+    assert_eq!(config.file_format, Format::default());
+    assert_eq!(config.rotation, Rotation::default());
+    assert_eq!(config.max_files, 7);
+    assert!(config.console_enabled);
+    assert_eq!(config.level, "info");
+
+    // `init()` reads this environment; with both sinks off it installs a
+    // dispatcher that writes nothing, and a second `init()` is refused.
+    quench_core::env::set("LOG_CONSOLE_ENABLED", "false");
+    quench_core::env::set("LOG_FILE_ENABLED", "false");
+    let first = std::panic::catch_unwind(quench_log::init);
+    let second = std::panic::catch_unwind(quench_log::init);
+    clear_env();
+    // Another test in this binary may have installed the global dispatcher first.
+    let _ = first;
+    let message = second
+        .unwrap_err()
+        .downcast_ref::<String>()
+        .cloned()
+        .unwrap_or_default();
+    assert!(message.contains("already installed"), "{message}");
+}
+
+#[test]
+fn names_display_as_their_config_spelling() {
+    assert_eq!(Format::Json.to_string(), "json");
+    assert_eq!(Format::Plain.to_string(), "plain");
+    assert_eq!(Rotation::Daily.to_string(), "daily");
+    assert_eq!(Rotation::Hourly.to_string(), "hourly");
+    assert_eq!(Rotation::Never.to_string(), "never");
+    assert_eq!(Format::parse("text"), Some(Format::Plain));
+    assert_eq!(Rotation::parse(" Never "), Some(Rotation::Never));
+}
+
+#[test]
+fn config_and_names_are_plain_values() {
+    let config = Config::default();
+    let copy = config.clone();
+    assert_eq!(copy, config);
+    assert_ne!(
+        copy,
+        Config {
+            max_files: 99,
+            ..Config::default()
+        }
+    );
+    assert!(format!("{config:?}").contains("max_files: 7"));
+    assert_ne!(Format::Json, Format::Plain);
+    assert_eq!(
+        format!("{:?} {:?}", Format::Json, Format::Plain),
+        "Json Plain"
+    );
+    assert_eq!(Rotation::default(), Rotation::Daily);
+    assert_eq!(format!("{:?}", Rotation::Never), "Never");
+}

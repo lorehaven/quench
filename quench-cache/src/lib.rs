@@ -1,4 +1,4 @@
-use thiserror::Error;
+use quench_core::Error;
 
 #[derive(Error, Debug)]
 pub enum CacheError {

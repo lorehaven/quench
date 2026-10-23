@@ -1,11 +1,12 @@
 use crate::domain::auth::{Permissions, Role};
 use crate::domain::jwks::JwksVerifier;
-use async_trait::async_trait;
-use jsonwebtoken::{
-    Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, decode_header, encode,
-    errors::ErrorKind,
+use quench_core::async_trait;
+use quench_core::time::{Duration, Time};
+use quench_crypto::jwt::{
+    Algorithm, DecodingKey, EncodingKey, Error as JwtError, ErrorKind, Header, Validation, decode,
+    decode_header, encode,
 };
-use serde::{Deserialize, Serialize};
+use quench_serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 /// Resolves the public key a token's `kid` was signed with.
@@ -120,7 +121,9 @@ impl JwtConfig {
         #[async_trait]
         impl KeySigner for OneKey {
             async fn active(&self) -> Option<(String, EncodingKey)> {
-                Some((self.kid.clone(), encoding_key(&self.der)))
+                encoding_key(&self.der)
+                    .ok()
+                    .map(|key| (self.kid.clone(), key))
             }
         }
 
@@ -134,10 +137,10 @@ impl JwtConfig {
     }
 
     fn from_parts(keys: Arc<dyn KeyResolver>, signer: Option<Arc<dyn KeySigner>>) -> Self {
-        let service_name = envmnt::get_or("SERVICE_NAME", "service");
-        let realm = envmnt::get_or("SERVICE_REALM", "https://localhost:8698/token");
+        let service_name = quench_core::env::get_or("SERVICE_NAME", "service");
+        let realm = quench_core::env::get_or("SERVICE_REALM", "https://localhost:8698/token");
 
-        let audiences: Vec<String> = envmnt::get_or("SERVICE_AUDIENCES", "")
+        let audiences: Vec<String> = quench_core::env::get_or("SERVICE_AUDIENCES", "")
             .split(',')
             .map(str::trim)
             .filter(|value| !value.is_empty())
@@ -149,13 +152,13 @@ impl JwtConfig {
             audiences
         };
 
-        let auth_enabled = envmnt::get_or("SERVICE_AUTH_ENABLED", "false")
+        let auth_enabled = quench_core::env::get_or("SERVICE_AUTH_ENABLED", "false")
             .parse()
             .unwrap_or(false);
-        let access_token_ttl_secs = envmnt::get_or("ACCESS_TOKEN_TTL_SECS", "900")
+        let access_token_ttl_secs = quench_core::env::get_or("ACCESS_TOKEN_TTL_SECS", "900")
             .parse()
             .unwrap_or(900);
-        let refresh_token_ttl_secs = envmnt::get_or("REFRESH_TOKEN_TTL_SECS", "604800")
+        let refresh_token_ttl_secs = quench_core::env::get_or("REFRESH_TOKEN_TTL_SECS", "604800")
             .parse()
             .unwrap_or(604_800);
 
@@ -174,44 +177,41 @@ impl JwtConfig {
     /// Errs if this config has no signer - true for every service but
     /// gatehouse, which should never be asking to mint a token in the first
     /// place.
-    pub async fn encode_claims(
-        &self,
-        claims: &Claims,
-    ) -> Result<String, jsonwebtoken::errors::Error> {
+    pub async fn encode_claims(&self, claims: &Claims) -> Result<String, JwtError> {
         let signer = self
             .signer
             .as_ref()
-            .ok_or_else(|| jsonwebtoken::errors::Error::from(ErrorKind::InvalidKeyFormat))?;
+            .ok_or_else(|| JwtError::from(ErrorKind::InvalidKeyFormat))?;
         let (kid, key) = signer
             .active()
             .await
-            .ok_or_else(|| jsonwebtoken::errors::Error::from(ErrorKind::InvalidKeyFormat))?;
+            .ok_or_else(|| JwtError::from(ErrorKind::InvalidKeyFormat))?;
 
         let mut header = Header::new(Algorithm::EdDSA);
         header.kid = Some(kid);
         encode(&header, claims, &key)
     }
 
-    pub async fn decode_claims(&self, token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
+    pub async fn decode_claims(&self, token: &str) -> Result<Claims, JwtError> {
         let header = decode_header(token)?;
         let kid = header
             .kid
-            .ok_or_else(|| jsonwebtoken::errors::Error::from(ErrorKind::InvalidToken))?;
+            .ok_or_else(|| JwtError::from(ErrorKind::InvalidToken))?;
         let key = self
             .keys
             .resolve(&kid)
             .await
-            .ok_or_else(|| jsonwebtoken::errors::Error::from(ErrorKind::InvalidKeyFormat))?;
+            .ok_or_else(|| JwtError::from(ErrorKind::InvalidKeyFormat))?;
 
         // Audience is checked against this service by `Claims::allows`, not
-        // by `jsonwebtoken`'s own validator.
+        // by the token validator.
         let mut validation = Validation::new(Algorithm::EdDSA);
         validation.validate_aud = false;
         validation.required_spec_claims.insert("iat".to_string());
         validation.required_spec_claims.insert("exp".to_string());
         let token_data = decode::<Claims>(token, &key, &validation)?;
 
-        let now = usize::try_from(chrono::Utc::now().timestamp()).unwrap_or(0);
+        let now = usize::try_from(Time::now().timestamp()).unwrap_or(0);
         let leeway = usize::try_from(validation.leeway).unwrap_or(usize::MAX);
         if token_data.claims.iat > now.saturating_add(leeway) {
             return Err(ErrorKind::ImmatureSignature.into());
@@ -226,7 +226,7 @@ impl JwtConfig {
         username: String,
         scope: String,
         session_id: Option<String>,
-    ) -> Result<String, jsonwebtoken::errors::Error> {
+    ) -> Result<String, JwtError> {
         self.issue_access_token_for(username, self.audiences.clone(), scope, session_id)
             .await
     }
@@ -244,7 +244,7 @@ impl JwtConfig {
         audiences: Vec<String>,
         scope: String,
         session_id: Option<String>,
-    ) -> Result<String, jsonwebtoken::errors::Error> {
+    ) -> Result<String, JwtError> {
         self.encode_claims(&Claims::for_audiences(
             username,
             audiences,
@@ -294,10 +294,10 @@ impl Claims {
         sid: Option<String>,
         duration_secs: i64,
     ) -> Self {
-        let now = chrono::Utc::now();
+        let now = Time::now();
         let iat = usize::try_from(now.timestamp()).unwrap_or(0);
-        let exp = usize::try_from((now + chrono::Duration::seconds(duration_secs)).timestamp())
-            .unwrap_or(0);
+        let exp =
+            usize::try_from((now + Duration::seconds(duration_secs)).timestamp()).unwrap_or(0);
 
         Self {
             sub,

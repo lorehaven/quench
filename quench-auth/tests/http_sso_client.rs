@@ -9,12 +9,12 @@
 //! runtime can deadlock on it.
 #![allow(clippy::await_holding_lock)]
 
-use bytes::Bytes;
-use http::{HeaderMap, Method, StatusCode, Uri};
 use quench_auth::domain::sso_client::SsoConfig;
 use quench_auth::http::domain::sso_client::{authorize_redirect, callback};
+use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
+use quench_http::http::{HeaderMap, Method, StatusCode, Uri};
 use quench_http::request::Request;
 use std::io::{Read, Write};
 use std::net::TcpListener as StdTcpListener;
@@ -30,7 +30,7 @@ async fn request(uri: &str, headers: &[(&str, &str)]) -> Request {
     let mut map = HeaderMap::new();
     for (k, v) in headers {
         map.insert(
-            http::HeaderName::from_bytes(k.as_bytes()).unwrap(),
+            quench_http::http::HeaderName::from_bytes(k.as_bytes()).unwrap(),
             v.parse().unwrap(),
         );
     }
@@ -44,8 +44,8 @@ async fn request(uri: &str, headers: &[(&str, &str)]) -> Request {
 }
 
 fn sso_config() -> SsoConfig {
-    envmnt::set("GATEHOUSE_CLIENT_ID", "test-client");
-    envmnt::set("GATEHOUSE_CLIENT_SECRET", "test-secret");
+    quench_core::env::set("GATEHOUSE_CLIENT_ID", "test-client");
+    quench_core::env::set("GATEHOUSE_CLIENT_SECRET", "test-secret");
     SsoConfig::init()
 }
 
@@ -72,7 +72,7 @@ fn spawn_mock_gatehouse(body: &'static str) -> String {
 #[tokio::test]
 async fn authorize_redirect_without_gatehouse_url_is_service_unavailable() {
     let _guard = ENV_LOCK.lock().unwrap();
-    envmnt::remove("GATEHOUSE_URL");
+    quench_core::env::remove("GATEHOUSE_URL");
     let config = sso_config();
 
     let req = request("/ui/login", &[]).await;
@@ -83,16 +83,16 @@ async fn authorize_redirect_without_gatehouse_url_is_service_unavailable() {
 #[tokio::test]
 async fn authorize_redirect_builds_a_pkce_authorize_url_and_sets_the_state_cookie() {
     let _guard = ENV_LOCK.lock().unwrap();
-    envmnt::set("GATEHOUSE_URL", "https://gate.example.com");
+    quench_core::env::set("GATEHOUSE_URL", "https://gate.example.com");
     let config = sso_config();
 
     let req = request("/ui/login", &[("host", "myservice.example.com")]).await;
     let resp = authorize_redirect(&req, &config);
     assert_eq!(resp.status(), StatusCode::FOUND);
 
-    let hyper_resp = resp.into_hyper();
+    let hyper_resp = resp.into_inner();
     let location = hyper_resp
-        .headers()
+        .headers
         .get("location")
         .unwrap()
         .to_str()
@@ -110,7 +110,7 @@ async fn authorize_redirect_builds_a_pkce_authorize_url_and_sets_the_state_cooki
     );
 
     let set_cookie = hyper_resp
-        .headers()
+        .headers
         .get("set-cookie")
         .unwrap()
         .to_str()
@@ -120,34 +120,34 @@ async fn authorize_redirect_builds_a_pkce_authorize_url_and_sets_the_state_cooki
         "{set_cookie}"
     );
 
-    envmnt::remove("GATEHOUSE_URL");
+    quench_core::env::remove("GATEHOUSE_URL");
 }
 
 #[tokio::test]
 async fn callback_without_an_authorize_state_cookie_redirects_to_login() {
     let _guard = ENV_LOCK.lock().unwrap();
-    envmnt::set("GATEHOUSE_URL", "https://gate.example.com");
+    quench_core::env::set("GATEHOUSE_URL", "https://gate.example.com");
     let config = sso_config();
 
     let req = request("/ui/auth/callback?code=abc&state=xyz", &[]).await;
     let resp = callback(&req, &config).await;
     assert_eq!(resp.status(), StatusCode::FOUND);
-    let hyper_resp = resp.into_hyper();
+    let hyper_resp = resp.into_inner();
     let location = hyper_resp
-        .headers()
+        .headers
         .get("location")
         .unwrap()
         .to_str()
         .unwrap();
     assert!(location.ends_with("/ui/login"), "{location}");
 
-    envmnt::remove("GATEHOUSE_URL");
+    quench_core::env::remove("GATEHOUSE_URL");
 }
 
 #[tokio::test]
 async fn callback_with_a_state_mismatch_redirects_to_login() {
     let _guard = ENV_LOCK.lock().unwrap();
-    envmnt::set("GATEHOUSE_URL", "https://gate.example.com");
+    quench_core::env::set("GATEHOUSE_URL", "https://gate.example.com");
     let config = sso_config();
 
     let saved_state = r#"{"state":"expected","code_verifier":"verifier","redirect":"/ui/home"}"#;
@@ -160,16 +160,16 @@ async fn callback_with_a_state_mismatch_redirects_to_login() {
 
     let resp = callback(&req, &config).await;
     assert_eq!(resp.status(), StatusCode::FOUND);
-    let hyper_resp = resp.into_hyper();
+    let hyper_resp = resp.into_inner();
     let location = hyper_resp
-        .headers()
+        .headers
         .get("location")
         .unwrap()
         .to_str()
         .unwrap();
     assert!(location.ends_with("/ui/login"), "{location}");
 
-    envmnt::remove("GATEHOUSE_URL");
+    quench_core::env::remove("GATEHOUSE_URL");
 }
 
 #[tokio::test]
@@ -177,7 +177,7 @@ async fn callback_exchanges_the_code_and_sets_session_cookies_on_success() {
     let _guard = ENV_LOCK.lock().unwrap();
     let mock_body = r#"{"access_token":"access-123","refresh_token":"refresh-456"}"#;
     let gatehouse_url = spawn_mock_gatehouse(mock_body);
-    envmnt::set("GATEHOUSE_URL", &gatehouse_url);
+    quench_core::env::set("GATEHOUSE_URL", &gatehouse_url);
     let config = sso_config();
 
     let saved_state = r#"{"state":"expected","code_verifier":"verifier","redirect":"/ui/home"}"#;
@@ -191,9 +191,9 @@ async fn callback_exchanges_the_code_and_sets_session_cookies_on_success() {
     let resp = callback(&req, &config).await;
     assert_eq!(resp.status(), StatusCode::FOUND);
 
-    let hyper_resp = resp.into_hyper();
+    let hyper_resp = resp.into_inner();
     let location = hyper_resp
-        .headers()
+        .headers
         .get("location")
         .unwrap()
         .to_str()
@@ -201,9 +201,8 @@ async fn callback_exchanges_the_code_and_sets_session_cookies_on_success() {
     assert_eq!(location, "/ui/home");
 
     let cookies: Vec<&str> = hyper_resp
-        .headers()
+        .headers
         .get_all("set-cookie")
-        .iter()
         .map(|v| v.to_str().unwrap())
         .collect();
     assert!(
@@ -226,5 +225,5 @@ async fn callback_exchanges_the_code_and_sets_session_cookies_on_success() {
         "expected the authorize-state cookie to be cleared: {cookies:?}"
     );
 
-    envmnt::remove("GATEHOUSE_URL");
+    quench_core::env::remove("GATEHOUSE_URL");
 }

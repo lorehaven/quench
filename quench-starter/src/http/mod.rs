@@ -12,9 +12,9 @@ pub mod routers;
 use crate::common::db::DbWrapper;
 use crate::common::health::HealthState;
 use crate::common::routes::normalize_base_path;
-use async_trait::async_trait;
 use quench_cli::prelude::{Tone, print_status};
-use quench_http::prelude::http::{Method, StatusCode, uri::Authority};
+use quench_core::async_trait;
+use quench_http::prelude::http::{Method, StatusCode, Uri};
 use quench_http::prelude::*;
 use std::future::Future;
 use std::net::SocketAddr;
@@ -34,8 +34,8 @@ pub async fn serve<I>(db: Option<Arc<DbWrapper>>, init: I) -> std::io::Result<()
 where
     I: Future<Output = ()> + Send + 'static,
 {
-    let base_path = normalize_base_path(&envmnt::get_or("BASE_PATH", "/"));
-    tracing::info!("Server initialized with BASE_PATH: {base_path}");
+    let base_path = normalize_base_path(&quench_core::env::get_or("BASE_PATH", "/"));
+    quench_log::info!("Server initialized with BASE_PATH: {base_path}");
 
     let db_wrapper = match db {
         Some(d) => d,
@@ -53,7 +53,7 @@ where
     let container = Arc::new(container);
 
     let app = discover_and_mount(base_path);
-    let service_name = envmnt::get_or("SERVICE_NAME", "service");
+    let service_name = quench_core::env::get_or("SERVICE_NAME", "service");
     serve_app(&format!("{service_name}-service"), app, container).await
 }
 
@@ -76,13 +76,11 @@ pub async fn serve_app(
     app: Arc<dyn Endpoint>,
     container: Arc<quench_http::di::Container>,
 ) -> std::io::Result<()> {
-    let _ = rustls::crypto::ring::default_provider().install_default();
-
     let (tls_addr, redirect_addr) = server_addrs();
 
     if let Some(config) = load_tls(
-        envmnt::get_or("SERVER_CERT_PATH", "cert.pem"),
-        envmnt::get_or("SERVER_KEY_PATH", "key.pem"),
+        quench_core::env::get_or("SERVER_CERT_PATH", "cert.pem"),
+        quench_core::env::get_or("SERVER_KEY_PATH", "key.pem"),
     ) {
         print_status(
             Tone::Success,
@@ -152,8 +150,9 @@ pub fn discover_and_mount(base_path: impl Into<String>) -> Arc<dyn Endpoint> {
 }
 
 fn server_addrs() -> (SocketAddr, SocketAddr) {
-    let addr_str: String = envmnt::get_or("SERVER_ADDR", "0.0.0.0:443");
-    let addr_redir_str: String = envmnt::get_or("SERVER_HTTP_REDIRECT_ADDR", "0.0.0.0:80");
+    let addr_str: String = quench_core::env::get_or("SERVER_ADDR", "0.0.0.0:443");
+    let addr_redir_str: String =
+        quench_core::env::get_or("SERVER_HTTP_REDIRECT_ADDR", "0.0.0.0:80");
 
     let tls_addr: SocketAddr = addr_str
         .parse()
@@ -208,17 +207,11 @@ impl Endpoint for RedirectToHttps {
 }
 
 fn build_https_authority(host: &str, https_port: u16) -> String {
-    let rendered_host = host.parse::<Authority>().map_or_else(
-        |_| host.to_string(),
-        |authority| {
-            let parsed_host = authority.host();
-            if parsed_host.contains(':') {
-                format!("[{parsed_host}]")
-            } else {
-                parsed_host.to_string()
-            }
-        },
-    );
+    // `Uri::host` keeps the brackets of an IPv6 literal, which a URL needs.
+    let rendered_host = Uri::parse(&format!("http://{host}/"))
+        .ok()
+        .and_then(|uri| uri.host().map(str::to_string))
+        .unwrap_or_else(|| host.to_string());
 
     if https_port == 443 {
         rendered_host
@@ -230,7 +223,7 @@ fn build_https_authority(host: &str, https_port: u16) -> String {
 #[cfg(test)]
 mod root_or_mounted_tests {
     use super::*;
-    use bytes::Bytes;
+    use quench_core::bytes::Bytes;
     use quench_http::body::InboundBody;
     use quench_http::di::ContainerBuilder;
     use quench_http::prelude::http::{HeaderMap, Uri};
@@ -272,8 +265,8 @@ mod root_or_mounted_tests {
 
         let resp = app.call(request("/", &container)).await;
         assert_eq!(resp.status(), StatusCode::FOUND);
-        let hyper_resp = resp.into_hyper();
-        assert!(hyper_resp.headers().contains_key("location"));
+        let inner = resp.into_inner();
+        assert!(inner.headers.contains_key("location"));
     }
 
     #[tokio::test]

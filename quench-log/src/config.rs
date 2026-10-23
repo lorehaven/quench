@@ -76,14 +76,6 @@ impl Rotation {
             _ => None,
         }
     }
-
-    pub(crate) const fn to_tracing(self) -> tracing_appender::rolling::Rotation {
-        match self {
-            Self::Daily => tracing_appender::rolling::Rotation::DAILY,
-            Self::Hourly => tracing_appender::rolling::Rotation::HOURLY,
-            Self::Never => tracing_appender::rolling::Rotation::NEVER,
-        }
-    }
 }
 
 impl fmt::Display for Rotation {
@@ -106,7 +98,7 @@ pub struct Config {
     /// console rather than instead of it - see the crate's own docs for why
     /// a deployment with no writable `file_dir` should set this to `false`.
     pub file_enabled: bool,
-    /// An `EnvFilter` directive string - `RUST_LOG`'s own format
+    /// A filter directive string - `RUST_LOG`'s own format
     /// (`info`, `my_crate=debug,tower=warn`, ...). Applies to both sinks;
     /// there is deliberately no way to give the file a different level than
     /// the console, since a level chosen for a human reading a terminal and
@@ -145,7 +137,7 @@ impl Config {
     ///
     /// - `LOG_CONSOLE_ENABLED` / `LOG_FILE_ENABLED` (`true`/`false` and the
     ///   usual spellings - see `parse_bool`)
-    /// - `RUST_LOG` - the same variable every other `tracing` setup in the
+    /// - `RUST_LOG` - the same variable every other logging setup in the
     ///   estate already reads, so turning this crate on changes no habits
     /// - `LOG_DIR`, `LOG_FILE_PREFIX` (falls back to `CARGO_BIN_NAME`, which
     ///   Cargo sets for the binary a workspace member built - see

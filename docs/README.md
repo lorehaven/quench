@@ -36,7 +36,9 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench Web](./quench-web.md) — dependency-light server-rendered HTML/CSS/JS page builder
 - [Quench Web Components](./quench-web-components.md) — higher-level UI builders on top of Quench Web
 - [Quench DB](./quench-db.md) — ORM/CRUD abstraction plus a migration catalog engine
-- [Quench Log](./quench-log.md) — console + rolling-file (JSON by default) `tracing` subscriber
+- [Quench Log](./quench-log.md) — leveled events, spans, console and rolling-file output
+- [Quench PG](./quench-pg.md) — PostgreSQL wire-protocol client with SCRAM, TLS, pool
+- [Quench Redis](./quench-redis.md) — Redis client: RESP2/3, pool, cluster routing
 - [Quench Cache](./quench-cache.md) — shared in-process/Redis caching layer
 - [Quench Client](./quench-client.md) — shared authenticated HTTP client wrappers
 - [Quench Config](./quench-config.md) — typed config/env loading helper
@@ -44,6 +46,26 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench CLI](./quench-cli.md) — shared terminal UI styling for CLI tools
 
 The `docker/*` services and several `cli/*` tools in the sibling [Forge](https://github.com/lorehaven/forge) repository depend on these crates, pulled in from the `ennor` cargo registry like any other dependency — see that repo's own docs for how they're used in practice.
+
+## Cargo features
+
+Features are additive and, unless noted, on by default. Turn them off with `default-features = false` and name the ones you want. Internally the crates depend on each other with `default-features = false` and list what they use, so a feature you disable stays disabled all the way down.
+
+| Crate | Features |
+| --- | --- |
+| `quench-proto` | `server`, `client`, `ws`, `multipart`, `sse`, `tls` |
+| `quench-http` | `tls` (`serve_https`, `load_tls`) |
+| `quench-client` | `tls` (`https://`) |
+| `quench-pg` | `tls` (`sslmode=require`, `verify-full`) |
+| `quench-redis` | `tls` (`rediss://`) |
+| `quench-cache` | `request-cache`, `data-cache`, `tls`; `redis` is off by default |
+| `quench-db` | `postgres`, `tls` |
+| `quench-auth` | `http`, `redis`, `postgres`, `tls` |
+| `quench-crypto` | `argon2`, `ed25519`, `rsa`, `jwt` |
+| `quench-cli` | `repl` |
+| `quench-serde` | `toml` (default), `yaml` (off by default) |
+
+Dropping every `tls` feature removes `rustls`, `ring` (unless `quench-crypto` still needs it for hashing) and `webpki-roots` from a build: `quench-http` goes from 25 to 17 third-party crates, `quench-client` from 25 to 15, and `quench-db` without `postgres` has 9. `scripts/features.fish` lints every crate with its features off and on one at a time (`-t` also runs the tests).
 
 ## Examples
 
@@ -73,15 +95,25 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 .
 ├── quench-auth/            # relying-party token/session verification
 ├── quench-cache/           # in-process/Redis caching layer
-├── quench-cli/             # shared terminal UI styling for CLI tools
+├── quench-cli/             # shared terminal UI styling and REPL line editor
+├── quench-core/            # time, uuid, base64, errors, env, bytes, streams, registry
+├── quench-core-macros/     # #[async_trait] and #[derive(Error)]
+├── quench-crypto/          # hashes, HMAC, Ed25519, RSA verify, PBKDF2, Argon2id, JWT
 ├── quench-client/          # authenticated HTTP client wrappers
 ├── quench-config/          # typed config/env loading
 ├── quench-db/              # ORM/CRUD abstraction plus migrations
 ├── quench-http/            # lightweight poem-shaped HTTP framework
 ├── quench-http-macros/     # #[get]/#[post]/#[injectable]/... proc macros for quench-http
-├── quench-log/             # console + rolling-file tracing subscriber
+├── quench-log/             # logging: events, spans, console + rolling file
+├── quench-log-macros/      # #[instrument]
 ├── quench-mail/            # MIME message builder + async SMTP submission client
+├── quench-pg/              # PostgreSQL client
+├── quench-proto/           # HTTP types, HTTP/1.1, multipart, cookies, WebSocket, SSE
+├── quench-redis/           # Redis client
+├── quench-serde/           # JSON, urlencoded, Value, Serialize/Deserialize; features toml, yaml
+├── quench-serde-macros/    # derives for quench-serde
 ├── quench-starter/         # service bootstrap
+├── quench-tls/             # rustls glue and trust stores
 ├── quench-web/             # server-rendered HTML/CSS/JS page builder
 ├── quench-web-components/  # UI components built on quench-web
 ├── examples/               # runnable references: basic, db_example, http_demo, forge_service_demo

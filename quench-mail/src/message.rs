@@ -3,7 +3,7 @@
 use crate::address::{Address, Mailbox};
 use crate::error::BuildError;
 use crate::mime;
-use chrono::{DateTime, Utc};
+use quench_core::time::Time;
 use std::fmt::Write as _;
 
 /// Headers `quench-mail` writes itself; a caller cannot set them as custom ones.
@@ -41,7 +41,7 @@ pub struct Message {
     text: Option<String>,
     html: Option<String>,
     headers: Vec<(String, String)>,
-    date: DateTime<Utc>,
+    date: Time,
     id: String,
     envelope_from: Option<Address>,
 }
@@ -121,7 +121,7 @@ impl Message {
                 out.push_str(&part_body(html));
             }
             (Some(text), Some(html)) => {
-                let boundary = format!("quench-{}", uuid::Uuid::new_v4().simple());
+                let boundary = format!("quench-{}", quench_core::uuid::Uuid::new_v4().simple());
                 let _ = write!(
                     out,
                     "Content-Type: multipart/alternative;\r\n boundary=\"{boundary}\"\r\n\r\n"
@@ -191,7 +191,7 @@ pub struct MessageBuilder {
     text: Option<String>,
     html: Option<String>,
     headers: Vec<(String, String)>,
-    date: Option<DateTime<Utc>>,
+    date: Option<Time>,
     message_id: Option<String>,
     envelope_from: Option<Address>,
     error: Option<BuildError>,
@@ -310,7 +310,7 @@ impl MessageBuilder {
 
     /// Overrides the `Date` header (defaults to now) - mainly for tests.
     #[must_use]
-    pub const fn date(mut self, date: DateTime<Utc>) -> Self {
+    pub const fn date(mut self, date: Time) -> Self {
         self.date = Some(date);
         self
     }
@@ -340,7 +340,7 @@ impl MessageBuilder {
         let message_id = self.message_id.unwrap_or_else(|| {
             format!(
                 "<{}@{}>",
-                uuid::Uuid::new_v4().simple(),
+                quench_core::uuid::Uuid::new_v4().simple(),
                 from.address.domain()
             )
         });
@@ -354,7 +354,7 @@ impl MessageBuilder {
             text: self.text,
             html: self.html,
             headers: self.headers,
-            date: self.date.unwrap_or_else(Utc::now),
+            date: self.date.unwrap_or_else(Time::now),
             id: message_id,
             envelope_from: self.envelope_from,
         })

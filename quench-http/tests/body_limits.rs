@@ -3,13 +3,13 @@
 //! and that `Limited<_, N>` can override it per-route without touching the
 //! app-wide default.
 
-use bytes::Bytes as RawBytes;
-use http::{HeaderMap, Method, StatusCode, Uri};
+use quench_core::bytes::Bytes as RawBytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
 use quench_http::extract::{BodyLimit, Bytes, FromRequest, Json, Limited};
 use quench_http::request::Request;
-use serde::Deserialize;
+use quench_proto::{HeaderMap, Method, StatusCode, Uri};
+use quench_serde::Deserialize;
 use std::sync::Arc;
 
 #[derive(Deserialize)]

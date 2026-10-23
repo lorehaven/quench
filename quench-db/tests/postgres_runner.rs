@@ -18,7 +18,7 @@ fn plan_for(schema: &str, table: &str) -> MigrationPlan {
     MigrationPlan {
         modules: vec![ResolvedModule {
             module: "runner-test".to_string(),
-            version: semver::Version::new(0, 1, 0),
+            version: quench_core::version::Version::new(0, 1, 0),
             schema: schema.to_string(),
             scope: ModuleScope::Schema,
             required_by: None,
@@ -30,8 +30,8 @@ fn plan_for(schema: &str, table: &str) -> MigrationPlan {
             schema: schema.to_string(),
             migration_id: "0001-create".to_string(),
             author: "test".to_string(),
-            since: semver::Version::new(0, 0, 0),
-            module_version: semver::Version::new(0, 1, 0),
+            since: quench_core::version::Version::new(0, 0, 0),
+            module_version: quench_core::version::Version::new(0, 1, 0),
             statements: vec![format!(
                 "CREATE SCHEMA IF NOT EXISTS {schema}; CREATE TABLE IF NOT EXISTS {schema}.{table} (id INT)"
             )],

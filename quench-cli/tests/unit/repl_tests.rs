@@ -1,7 +1,7 @@
 //! Unit tests for `repl.rs`.
 //!
 //! `cargo test` runs with a non-interactive stdin (empty/closed), so
-//! `rustyline`'s `readline` hits EOF immediately - the same path a real
+//! the editor's `readline` hits EOF immediately - the same path a real
 //! Ctrl-D press takes. That's enough to exercise `run`'s whole loop shape
 //! without needing a pty.
 

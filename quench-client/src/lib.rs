@@ -1,6 +1,5 @@
-use anyhow::{Context, Result, anyhow};
-use serde::{Serialize, de::DeserializeOwned};
-use thiserror::Error;
+use quench_core::{Context, Error, Result, err};
+use quench_serde::{DeserializeOwned, Serialize};
 use transport::{Client, Response};
 
 pub mod transport;
@@ -104,7 +103,7 @@ impl HttpClient {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(anyhow!("HTTP {status}: {body}"));
+            return Err(err!("HTTP {status}: {body}"));
         }
 
         res.json::<T>().await.context("Failed to parse response")
@@ -176,7 +175,7 @@ impl BasicAuthClient {
 
     pub async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         let url = format!("{}{}", self.client.base_url, path);
-        tracing::debug!(
+        quench_log::debug!(
             "BasicAuthClient::get - Sending request to {} with username: {}",
             url,
             self.username
@@ -190,7 +189,7 @@ impl BasicAuthClient {
             .await
             .context("Failed to send GET request")?;
 
-        tracing::debug!("BasicAuthClient::get - Response status: {}", res.status());
+        quench_log::debug!("BasicAuthClient::get - Response status: {}", res.status());
         self.client.handle_response::<T>(res).await
     }
 
@@ -266,7 +265,7 @@ impl BasicAuthClient {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(anyhow!("HTTP {status}: {body}"));
+            return Err(err!("HTTP {status}: {body}"));
         }
         Ok(())
     }
@@ -433,7 +432,7 @@ impl std::fmt::Debug for CachedToken {
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(quench_serde::Deserialize)]
 struct TokenResponse {
     access_token: String,
     expires_in: i64,
@@ -481,7 +480,7 @@ impl ClientCredentialsClient {
 
         if !response.status().is_success() {
             let body = response.text().await.unwrap_or_default();
-            return Err(anyhow!("client_credentials grant was refused: {body}"));
+            return Err(err!("client_credentials grant was refused: {body}"));
         }
 
         let tokens: TokenResponse = response
@@ -547,7 +546,7 @@ impl ClientCredentialsClient {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(anyhow!("HTTP {status}: {body}"));
+            return Err(err!("HTTP {status}: {body}"));
         }
         Ok(())
     }

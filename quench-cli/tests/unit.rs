@@ -1,3 +1,4 @@
+#[cfg(feature = "repl")]
 #[path = "unit/repl_tests.rs"]
 mod repl_tests;
 #[path = "unit/require_tests.rs"]

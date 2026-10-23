@@ -7,9 +7,8 @@
 
 use crate::error::{Error, Reply};
 use crate::message::{Envelope, Message};
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD;
-use rustls::pki_types::{CertificateDer, ServerName};
+use quench_core::base64::STANDARD;
+use quench_tls::{ClientOptions, ServerName, TlsConnector, TlsStream};
 use std::fmt;
 use std::io;
 use std::pin::Pin;
@@ -19,8 +18,6 @@ use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
-use tokio_rustls::TlsConnector;
-use tokio_rustls::client::TlsStream;
 
 /// A reply line longer than this, or a reply with more lines, is not SMTP.
 const MAX_LINE: usize = 4096;
@@ -86,7 +83,7 @@ pub struct MailerBuilder {
     credentials: Option<Credentials>,
     hello_name: String,
     timeout: Duration,
-    extra_roots: Vec<CertificateDer<'static>>,
+    extra_roots_pem: Vec<Vec<u8>>,
     allow_plaintext_auth: bool,
 }
 
@@ -139,16 +136,21 @@ impl MailerBuilder {
     /// Trust one more root, given as a PEM certificate, besides the built-in
     /// public roots - for a private CA or a self-signed server.
     pub fn add_root_certificate_pem(mut self, pem: &str) -> Result<Self, Error> {
-        let mut found = false;
-        for cert in pem_certificates(pem)? {
-            self.extra_roots.push(cert);
-            found = true;
+        let options = ClientOptions {
+            extra_roots_pem: vec![pem.as_bytes().to_vec()],
+            ..ClientOptions::default()
+        };
+        let base = quench_tls::root_store(&ClientOptions::default())
+            .map_err(Error::Config)?
+            .len();
+        let with = quench_tls::root_store(&options)
+            .map_err(Error::Config)?
+            .len();
+        if with == base {
+            return Err(Error::Config("no certificate found in the PEM".into()));
         }
-        if found {
-            Ok(self)
-        } else {
-            Err(Error::Config("no certificate found in the PEM".into()))
-        }
+        self.extra_roots_pem.push(pem.as_bytes().to_vec());
+        Ok(self)
     }
 
     /// Send credentials over an unencrypted connection. Off by default.
@@ -185,26 +187,17 @@ impl MailerBuilder {
             ));
         }
 
-        let mut roots =
-            rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-        for cert in &self.extra_roots {
-            roots
-                .add(cert.clone())
-                .map_err(|err| Error::Config(format!("unusable root certificate: {err}")))?;
-        }
-        let tls = rustls::ClientConfig::builder_with_provider(Arc::new(
-            rustls::crypto::ring::default_provider(),
-        ))
-        .with_safe_default_protocol_versions()
-        .map_err(|err| Error::Tls(err.to_string()))?
-        .with_root_certificates(roots)
-        .with_no_client_auth();
+        let tls = quench_tls::client_config(&ClientOptions {
+            extra_roots_pem: self.extra_roots_pem,
+            ..ClientOptions::default()
+        })
+        .map_err(Error::Tls)?;
 
         let name = self
             .tls_server_name
             .clone()
             .unwrap_or_else(|| self.host.clone());
-        let server_name = ServerName::try_from(name.clone())
+        let server_name = quench_tls::server_name(&name)
             .map_err(|_| Error::Config(format!("invalid TLS server name {name:?}")))?;
 
         Ok(Mailer {
@@ -215,31 +208,11 @@ impl MailerBuilder {
                 credentials: self.credentials,
                 hello_name: self.hello_name,
                 timeout: self.timeout,
-                connector: TlsConnector::from(Arc::new(tls)),
+                connector: TlsConnector::new(tls),
                 server_name,
             }),
         })
     }
-}
-
-fn pem_certificates(pem: &str) -> Result<Vec<CertificateDer<'static>>, Error> {
-    const BEGIN: &str = "-----BEGIN CERTIFICATE-----";
-    const END: &str = "-----END CERTIFICATE-----";
-    let mut certs = Vec::new();
-    let mut rest = pem;
-    while let Some(start) = rest.find(BEGIN) {
-        let after = &rest[start + BEGIN.len()..];
-        let end = after
-            .find(END)
-            .ok_or_else(|| Error::Config("unterminated PEM certificate".into()))?;
-        let body: String = after[..end].split_whitespace().collect();
-        let der = STANDARD
-            .decode(body)
-            .map_err(|err| Error::Config(format!("invalid PEM certificate: {err}")))?;
-        certs.push(CertificateDer::from(der));
-        rest = &after[end + END.len()..];
-    }
-    Ok(certs)
 }
 
 struct Inner {
@@ -281,7 +254,7 @@ impl Mailer {
             credentials: None,
             hello_name: "localhost".to_string(),
             timeout: Duration::from_secs(30),
-            extra_roots: Vec::new(),
+            extra_roots_pem: Vec::new(),
             allow_plaintext_auth: false,
         }
     }

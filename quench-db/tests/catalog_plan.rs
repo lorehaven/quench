@@ -1,9 +1,9 @@
 //! Catalog loading and dependency resolution - the part of the migration
 //! pipeline that runs before any database is touched.
 
+use quench_core::tmp::TempDir;
 use quench_db::prelude::{Catalog, InstallRequest, MigrationPlan, PlanError};
 use std::path::Path;
-use tempfile::TempDir;
 
 /// Writes `<dir>/<module>/module.toml` plus the given migration files.
 fn module(root: &Path, name: &str, manifest: &str, migrations: &[(&str, &str)]) {
@@ -324,9 +324,9 @@ sql = "SELECT 1;"
 #[tokio::test]
 async fn find_by_rejects_columns_the_model_does_not_declare() {
     use quench_db::prelude::{Crud, Db, Model};
-    use serde::{Deserialize, Serialize};
+    use quench_serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     struct Row {
         id: String,
         owner: String,

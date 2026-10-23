@@ -6,7 +6,7 @@ use quench_cache::data_cache::*;
 fn test_set_and_get() {
     let cache = DataCache::new();
     let key = "user:123".to_string();
-    let value = serde_json::json!({"id": 123, "name": "Alice"});
+    let value = quench_serde::json!({"id": 123, "name": "Alice"});
 
     cache.set(key.clone(), value.clone());
     let retrieved = cache.get(&key);
@@ -19,7 +19,7 @@ fn test_set_and_get() {
 fn test_ttl_expiration() {
     let cache = DataCache::new();
     let key = "temp_key".to_string();
-    let value = serde_json::json!({"data": "temporary"});
+    let value = quench_serde::json!({"data": "temporary"});
 
     cache.set_with_ttl(key.clone(), value, 0);
     let retrieved = cache.get(&key);
@@ -31,7 +31,7 @@ fn test_ttl_expiration() {
 fn test_delete() {
     let cache = DataCache::new();
     let key = "delete_me".to_string();
-    cache.set(key.clone(), serde_json::json!({}));
+    cache.set(key.clone(), quench_serde::json!({}));
 
     assert!(cache.has(&key));
     assert!(cache.delete(&key));
@@ -48,7 +48,7 @@ fn has_is_false_for_a_missing_key_and_delete_reports_whether_anything_was_remove
 #[test]
 fn a_value_with_no_ttl_never_expires() {
     let entry = CacheEntry {
-        value: serde_json::json!("x"),
+        value: quench_serde::json!("x"),
         timestamp: 0,
         ttl_secs: None,
     };
@@ -67,8 +67,8 @@ fn len_and_is_empty_track_the_entry_count() {
     assert!(cache.is_empty());
     assert_eq!(cache.len(), 0);
 
-    cache.set("a".to_string(), serde_json::json!(1));
-    cache.set("b".to_string(), serde_json::json!(2));
+    cache.set("a".to_string(), quench_serde::json!(1));
+    cache.set("b".to_string(), quench_serde::json!(2));
     assert_eq!(cache.len(), 2);
     assert!(!cache.is_empty());
 }
@@ -76,8 +76,8 @@ fn len_and_is_empty_track_the_entry_count() {
 #[test]
 fn clear_removes_every_entry() {
     let cache = DataCache::new();
-    cache.set("a".to_string(), serde_json::json!(1));
-    cache.set("b".to_string(), serde_json::json!(2));
+    cache.set("a".to_string(), quench_serde::json!(1));
+    cache.set("b".to_string(), quench_serde::json!(2));
     cache.clear();
     assert!(cache.is_empty());
 }
@@ -85,8 +85,8 @@ fn clear_removes_every_entry() {
 #[test]
 fn stats_reports_size_and_expired_count() {
     let cache = DataCache::new();
-    cache.set("fresh".to_string(), serde_json::json!("abc"));
-    cache.set_with_ttl("stale".to_string(), serde_json::json!("xyz"), 0);
+    cache.set("fresh".to_string(), quench_serde::json!("abc"));
+    cache.set_with_ttl("stale".to_string(), quench_serde::json!("xyz"), 0);
 
     let stats = cache.stats();
     assert_eq!(stats.total_entries, 2);
@@ -97,9 +97,9 @@ fn stats_reports_size_and_expired_count() {
 #[test]
 fn cleanup_expired_removes_only_expired_entries_and_reports_how_many() {
     let cache = DataCache::new();
-    cache.set("fresh".to_string(), serde_json::json!("abc"));
-    cache.set_with_ttl("stale_one".to_string(), serde_json::json!("x"), 0);
-    cache.set_with_ttl("stale_two".to_string(), serde_json::json!("y"), 0);
+    cache.set("fresh".to_string(), quench_serde::json!("abc"));
+    cache.set_with_ttl("stale_one".to_string(), quench_serde::json!("x"), 0);
+    cache.set_with_ttl("stale_two".to_string(), quench_serde::json!("y"), 0);
 
     let removed = cache.cleanup_expired();
     assert_eq!(removed, 2);
@@ -133,7 +133,7 @@ fn add_to_set_replaces_an_expired_set_instead_of_appending_to_it() {
 #[test]
 fn add_to_set_replaces_a_non_array_value_at_the_same_key() {
     let cache = DataCache::new();
-    cache.set("tags".to_string(), serde_json::json!("not-an-array"));
+    cache.set("tags".to_string(), quench_serde::json!("not-an-array"));
     cache.add_to_set("tags", "member", None);
 
     assert_eq!(cache.set_members("tags"), vec!["member".to_string()]);

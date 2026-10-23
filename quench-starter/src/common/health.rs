@@ -44,7 +44,7 @@ impl HealthState {
         tokio::spawn(async move {
             init.await;
             state.mark_ready();
-            tracing::info!("Service initialization complete");
+            quench_log::info!("Service initialization complete");
         });
     }
 }

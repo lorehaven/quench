@@ -1,5 +1,5 @@
-use dashmap::DashMap;
-use serde::{Deserialize, Serialize};
+use quench_core::map::ShardedMap;
+use quench_serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -15,7 +15,7 @@ pub struct CachedResponse {
 /// Request/response cache with TTL (24 hours default)
 #[derive(Debug)]
 pub struct RequestCache {
-    cache: Arc<DashMap<String, CachedResponse>>,
+    cache: Arc<ShardedMap<String, CachedResponse>>,
     ttl_secs: u64,
 }
 
@@ -23,7 +23,7 @@ impl RequestCache {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            cache: Arc::new(DashMap::new()),
+            cache: Arc::new(ShardedMap::new()),
             ttl_secs: 24 * 60 * 60, // 24 hours
         }
     }
@@ -31,7 +31,7 @@ impl RequestCache {
     #[must_use]
     pub fn with_ttl(ttl_secs: u64) -> Self {
         Self {
-            cache: Arc::new(DashMap::new()),
+            cache: Arc::new(ShardedMap::new()),
             ttl_secs,
         }
     }
@@ -50,20 +50,19 @@ impl RequestCache {
     /// Get cached response if valid and not expired
     #[must_use]
     pub fn get(&self, key: &str) -> Option<CachedResponse> {
-        if let Some(entry) = self.cache.get(key) {
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let ttl = self.ttl_secs;
 
-            let age = now.saturating_sub(entry.timestamp);
-            if age < self.ttl_secs {
-                return Some(entry.clone());
-            }
-            // Expired, remove it
-            drop(entry);
-            self.cache.remove(key);
+        let entry = self.cache.get(key)?;
+        if now.saturating_sub(entry.timestamp) < ttl {
+            return Some(entry);
         }
+        // Expired, remove it (unless a writer replaced it with a fresh one).
+        self.cache
+            .remove_if(key, |held| now.saturating_sub(held.timestamp) >= ttl);
         None
     }
 
@@ -94,13 +93,13 @@ impl RequestCache {
             .unwrap_or_default()
             .as_secs();
 
-        for entry in self.cache.iter() {
-            let age = now.saturating_sub(entry.value().timestamp);
+        self.cache.for_each(|_, entry| {
+            let age = now.saturating_sub(entry.timestamp);
             if age >= self.ttl_secs {
                 expired_count += 1;
             }
-            total_size += entry.value().content.len();
-        }
+            total_size += entry.content.len();
+        });
 
         CacheStats {
             total_entries: self.cache.len(),

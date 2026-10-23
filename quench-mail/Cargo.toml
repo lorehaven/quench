@@ -12,14 +12,9 @@ license = { workspace = true }
 readme = { workspace = true }
 
 [dependencies]
-base64 = { workspace = true }
-chrono = { workspace = true }
-rustls = { workspace = true }
-thiserror = { workspace = true }
+quench-core = { workspace = true }
+quench-tls = { workspace = true }
 tokio = { workspace = true }
-tokio-rustls = { workspace = true }
-uuid = { workspace = true }
-webpki-roots = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

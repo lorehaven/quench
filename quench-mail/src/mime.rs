@@ -1,8 +1,7 @@
 //! The wire-format primitives: RFC 2047 encoded words, quoted-printable,
 //! header folding. Pure functions over text, no I/O.
 
-use base64::Engine;
-use base64::engine::general_purpose::STANDARD;
+use quench_core::base64::STANDARD;
 
 /// Longest line a header may be folded to (RFC 5322 recommends 78).
 const FOLD_AT: usize = 78;

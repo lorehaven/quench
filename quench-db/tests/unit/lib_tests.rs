@@ -1,9 +1,9 @@
 //! Unit tests for `lib.rs`.
 
 use quench_db::*;
-use serde::{Deserialize, Serialize};
+use quench_serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct TestModel {
     id: String,
     name: String,
@@ -71,4 +71,20 @@ async fn repository_dispatches_crud_to_the_in_memory_backend() {
 
     repo.delete("1").await.expect("delete");
     assert!(repo.read("1").await.expect("read").is_none());
+}
+
+#[cfg(not(feature = "postgres"))]
+#[tokio::test]
+async fn a_url_needs_the_postgres_feature() {
+    let err = quench_db::Db::connect("postgres://localhost/app")
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(&err, quench_db::DbError::ConnectionError(m) if m.contains("`postgres` feature")),
+        "{err}"
+    );
+    assert!(
+        quench_db::Db::connect("").await.is_ok(),
+        "the in-memory backend needs nothing"
+    );
 }

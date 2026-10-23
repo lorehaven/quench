@@ -2,19 +2,19 @@
 //! runtime-configured `BASE_PATH` (an env var, so it can't be baked into
 //! the `&'static str` route patterns `#[get]`/... register).
 
-use bytes::Bytes;
-use http::{HeaderMap, Method, StatusCode, Uri};
+use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
 use quench_http::endpoint::Endpoint;
 use quench_http::request::Request;
 use quench_http::response::Response;
 use quench_http::router::{RouterBuilder, mount};
+use quench_proto::{HeaderMap, Method, StatusCode, Uri};
 use std::sync::Arc;
 
 struct Echo;
 
-#[async_trait::async_trait]
+#[quench_core::async_trait]
 impl Endpoint for Echo {
     async fn call(&self, _req: Request) -> Response {
         Response::text(StatusCode::OK, "ok")

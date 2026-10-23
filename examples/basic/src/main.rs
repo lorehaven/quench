@@ -1,4 +1,4 @@
-use async_trait::async_trait;
+use quench_core::async_trait;
 use quench_http::prelude::http::StatusCode;
 use quench_http::prelude::*;
 use quench_starter::http::routers::ui::serve_assets;

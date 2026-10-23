@@ -21,7 +21,7 @@ pub fn init() {
     quench_log::init();
 
     let actual_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
-    tracing::debug!("Logging initialized with RUST_LOG={}", actual_level);
+    quench_log::debug!("Logging initialized with RUST_LOG={}", actual_level);
 }
 
 /// `.env` from the working directory or the nearest ancestor that has one.
@@ -106,5 +106,75 @@ mod env_tests {
         assert_eq!(get("C"), Some("z"));
         assert_eq!(get("D"), Some("v"));
         assert_eq!(env.len(), 4);
+    }
+}
+
+#[cfg(test)]
+mod loader_tests {
+    use super::{init, load_env_file, load_env_from_ancestors};
+
+    #[test]
+    fn existing_variables_win_over_the_file() {
+        let dir = quench_core::tmp::TempDir::new().unwrap();
+        let file = dir.path().join(".env");
+        std::fs::write(
+            &file,
+            "QUENCH_TEST_ENV_NEW=from-file\nQUENCH_TEST_ENV_OLD=from-file\n",
+        )
+        .unwrap();
+        quench_core::env::set("QUENCH_TEST_ENV_OLD", "from-process");
+        quench_core::env::remove("QUENCH_TEST_ENV_NEW");
+        load_env_file(&file);
+        assert_eq!(
+            quench_core::env::get_or("QUENCH_TEST_ENV_NEW", ""),
+            "from-file"
+        );
+        assert_eq!(
+            quench_core::env::get_or("QUENCH_TEST_ENV_OLD", ""),
+            "from-process"
+        );
+        load_env_file(&dir.path().join("missing.env"));
+        quench_core::env::remove("QUENCH_TEST_ENV_NEW");
+        quench_core::env::remove("QUENCH_TEST_ENV_OLD");
+    }
+
+    /// Changes the working directory, so it is the only test here that does, and it puts it back.
+    #[test]
+    fn init_loads_the_nearest_env_file_and_installs_logging() {
+        let dir = quench_core::tmp::TempDir::new().unwrap();
+        let nested = dir.path().join("a/b");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::write(
+            dir.path().join(".env"),
+            "QUENCH_TEST_ANCESTOR=found\nLOG_FILE_ENABLED=false\nLOG_CONSOLE_ENABLED=false\n",
+        )
+        .unwrap();
+        let service_dir = dir.path().join("docker/svc");
+        std::fs::create_dir_all(&service_dir).unwrap();
+        std::fs::write(service_dir.join(".env"), "QUENCH_TEST_SERVICE=found\n").unwrap();
+
+        let original = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&nested).unwrap();
+        quench_core::env::remove("QUENCH_TEST_ANCESTOR");
+        load_env_from_ancestors();
+        let found = quench_core::env::get_or("QUENCH_TEST_ANCESTOR", "");
+
+        std::env::set_current_dir(dir.path()).unwrap();
+        quench_core::env::set("CARGO_BIN_NAME", "svc");
+        init();
+        let service = quench_core::env::get_or("QUENCH_TEST_SERVICE", "");
+        std::env::set_current_dir(original).unwrap();
+
+        assert_eq!(found, "found");
+        assert_eq!(service, "found");
+        assert!(quench_log::global_is_set());
+
+        // No `.env` anywhere above a directory with none: nothing happens.
+        let empty = quench_core::tmp::TempDir::new().unwrap();
+        let before = std::env::current_dir().unwrap();
+        std::env::set_current_dir(empty.path()).unwrap();
+        load_env_from_ancestors();
+        std::env::set_current_dir(before).unwrap();
+        quench_core::env::remove("CARGO_BIN_NAME");
     }
 }

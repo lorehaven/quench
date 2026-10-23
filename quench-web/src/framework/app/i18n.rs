@@ -1,17 +1,26 @@
-use fluent_syntax::ast::{Entry, Expression, InlineExpression, PatternElement};
-use fluent_syntax::parser::parse;
-use std::collections::HashSet;
+use quench_core::{Context as _, Result};
+use quench_serde::json;
+use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
-pub fn available_locales() -> anyhow::Result<Vec<String>> {
-    let i18n_path = Path::new("i18n");
+use super::ftl;
+
+const I18N_DIR: &str = "i18n";
+
+/// The locales with a `.ftl` file in `./i18n`, sorted.
+pub fn available_locales() -> Result<Vec<String>> {
+    available_locales_in(Path::new(I18N_DIR))
+}
+
+/// The locales with a `.ftl` file in `dir`, sorted.
+pub fn available_locales_in(dir: &Path) -> Result<Vec<String>> {
     let mut locales = Vec::new();
 
-    if !i18n_path.exists() {
+    if !dir.exists() {
         return Ok(Vec::new());
     }
 
-    for entry in std::fs::read_dir(i18n_path)? {
+    for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
         if path.extension().is_some_and(|s| s == "ftl")
@@ -26,32 +35,46 @@ pub fn available_locales() -> anyhow::Result<Vec<String>> {
     Ok(locales)
 }
 
-pub fn validate_locales_exist(locales: &[String]) -> anyhow::Result<()> {
+pub fn validate_locales_exist(locales: &[String]) -> Result<()> {
+    validate_locales_exist_in(Path::new(I18N_DIR), locales)
+}
+
+pub fn validate_locales_exist_in(dir: &Path, locales: &[String]) -> Result<()> {
     for locale in locales {
-        let path = Path::new("i18n").join(format!("{locale}.ftl"));
+        let path = dir.join(format!("{locale}.ftl"));
         if !path.exists() {
-            anyhow::bail!("missing locale file: {}", path.display());
+            quench_core::bail!("missing locale file: {}", path.display());
         }
     }
     Ok(())
 }
 
-pub fn parse_ftl_with_options(supported_locales: Option<&[String]>) -> anyhow::Result<String> {
-    let i18n_path = Path::new("i18n");
-    if !i18n_path.exists() {
+/// The translations as pretty JSON: `{"en-US": {"id": "text with {$var}"}}`.
+/// Only the `supported_locales` are included when given.
+pub fn parse_ftl_with_options(supported_locales: Option<&[String]>) -> Result<String> {
+    parse_ftl_in(Path::new(I18N_DIR), supported_locales)
+}
+
+pub fn parse_ftl_in(dir: &Path, supported_locales: Option<&[String]>) -> Result<String> {
+    if !dir.exists() {
         return Ok("{}".to_string());
     }
 
     let allowed: Option<HashSet<&str>> =
-        supported_locales.map(|v| v.iter().map(std::string::String::as_str).collect());
-    let mut all_locales = serde_json::Map::new();
+        supported_locales.map(|v| v.iter().map(String::as_str).collect());
+    // Sorted maps keep the generated file stable from run to run.
+    let mut all_locales: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
 
-    for entry in std::fs::read_dir(i18n_path)? {
+    for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
 
         if path.extension().is_some_and(|s| s == "ftl") {
-            let locale = path.file_stem().unwrap().to_string_lossy().to_string();
+            let locale = path
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
             if let Some(allowed) = &allowed
                 && !allowed.contains(locale.as_str())
             {
@@ -59,38 +82,14 @@ pub fn parse_ftl_with_options(supported_locales: Option<&[String]>) -> anyhow::R
             }
 
             let ftl_string = std::fs::read_to_string(&path)?;
-            let res = parse(&*ftl_string)
-                .map_err(|_| anyhow::anyhow!("Failed to parse FTL: {}", path.display()))?;
-            let mut map = serde_json::Map::new();
-
-            for entry in &res.body {
-                if let Entry::Message(msg) = entry
-                    && let Some(pattern) = &msg.value
-                {
-                    let val = pattern
-                        .elements
-                        .iter()
-                        .map(|e| match e {
-                            PatternElement::TextElement { value: t } => t.to_string(),
-                            // Keep variable placeables as `{$name}` tokens so the
-                            // client can substitute them via data-i18n-args.
-                            PatternElement::Placeable {
-                                expression:
-                                    Expression::Inline(InlineExpression::VariableReference { id }),
-                            } => format!("{{${}}}", id.name),
-                            PatternElement::Placeable { .. } => String::new(),
-                        })
-                        .collect::<String>();
-
-                    map.insert(msg.id.name.to_string(), serde_json::json!(val));
-                }
-            }
-
-            all_locales.insert(locale, serde_json::json!(map));
+            let messages = ftl::parse(&ftl_string)
+                .with_context(|| format!("Failed to parse FTL: {}", path.display()))?;
+            let map = messages.into_iter().map(|m| (m.id, m.value)).collect();
+            all_locales.insert(locale, map);
         }
     }
 
-    Ok(serde_json::to_string_pretty(&all_locales)?)
+    Ok(json::to_string_pretty(&all_locales))
 }
 
 #[must_use]

@@ -11,12 +11,11 @@ name = "db_example"
 path = "src/main.rs"
 
 [dependencies]
-quench-db = { workspace = true }
+quench-log = { workspace = true }
+quench-db = { workspace = true, features = ["postgres", "tls"] }
 tokio = { workspace = true }
-serde = { workspace = true }
-sqlx = { workspace = true }
-anyhow = { workspace = true }
-tracing-subscriber = { workspace = true }
+quench-serde = { workspace = true }
+quench-core = { workspace = true }
 
 [lints]
 workspace = true

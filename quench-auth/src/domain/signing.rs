@@ -1,13 +1,11 @@
 //! Ed25519 key generation, and the byte shapes gatehouse persists.
 //!
-//! Kept in one place so `ed25519-dalek`/`pkcs8` stay an implementation detail
-//! of this crate: gatehouse's `SigningKeys` (`docker/gatehouse-service/src/keys.rs`)
-//! only ever handles opaque `Vec<u8>` and the `jsonwebtoken` key types this
-//! module hands back.
+//! Kept in one place so the key encoding stays an implementation detail of
+//! this crate: gatehouse's `SigningKeys` (`docker/gatehouse-service/src/keys.rs`)
+//! only ever handles opaque `Vec<u8>` and the key types this module hands back.
 
-use ed25519_dalek::SigningKey;
-use ed25519_dalek::pkcs8::EncodePrivateKey;
-use jsonwebtoken::{DecodingKey, EncodingKey};
+use quench_crypto::ed25519::SigningKey;
+use quench_crypto::jwt::{DecodingKey, EncodingKey, Error};
 
 pub struct GeneratedSigningKey {
     /// PKCS8 DER - what `encoding_key` expects back.
@@ -28,23 +26,15 @@ impl std::fmt::Debug for GeneratedSigningKey {
 
 #[must_use]
 pub fn generate_signing_key() -> GeneratedSigningKey {
-    let mut seed = [0u8; 32];
-    getrandom::fill(&mut seed).expect("the OS random source is available");
-    let signing_key = SigningKey::from_bytes(&seed);
-    let private_key_der = signing_key
-        .to_pkcs8_der()
-        .expect("an Ed25519 key always encodes to PKCS8 DER")
-        .as_bytes()
-        .to_vec();
-    let public_key = signing_key.verifying_key().to_bytes().to_vec();
+    let signing_key = SigningKey::generate();
     GeneratedSigningKey {
-        private_key_der,
-        public_key,
+        private_key_der: signing_key.to_pkcs8_der(),
+        public_key: signing_key.public_key().to_vec(),
     }
 }
 
-#[must_use]
-pub fn encoding_key(private_key_der: &[u8]) -> EncodingKey {
+/// The signing key for stored PKCS8 DER (either encoding version).
+pub fn encoding_key(private_key_der: &[u8]) -> Result<EncodingKey, Error> {
     EncodingKey::from_ed_der(private_key_der)
 }
 

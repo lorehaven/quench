@@ -15,8 +15,22 @@ See [docs/](./docs/) for per-crate reference.
 - [Quench Cache](./docs/quench-cache.md) — shared in-process/Redis caching layer
 - [Quench Client](./docs/quench-client.md) — shared authenticated HTTP client wrappers
 - [Quench Config](./docs/quench-config.md) — typed config/env loading helper
+- [Quench Serde](./docs/quench-serde.md) — JSON/TOML/urlencoded codecs and a dynamic `Value` model, without serde
+- [Quench Crypto](./docs/quench-crypto.md) — hashing, HMAC, Ed25519, RSA verify, PBKDF2, Argon2id and JWT
+- [Quench Serde YAML](./docs/quench-serde-yaml.md) — the `yaml` feature of Quench Serde: YAML 1.2 on `Value`
+- [Quench Core Macros](./docs/quench-core-macros.md) — `#[async_trait]` and `#[derive(Error)]` for Quench Core
+- [Quench Serde Macros](./docs/quench-serde-macros.md) — `#[derive(Serialize, Deserialize)]` for Quench Serde
+- [Quench Core](./docs/quench-core.md) — dependency-free foundations: time, uuid, base64/hex, errors, env, sharded map, versions, bytes
+- [Quench Proto](./docs/quench-proto.md) — HTTP types, an HTTP/1.1 codec for servers and clients, multipart, cookies, WebSocket and SSE
+- [Quench TLS](./docs/quench-tls.md) — async glue between tokio streams and rustls, with shared trust-store helpers
+- [Quench Log](./docs/quench-log.md) — leveled events, spans, console and rolling-file output
+- [Quench Log Macros](./docs/quench-log-macros.md) — `#[instrument]` for Quench Log
+- [Quench PG](./docs/quench-pg.md) — PostgreSQL client: wire protocol, SCRAM-SHA-256, TLS, typed rows, pool
+- [Quench Redis](./docs/quench-redis.md) — Redis client: RESP2/3, pooled connections, cluster routing
 - [Quench Mail](./docs/quench-mail.md) — MIME message builder and async SMTP submission client
 - [Quench CLI](./docs/quench-cli.md) — shared terminal UI styling for CLI tools
+
+Most crates have cargo features for the heavier optional parts (TLS, the Postgres backend, the HTTP layer of `quench-auth`, the REPL editor, ...); see [Cargo features](./docs/README.md#cargo-features).
 
 ## Build
 

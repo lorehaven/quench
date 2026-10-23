@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use quench_serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::path::Path;
@@ -53,7 +53,7 @@ pub fn render(template: &str, vars: &BTreeMap<String, String>) -> Result<String,
     Ok(out)
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, quench_core::Error)]
 pub enum RenderError {
     #[error("unknown variable '{name}' (known: {})", known.join(", "))]
     UnknownVariable { name: String, known: Vec<String> },
@@ -71,7 +71,7 @@ pub struct MigrationFile {
 pub struct MigrationLoader;
 
 impl MigrationLoader {
-    pub fn load_from_dir<P: AsRef<Path>>(dir: P) -> anyhow::Result<Vec<Migration>> {
+    pub fn load_from_dir<P: AsRef<Path>>(dir: P) -> quench_core::Result<Vec<Migration>> {
         Self::load_from_dir_excluding(dir, &[])
     }
 
@@ -80,7 +80,7 @@ impl MigrationLoader {
     pub fn load_from_dir_excluding<P: AsRef<Path>>(
         dir: P,
         exclude: &[&str],
-    ) -> anyhow::Result<Vec<Migration>> {
+    ) -> quench_core::Result<Vec<Migration>> {
         // A missing / unreadable directory simply has no migrations.
         let mut files: Vec<_> = std::fs::read_dir(dir)
             .into_iter()
@@ -101,7 +101,8 @@ impl MigrationLoader {
 
         for entry in files {
             let content = std::fs::read_to_string(entry.path())?;
-            let mut file: MigrationFile = toml::from_str(&content)?;
+            let mut file: MigrationFile = quench_serde::toml::from_str(&content)
+                .map_err(|e| quench_core::err!("{}: {e}", entry.path().display()))?;
 
             // Sort migrations inside the file by ID (0000-text)
             file.migrations.sort_by(|a, b| a.id.cmp(&b.id));
@@ -111,7 +112,7 @@ impl MigrationLoader {
             for migration in &file.migrations {
                 let prefix = migration.id.split('-').next().unwrap_or("");
                 if !ids.insert(prefix) {
-                    anyhow::bail!(
+                    quench_core::bail!(
                         "Duplicate migration prefix '{}' in file {}",
                         prefix,
                         entry.path().display()

@@ -2,7 +2,7 @@
 //! `mock_server.rs` (no live network access, no mocking crate dependency).
 
 use quench_client::{BasicAuthClient, BearerAuthClient, ClientCredentialsClient, HttpClient};
-use serde_json::{Value, json};
+use quench_serde::{Value, json};
 
 use crate::mock_server::{serve_n, serve_once};
 
@@ -339,4 +339,161 @@ async fn client_credentials_client_delete_expect_success_covers_both_branches() 
     assert!(message.contains("500"));
     assert!(message.contains("nope"));
     api_handle.await.expect("api server task");
+}
+
+const DEAD: &str = "http://127.0.0.1:1";
+
+#[tokio::test]
+async fn every_client_reports_a_connection_failure_with_context() {
+    let http = HttpClient::new(DEAD).unwrap();
+    for message in [
+        format!("{:#}", http.get::<Value>("/x").await.unwrap_err()),
+        format!(
+            "{:#}",
+            http.post::<_, Value>("/x", &json!({})).await.unwrap_err()
+        ),
+        format!(
+            "{:#}",
+            http.put::<_, Value>("/x", &json!({})).await.unwrap_err()
+        ),
+        format!("{:#}", http.delete::<Value>("/x").await.unwrap_err()),
+    ] {
+        assert!(message.contains("Failed to send"), "{message}");
+    }
+
+    let basic = BasicAuthClient::new(DEAD, "user", "pw").unwrap();
+    for message in [
+        format!("{:#}", basic.get::<Value>("/x").await.unwrap_err()),
+        format!(
+            "{:#}",
+            basic.post::<_, Value>("/x", &json!({})).await.unwrap_err()
+        ),
+        format!(
+            "{:#}",
+            basic.put::<_, Value>("/x", &json!({})).await.unwrap_err()
+        ),
+        format!("{:#}", basic.delete::<Value>("/x").await.unwrap_err()),
+        format!("{:#}", basic.delete_expect_success("/x").await.unwrap_err()),
+    ] {
+        assert!(message.contains("Failed to send"), "{message}");
+    }
+
+    let bearer = BearerAuthClient::new(DEAD, "tok").unwrap();
+    assert!(
+        format!("{:#}", bearer.get::<Value>("/x").await.unwrap_err())
+            .contains("Failed to send GET")
+    );
+    assert!(
+        format!(
+            "{:#}",
+            bearer.post::<_, Value>("/x", &json!({})).await.unwrap_err()
+        )
+        .contains("Failed to send POST")
+    );
+
+    let credentials = ClientCredentialsClient::builder(DEAD)
+        .token_url(&format!("{DEAD}/token"))
+        .client_id("svc")
+        .client_secret("s")
+        .build()
+        .unwrap();
+    let message = format!("{:#}", credentials.get::<Value>("/x").await.unwrap_err());
+    assert!(message.contains("token request failed"), "{message}");
+    assert!(
+        credentials
+            .post::<_, Value>("/x", &json!({}))
+            .await
+            .is_err()
+    );
+    assert!(credentials.delete_expect_success("/x").await.is_err());
+}
+
+#[tokio::test]
+async fn an_unparseable_token_response_is_reported() {
+    let (token_url, handle) = serve_once("200 OK", "this is not json").await;
+    let client = ClientCredentialsClient::builder(DEAD)
+        .token_url(&format!("{token_url}/token"))
+        .client_id("svc")
+        .client_secret("s")
+        .build()
+        .unwrap();
+    let message = format!("{:#}", client.get::<Value>("/x").await.unwrap_err());
+    assert!(
+        message.contains("failed to parse the client_credentials token response"),
+        "{message}"
+    );
+    handle.await.unwrap();
+}
+
+#[tokio::test]
+async fn error_statuses_carry_the_response_body() {
+    let (base, handle) = serve_once("500 Internal Server Error", "kaput").await;
+    let message = format!(
+        "{:#}",
+        HttpClient::new(&base)
+            .unwrap()
+            .get::<Value>("/x")
+            .await
+            .unwrap_err()
+    );
+    assert!(
+        message.contains("500") && message.contains("kaput"),
+        "{message}"
+    );
+    handle.await.unwrap();
+    let (base, handle) = serve_once("404 Not Found", "gone").await;
+    let message = format!(
+        "{:#}",
+        BasicAuthClient::new(&base, "u", "p")
+            .unwrap()
+            .delete_expect_success("/x")
+            .await
+            .unwrap_err()
+    );
+    assert!(
+        message.contains("404") && message.contains("gone"),
+        "{message}"
+    );
+    handle.await.unwrap();
+}
+
+#[test]
+fn debug_output_never_shows_secrets() {
+    let basic = BasicAuthClient::new(DEAD, "user", "hunter2").unwrap();
+    assert!(!format!("{basic:?}").contains("hunter2"));
+    let builder = BasicAuthClient::builder(DEAD)
+        .username("user")
+        .password("hunter2");
+    assert!(!format!("{builder:?}").contains("hunter2"));
+    let bearer = BearerAuthClient::new(DEAD, "tok-secret").unwrap();
+    assert!(!format!("{bearer:?}").contains("tok-secret"));
+    let credentials = ClientCredentialsClient::builder(DEAD)
+        .token_url("http://t/token")
+        .client_id("svc")
+        .client_secret("very-secret");
+    assert!(!format!("{credentials:?}").contains("very-secret"));
+    let built = credentials.build().unwrap();
+    assert!(!format!("{built:?}").contains("very-secret"));
+    assert!(format!("{built:?}").contains("redacted"));
+}
+
+#[test]
+fn builders_validate_their_inputs() {
+    assert!(
+        BasicAuthClient::builder(DEAD)
+            .username("u")
+            .password("p")
+            .build()
+            .is_ok()
+    );
+    assert!(
+        ClientCredentialsClient::builder(DEAD)
+            .token_url("http://t/token")
+            .client_id("c")
+            .client_secret("s")
+            .build()
+            .is_ok()
+    );
+    assert!(HttpClient::builder(DEAD).tls_verify(false).build().is_ok());
+    assert!(BearerAuthClient::with_tls_verify(DEAD, "t", false).is_ok());
 }

@@ -5,9 +5,9 @@
 //! read it back - add that if a handler ever needs its own correlation id
 //! rather than just having it flow through the tracing span.
 
-use async_trait::async_trait;
+use quench_core::async_trait;
+use quench_core::uuid::Uuid;
 use quench_http::prelude::{Endpoint, Middleware, Request, Response};
-use uuid::Uuid;
 
 const CORRELATION_ID_HEADER: &str = "x-correlation-id";
 
@@ -21,7 +21,7 @@ impl Middleware for CorrelationId {
             .header(CORRELATION_ID_HEADER)
             .map_or_else(|| Uuid::new_v4().to_string(), str::to_string);
 
-        tracing::Span::current().record("correlation_id", &correlation_id);
+        quench_log::Span::current().record("correlation_id", &correlation_id);
 
         next.call(req)
             .await
@@ -30,6 +30,7 @@ impl Middleware for CorrelationId {
 }
 
 /// Helper to inject correlation ID into outgoing HTTP requests.
+#[must_use]
 pub fn inject_correlation_id_header(
     builder: quench_client::transport::RequestBuilder,
     correlation_id: &str,

@@ -12,19 +12,21 @@ license = { workspace = true }
 readme = { workspace = true }
 
 [dependencies]
-dashmap = { workspace = true }
-redis = { workspace = true, optional = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
+quench-core = { workspace = true }
+quench-serde = { workspace = true }
+quench-redis = { workspace = true, optional = true }
 
 [features]
-default = ["request-cache", "data-cache"]
-redis = ["dep:redis", "data-cache"]
+default = ["request-cache", "data-cache", "tls"]
+redis = ["dep:quench-redis", "data-cache"]
+# `rediss://` for the Redis store; has no effect without `redis`.
+tls = ["quench-redis?/tls"]
 request-cache = []
 data-cache = []
 
 [dev-dependencies]
+quench-core = { workspace = true }
+quench-redis = { workspace = true }
 tokio = { workspace = true }
 
 [lints]

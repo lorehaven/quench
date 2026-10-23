@@ -6,6 +6,14 @@ If you know `poem` or `tower`, the shapes will feel familiar: an `Endpoint` trai
 
 This page is a guide, not just a reference — it builds up feature by feature the way `examples/http_demo` (a runnable version of everything below) does. For the fuller production-service shape — health checks, base-path scoping, TLS, auth middleware — see [Quench Starter](./quench-starter.md) and [Quench Auth](./quench-auth.md), and [Example: Forge Service Demo](./examples/forge_service_demo.md) for how they compose with this crate.
 
+## Features
+
+`tls` (default) enables `serve_https`, `serve_https_on` and `load_tls`, and with them the `rustls` types in their signatures. Without it the server is plain HTTP/1.1 (the usual shape behind an ingress that terminates TLS) and `quench-http` does not build `rustls`, `ring` or `webpki-roots`. `quench-http` always enables `quench-proto`'s `server`, `ws`, `multipart` and `sse`.
+
+```toml
+quench-http = { version = "0.1", default-features = false } # plain HTTP only
+```
+
 ## Installation
 
 ```toml
@@ -196,7 +204,7 @@ impl Middleware for RequestLogger {
         let method = req.method().clone();
         let path = req.uri().path().to_string();
         let response = next.call(req).await;
-        tracing::info!("{method} {path} -> {}", response.status());
+        quench_log::info!("{method} {path} -> {}", response.status());
         response
     }
 }
@@ -280,7 +288,39 @@ async fn upload(mut form: Multipart) -> Result<String, HttpError> {
 }
 ```
 
-`field.file_name()`/`field.content_type()` are available before consuming the field. The whole-stream size cap is the same `BodyLimit` `Json`/`Bytes` use.
+`field.file_name()`/`field.content_type()` are available before consuming the field. The whole-stream size cap is the same `BodyLimit` `Json`/`Bytes` use. A field can also be streamed without buffering: `while let Some(chunk) = field.chunk().await? { ... }` hands over the body piece by piece, which is how an upload is piped to disk. A field you do not read is skipped. The parser itself is `quench_proto::multipart` (see [Quench Proto](./quench-proto.md)).
+
+## Cookies
+
+`quench_http::http::cookie` (from [Quench Proto](./quench-proto.md)) parses and builds cookies: `cookie_value(header, "sid")` for the request side, and `Response::cookie(&cookie)` to add a `Set-Cookie` header.
+
+```rust
+use quench_http::http::cookie::{Cookie, SameSite};
+
+let cookie = Cookie::build(("sid", token)).path("/").http_only(true).secure(true).same_site(SameSite::Lax).build();
+Response::ok().cookie(&cookie)
+```
+
+## WebSocket and server-sent events
+
+Take `WebSocketUpgrade` as a handler parameter, then answer with `on_upgrade`:
+
+```rust
+#[get("/socket")]
+async fn socket(upgrade: WebSocketUpgrade) -> Response {
+    upgrade.on_upgrade(|mut socket| async move {
+        while let Ok(Some(message)) = socket.recv().await {
+            if let Message::Text(text) = message {
+                let _ = socket.send(Message::Text(format!("echo: {text}"))).await;
+            }
+        }
+    })
+}
+```
+
+The extractor validates the handshake (a request that is not a valid upgrade is a `400` before the handler runs); `on_upgrade` answers `101 Switching Protocols` and runs the closure with a `WebSocket` once the connection has switched. `recv()` yields `Message::Text`/`Binary`/`Pong`/`Close` (pings are answered for you, fragments are reassembled, text is checked for UTF-8), `send()` writes a message and `close(code, reason)` starts the closing handshake. `.config(Config { max_message_size, max_frame_size })` sets the size limits (16 MiB by default; an oversized message closes the connection with `1009`). From a hand-written `Endpoint`, `ws::upgrade(&req, handler)` does the same given the `Request`.
+
+`Response::sse(stream)` streams server-sent events: the stream's items are `quench_proto::sse::Event` values (`Event::new().event("tick").data("...")`), sent with `content-type: text/event-stream` and the headers that stop proxies buffering them. `Response::streaming(status, stream)` is the lower-level form for any chunked body.
 
 ## Serving your app
 
@@ -298,7 +338,7 @@ if let Some(config) = load_tls("cert.pem", "key.pem") {
 }
 ```
 
-Both run until a `SIGTERM`/`SIGINT` (or, on non-Unix, Ctrl+C) arrives, then stop accepting new connections and wait up to `DEFAULT_GRACEFUL_TIMEOUT` (25s, comfortably under Kubernetes' default `terminationGracePeriodSeconds`) for in-flight ones to finish before returning - a `docker stop`/`kubectl delete pod` drains requests instead of cutting them off. A connection also has a header-read timeout (30s by default) so a client that never finishes sending its request headers can't hold a slot open forever.
+Both run until a `SIGTERM`/`SIGINT` (or, on non-Unix, Ctrl+C) arrives, then stop accepting new connections and wait up to `DEFAULT_GRACEFUL_TIMEOUT` (25s, comfortably under Kubernetes' default `terminationGracePeriodSeconds`) for in-flight ones to finish before returning - a `docker stop`/`kubectl delete pod` drains requests instead of cutting them off. A connection also has a header-read timeout (30s by default) so a client that never finishes sending its request headers can't hold a slot open forever. The server speaks HTTP/1.1 only (keep-alive, pipelining, chunked bodies, `Expect: 100-continue`); TLS is terminated at the ingress in practice, and `serve_https` is there for development and for services that terminate it themselves. The protocol work lives in [Quench Proto](./quench-proto.md), which also rejects the malformed framing request-smuggling relies on.
 
 `serve_http_on`/`serve_https_on` take an already-bound `TcpListener` and an arbitrary shutdown future instead of binding `addr` and always waiting for a real signal - what a test needs to discover an ephemeral port and trigger shutdown itself, and also what lets a service compose its own shutdown source.
 
@@ -327,6 +367,6 @@ This is how `quench-http`'s own test suite is written throughout - see `tests/ro
 
 ## Testing
 
-`tests/*.rs` covers the router (including the wildcard cases above), the DI container (chain resolution, missing dependency, cycle detection, `provide_arc`), extensions/headers, body limits, multipart, `mount`, and - over a real socket - graceful shutdown. Run with `cargo test -p quench-http`.
+`tests/*.rs` covers the router (including the wildcard cases above), the DI container (chain resolution, missing dependency, cycle detection, `provide_arc`), extensions/headers, body limits, multipart, `mount`, every extractor and response type (`tests/framework.rs`), and - over real sockets - graceful shutdown, HTTPS with a real handshake, WebSocket upgrades, server-sent events and multipart uploads (`tests/e2e.rs`). Run with `cargo test -p quench-http`.
 
 [Home](../README.md)

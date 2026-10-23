@@ -1,7 +1,7 @@
 //! Unit tests for `http/routers/ui/pages/home.rs`.
 
-use bytes::Bytes;
 use quench_auth::domain::jwt::JwtConfig;
+use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
 use quench_http::prelude::http::{HeaderMap, Method, StatusCode, Uri};
@@ -42,7 +42,7 @@ async fn auth_enabled_without_a_session_cookie_redirects_to_login_instead_of_ren
     .await;
 
     assert_eq!(response.status(), StatusCode::FOUND);
-    assert!(response.into_hyper().headers().contains_key("location"));
+    assert!(response.into_inner().headers.contains_key("location"));
 }
 
 #[test]

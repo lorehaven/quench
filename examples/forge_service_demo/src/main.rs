@@ -33,14 +33,14 @@
 //! ```
 #![allow(clippy::unused_async)] // route handlers are async by contract
 
-use async_trait::async_trait;
 use quench_auth::domain::jwt::{Claims, JwtConfig};
 use quench_auth::domain::session::SessionDb;
 use quench_auth::http::middleware::auth::Auth;
 use quench_auth::http::middleware::require_write::RequireWrite;
 use quench_cache::CacheStore;
+use quench_core::async_trait;
 use quench_http::prelude::*;
-use serde::{Deserialize, Serialize};
+use quench_serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 /// Applies `inner` only to requests whose path starts with `prefix`,
@@ -135,12 +135,12 @@ async fn create_note(Extension(claims): Extension<Claims>, Json(note): Json<Crea
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    tracing_subscriber::fmt::init();
+    quench_log::init_console();
 
     // A real service reads this from `GATEHOUSE_URL`/`SERVICE_AUDIENCES`/...
     // via `JwtConfig::init()`. See this file's own doc comment for why the
     // demo mints its own key instead.
-    envmnt::set("SERVICE_NAME", "demo");
+    quench_core::env::set("SERVICE_NAME", "demo");
     let mut jwt_config = JwtConfig::for_tests_with_signing();
     jwt_config.service_name = "demo".to_string();
     jwt_config.audiences = vec!["demo".to_string()];

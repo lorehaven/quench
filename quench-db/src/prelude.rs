@@ -1,3 +1,4 @@
+#[cfg(feature = "postgres")]
 pub use crate::backends::postgres::{PostgresDb, PostgresRepository};
 pub use crate::catalog::{
     Catalog, CatalogError, CatalogModule, ModuleManifest, ModuleScope, Requirement,
@@ -5,6 +6,7 @@ pub use crate::catalog::{
 pub use crate::error::DbError;
 pub use crate::migrations::{ChangeSet, ColumnDef, Migration, MigrationFile, MigrationLoader};
 pub use crate::plan::{InstallRequest, MigrationPlan, PlanError, PlannedMigration, ResolvedModule};
+#[cfg(feature = "postgres")]
 pub use crate::runner::{
     ApplyReport, MigrationOutcome, MigrationResult, MigrationRunner, ResetReport,
 };

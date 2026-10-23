@@ -1,5 +1,6 @@
 mod assets;
 mod builder;
+mod ftl;
 mod i18n;
 mod scripts;
 mod shell;

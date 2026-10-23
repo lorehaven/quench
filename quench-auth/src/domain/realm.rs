@@ -5,7 +5,8 @@
 //! place those names are constructed - building them per service is what kept
 //! the old setup from being single sign-on.
 
-use cookie::{Cookie, SameSite, time::Duration};
+use quench_core::time::Duration;
+use quench_proto::cookie::{Cookie, SameSite};
 
 pub const DEFAULT_AUTH_SCHEMA: &str = "auth";
 pub const DEFAULT_SESSION_COOKIE: &str = "forge_session";
@@ -21,31 +22,32 @@ pub const AUTHORIZE_STATE_COOKIE: &str = "forge_authorize_state";
 /// gatehouse writes to it outside of session bookkeeping.
 #[must_use]
 pub fn auth_schema() -> String {
-    envmnt::get_or("AUTH_DB_SCHEMA", DEFAULT_AUTH_SCHEMA)
+    quench_core::env::get_or("AUTH_DB_SCHEMA", DEFAULT_AUTH_SCHEMA)
 }
 
 #[must_use]
 pub fn session_cookie_name() -> String {
-    envmnt::get_or("AUTH_COOKIE_NAME", DEFAULT_SESSION_COOKIE)
+    quench_core::env::get_or("AUTH_COOKIE_NAME", DEFAULT_SESSION_COOKIE)
 }
 
 #[must_use]
 pub fn refresh_cookie_name() -> String {
-    envmnt::get_or("AUTH_REFRESH_COOKIE_NAME", DEFAULT_REFRESH_COOKIE)
+    quench_core::env::get_or("AUTH_REFRESH_COOKIE_NAME", DEFAULT_REFRESH_COOKIE)
 }
 
 /// Parent domain the cookies are scoped to, e.g. `.forge.example.com`. Unset
 /// means host-only, which is what local development wants.
 #[must_use]
 pub fn cookie_domain() -> Option<String> {
-    non_empty(&envmnt::get_or("AUTH_COOKIE_DOMAIN", ""))
+    non_empty(&quench_core::env::get_or("AUTH_COOKIE_DOMAIN", ""))
 }
 
 /// Base URL of the gatehouse service. When unset, a service falls back to its
 /// own login form - the pre-gatehouse behaviour.
 #[must_use]
 pub fn gatehouse_url() -> Option<String> {
-    non_empty(&envmnt::get_or("GATEHOUSE_URL", "")).map(|url| url.trim_end_matches('/').to_string())
+    non_empty(&quench_core::env::get_or("GATEHOUSE_URL", ""))
+        .map(|url| url.trim_end_matches('/').to_string())
 }
 
 #[must_use]
@@ -76,7 +78,7 @@ fn gatehouse_endpoint(path: &str, return_to: Option<&str>) -> Option<String> {
 /// `SameSite=Lax` rather than `Strict`: `Strict` suppresses the cookie on
 /// cross-site top-level navigations, which is exactly the redirect back from
 /// gatehouse after login.
-pub fn session_cookie(token: impl Into<String>) -> Cookie<'static> {
+pub fn session_cookie(token: impl Into<String>) -> Cookie {
     realm_cookie(session_cookie_name(), token.into(), None)
 }
 
@@ -86,7 +88,7 @@ pub fn session_cookie(token: impl Into<String>) -> Cookie<'static> {
 /// own server-side validity - so the cookie survives a browser restart instead
 /// of vanishing as a session cookie while the token behind it is still good.
 ///
-pub fn refresh_cookie(token: impl Into<String>) -> Cookie<'static> {
+pub fn refresh_cookie(token: impl Into<String>) -> Cookie {
     realm_cookie(
         refresh_cookie_name(),
         token.into(),
@@ -95,7 +97,7 @@ pub fn refresh_cookie(token: impl Into<String>) -> Cookie<'static> {
 }
 
 fn refresh_cookie_max_age() -> Duration {
-    let secs: i64 = envmnt::get_or("REFRESH_TOKEN_TTL_SECS", "604800")
+    let secs: i64 = quench_core::env::get_or("REFRESH_TOKEN_TTL_SECS", "604800")
         .parse()
         .unwrap_or(604_800);
     Duration::seconds(secs)
@@ -103,16 +105,16 @@ fn refresh_cookie_max_age() -> Duration {
 
 /// Expired counterparts, for logout.
 #[must_use]
-pub fn cleared_session_cookie() -> Cookie<'static> {
+pub fn cleared_session_cookie() -> Cookie {
     cleared_cookie(session_cookie_name())
 }
 
 #[must_use]
-pub fn cleared_refresh_cookie() -> Cookie<'static> {
+pub fn cleared_refresh_cookie() -> Cookie {
     cleared_cookie(refresh_cookie_name())
 }
 
-fn realm_cookie(name: String, value: String, max_age: Option<Duration>) -> Cookie<'static> {
+fn realm_cookie(name: String, value: String, max_age: Option<Duration>) -> Cookie {
     let mut builder = Cookie::build((name, value))
         .path("/")
         .http_only(true)
@@ -127,7 +129,7 @@ fn realm_cookie(name: String, value: String, max_age: Option<Duration>) -> Cooki
     builder.build()
 }
 
-fn cleared_cookie(name: String) -> Cookie<'static> {
+fn cleared_cookie(name: String) -> Cookie {
     let mut builder = Cookie::build((name, ""))
         .path("/")
         .http_only(true)
@@ -144,7 +146,7 @@ fn cleared_cookie(name: String) -> Cookie<'static> {
 ///
 /// Deliberately not domain-scoped even when `AUTH_COOKIE_DOMAIN` is set: it is
 /// read back by the exact host that set it, never another relying party.
-pub fn authorize_state_cookie(value: impl Into<String>) -> Cookie<'static> {
+pub fn authorize_state_cookie(value: impl Into<String>) -> Cookie {
     Cookie::build((AUTHORIZE_STATE_COOKIE, value.into()))
         .path("/")
         .http_only(true)
@@ -155,7 +157,7 @@ pub fn authorize_state_cookie(value: impl Into<String>) -> Cookie<'static> {
 }
 
 #[must_use]
-pub fn cleared_authorize_state_cookie() -> Cookie<'static> {
+pub fn cleared_authorize_state_cookie() -> Cookie {
     Cookie::build((AUTHORIZE_STATE_COOKIE, ""))
         .path("/")
         .http_only(true)
@@ -169,7 +171,7 @@ pub fn cleared_authorize_state_cookie() -> Cookie<'static> {
 /// a leading-slash, no-trailing-slash prefix.
 #[must_use]
 pub fn base_path() -> String {
-    let raw = envmnt::get_or("BASE_PATH", "/");
+    let raw = quench_core::env::get_or("BASE_PATH", "/");
     let trimmed = raw.trim();
     if trimmed.is_empty() || trimmed == "/" {
         "/".to_string()

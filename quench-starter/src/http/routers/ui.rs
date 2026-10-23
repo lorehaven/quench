@@ -19,13 +19,13 @@
 //! routes - which means there's no *guaranteed* ordering between these two and a route a
 //! service registers at the same pattern (a root-mounted `{path:.*}`
 //! catch-all can match `""`/`"/"` too). In practice `quench-starter`'s own
-//! `inventory` registrations link before a dependent service's, so these
+//! registrations link before a dependent service's, so these
 //! win - but that rests on linker behavior, not something enforced here. A
 //! service whose own routing needs to win at the literal base path should
 //! register more specifically than a bare root wildcard.
 
 use crate::common::routes::with_base_path;
-use bytes::Bytes;
+use quench_core::bytes::Bytes;
 use quench_http::prelude::http::StatusCode;
 use quench_http::prelude::{Request, Response, get};
 
@@ -36,9 +36,10 @@ use std::path::{Component, Path as FsPath, PathBuf};
 
 pub use quench_auth::http::routers::ui::is_ui_authenticated;
 
+#[must_use]
 pub fn ui_path(path: &str) -> String {
     let result = with_base_path(&format!("/ui{path}"));
-    tracing::debug!("ui_path({}) = {}", path, result);
+    quench_log::debug!("ui_path({}) = {}", path, result);
     result
 }
 
@@ -59,6 +60,7 @@ pub fn ui_login_redirect() -> Response {
 /// can see it, so an htmx-driven request gets `HX-Redirect` (on a `200`, since
 /// htmx ignores the headers of a response it considers an error) and turns
 /// that into a real navigation.
+#[must_use]
 pub fn ui_login_redirect_for(request: &Request) -> Response {
     if request.header("hx-request").is_some() {
         return Response::new(StatusCode::OK).header("HX-Redirect", ui_path("/login"));

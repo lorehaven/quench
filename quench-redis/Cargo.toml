@@ -1,0 +1,32 @@
+[package]
+name = "quench-redis"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - a Redis client: RESP2/RESP3, pooled connections with reconnect, pipelines and cluster routing (CRC16 slots, MOVED/ASK)"
+keywords = ["redis", "cache", "async"]
+categories = ["database"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_redis"
+path = "src/lib.rs"
+
+[dependencies]
+quench-core = { workspace = true }
+quench-tls = { workspace = true, optional = true }
+tokio = { workspace = true, features = ["io-util", "net", "sync", "time"] }
+
+[features]
+default = ["tls"]
+# `rediss://` (rustls). Without it a TLS configuration fails to connect.
+tls = ["dep:quench-tls"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+
+[lints]
+workspace = true
