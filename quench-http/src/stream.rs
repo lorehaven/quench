@@ -65,8 +65,13 @@ mod tests {
         }
 
         let data = vec![7u8; READ_CHUNK + 10];
-        let chunks = reader_stream(std::io::Cursor::new(data.clone())).collect_vec().await;
-        let joined: Vec<u8> = chunks.into_iter().flat_map(|c| c.unwrap().to_vec()).collect();
+        let chunks = reader_stream(std::io::Cursor::new(data.clone()))
+            .collect_vec()
+            .await;
+        let joined: Vec<u8> = chunks
+            .into_iter()
+            .flat_map(|c| c.unwrap().to_vec())
+            .collect();
         assert_eq!(joined, data);
 
         let mut failing = reader_stream(Failing);

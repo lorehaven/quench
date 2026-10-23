@@ -10,11 +10,11 @@
 use quench_core::base64;
 use quench_core::bytes::Bytes;
 use quench_core::stream::{BoxStream, StreamExt};
+use quench_proto::Body;
 use quench_proto::h1::client::{ClientConfig, ClientConn, send_request};
 use quench_proto::io::Io;
 #[cfg(feature = "tls")]
 use quench_proto::tls::{ClientOptions, TlsConnector, client_config, server_name};
-use quench_proto::Body;
 
 // The protocol types a request or response speaks, so callers need not depend on `quench-proto` for them.
 pub use quench_proto::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header};
@@ -456,7 +456,14 @@ impl RequestBuilder {
             return Err(error);
         }
         let url = self.url?;
-        let exchange = exchange(&self.client, self.method, url, self.headers, self.body, true);
+        let exchange = exchange(
+            &self.client,
+            self.method,
+            url,
+            self.headers,
+            self.body,
+            true,
+        );
         match self.timeout {
             Some(limit) => tokio::time::timeout(limit, exchange)
                 .await
@@ -470,7 +477,14 @@ impl RequestBuilder {
             return Err(error);
         }
         let url = self.url?;
-        let exchange = exchange(&self.client, self.method, url, self.headers, self.body, false);
+        let exchange = exchange(
+            &self.client,
+            self.method,
+            url,
+            self.headers,
+            self.body,
+            false,
+        );
         match self.timeout {
             Some(limit) => tokio::time::timeout(limit, exchange)
                 .await
@@ -672,7 +686,8 @@ impl Response {
     }
 
     pub async fn json<T: DeserializeOwned>(self) -> Result<T> {
-        quench_serde::json::from_slice(&self.bytes().await?).map_err(|e| Error::Decode(e.to_string()))
+        quench_serde::json::from_slice(&self.bytes().await?)
+            .map_err(|e| Error::Decode(e.to_string()))
     }
 
     /// The body as it arrives, for responses that are long-lived or too big to hold (server-sent events, a

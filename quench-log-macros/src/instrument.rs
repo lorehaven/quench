@@ -27,9 +27,12 @@ impl Parse for Options {
                     let content;
                     syn::parenthesized!(content in input);
                     // `parse_any`: `self` is a keyword, and `skip(self)` is how a method leaves its receiver out.
-                    options.skip = Punctuated::<Ident, Token![,]>::parse_terminated_with(&content, Ident::parse_any)?
-                        .into_iter()
-                        .collect();
+                    options.skip = Punctuated::<Ident, Token![,]>::parse_terminated_with(
+                        &content,
+                        Ident::parse_any,
+                    )?
+                    .into_iter()
+                    .collect();
                 }
                 "fields" => {
                     let content;
@@ -265,7 +268,10 @@ mod tests {
     fn skip_accepts_the_receiver() {
         let out = run("skip(self, b)", "fn f(&self, a: u8, b: u8) {}");
         assert!(out.contains("a = ? a"), "{out}");
-        assert!(!out.contains("self = ? self") && !out.contains("b = ? b"), "{out}");
+        assert!(
+            !out.contains("self = ? self") && !out.contains("b = ? b"),
+            "{out}"
+        );
     }
 
     #[test]

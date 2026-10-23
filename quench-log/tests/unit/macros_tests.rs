@@ -348,7 +348,11 @@ fn level_macros_and_spans_take_an_explicit_target() {
         quench_log::warn_span!(target: "audit", "c");
         quench_log::error_span!(target: "audit", "d");
     });
-    let audit: Vec<_> = records.iter().filter(|r| r.target == "audit").map(|r| r.message.as_str()).collect();
+    let audit: Vec<_> = records
+        .iter()
+        .filter(|r| r.target == "audit")
+        .map(|r| r.message.as_str())
+        .collect();
     assert_eq!(audit, ["t", "d", "i", "w", "e"]);
     assert_eq!(value(&records[2], "user"), &FieldValue::Text("ann".into()));
 }

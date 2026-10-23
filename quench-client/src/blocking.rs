@@ -33,12 +33,16 @@ impl Client {
     /// When the runtime cannot start (the process is out of threads or descriptors).
     #[must_use]
     pub fn new() -> Self {
-        Self::builder().build().expect("default client configuration is valid")
+        Self::builder()
+            .build()
+            .expect("default client configuration is valid")
     }
 
     #[must_use]
     pub const fn builder() -> ClientBuilder {
-        ClientBuilder { inner: transport::Client::builder() }
+        ClientBuilder {
+            inner: transport::Client::builder(),
+        }
     }
 
     pub fn get(&self, url: impl AsRef<str>) -> RequestBuilder {
@@ -66,7 +70,10 @@ impl Client {
     }
 
     pub fn request(&self, method: Method, url: impl AsRef<str>) -> RequestBuilder {
-        RequestBuilder { inner: self.inner.request(method, url), runtime: Arc::clone(&self.runtime) }
+        RequestBuilder {
+            inner: self.inner.request(method, url),
+            runtime: Arc::clone(&self.runtime),
+        }
     }
 }
 
@@ -111,7 +118,10 @@ impl ClientBuilder {
     }
 
     pub fn build(self) -> Result<Client> {
-        Ok(Client { inner: self.inner.build()?, runtime: runtime()? })
+        Ok(Client {
+            inner: self.inner.build()?,
+            runtime: runtime()?,
+        })
     }
 }
 
@@ -180,7 +190,10 @@ impl RequestBuilder {
     /// Sends the request and waits for the whole response.
     pub fn send(self) -> Result<Response> {
         let inner = self.runtime.block_on(self.inner.send())?;
-        Ok(Response { inner, runtime: self.runtime })
+        Ok(Response {
+            inner,
+            runtime: self.runtime,
+        })
     }
 }
 

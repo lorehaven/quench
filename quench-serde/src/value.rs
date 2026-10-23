@@ -278,7 +278,10 @@ impl ValueIndex for usize {
         let kind = value.type_name();
         match value.as_array_mut() {
             Some(items) if *self < items.len() => &mut items[*self],
-            Some(items) => panic!("index {self} is out of bounds for an array of {}", items.len()),
+            Some(items) => panic!(
+                "index {self} is out of bounds for an array of {}",
+                items.len()
+            ),
             None => panic!("cannot index a {kind} with {self}"),
         }
     }

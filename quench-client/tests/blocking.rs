@@ -17,8 +17,16 @@ struct Echo;
 #[async_trait]
 impl Endpoint for Echo {
     async fn call(&self, mut req: Request) -> Response {
-        let body = req.take_body().collect_limited(1 << 20).await.unwrap_or_default();
-        let auth = req.headers().get("authorization").and_then(|v| v.to_str().ok()).map(str::to_string);
+        let body = req
+            .take_body()
+            .collect_limited(1 << 20)
+            .await
+            .unwrap_or_default();
+        let auth = req
+            .headers()
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
         Response::json(
             StatusCode::OK,
             &json!({
@@ -37,32 +45,87 @@ fn server(runtime: &tokio::runtime::Runtime) -> String {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
-        tokio::spawn(serve_http_on(Arc::new(Echo), container, listener, std::future::pending()));
+        tokio::spawn(serve_http_on(
+            Arc::new(Echo),
+            container,
+            listener,
+            std::future::pending(),
+        ));
         format!("http://{addr}")
     })
 }
 
 #[test]
 fn blocking_calls_return_when_the_response_is_in() {
-    let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(1).enable_all().build().unwrap();
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .unwrap();
     let base = server(&runtime);
-    let client = Client::builder().user_agent("t/1").timeout(std::time::Duration::from_secs(5)).build().unwrap();
+    let client = Client::builder()
+        .user_agent("t/1")
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .unwrap();
 
-    let got: Value = client.get(format!("{base}/a")).query(&[("q", "x y")]).bearer_auth("tok").send().unwrap().json().unwrap();
-    assert_eq!((got["method"].as_str(), got["authorization"].as_str()), (Some("GET"), Some("Bearer tok")));
+    let got: Value = client
+        .get(format!("{base}/a"))
+        .query(&[("q", "x y")])
+        .bearer_auth("tok")
+        .send()
+        .unwrap()
+        .json()
+        .unwrap();
+    assert_eq!(
+        (got["method"].as_str(), got["authorization"].as_str()),
+        (Some("GET"), Some("Bearer tok"))
+    );
     assert_eq!(got["uri"], "/a?q=x%20y");
 
-    let posted = client.post(format!("{base}/b")).json(&json!({"k": 1})).send().unwrap();
+    let posted = client
+        .post(format!("{base}/b"))
+        .json(&json!({"k": 1}))
+        .send()
+        .unwrap();
     assert_eq!(posted.status(), StatusCode::OK);
     let posted: Value = posted.json().unwrap();
     assert_eq!(posted["body"], r#"{"k":1}"#);
 
-    let text = client.put(format!("{base}/c")).body("raw").send().unwrap().text().unwrap();
+    let text = client
+        .put(format!("{base}/c"))
+        .body("raw")
+        .send()
+        .unwrap()
+        .text()
+        .unwrap();
     assert!(text.contains("\"PUT\"") && text.contains("raw"), "{text}");
-    let bytes = client.patch(format!("{base}/d")).form(&[("a", "1")]).send().unwrap().bytes().unwrap();
+    let bytes = client
+        .patch(format!("{base}/d"))
+        .form(&[("a", "1")])
+        .send()
+        .unwrap()
+        .bytes()
+        .unwrap();
     assert!(!bytes.is_empty());
-    assert!(client.head(format!("{base}/e")).send().unwrap().status().is_success());
-    assert!(client.delete(format!("{base}/f")).basic_auth("u", Some("p")).header("x-a", "b").send().unwrap().headers().contains_key("content-type"));
+    assert!(
+        client
+            .head(format!("{base}/e"))
+            .send()
+            .unwrap()
+            .status()
+            .is_success()
+    );
+    assert!(
+        client
+            .delete(format!("{base}/f"))
+            .basic_auth("u", Some("p"))
+            .header("x-a", "b")
+            .send()
+            .unwrap()
+            .headers()
+            .contains_key("content-type")
+    );
     assert!(Client::new().get("http://127.0.0.1:1/").send().is_err());
     drop(runtime);
 }

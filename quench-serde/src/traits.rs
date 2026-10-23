@@ -864,7 +864,10 @@ mod tests {
         round_trip(&-7_i128);
         assert!(matches!(u128::MAX.serialize(), Value::Float(f) if f > 3.0e38));
         assert!(matches!(i128::MIN.serialize(), Value::Float(f) if f < -1.0e38));
-        assert!(err::<u128>(Value::from(-1)).contains("u64") || !err::<u128>(Value::from(-1)).is_empty());
+        assert!(
+            err::<u128>(Value::from(-1)).contains("u64")
+                || !err::<u128>(Value::from(-1)).is_empty()
+        );
     }
 
     #[test]
@@ -872,7 +875,20 @@ mod tests {
         round_trip(&(1_u8,));
         round_trip(&(1_u8, "two".to_string()));
         round_trip(&(1_u8, 2_i8, 3_u16, 4_u32, 5_i64, 6_usize));
-        round_trip(&(1_u8, 2_i8, 3_u16, 4_u32, 5_i64, 6_usize, 7_u8, 8_u8, 9_u8, 10_u8, 11_u8, "twelve".to_string()));
+        round_trip(&(
+            1_u8,
+            2_i8,
+            3_u16,
+            4_u32,
+            5_i64,
+            6_usize,
+            7_u8,
+            8_u8,
+            9_u8,
+            10_u8,
+            11_u8,
+            "twelve".to_string(),
+        ));
         assert_eq!(
             (1_u8, "a").serialize(),
             Value::Array(vec![Value::from(1), Value::from("a")])

@@ -662,7 +662,14 @@ mod pool {
 async fn a_client_user_agent_is_sent_and_a_request_can_replace_it() {
     let base = plain_server().await;
     let client = Client::builder().user_agent("conveyor/1").build().unwrap();
-    let echoed: Value = client.get(format!("{base}/echo")).send().await.unwrap().json().await.unwrap();
+    let echoed: Value = client
+        .get(format!("{base}/echo"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
     assert_eq!(echoed["user_agent"], "conveyor/1");
     let replaced: Value = client
         .get(format!("{base}/echo"))
@@ -674,9 +681,19 @@ async fn a_client_user_agent_is_sent_and_a_request_can_replace_it() {
         .await
         .unwrap();
     assert_eq!(replaced["user_agent"], "other");
-    let none: Value = Client::new().get(format!("{base}/echo")).send().await.unwrap().json().await.unwrap();
+    let none: Value = Client::new()
+        .get(format!("{base}/echo"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
     assert_eq!(none["user_agent"], Value::Null);
-    assert!(matches!(Client::builder().user_agent("bad\nagent").build(), Err(Error::Build(_))));
+    assert!(matches!(
+        Client::builder().user_agent("bad\nagent").build(),
+        Err(Error::Build(_))
+    ));
 }
 
 #[tokio::test]
@@ -685,7 +702,11 @@ async fn a_streamed_response_arrives_chunk_by_chunk_or_whole() {
     let base = plain_server().await;
     let client = Client::new();
 
-    let response = client.get(format!("{base}/stream")).send_streaming().await.unwrap();
+    let response = client
+        .get(format!("{base}/stream"))
+        .send_streaming()
+        .await
+        .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     let mut stream = response.bytes_stream();
     let mut all = Vec::new();
@@ -695,16 +716,41 @@ async fn a_streamed_response_arrives_chunk_by_chunk_or_whole() {
     assert_eq!(all, b"one,two,three");
 
     // The ordinary readers work on a streamed response too, and a buffered one is a single chunk.
-    let text = client.get(format!("{base}/stream")).send_streaming().await.unwrap().text().await.unwrap();
+    let text = client
+        .get(format!("{base}/stream"))
+        .send_streaming()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
     assert_eq!(text, "one,two,three");
-    let mut buffered = client.get(format!("{base}/echo")).send().await.unwrap().bytes_stream();
+    let mut buffered = client
+        .get(format!("{base}/echo"))
+        .send()
+        .await
+        .unwrap()
+        .bytes_stream();
     assert!(buffered.next().await.unwrap().is_ok());
     assert!(buffered.next().await.is_none());
 
     let capped = Client::builder().max_response_bytes(5).build().unwrap();
-    let error = capped.get(format!("{base}/stream")).send_streaming().await.unwrap().bytes().await.unwrap_err();
+    let error = capped
+        .get(format!("{base}/stream"))
+        .send_streaming()
+        .await
+        .unwrap()
+        .bytes()
+        .await
+        .unwrap_err();
     assert!(matches!(error, Error::Transport(_)), "{error}");
-    assert!(Client::new().get("not a url").send_streaming().await.is_err());
+    assert!(
+        Client::new()
+            .get("not a url")
+            .send_streaming()
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]
@@ -712,8 +758,19 @@ async fn headers_can_be_added_in_bulk_and_the_protocol_types_come_with_the_clien
     use quench_client::transport::{HeaderMap, HeaderValue, header};
     let base = plain_server().await;
     let mut headers = HeaderMap::new();
-    headers.insert(header::AUTHORIZATION, HeaderValue::from_static("Bearer bulk"));
-    let echoed: Value = Client::new().get(format!("{base}/echo")).headers(headers).send().await.unwrap().json().await.unwrap();
+    headers.insert(
+        header::AUTHORIZATION,
+        HeaderValue::from_static("Bearer bulk"),
+    );
+    let echoed: Value = Client::new()
+        .get(format!("{base}/echo"))
+        .headers(headers)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
     assert_eq!(echoed["authorization"], "Bearer bulk");
 }
 
@@ -721,7 +778,14 @@ async fn headers_can_be_added_in_bulk_and_the_protocol_types_come_with_the_clien
 async fn patch_and_head_are_requests_too() {
     let base = plain_server().await;
     let client = Client::new();
-    let patched: Value = client.patch(format!("{base}/echo")).send().await.unwrap().json().await.unwrap();
+    let patched: Value = client
+        .patch(format!("{base}/echo"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
     assert_eq!(patched["method"], "PATCH");
     let head = client.head(format!("{base}/echo")).send().await.unwrap();
     assert!(head.status().is_success());
@@ -731,7 +795,15 @@ async fn patch_and_head_are_requests_too() {
 async fn query_pairs_are_appended_and_encoded() {
     let base = plain_server().await;
     let client = Client::new();
-    let echoed: Value = client.get(format!("{base}/echo")).query(&[("q", "a b&c"), ("n", "1")]).send().await.unwrap().json().await.unwrap();
+    let echoed: Value = client
+        .get(format!("{base}/echo"))
+        .query(&[("q", "a b&c"), ("n", "1")])
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
     assert_eq!(echoed["path"], "/echo");
     let again = client.get(format!("{base}/echo?x=1")).query(&[("y", "2")]);
     assert!(format!("{again:?}").contains("x=1&y=2"), "{again:?}");
@@ -740,4 +812,3 @@ async fn query_pairs_are_appended_and_encoded() {
     let bad = Client::new().get("not a url").query(&[("a", "b")]);
     assert!(bad.send().await.is_err());
 }
-

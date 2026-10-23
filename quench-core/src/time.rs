@@ -396,11 +396,27 @@ impl Time {
     #[must_use]
     pub fn format(&self, pattern: &str) -> String {
         const FULL_MONTHS: [&str; 12] = [
-            "January", "February", "March", "April", "May", "June", "July", "August", "September",
-            "October", "November", "December",
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
         ];
         const FULL_DAYS: [&str; 7] = [
-            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
         ];
         let c = self.civil();
         let weekday = self.weekday();
@@ -442,11 +458,14 @@ impl Time {
                 }
                 'j' => {
                     let jan1 = days_from_civil(i64::from(c.year), 1, 1);
-                    let today = days_from_civil(i64::from(c.year), i64::from(c.month), i64::from(c.day));
+                    let today =
+                        days_from_civil(i64::from(c.year), i64::from(c.month), i64::from(c.day));
                     let _ = write!(out, "{:03}", today - jan1 + 1);
                 }
                 'a' => out.push_str(weekday.name()),
-                'A' => out.push_str(FULL_DAYS[Weekday::ALL.iter().position(|d| *d == weekday).unwrap_or(0)]),
+                'A' => out.push_str(
+                    FULL_DAYS[Weekday::ALL.iter().position(|d| *d == weekday).unwrap_or(0)],
+                ),
                 'b' => out.push_str(MONTHS[(c.month - 1) as usize]),
                 'B' => out.push_str(FULL_MONTHS[(c.month - 1) as usize]),
                 'F' => {
@@ -966,12 +985,20 @@ mod tests {
         let t = Time::from_ymd_hms(2026, 3, 5, 7, 8, 9).unwrap();
         assert_eq!(t.format("%Y-%m-%d %H:%M:%S"), "2026-03-05 07:08:09");
         assert_eq!(t.format("%F %T"), "2026-03-05 07:08:09");
-        assert_eq!(t.format("%y|%e|%j|%a|%A|%b|%B|%Z|%z|%%"), "26| 5|064|Thu|Thursday|Mar|March|UTC|+0000|%");
+        assert_eq!(
+            t.format("%y|%e|%j|%a|%A|%b|%B|%Z|%z|%%"),
+            "26| 5|064|Thu|Thursday|Mar|March|UTC|+0000|%"
+        );
         assert_eq!(t.format("%s"), t.timestamp().to_string());
         let t = Time::from_unix_nanos(0, 123_456_789);
         assert_eq!(t.format("%f %3f %6f"), "123456789 123 123456");
         assert_eq!(t.format("%Q 100%"), "%Q 100%");
-        assert_eq!(Time::from_ymd_hms(2024, 12, 31, 0, 0, 0).unwrap().format("%j"), "366");
+        assert_eq!(
+            Time::from_ymd_hms(2024, 12, 31, 0, 0, 0)
+                .unwrap()
+                .format("%j"),
+            "366"
+        );
     }
 
     #[test]

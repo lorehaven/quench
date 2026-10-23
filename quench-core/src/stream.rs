@@ -159,13 +159,15 @@ impl<A: Stream + Unpin, B: Stream<Item = A::Item> + Unpin> Stream for Chain<A, B
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         let (second_low, second_high) = self.second.size_hint();
-        self.first.as_ref().map_or((second_low, second_high), |first| {
-            let (low, high) = first.size_hint();
-            (
-                low.saturating_add(second_low),
-                high.zip(second_high).and_then(|(a, b)| a.checked_add(b)),
-            )
-        })
+        self.first
+            .as_ref()
+            .map_or((second_low, second_high), |first| {
+                let (low, high) = first.size_hint();
+                (
+                    low.saturating_add(second_low),
+                    high.zip(second_high).and_then(|(a, b)| a.checked_add(b)),
+                )
+            })
     }
 }
 
