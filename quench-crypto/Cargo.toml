@@ -21,7 +21,7 @@ quench-serde = { workspace = true, optional = true }
 ring = { workspace = true }
 
 [features]
-default = ["argon2", "ed25519", "rsa", "jwt", "totp", "aead"]
+default = ["argon2", "ed25519", "rsa", "jwt", "totp", "aead", "x25519", "age"]
 # Argon2id password hashing (and the BLAKE2b it is built on).
 argon2 = []
 # Ed25519 signing keys and verification.
@@ -32,6 +32,10 @@ rsa = []
 totp = []
 # ChaCha20-Poly1305 and XChaCha20-Poly1305 authenticated encryption.
 aead = []
+# X25519 key agreement for stored keys.
+x25519 = []
+# age file encryption (X25519 recipients).
+age = ["aead", "x25519"]
 # JSON Web Tokens; needs the signature schemes it supports.
 jwt = ["dep:quench-serde", "ed25519", "rsa"]
 

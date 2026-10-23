@@ -1,0 +1,23 @@
+[package]
+name = "quench-args-macros"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - derive macros for quench-args (Parser, Args, Subcommand, ValueEnum)"
+keywords = ["cli", "macros"]
+categories = ["command-line-interface"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
+
+[lints]
+workspace = true

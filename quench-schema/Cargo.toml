@@ -1,0 +1,23 @@
+[package]
+name = "quench-schema"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - JSON Schema validation over quench-serde values (the draft 2020-12 keywords Kubernetes CRDs and configuration use)"
+keywords = ["json-schema", "validation", "json"]
+categories = ["encoding", "data-structures"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_schema"
+path = "src/lib.rs"
+
+[dependencies]
+quench-regex = { workspace = true }
+quench-serde = { workspace = true }
+
+[lints]
+workspace = true

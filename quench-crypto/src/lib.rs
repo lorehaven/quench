@@ -10,6 +10,8 @@
 
 #[cfg(feature = "aead")]
 pub mod aead;
+#[cfg(feature = "age")]
+pub mod age;
 #[cfg(feature = "argon2")]
 pub mod argon2;
 #[cfg(feature = "argon2")]
@@ -18,6 +20,7 @@ pub mod ct;
 #[cfg(feature = "ed25519")]
 pub mod ed25519;
 pub mod hash;
+pub mod hkdf;
 pub mod hmac;
 #[cfg(feature = "jwt")]
 pub mod jwt;
@@ -26,3 +29,5 @@ pub mod pbkdf2;
 pub mod rsa;
 #[cfg(feature = "totp")]
 pub mod totp;
+#[cfg(feature = "x25519")]
+pub mod x25519;

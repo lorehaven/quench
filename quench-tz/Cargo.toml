@@ -1,0 +1,22 @@
+[package]
+name = "quench-tz"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - IANA time zones: offsets, daylight saving and local-time resolution, with the zone database built in"
+keywords = ["timezone", "tzdata", "iana", "dst"]
+categories = ["date-and-time"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_tz"
+path = "src/lib.rs"
+
+[dependencies]
+quench-core = { workspace = true }
+
+[lints]
+workspace = true

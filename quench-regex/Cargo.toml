@@ -1,0 +1,19 @@
+[package]
+name = "quench-regex"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - regular expressions with Unicode classes, captures and replacement, no dependencies"
+keywords = ["regex", "regular-expression", "pattern", "text"]
+categories = ["text-processing"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_regex"
+path = "src/lib.rs"
+
+[lints]
+workspace = true

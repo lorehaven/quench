@@ -1,8 +1,8 @@
 //! UTC time: instants, signed durations, RFC 3339 / RFC 2822 text.
 //!
-//! Deliberately UTC-only: every use in quench is a stored or logged instant,
-//! never a calendar in a local zone. Both types hold plain nanosecond counts,
-//! so ordering and arithmetic are exact and cannot overflow in practice.
+//! Deliberately UTC-only: every use in quench is a stored or logged instant. Both types hold plain
+//! nanosecond counts, so ordering and arithmetic are exact and cannot overflow in practice. Calendar dates
+//! without a zone are in [`crate::date`], and `quench-tz` adds named zones on top.
 
 use std::fmt::{self, Write as _};
 use std::ops::{Add, AddAssign, Mul, Neg, Sub, SubAssign};
@@ -184,7 +184,7 @@ pub enum Weekday {
 }
 
 impl Weekday {
-    const ALL: [Self; 7] = [
+    pub(crate) const ALL: [Self; 7] = [
         Self::Mon,
         Self::Tue,
         Self::Wed,
@@ -251,6 +251,35 @@ pub struct Civil {
     pub nanosecond: u32,
 }
 
+impl Civil {
+    /// The calendar date.
+    #[must_use]
+    pub fn date(&self) -> crate::date::Date {
+        crate::date::Date::from_ymd(self.year, self.month, self.day).unwrap_or_default()
+    }
+
+    /// The fields as an instant, reading them as UTC. `None` when a field is out of range.
+    #[must_use]
+    pub fn to_time(&self) -> Option<Time> {
+        let base = Time::from_ymd_hms(
+            self.year,
+            self.month,
+            self.day,
+            self.hour,
+            self.minute,
+            self.second,
+        )?;
+        (self.nanosecond < 1_000_000_000)
+            .then(|| base + Duration::nanoseconds(i64::from(self.nanosecond)))
+    }
+
+    /// The day of the week of the date.
+    #[must_use]
+    pub fn weekday(&self) -> Weekday {
+        self.date().weekday()
+    }
+}
+
 /// An instant in time, UTC, nanoseconds since 1970-01-01T00:00:00Z.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Time {
@@ -260,6 +289,12 @@ pub struct Time {
 /// Text that is not valid RFC 3339.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseTimeError(String);
+
+impl ParseTimeError {
+    pub(crate) const fn new(message: String) -> Self {
+        Self(message)
+    }
+}
 
 impl fmt::Display for ParseTimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -616,11 +651,11 @@ fn clock_nanos() -> i128 {
     CLOCK.get().map_or(0, |now| now())
 }
 
-const fn is_leap(year: i32) -> bool {
+pub(crate) const fn is_leap(year: i32) -> bool {
     (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
 
-const fn days_in_month(year: i32, month: u32) -> u32 {
+pub(crate) const fn days_in_month(year: i32, month: u32) -> u32 {
     match month {
         2 if is_leap(year) => 29,
         2 => 28,
@@ -630,7 +665,7 @@ const fn days_in_month(year: i32, month: u32) -> u32 {
 }
 
 /// Days since 1970-01-01 for a proleptic Gregorian date (H. Hinnant's algorithm).
-const fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+pub(crate) const fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let y = if month <= 2 { year - 1 } else { year };
     let era = y.div_euclid(400);
     let yoe = y - era * 400;
@@ -640,7 +675,7 @@ const fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
-fn civil_from_days(days: i64) -> (i64, i64, i64) {
+pub(crate) fn civil_from_days(days: i64) -> (i64, i64, i64) {
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z - era * 146_097;

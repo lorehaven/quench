@@ -18,7 +18,7 @@ set -l matrix \
     "quench-cache:request-cache data-cache redis tls" \
     "quench-db:postgres tls" \
     "quench-auth:http redis postgres tls" \
-    "quench-crypto:argon2 ed25519 rsa jwt totp aead" \
+    "quench-crypto:argon2 ed25519 rsa jwt totp aead x25519 age" \
     "quench-cli:tui repl" \
     "quench-serde:toml yaml"
 

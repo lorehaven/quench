@@ -7,6 +7,7 @@
 pub mod base32;
 pub mod base64;
 pub mod bytes;
+pub mod date;
 pub mod dotenv;
 pub mod env;
 pub mod error;

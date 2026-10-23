@@ -7,6 +7,7 @@ Quench is a modular Rust workspace of shared library crates split out of [Forge]
 ```text
 docs/
 ├── README.md                 # this file
+├── quench-args.md
 ├── quench-auth.md
 ├── quench-cache.md
 ├── quench-cli.md
@@ -38,6 +39,10 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench DB](./quench-db.md) — ORM/CRUD abstraction plus a migration catalog engine
 - [Quench Log](./quench-log.md) — leveled events, spans, console and rolling-file output
 - [Quench QR](./quench-qr.md) — QR code encoder (ISO 18004, versions 1-40) with SVG output, no dependencies
+- [Quench Args](./quench-args.md) — command-line parsing with clap-compatible derives, no clap
+- [Quench Schema](./quench-schema.md) — JSON Schema validation over quench-serde values
+- [Quench Regex](./quench-regex.md) — regular expressions with Unicode classes, no dependencies
+- [Quench TZ](./quench-tz.md) — IANA time zones with the database built in
 - [Quench PG](./quench-pg.md) — PostgreSQL wire-protocol client with SCRAM, TLS, pool
 - [Quench Redis](./quench-redis.md) — Redis client: RESP2/3, pool, cluster routing
 - [Quench Cache](./quench-cache.md) — shared in-process/Redis caching layer
@@ -62,7 +67,7 @@ Features are additive and, unless noted, on by default. Turn them off with `defa
 | `quench-cache` | `request-cache`, `data-cache`, `tls`; `redis` is off by default |
 | `quench-db` | `postgres`, `tls` |
 | `quench-auth` | `http`, `redis`, `postgres`, `tls` |
-| `quench-crypto` | `argon2`, `ed25519`, `rsa`, `jwt`, `totp`, `aead` |
+| `quench-crypto` | `argon2`, `ed25519`, `rsa`, `jwt`, `totp`, `aead`, `x25519`, `age` |
 | `quench-cli` | `tui`, `repl` |
 | `quench-serde` | `toml` (default), `yaml` (off by default) |
 
@@ -94,6 +99,8 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 
 ```text
 .
+├── quench-args/            # command-line argument parsing
+├── quench-args-macros/     # its derive macros
 ├── quench-auth/            # relying-party token/session verification
 ├── quench-cache/           # in-process/Redis caching layer
 ├── quench-cli/             # shared terminal UI styling and REPL line editor
@@ -110,7 +117,10 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ├── quench-mail/            # MIME message builder + async SMTP submission client
 ├── quench-pg/              # PostgreSQL client
 ├── quench-proto/           # HTTP types, HTTP/1.1, multipart, cookies, WebSocket, SSE
-├── quench-redis/           # Redis client
+├── quench-redis/
+├── quench-regex/           # regular expressions
+├── quench-schema/          # JSON Schema validation
+           # Redis client
 ├── quench-serde/           # JSON, urlencoded, Value, Serialize/Deserialize; features toml, yaml
 ├── quench-serde-macros/    # derives for quench-serde
 ├── quench-starter/         # service bootstrap
