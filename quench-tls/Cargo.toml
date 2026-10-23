@@ -1,6 +1,6 @@
 [package]
 name = "quench-tls"
-version = "0.1.2"
+version = "0.1.3"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - a thin async glue between tokio streams and rustls, with the trust-store helpers quench's servers and clients share"

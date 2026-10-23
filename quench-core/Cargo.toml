@@ -1,6 +1,6 @@
 [package]
 name = "quench-core"
-version = "0.1.2"
+version = "0.1.3"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - dependency-free foundations: time, uuid, base64/hex, errors, env, collections, versions"
