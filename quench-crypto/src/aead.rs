@@ -27,27 +27,45 @@ pub struct OpenError;
 
 impl fmt::Display for OpenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("decryption failed: wrong key or associated data, or the ciphertext was altered")
+        f.write_str(
+            "decryption failed: wrong key or associated data, or the ciphertext was altered",
+        )
     }
 }
 
 impl std::error::Error for OpenError {}
 
 fn key(bytes: &[u8; KEY_LEN]) -> LessSafeKey {
-    LessSafeKey::new(UnboundKey::new(&CHACHA20_POLY1305, bytes).expect("a 32-byte key is valid for ChaCha20-Poly1305"))
+    LessSafeKey::new(
+        UnboundKey::new(&CHACHA20_POLY1305, bytes)
+            .expect("a 32-byte key is valid for ChaCha20-Poly1305"),
+    )
 }
 
 fn encrypt(key: &LessSafeKey, nonce: [u8; NONCE_LEN], aad: &[u8], plaintext: &[u8]) -> Vec<u8> {
     let mut buffer = plaintext.to_vec();
-    key.seal_in_place_append_tag(Nonce::assume_unique_for_key(nonce), Aad::from(aad), &mut buffer)
-        .expect("a ChaCha20-Poly1305 seal cannot fail for a message that fits in memory");
+    key.seal_in_place_append_tag(
+        Nonce::assume_unique_for_key(nonce),
+        Aad::from(aad),
+        &mut buffer,
+    )
+    .expect("a ChaCha20-Poly1305 seal cannot fail for a message that fits in memory");
     buffer
 }
 
-fn decrypt(key: &LessSafeKey, nonce: [u8; NONCE_LEN], aad: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, OpenError> {
+fn decrypt(
+    key: &LessSafeKey,
+    nonce: [u8; NONCE_LEN],
+    aad: &[u8],
+    ciphertext: &[u8],
+) -> Result<Vec<u8>, OpenError> {
     let mut buffer = ciphertext.to_vec();
     let plain = key
-        .open_in_place(Nonce::assume_unique_for_key(nonce), Aad::from(aad), &mut buffer)
+        .open_in_place(
+            Nonce::assume_unique_for_key(nonce),
+            Aad::from(aad),
+            &mut buffer,
+        )
         .map_err(|_| OpenError)?;
     let len = plain.len();
     buffer.truncate(len);
@@ -82,7 +100,12 @@ impl ChaCha20Poly1305 {
     /// # Errors
     ///
     /// [`OpenError`] when the tag does not verify.
-    pub fn decrypt(&self, nonce: [u8; NONCE_LEN], aad: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, OpenError> {
+    pub fn decrypt(
+        &self,
+        nonce: [u8; NONCE_LEN],
+        aad: &[u8],
+        ciphertext: &[u8],
+    ) -> Result<Vec<u8>, OpenError> {
         decrypt(&key(&self.key), nonce, aad, ciphertext)
     }
 
@@ -144,7 +167,12 @@ impl XChaCha20Poly1305 {
     /// # Errors
     ///
     /// [`OpenError`] when the tag does not verify.
-    pub fn decrypt(&self, nonce: &[u8; XNONCE_LEN], aad: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, OpenError> {
+    pub fn decrypt(
+        &self,
+        nonce: &[u8; XNONCE_LEN],
+        aad: &[u8],
+        ciphertext: &[u8],
+    ) -> Result<Vec<u8>, OpenError> {
         let (key, inner) = self.derive(nonce);
         decrypt(&key, inner, aad, ciphertext)
     }
@@ -223,7 +251,10 @@ mod tests {
 
     #[test]
     fn hchacha20_matches_the_draft_vector() {
-        let key: [u8; 32] = unhex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f").try_into().unwrap();
+        let key: [u8; 32] =
+            unhex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
+                .try_into()
+                .unwrap();
         let nonce = unhex("000000090000004a0000000031415927");
         assert_eq!(
             quench_core::hex::encode(hchacha20(&key, &nonce)),
@@ -234,7 +265,10 @@ mod tests {
     #[test]
     fn chacha20_poly1305_matches_rfc_8439() {
         // RFC 8439 section 2.8.2.
-        let key: [u8; 32] = unhex("808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f").try_into().unwrap();
+        let key: [u8; 32] =
+            unhex("808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f")
+                .try_into()
+                .unwrap();
         let nonce: [u8; 12] = unhex("070000004041424344454647").try_into().unwrap();
         let aad = unhex("50515253c0c1c2c3c4c5c6c7");
         let plain = b"Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it.";
@@ -244,32 +278,54 @@ mod tests {
             "1ae10b594f09e26a7e902ecbd0600691"
         );
         assert!(quench_core::hex::encode(&sealed).starts_with("d31a8d34648e60db7b86afbc53ef7ec2"));
-        assert_eq!(ChaCha20Poly1305::new(key).decrypt(nonce, &aad, &sealed).unwrap(), plain);
+        assert_eq!(
+            ChaCha20Poly1305::new(key)
+                .decrypt(nonce, &aad, &sealed)
+                .unwrap(),
+            plain
+        );
     }
 
     #[test]
     fn xchacha20_poly1305_matches_the_draft() {
         // draft-irtf-cfrg-xchacha appendix A.3.1.
-        let key: [u8; 32] = unhex("808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f").try_into().unwrap();
-        let nonce: [u8; 24] = unhex("404142434445464748494a4b4c4d4e4f5051525354555657").try_into().unwrap();
+        let key: [u8; 32] =
+            unhex("808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f")
+                .try_into()
+                .unwrap();
+        let nonce: [u8; 24] = unhex("404142434445464748494a4b4c4d4e4f5051525354555657")
+            .try_into()
+            .unwrap();
         let aad = unhex("50515253c0c1c2c3c4c5c6c7");
         let plain = b"Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it.";
         let sealed = XChaCha20Poly1305::new(key).encrypt(&nonce, &aad, plain);
         assert!(quench_core::hex::encode(&sealed).starts_with("bd6d179d3e83d43b9576579493c0e939"));
-        assert_eq!(quench_core::hex::encode(&sealed[sealed.len() - 16..]), "c0875924c1c7987947deafd8780acf49");
-        assert_eq!(XChaCha20Poly1305::new(key).decrypt(&nonce, &aad, &sealed).unwrap(), plain);
+        assert_eq!(
+            quench_core::hex::encode(&sealed[sealed.len() - 16..]),
+            "c0875924c1c7987947deafd8780acf49"
+        );
+        assert_eq!(
+            XChaCha20Poly1305::new(key)
+                .decrypt(&nonce, &aad, &sealed)
+                .unwrap(),
+            plain
+        );
     }
 
     #[test]
     fn seal_and_open_round_trip_and_bind_everything() {
         for (seal, open) in [
             (
-                Box::new(|aad: &[u8], p: &[u8]| ChaCha20Poly1305::new([7; 32]).seal(aad, p)) as Box<dyn Fn(&[u8], &[u8]) -> Vec<u8>>,
-                Box::new(|k: u8, aad: &[u8], s: &[u8]| ChaCha20Poly1305::new([k; 32]).open(aad, s)) as Box<dyn Fn(u8, &[u8], &[u8]) -> Result<Vec<u8>, OpenError>>,
+                Box::new(|aad: &[u8], p: &[u8]| ChaCha20Poly1305::new([7; 32]).seal(aad, p))
+                    as Box<dyn Fn(&[u8], &[u8]) -> Vec<u8>>,
+                Box::new(|k: u8, aad: &[u8], s: &[u8]| ChaCha20Poly1305::new([k; 32]).open(aad, s))
+                    as Box<dyn Fn(u8, &[u8], &[u8]) -> Result<Vec<u8>, OpenError>>,
             ),
             (
                 Box::new(|aad: &[u8], p: &[u8]| XChaCha20Poly1305::new([7; 32]).seal(aad, p)),
-                Box::new(|k: u8, aad: &[u8], s: &[u8]| XChaCha20Poly1305::new([k; 32]).open(aad, s)),
+                Box::new(|k: u8, aad: &[u8], s: &[u8]| {
+                    XChaCha20Poly1305::new([k; 32]).open(aad, s)
+                }),
             ),
         ] {
             let sealed = seal(b"ctx", b"secret");
@@ -281,7 +337,11 @@ mod tests {
             assert_eq!(open(7, b"ctx", &altered), Err(OpenError), "altered");
             assert_eq!(open(7, b"ctx", &sealed[..5]), Err(OpenError), "truncated");
             assert_ne!(seal(b"ctx", b"secret"), sealed, "a fresh nonce each time");
-            assert_eq!(open(7, b"", &seal(b"", b"")).unwrap(), b"", "empty plaintext");
+            assert_eq!(
+                open(7, b"", &seal(b"", b"")).unwrap(),
+                b"",
+                "empty plaintext"
+            );
         }
     }
 

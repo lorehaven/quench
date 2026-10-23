@@ -78,7 +78,10 @@ const fn level_bits(level: EcLevel) -> u32 {
 #[test]
 fn a_small_symbol_matches_the_reference_encoder() {
     let code = QrCode::new("Hello, World").unwrap();
-    assert_eq!((code.version(), code.size(), code.level(), code.mask()), (1, 21, EcLevel::M, 3));
+    assert_eq!(
+        (code.version(), code.size(), code.level(), code.mask()),
+        (1, 21, EcLevel::M, 3)
+    );
     for (y, row) in HELLO.iter().enumerate() {
         for (x, ch) in row.chars().enumerate() {
             assert_eq!(code.is_dark(x, y), ch == '#', "module ({x}, {y})");
@@ -86,7 +89,12 @@ fn a_small_symbol_matches_the_reference_encoder() {
     }
     let text = code.to_text();
     assert_eq!(text.lines().count(), 21);
-    assert!(text.lines().next().unwrap().starts_with("##############  ####"));
+    assert!(
+        text.lines()
+            .next()
+            .unwrap()
+            .starts_with("##############  ####")
+    );
 }
 
 #[test]
@@ -94,11 +102,32 @@ fn the_smallest_version_that_fits_is_chosen_and_the_limits_are_exact() {
     assert_eq!(QrCode::new("").unwrap().version(), 1);
     assert_eq!(QrCode::new(vec![b'a'; 14]).unwrap().version(), 1);
     assert_eq!(QrCode::new(vec![b'a'; 15]).unwrap().version(), 2);
-    assert_eq!(QrCode::with_level(vec![b'a'; 17], EcLevel::L).unwrap().version(), 1);
-    assert_eq!(QrCode::with_level(vec![0xffu8; 2953], EcLevel::L).unwrap().version(), 40);
-    assert_eq!(QrCode::with_level(vec![0u8; 1273], EcLevel::H).unwrap().version(), 40);
+    assert_eq!(
+        QrCode::with_level(vec![b'a'; 17], EcLevel::L)
+            .unwrap()
+            .version(),
+        1
+    );
+    assert_eq!(
+        QrCode::with_level(vec![0xffu8; 2953], EcLevel::L)
+            .unwrap()
+            .version(),
+        40
+    );
+    assert_eq!(
+        QrCode::with_level(vec![0u8; 1273], EcLevel::H)
+            .unwrap()
+            .version(),
+        40
+    );
     let error = QrCode::with_level(vec![0u8; 1274], EcLevel::H).unwrap_err();
-    assert_eq!(error, Error::TooLong { len: 1274, max: 1273 });
+    assert_eq!(
+        error,
+        Error::TooLong {
+            len: 1274,
+            max: 1273
+        }
+    );
     assert!(error.to_string().contains("1274"));
 }
 
@@ -106,13 +135,19 @@ fn the_smallest_version_that_fits_is_chosen_and_the_limits_are_exact() {
 fn every_version_and_level_lays_out_consistently() {
     for level in [EcLevel::L, EcLevel::M, EcLevel::Q, EcLevel::H] {
         for len in [0usize, 1, 7, 14, 22, 40, 90, 150, 280, 450, 700, 1000, 1273] {
-            let data: Vec<u8> = (0..len).map(|i| u8::try_from(i * 7 % 256).unwrap()).collect();
+            let data: Vec<u8> = (0..len)
+                .map(|i| u8::try_from(i * 7 % 256).unwrap())
+                .collect();
             let code = QrCode::with_level(&data, level).unwrap();
             let size = code.size();
             assert_eq!(size, usize::from(code.version()) * 4 + 17);
             // Finder patterns: a dark ring, a light ring, a dark 3x3 centre, at three corners.
             for (cx, cy) in [(3, 3), (size - 4, 3), (3, size - 4)] {
-                assert!(code.is_dark(cx, cy) && code.is_dark(cx + 1, cy + 1) && code.is_dark(cx - 3, cy - 3));
+                assert!(
+                    code.is_dark(cx, cy)
+                        && code.is_dark(cx + 1, cy + 1)
+                        && code.is_dark(cx - 3, cy - 3)
+                );
                 assert!(!code.is_dark(cx + 2, cy) && !code.is_dark(cx, cy + 2));
             }
             // Timing patterns alternate.
@@ -125,7 +160,10 @@ fn every_version_and_level_lays_out_consistently() {
             assert_eq!(bits, format_bits_second_copy(&code));
             let data_bits = (bits ^ 0x5412) >> 10;
             assert_eq!(data_bits, (level_bits(level) << 3) | u32::from(code.mask()));
-            assert_eq!(bits ^ 0x5412, (data_bits << 10) | (bch(data_bits, 0x537, 10) & 0x3ff));
+            assert_eq!(
+                bits ^ 0x5412,
+                (data_bits << 10) | (bch(data_bits, 0x537, 10) & 0x3ff)
+            );
             assert!(code.is_dark(8, size - 8), "the fixed dark module");
             // Version information (7 and up) is valid and written twice alike.
             if code.version() >= 7 {
@@ -153,7 +191,9 @@ fn encoding_is_deterministic_and_data_dependent() {
 #[test]
 fn modules_outside_the_symbol_are_light() {
     let code = QrCode::new("x").unwrap();
-    assert!(!code.is_dark(code.size(), 0) && !code.is_dark(0, code.size()) && !code.is_dark(1000, 1000));
+    assert!(
+        !code.is_dark(code.size(), 0) && !code.is_dark(0, code.size()) && !code.is_dark(1000, 1000)
+    );
 }
 
 #[test]
@@ -162,9 +202,15 @@ fn the_svg_is_a_scaled_document_with_a_quiet_zone() {
     let svg = code.to_svg(200);
     // 21 modules + 2 * 4 quiet = 29; 200 / 29 rounds up to 7 pixels per module.
     assert!(svg.starts_with("<?xml version=\"1.0\""));
-    assert!(svg.contains("width=\"203\" height=\"203\" viewBox=\"0 0 29 29\""), "{svg}");
+    assert!(
+        svg.contains("width=\"203\" height=\"203\" viewBox=\"0 0 29 29\""),
+        "{svg}"
+    );
     assert!(svg.contains("<rect width=\"29\" height=\"29\" fill=\"#fff\"/>"));
-    assert!(svg.contains("M4 4h7v1h-7z"), "the first finder row starts after the quiet zone: {svg}");
+    assert!(
+        svg.contains("M4 4h7v1h-7z"),
+        "the first finder row starts after the quiet zone: {svg}"
+    );
     assert!(svg.contains("fill=\"#000\"") && svg.trim_end().ends_with("</svg>"));
     // A smaller request still gives at least one pixel per module.
     assert!(QrCode::new("x").unwrap().to_svg(1).contains("width=\"29\""));
@@ -178,7 +224,9 @@ fn a_full_payload_fills_every_version_at_every_level() {
             let capacity = QrCode::capacity(version, level);
             assert!(capacity > previous, "capacity grows with the version");
             previous = capacity;
-            let data: Vec<u8> = (0..capacity).map(|i| u8::try_from(i % 251).unwrap()).collect();
+            let data: Vec<u8> = (0..capacity)
+                .map(|i| u8::try_from(i % 251).unwrap())
+                .collect();
             let code = QrCode::with_level(&data, level).unwrap();
             assert_eq!(code.version(), version, "{capacity} bytes at {level:?}");
             assert_eq!(code.size(), usize::from(version) * 4 + 17);

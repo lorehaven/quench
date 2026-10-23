@@ -39,7 +39,9 @@ pub fn encode(input: impl AsRef<[u8]>) -> String {
         }
     }
     if bits > 0 {
-        out.push(char::from(ALPHABET[usize::from((buffer << (5 - bits)) & 0x1f)]));
+        out.push(char::from(
+            ALPHABET[usize::from((buffer << (5 - bits)) & 0x1f)],
+        ));
     }
     out
 }
@@ -117,7 +119,9 @@ mod tests {
     #[test]
     fn every_length_of_random_looking_bytes_round_trips() {
         for len in 0..40u8 {
-            let data: Vec<u8> = (0..len).map(|i| i.wrapping_mul(37).wrapping_add(11)).collect();
+            let data: Vec<u8> = (0..len)
+                .map(|i| i.wrapping_mul(37).wrapping_add(11))
+                .collect();
             assert_eq!(decode(&encode(&data)).unwrap(), data);
         }
     }

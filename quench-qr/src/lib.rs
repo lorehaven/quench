@@ -28,7 +28,10 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::TooLong { len, max } => write!(f, "{len} bytes do not fit a QR code at this error-correction level (at most {max})"),
+            Self::TooLong { len, max } => write!(
+                f,
+                "{len} bytes do not fit a QR code at this error-correction level (at most {max})"
+            ),
         }
     }
 }
@@ -76,10 +79,12 @@ impl QrCode {
     /// [`Error::TooLong`] when even version 40 is too small.
     pub fn with_level(data: impl AsRef<[u8]>, level: EcLevel) -> Result<Self, Error> {
         let data = data.as_ref();
-        let version = (1..=40u8).find(|v| layout::fits(*v, level, data.len())).ok_or_else(|| Error::TooLong {
-            len: data.len(),
-            max: layout::capacity(40, level),
-        })?;
+        let version = (1..=40u8)
+            .find(|v| layout::fits(*v, level, data.len()))
+            .ok_or_else(|| Error::TooLong {
+                len: data.len(),
+                max: layout::capacity(40, level),
+            })?;
         Ok(layout::build(data, version, level))
     }
 
@@ -151,7 +156,14 @@ impl QrCode {
                 while self.is_dark(x, y) {
                     x += 1;
                 }
-                let _ = write!(path, "M{} {}h{}v1h-{}z", start + QUIET_ZONE, y + QUIET_ZONE, x - start, x - start);
+                let _ = write!(
+                    path,
+                    "M{} {}h{}v1h-{}z",
+                    start + QUIET_ZONE,
+                    y + QUIET_ZONE,
+                    x - start,
+                    x - start
+                );
             }
         }
         format!(

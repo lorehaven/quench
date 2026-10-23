@@ -1,9 +1,9 @@
 //! From bytes to modules: the bit stream, its blocks and error correction, the function patterns, the zigzag
 //! placement of the data, and the mask that scores best.
 
+use crate::QrCode;
 use crate::galois::remainder;
 use crate::tables::{EcLevel, blocks, ecc_per_block};
-use crate::QrCode;
 
 /// Modules per side.
 const fn size_of(version: u8) -> usize {
@@ -63,7 +63,10 @@ fn data_stream(data: &[u8], version: u8, level: EcLevel) -> Vec<u8> {
     let capacity_bits = data_codewords(version, level) * 8;
     let mut bits = BitBuffer(Vec::with_capacity(capacity_bits));
     bits.push(0b0100, 4);
-    bits.push(u32::try_from(data.len()).unwrap_or(u32::MAX), count_bits(version));
+    bits.push(
+        u32::try_from(data.len()).unwrap_or(u32::MAX),
+        count_bits(version),
+    );
     for &byte in data {
         bits.push(u32::from(byte), 8);
     }
@@ -72,7 +75,14 @@ fn data_stream(data: &[u8], version: u8, level: EcLevel) -> Vec<u8> {
     while !bits.0.len().is_multiple_of(8) {
         bits.0.push(false);
     }
-    let mut out: Vec<u8> = bits.0.chunks(8).map(|byte| byte.iter().fold(0u8, |acc, bit| (acc << 1) | u8::from(*bit))).collect();
+    let mut out: Vec<u8> = bits
+        .0
+        .chunks(8)
+        .map(|byte| {
+            byte.iter()
+                .fold(0u8, |acc, bit| (acc << 1) | u8::from(*bit))
+        })
+        .collect();
     let mut pad = [0xec, 0x11].into_iter().cycle();
     while out.len() < capacity_bits / 8 {
         out.extend(pad.next());
@@ -125,7 +135,11 @@ struct Grid {
 
 impl Grid {
     fn new(size: usize) -> Self {
-        Self { size, dark: vec![false; size * size], function: vec![false; size * size] }
+        Self {
+            size,
+            dark: vec![false; size * size],
+            function: vec![false; size * size],
+        }
     }
 
     fn set_function(&mut self, x: usize, y: usize, dark: bool) {
@@ -140,7 +154,10 @@ impl Grid {
     fn finder(&mut self, cx: usize, cy: usize) {
         for dy in -4i32..=4 {
             for dx in -4i32..=4 {
-                let (Some(x), Some(y)) = (cx.checked_add_signed(dx as isize), cy.checked_add_signed(dy as isize)) else {
+                let (Some(x), Some(y)) = (
+                    cx.checked_add_signed(dx as isize),
+                    cy.checked_add_signed(dy as isize),
+                ) else {
                     continue;
                 };
                 if x < self.size && y < self.size {
@@ -245,7 +262,11 @@ impl Grid {
                 for j in 0..2 {
                     let x = right - j;
                     let upward = ((right + 1) & 2) == 0;
-                    let y = if upward { size - 1 - vertical } else { vertical };
+                    let y = if upward {
+                        size - 1 - vertical
+                    } else {
+                        vertical
+                    };
                     if !self.is_function(x, y) && bit < codewords.len() * 8 {
                         self.dark[y * size + x] = (codewords[bit >> 3] >> (7 - (bit & 7))) & 1 == 1;
                         bit += 1;
@@ -308,7 +329,11 @@ impl Grid {
             for vertical in [false, true] {
                 // The symbol is surrounded by light modules.
                 let padded: Vec<bool> = (0..size + 8)
-                    .map(|i| i.checked_sub(4).filter(|j| *j < size).is_some_and(|j| if vertical { at(line, j) } else { at(j, line) }))
+                    .map(|i| {
+                        i.checked_sub(4)
+                            .filter(|j| *j < size)
+                            .is_some_and(|j| if vertical { at(line, j) } else { at(j, line) })
+                    })
                     .collect();
                 for window in padded.windows(11) {
                     if window == PATTERN_A || window == PATTERN_B {
@@ -327,8 +352,12 @@ impl Grid {
 }
 
 /// The finder-like pattern 1:1:3:1:1 followed by four light modules, and its mirror image.
-const PATTERN_A: [bool; 11] = [true, false, true, true, true, false, true, false, false, false, false];
-const PATTERN_B: [bool; 11] = [false, false, false, false, true, false, true, true, true, false, true];
+const PATTERN_A: [bool; 11] = [
+    true, false, true, true, true, false, true, false, false, false, false,
+];
+const PATTERN_B: [bool; 11] = [
+    false, false, false, false, true, false, true, true, true, false, true,
+];
 
 const fn mask_flips(mask: u8, x: usize, y: usize) -> bool {
     match mask {
@@ -378,7 +407,13 @@ pub fn build(data: &[u8], version: u8, level: EcLevel) -> QrCode {
     let mask = best.map_or(0, |(_, mask)| mask);
     grid.apply_mask(mask);
     grid.format_bits(level, mask);
-    QrCode { version, level, mask, size, modules: grid.dark }
+    QrCode {
+        version,
+        level,
+        mask,
+        size,
+        modules: grid.dark,
+    }
 }
 
 #[cfg(test)]
@@ -429,7 +464,11 @@ mod tests {
         let before = grid.dark.clone();
         for mask in 0..8 {
             grid.apply_mask(mask);
-            assert!((0..21).all(|y| (0..21).all(|x| !grid.is_function(x, y) || grid.dark[y * 21 + x] == before[y * 21 + x])));
+            assert!(
+                (0..21).all(|y| (0..21).all(
+                    |x| !grid.is_function(x, y) || grid.dark[y * 21 + x] == before[y * 21 + x]
+                ))
+            );
             grid.apply_mask(mask);
             assert_eq!(grid.dark, before);
         }

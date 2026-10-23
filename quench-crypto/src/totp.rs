@@ -50,7 +50,10 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::SecretTooShort(len) => {
-                write!(f, "a one-time-password secret needs at least {MIN_SECRET_BYTES} bytes, got {len}")
+                write!(
+                    f,
+                    "a one-time-password secret needs at least {MIN_SECRET_BYTES} bytes, got {len}"
+                )
             }
             Self::BadBase32(why) => write!(f, "the secret is not valid base32: {why}"),
             Self::BadDigits(digits) => write!(f, "a code has 6 to 9 digits, not {digits}"),
@@ -72,7 +75,12 @@ pub fn hotp(algorithm: Algorithm, key: &[u8], counter: u64, digits: u32) -> Stri
     let tag = hmac::sign(algorithm.hmac(), key, counter.to_be_bytes());
     // Dynamic truncation (RFC 4226 section 5.3).
     let offset = usize::from(tag[tag.len() - 1] & 0x0f);
-    let word = u32::from_be_bytes([tag[offset] & 0x7f, tag[offset + 1], tag[offset + 2], tag[offset + 3]]);
+    let word = u32::from_be_bytes([
+        tag[offset] & 0x7f,
+        tag[offset + 1],
+        tag[offset + 2],
+        tag[offset + 3],
+    ]);
     let modulus = 10u32.pow(digits.min(9));
     format!("{:0width$}", word % modulus, width = digits.min(9) as usize)
 }
@@ -109,7 +117,13 @@ impl Totp {
         if secret.len() < MIN_SECRET_BYTES {
             return Err(Error::SecretTooShort(secret.len()));
         }
-        Ok(Self { secret, algorithm: Algorithm::Sha1, digits: 6, step: 30, skew: 1 })
+        Ok(Self {
+            secret,
+            algorithm: Algorithm::Sha1,
+            digits: 6,
+            step: 30,
+            skew: 1,
+        })
     }
 
     /// Like [`new`](Self::new) from the base32 text apps display and accept.
@@ -161,7 +175,12 @@ impl Totp {
     /// The code valid at `unix_seconds`.
     #[must_use]
     pub fn code_at(&self, unix_seconds: u64) -> String {
-        hotp(self.algorithm, &self.secret, unix_seconds / self.step, self.digits)
+        hotp(
+            self.algorithm,
+            &self.secret,
+            unix_seconds / self.step,
+            self.digits,
+        )
     }
 
     /// The code valid now.
@@ -206,7 +225,9 @@ impl Totp {
 }
 
 fn now() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs())
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
 }
 
 /// Percent-encodes everything but the RFC 3986 unreserved characters.
@@ -230,22 +251,36 @@ mod tests {
     // RFC 4226 appendix D: key "12345678901234567890".
     #[test]
     fn hotp_matches_the_rfc_4226_vectors() {
-        let expected = ["755224", "287082", "359152", "969429", "338314", "254676", "287922", "162583", "399871", "520489"];
+        let expected = [
+            "755224", "287082", "359152", "969429", "338314", "254676", "287922", "162583",
+            "399871", "520489",
+        ];
         for (counter, code) in expected.iter().enumerate() {
-            assert_eq!(hotp(Algorithm::Sha1, b"12345678901234567890", counter as u64, 6), *code);
+            assert_eq!(
+                hotp(Algorithm::Sha1, b"12345678901234567890", counter as u64, 6),
+                *code
+            );
         }
     }
 
     // RFC 6238 appendix B, 8 digits, per-algorithm keys.
     #[test]
     fn totp_matches_the_rfc_6238_vectors() {
-        let sha1 = Totp::new(b"12345678901234567890".to_vec()).unwrap().with_digits(8).unwrap();
-        let sha256 = Totp::new(b"12345678901234567890123456789012".to_vec()).unwrap().with_algorithm(Algorithm::Sha256).with_digits(8).unwrap();
-        let sha512 = Totp::new(b"1234567890123456789012345678901234567890123456789012345678901234".to_vec())
+        let sha1 = Totp::new(b"12345678901234567890".to_vec())
             .unwrap()
-            .with_algorithm(Algorithm::Sha512)
             .with_digits(8)
             .unwrap();
+        let sha256 = Totp::new(b"12345678901234567890123456789012".to_vec())
+            .unwrap()
+            .with_algorithm(Algorithm::Sha256)
+            .with_digits(8)
+            .unwrap();
+        let sha512 =
+            Totp::new(b"1234567890123456789012345678901234567890123456789012345678901234".to_vec())
+                .unwrap()
+                .with_algorithm(Algorithm::Sha512)
+                .with_digits(8)
+                .unwrap();
         for (time, c1, c256, c512) in [
             (59, "94287082", "46119246", "90693936"),
             (1_111_111_109, "07081804", "68084774", "25091201"),
@@ -269,7 +304,10 @@ mod tests {
         assert!(totp.check_at(&totp.code_at(t + 30), t), "one step early");
         assert!(!totp.check_at(&totp.code_at(t - 120), t));
         assert!(!totp.check_at("000000", t) || totp.code_at(t) == "000000");
-        assert!(totp.check_at(&format!(" {} ", totp.code_at(t)), t), "surrounding space is ignored");
+        assert!(
+            totp.check_at(&format!(" {} ", totp.code_at(t)), t),
+            "surrounding space is ignored"
+        );
         assert!(!totp.check_at("12345", t) && !totp.check_at("", t));
         let strict = totp.clone().with_skew(0);
         assert!(!strict.check_at(&strict.code_at(t - 30), t));
@@ -280,14 +318,30 @@ mod tests {
     fn construction_validates_and_the_secret_stays_out_of_debug() {
         assert_eq!(Totp::new(vec![1; 15]), Err(Error::SecretTooShort(15)));
         assert!(Totp::from_base32("not base32!").is_err());
-        assert_eq!(Totp::new(vec![1; 16]).unwrap().with_digits(5), Err(Error::BadDigits(5)));
-        assert_eq!(Totp::new(vec![1; 16]).unwrap().with_digits(10), Err(Error::BadDigits(10)));
+        assert_eq!(
+            Totp::new(vec![1; 16]).unwrap().with_digits(5),
+            Err(Error::BadDigits(5))
+        );
+        assert_eq!(
+            Totp::new(vec![1; 16]).unwrap().with_digits(10),
+            Err(Error::BadDigits(10))
+        );
         let totp = Totp::new(b"12345678901234567890".to_vec()).unwrap();
         let shown = format!("{totp:?}");
-        assert!(!shown.contains("GEZDG") && !shown.contains("12345"), "{shown}");
+        assert!(
+            !shown.contains("GEZDG") && !shown.contains("12345"),
+            "{shown}"
+        );
         assert_eq!(Totp::from_base32(&totp.secret_base32()).unwrap(), totp);
-        assert_eq!(totp.clone().with_step(0).code_at(5), totp.with_step(1).code_at(5));
-        for error in [Error::SecretTooShort(3), Error::BadBase32(quench_core::base32::DecodeError::InvalidLength), Error::BadDigits(4)] {
+        assert_eq!(
+            totp.clone().with_step(0).code_at(5),
+            totp.with_step(1).code_at(5)
+        );
+        for error in [
+            Error::SecretTooShort(3),
+            Error::BadBase32(quench_core::base32::DecodeError::InvalidLength),
+            Error::BadDigits(4),
+        ] {
             assert!(!error.to_string().is_empty());
         }
     }
