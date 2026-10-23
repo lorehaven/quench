@@ -604,7 +604,7 @@ async fn exchange(
             return Ok(Response {
                 status,
                 headers: response_headers,
-                body: ResponseBody::Streaming(result.response.body),
+                body: ResponseBody::Streaming(std::panic::AssertUnwindSafe(result.response.body)),
                 limit: client.inner.max_response_bytes.unwrap_or(usize::MAX),
             });
         }
@@ -652,7 +652,8 @@ pub struct Response {
 #[derive(Debug)]
 enum ResponseBody {
     Buffered(Bytes),
-    Streaming(Body),
+    // `AssertUnwindSafe`: a response held across a `catch_unwind` stays usable, as it was before streaming.
+    Streaming(std::panic::AssertUnwindSafe<Body>),
 }
 
 // The body is already buffered, so these never await - async keeps the signatures
@@ -675,6 +676,7 @@ impl Response {
         match self.body {
             ResponseBody::Buffered(bytes) => Ok(bytes),
             ResponseBody::Streaming(body) => body
+                .0
                 .collect_limited(self.limit)
                 .await
                 .map_err(|e| Error::Transport(e.to_string())),
@@ -696,7 +698,7 @@ impl Response {
     pub fn bytes_stream(self) -> BoxStream<'static, Result<Bytes>> {
         match self.body {
             ResponseBody::Buffered(bytes) => Box::pin(quench_core::stream::once(Ok(bytes))),
-            ResponseBody::Streaming(body) => Box::pin(StreamExt::map(body, |chunk| {
+            ResponseBody::Streaming(body) => Box::pin(StreamExt::map(body.0, |chunk| {
                 chunk.map_err(|e| Error::Transport(e.to_string()))
             })),
         }
