@@ -199,14 +199,36 @@ async fn the_redirect_policy_can_hand_back_the_redirect() {
     let base = plain_server().await;
 
     let client = Client::builder().redirect(Redirect::None).build().unwrap();
-    let response = client.get(format!("{base}/redirect-get")).send().await.unwrap();
+    let response = client
+        .get(format!("{base}/redirect-get"))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(response.status(), StatusCode::FOUND);
-    assert_eq!(response.headers().get("location").and_then(|v| v.to_str().ok()), Some("/echo"));
+    assert_eq!(
+        response
+            .headers()
+            .get("location")
+            .and_then(|v| v.to_str().ok()),
+        Some("/echo")
+    );
 
-    let limited = Client::builder().redirect(Redirect::Limited(2)).build().unwrap();
-    let err = limited.get(format!("{base}/loop")).send().await.err().unwrap();
+    let limited = Client::builder()
+        .redirect(Redirect::Limited(2))
+        .build()
+        .unwrap();
+    let err = limited
+        .get(format!("{base}/loop"))
+        .send()
+        .await
+        .err()
+        .unwrap();
     assert!(matches!(err, Error::Transport(m) if m.contains("redirect")));
-    let followed = limited.get(format!("{base}/redirect-get")).send().await.unwrap();
+    let followed = limited
+        .get(format!("{base}/redirect-get"))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(followed.status(), StatusCode::OK);
 }
 
@@ -214,9 +236,12 @@ async fn the_redirect_policy_can_hand_back_the_redirect() {
 async fn multipart_bodies_carry_their_boundary() {
     use quench_client::multipart::{Form, Part};
     let base = plain_server().await;
-    let form = Form::new()
-        .text("title", "hello")
-        .part("file", Part::bytes(&b"contents"[..]).file_name("a.txt").mime_str("text/plain"));
+    let form = Form::new().text("title", "hello").part(
+        "file",
+        Part::bytes(&b"contents"[..])
+            .file_name("a.txt")
+            .mime_str("text/plain"),
+    );
     let boundary = form.boundary().to_string();
     let echoed: Value = Client::new()
         .post(format!("{base}/echo"))
@@ -243,7 +268,10 @@ async fn cookies_are_read_from_responses_and_sent_back() {
     let response = client.get(format!("{base}/cookies")).send().await.unwrap();
     assert_eq!(
         response.cookies(),
-        vec![("session".to_string(), "abc123".to_string()), ("theme".to_string(), "dark".to_string())]
+        vec![
+            ("session".to_string(), "abc123".to_string()),
+            ("theme".to_string(), "dark".to_string())
+        ]
     );
     assert_eq!(response.cookie("theme").as_deref(), Some("dark"));
     assert_eq!(response.cookie("missing"), None);

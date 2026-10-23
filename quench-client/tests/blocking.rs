@@ -18,7 +18,9 @@ struct Echo;
 impl Endpoint for Echo {
     async fn call(&self, mut req: Request) -> Response {
         match req.uri().path() {
-            "/redirect" => return Response::new(StatusCode::FOUND).header("location", "/elsewhere"),
+            "/redirect" => {
+                return Response::new(StatusCode::FOUND).header("location", "/elsewhere");
+            }
             "/cookie" => return Response::ok().append_header("set-cookie", "k=v; Path=/"),
             _ => {}
         }
@@ -164,5 +166,10 @@ fn blocking_redirects_cookies_and_multipart() {
         .unwrap()
         .json()
         .unwrap();
-    assert!(echoed["body"].as_str().unwrap().contains("name=\"a\"\r\n\r\nb"));
+    assert!(
+        echoed["body"]
+            .as_str()
+            .unwrap()
+            .contains("name=\"a\"\r\n\r\nb")
+    );
 }

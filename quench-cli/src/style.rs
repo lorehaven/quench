@@ -5,8 +5,10 @@
 
 use std::fmt;
 
-/// The sixteen ANSI colours. The plain names are the bright ones (`Red` is `\x1b[91m`), the `Dark` names the
-/// normal ones (`DarkRed` is `\x1b[31m`), and `Grey` is the light grey that sits between `DarkGrey` and `White`.
+/// The sixteen ANSI colours.
+///
+/// The plain names are the bright ones (`Red` is `\x1b[91m`), the `Dark` names the normal ones (`DarkRed` is
+/// `\x1b[31m`), and `Grey` is the light grey that sits between `DarkGrey` and `White`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Color {
     Black,

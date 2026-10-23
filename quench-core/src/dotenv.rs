@@ -109,7 +109,11 @@ pub fn parse(text: &str) -> Result<Vec<(String, String)>, ParseError> {
                 message: format!("`{key}` has no `=`"),
             });
         }
-        if key.is_empty() || !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.') {
+        if key.is_empty()
+            || !key
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
+        {
             return Err(ParseError {
                 line: start_line,
                 message: format!("`{key}` is not a valid name"),
@@ -122,10 +126,11 @@ pub fn parse(text: &str) -> Result<Vec<(String, String)>, ParseError> {
                 .or_else(|| std::env::var(name).ok())
                 .unwrap_or_default()
         };
-        let value = read_value(&chars, &mut at, &mut line, &lookup).map_err(|message| ParseError {
-            line: start_line,
-            message,
-        })?;
+        let value =
+            read_value(&chars, &mut at, &mut line, &lookup).map_err(|message| ParseError {
+                line: start_line,
+                message,
+            })?;
         seen.insert(key.to_string(), value.clone());
         pairs.push((key.to_string(), value));
     }
@@ -300,13 +305,22 @@ mod tests {
         let got = pairs("# top\n\nA=1\n  B = two words  \nexport C=3\nD=\nE=x # note\nF=a#b\n");
         assert_eq!(
             got,
-            [kv("A", "1"), kv("B", "two words"), kv("C", "3"), kv("D", ""), kv("E", "x"), kv("F", "a#b")]
+            [
+                kv("A", "1"),
+                kv("B", "two words"),
+                kv("C", "3"),
+                kv("D", ""),
+                kv("E", "x"),
+                kv("F", "a#b")
+            ]
         );
     }
 
     #[test]
     fn quotes() {
-        let got = pairs("A='lit $X \\n'\nB=\"tab\\there \\\"q\\\" \\$X \\\\\"\nC=\"multi\nline\"\nD=\"keeps trailing \"\nE=a\"b c\"'d'\n");
+        let got = pairs(
+            "A='lit $X \\n'\nB=\"tab\\there \\\"q\\\" \\$X \\\\\"\nC=\"multi\nline\"\nD=\"keeps trailing \"\nE=a\"b c\"'d'\n",
+        );
         assert_eq!(
             got,
             [
@@ -344,10 +358,30 @@ mod tests {
     #[test]
     fn malformed_lines_name_their_line() {
         assert_eq!(parse("A=1\nnoequals\n").unwrap_err().line, 2);
-        assert!(parse("=v").unwrap_err().to_string().contains("not a valid name"));
-        assert!(parse("A=\"open").unwrap_err().message.contains("unterminated"));
-        assert!(parse("A='open").unwrap_err().message.contains("unterminated"));
-        assert!(parse("A=\"x\\").unwrap_err().message.contains("unterminated"));
+        assert!(
+            parse("=v")
+                .unwrap_err()
+                .to_string()
+                .contains("not a valid name")
+        );
+        assert!(
+            parse("A=\"open")
+                .unwrap_err()
+                .message
+                .contains("unterminated")
+        );
+        assert!(
+            parse("A='open")
+                .unwrap_err()
+                .message
+                .contains("unterminated")
+        );
+        assert!(
+            parse("A=\"x\\")
+                .unwrap_err()
+                .message
+                .contains("unterminated")
+        );
         assert!(parse("bad key=1").is_err());
         assert_eq!(parse("A=\"1\nB=2\n").unwrap_err().line, 1);
     }
@@ -356,7 +390,11 @@ mod tests {
     fn loading_never_overrides_what_is_set() {
         let dir = TempDir::new().unwrap();
         let file = dir.path().join(".env");
-        std::fs::write(&file, "QUENCH_DOTENV_A=from-file\nQUENCH_DOTENV_B=from-file\n").unwrap();
+        std::fs::write(
+            &file,
+            "QUENCH_DOTENV_A=from-file\nQUENCH_DOTENV_B=from-file\n",
+        )
+        .unwrap();
         env::set("QUENCH_DOTENV_A", "from-env");
         env::remove("QUENCH_DOTENV_B");
         load_from(&file).unwrap();
@@ -365,7 +403,10 @@ mod tests {
         env::remove("QUENCH_DOTENV_A");
         env::remove("QUENCH_DOTENV_B");
 
-        assert!(matches!(load_from(dir.path().join("missing")), Err(Error::Io(_))));
+        assert!(matches!(
+            load_from(dir.path().join("missing")),
+            Err(Error::Io(_))
+        ));
         std::fs::write(&file, "broken\n").unwrap();
         let error = load_from(&file).unwrap_err();
         assert!(matches!(error, Error::Parse(_)));

@@ -112,14 +112,20 @@ mod tests {
 
     #[test]
     fn splits_on_whitespace() {
-        assert_eq!(words("  cargo   build\t--release \n"), ["cargo", "build", "--release"]);
+        assert_eq!(
+            words("  cargo   build\t--release \n"),
+            ["cargo", "build", "--release"]
+        );
         assert!(words("").is_empty());
         assert!(words("   ").is_empty());
     }
 
     #[test]
     fn quotes_group_words() {
-        assert_eq!(words(r#"echo "a b" 'c d' e"f g"h"#), ["echo", "a b", "c d", "ef gh"]);
+        assert_eq!(
+            words(r#"echo "a b" 'c d' e"f g"h"#),
+            ["echo", "a b", "c d", "ef gh"]
+        );
         assert_eq!(words("''"), [""]);
         assert_eq!(words(r#"a "" b"#), ["a", "", "b"]);
         assert_eq!(split("it's"), None);
@@ -128,7 +134,10 @@ mod tests {
     #[test]
     fn escapes() {
         assert_eq!(words(r"a\ b c"), ["a b", "c"]);
-        assert_eq!(words(r#""a\"b" "c\\d" "e\$f" "g\xh""#), [r#"a"b"#, r"c\d", "e$f", r"g\xh"]);
+        assert_eq!(
+            words(r#""a\"b" "c\\d" "e\$f" "g\xh""#),
+            [r#"a"b"#, r"c\d", "e$f", r"g\xh"]
+        );
         assert_eq!(words("'a\\b'"), [r"a\b"]);
         assert_eq!(words("a\\\nb"), ["ab"]);
         assert_eq!(words("\"a\\\nb\""), ["ab"]);
@@ -150,7 +159,10 @@ mod tests {
 
     #[test]
     fn quote_leaves_safe_words_alone() {
-        assert_eq!(quote("path/to-file_1.txt"), Cow::Borrowed("path/to-file_1.txt"));
+        assert_eq!(
+            quote("path/to-file_1.txt"),
+            Cow::Borrowed("path/to-file_1.txt")
+        );
         assert_eq!(quote(""), "''");
         assert_eq!(quote("a b"), "'a b'");
         assert_eq!(quote("it's"), r"'it'\''s'");
@@ -159,7 +171,17 @@ mod tests {
 
     #[test]
     fn join_round_trips_through_split() {
-        let original = ["echo", "a b", "", "it's", "$x", "multi\nline", "back\\slash", "#c", "é"];
+        let original = [
+            "echo",
+            "a b",
+            "",
+            "it's",
+            "$x",
+            "multi\nline",
+            "back\\slash",
+            "#c",
+            "é",
+        ];
         assert_eq!(words(&join(original)), original);
     }
 }

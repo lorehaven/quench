@@ -236,7 +236,9 @@ fn parse_csi(bytes: &[u8]) -> Parsed {
 }
 
 fn finish_csi(final_byte: u8, params: &[u32], used: usize) -> Parsed {
-    let modifiers = params.get(1).map_or(Modifiers::NONE, |&p| Modifiers::from_param(p));
+    let modifiers = params
+        .get(1)
+        .map_or(Modifiers::NONE, |&p| Modifiers::from_param(p));
     let first = params.first().copied().unwrap_or(0);
     let code = match final_byte {
         b'A' => KeyCode::Up,
@@ -323,7 +325,11 @@ impl Keys {
             if self.pending == [0x1b] && remaining.is_zero() {
                 return Ok(true);
             }
-            if !self.fill(remaining.min(if self.pending.is_empty() { remaining } else { ESC_WAIT }))? {
+            if !self.fill(remaining.min(if self.pending.is_empty() {
+                remaining
+            } else {
+                ESC_WAIT
+            }))? {
                 if self.pending == [0x1b] {
                     return Ok(true);
                 }
@@ -453,9 +459,18 @@ mod tests {
         assert_eq!(key(b"\x7f"), (KeyCode::Backspace, Modifiers::NONE, 1));
         assert_eq!(key(b"\x08"), (KeyCode::Backspace, Modifiers::NONE, 1));
         assert_eq!(key(b" "), (KeyCode::Char(' '), Modifiers::NONE, 1));
-        assert_eq!(key("é".as_bytes()), (KeyCode::Char('é'), Modifiers::NONE, 2));
-        assert_eq!(key("€x".as_bytes()), (KeyCode::Char('€'), Modifiers::NONE, 3));
-        assert_eq!(key("😀".as_bytes()), (KeyCode::Char('😀'), Modifiers::NONE, 4));
+        assert_eq!(
+            key("é".as_bytes()),
+            (KeyCode::Char('é'), Modifiers::NONE, 2)
+        );
+        assert_eq!(
+            key("€x".as_bytes()),
+            (KeyCode::Char('€'), Modifiers::NONE, 3)
+        );
+        assert_eq!(
+            key("😀".as_bytes()),
+            (KeyCode::Char('😀'), Modifiers::NONE, 4)
+        );
     }
 
     #[test]
@@ -490,7 +505,11 @@ mod tests {
             (b"\x1b[7~", KeyCode::Home),
             (b"\x1b[8~", KeyCode::End),
         ] {
-            assert_eq!(key(bytes), (code, Modifiers::NONE, bytes.len()), "{bytes:?}");
+            assert_eq!(
+                key(bytes),
+                (code, Modifiers::NONE, bytes.len()),
+                "{bytes:?}"
+            );
         }
         assert_eq!(key(b"\x1b[Z"), (KeyCode::BackTab, SHIFT, 3));
     }
@@ -597,7 +616,10 @@ mod tests {
 
         // The end of input is an error, not a hang.
         close(wr);
-        assert_eq!(keys.read().unwrap_err().kind(), io::ErrorKind::UnexpectedEof);
+        assert_eq!(
+            keys.read().unwrap_err().kind(),
+            io::ErrorKind::UnexpectedEof
+        );
         assert!(keys.poll(Duration::ZERO).is_err());
         close(rd);
         assert!(format!("{keys:?}").contains("Keys"));

@@ -102,6 +102,11 @@ mod tests {
 
         // `sh` is on every PATH the tests run with.
         assert!(which("sh").unwrap().is_absolute());
-        assert_eq!(which("definitely-not-a-program-xyz").unwrap_err().to_string(), "cannot find binary path: definitely-not-a-program-xyz");
+        assert_eq!(
+            which("definitely-not-a-program-xyz")
+                .unwrap_err()
+                .to_string(),
+            "cannot find binary path: definitely-not-a-program-xyz"
+        );
     }
 }

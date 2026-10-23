@@ -508,7 +508,9 @@ mod tests {
             let mut got = set.collect_vec().await;
             got.sort_unstable();
             assert_eq!(got, vec![1, 2]);
-            assert!(format!("{:?}", FuturesUnordered::<std::future::Ready<u8>>::new()).contains('0'));
+            assert!(
+                format!("{:?}", FuturesUnordered::<std::future::Ready<u8>>::new()).contains('0')
+            );
         });
     }
 

@@ -156,9 +156,12 @@ mod tests {
             done: Arc::new(AtomicBool::new(false)),
             started: false,
         };
-        let futures: Vec<LocalBoxFuture<'_, &str>> = vec![Box::pin(async { "quick" }), Box::pin(slow)];
+        let futures: Vec<LocalBoxFuture<'_, &str>> =
+            vec![Box::pin(async { "quick" }), Box::pin(slow)];
         assert_eq!(block_on(join_all(futures)), vec!["quick", "woken"]);
-        assert!(format!("{:?}", join_all(Vec::<std::future::Ready<u8>>::new())).contains("JoinAll"));
+        assert!(
+            format!("{:?}", join_all(Vec::<std::future::Ready<u8>>::new())).contains("JoinAll")
+        );
     }
 
     #[test]

@@ -128,7 +128,8 @@ fn read_line(fd: i32) -> io::Result<String> {
     if bytes.last() == Some(&b'\r') {
         bytes.pop();
     }
-    String::from_utf8(bytes).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "input is not UTF-8"))
+    String::from_utf8(bytes)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "input is not UTF-8"))
 }
 
 /// Echo switched off on a terminal until dropped; nothing happens for a descriptor that is not one.
@@ -244,7 +245,10 @@ mod tests {
             ws_ypixel: 0,
         };
         // SAFETY: sets the size of the pty this test owns.
-        assert_eq!(unsafe { libc::ioctl(slave, libc::TIOCSWINSZ, &raw const ws) }, 0);
+        assert_eq!(
+            unsafe { libc::ioctl(slave, libc::TIOCSWINSZ, &raw const ws) },
+            0
+        );
         assert_eq!(size_of(slave).unwrap(), (100, 30));
         close(master);
         close(slave);
@@ -301,7 +305,10 @@ mod tests {
         // SAFETY: `pipe` fills the array.
         assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
         write_fd(fds[1], b"\xff\xfe\n");
-        assert_eq!(read_secret(fds[0], "").unwrap_err().kind(), io::ErrorKind::InvalidData);
+        assert_eq!(
+            read_secret(fds[0], "").unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
         close(fds[0]);
         close(fds[1]);
     }

@@ -102,10 +102,9 @@ impl Form {
         let mut out = Vec::new();
         for (name, part) in &self.parts {
             out.extend_from_slice(format!("--{}\r\n", self.boundary).as_bytes());
-            let file_name = part
-                .file_name
-                .as_ref()
-                .map_or_else(String::new, |file| format!("; filename=\"{}\"", escape(file)));
+            let file_name = part.file_name.as_ref().map_or_else(String::new, |file| {
+                format!("; filename=\"{}\"", escape(file))
+            });
             let disposition = format!(
                 "Content-Disposition: form-data; name=\"{}\"{file_name}",
                 escape(name)
@@ -159,7 +158,9 @@ mod tests {
         assert!(text.starts_with(&format!("--{boundary}\r\n")));
         assert!(text.ends_with(&format!("--{boundary}--\r\n")));
         assert!(text.contains("Content-Disposition: form-data; name=\"title\"\r\n\r\nhello\r\n"));
-        assert!(text.contains("name=\"upload\"; filename=\"a %22b%22.bin\"\r\nContent-Type: image/png\r\n\r\n"));
+        assert!(text.contains(
+            "name=\"upload\"; filename=\"a %22b%22.bin\"\r\nContent-Type: image/png\r\n\r\n"
+        ));
         assert!(text.contains("filename=\"p.txt\"\r\nContent-Type: application/octet-stream\r\n"));
         assert!(body.windows(6).any(|w| w == b"\x00\x01data"));
     }
@@ -173,6 +174,9 @@ mod tests {
         assert!(text.contains("\r\n\r\nv\r\n"));
         let empty = Form::new();
         let boundary = empty.boundary().to_string();
-        assert_eq!(empty.into_body().as_ref(), format!("--{boundary}--\r\n").as_bytes());
+        assert_eq!(
+            empty.into_body().as_ref(),
+            format!("--{boundary}--\r\n").as_bytes()
+        );
     }
 }

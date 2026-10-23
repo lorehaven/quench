@@ -264,7 +264,16 @@ mod tests {
         let got = names(Walk::new(dir.path()).sort_by_file_name(), dir.path());
         assert_eq!(
             got,
-            ["", "a", "a/one.txt", "b", "b/inner", "b/inner/three.txt", "b/two.txt", "root.txt"]
+            [
+                "",
+                "a",
+                "a/one.txt",
+                "b",
+                "b/inner",
+                "b/inner/three.txt",
+                "b/two.txt",
+                "root.txt"
+            ]
         );
     }
 
@@ -278,18 +287,27 @@ mod tests {
             .collect();
         assert_eq!(entries[0].depth(), 0);
         assert!(entries[0].file_type().is_dir());
-        let three = entries.iter().find(|e| e.file_name() == "three.txt").unwrap();
+        let three = entries
+            .iter()
+            .find(|e| e.file_name() == "three.txt")
+            .unwrap();
         assert_eq!(three.depth(), 3);
         assert!(three.file_type().is_file());
         assert_eq!(three.metadata().unwrap().len(), 1);
-        assert_eq!(three.clone().into_path(), dir.path().join("b/inner/three.txt"));
+        assert_eq!(
+            three.clone().into_path(),
+            dir.path().join("b/inner/three.txt")
+        );
     }
 
     #[test]
     fn max_depth_limits_the_descent() {
         let dir = tree();
         assert_eq!(names(Walk::new(dir.path()).max_depth(0), dir.path()), [""]);
-        let one = names(Walk::new(dir.path()).max_depth(1).sort_by_file_name(), dir.path());
+        let one = names(
+            Walk::new(dir.path()).max_depth(1).sort_by_file_name(),
+            dir.path(),
+        );
         assert_eq!(one, ["", "a", "b", "root.txt"]);
     }
 
@@ -329,7 +347,10 @@ mod tests {
         let dir = tree();
         let locked = dir.path().join("a");
         fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
-        let results: Vec<_> = Walk::new(dir.path()).sort_by_file_name().into_iter().collect();
+        let results: Vec<_> = Walk::new(dir.path())
+            .sort_by_file_name()
+            .into_iter()
+            .collect();
         fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
         // Running as root reads it anyway; otherwise the error follows the entry for `a`.
         let position = results
@@ -339,7 +360,11 @@ mod tests {
         if results.iter().any(Result::is_err) {
             assert!(results[position + 1].is_err());
         }
-        assert!(results.iter().any(|r| r.as_ref().is_ok_and(|e| e.file_name() == "root.txt")));
+        assert!(
+            results
+                .iter()
+                .any(|r| r.as_ref().is_ok_and(|e| e.file_name() == "root.txt"))
+        );
     }
 
     #[cfg(unix)]
@@ -357,7 +382,10 @@ mod tests {
             .unwrap();
         assert!(link.file_type().is_symlink());
 
-        let followed = names(Walk::new(dir.path()).follow_links(true).sort_by_file_name(), dir.path());
+        let followed = names(
+            Walk::new(dir.path()).follow_links(true).sort_by_file_name(),
+            dir.path(),
+        );
         assert!(followed.contains(&"link/one.txt".to_string()));
     }
 
@@ -367,7 +395,10 @@ mod tests {
         use std::os::unix::fs::symlink;
         let dir = tree();
         symlink(dir.path(), dir.path().join("a/up")).unwrap();
-        let results: Vec<_> = Walk::new(dir.path()).follow_links(true).into_iter().collect();
+        let results: Vec<_> = Walk::new(dir.path())
+            .follow_links(true)
+            .into_iter()
+            .collect();
         assert!(results.iter().any(Result::is_err));
         assert!(results.len() < 100);
     }
