@@ -1,6 +1,6 @@
 [package]
 name = "quench-serde"
-version = "0.1.1"
+version = "0.1.2"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - JSON/TOML/urlencoded codecs and a dynamic Value model, without serde"
