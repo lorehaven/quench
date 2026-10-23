@@ -1,6 +1,9 @@
-//! Boxed futures and a minimal `block_on`.
+//! Boxed futures, `join_all`, `catch_unwind` and a minimal `block_on`.
 
+use std::any::Any;
+use std::fmt;
 use std::future::Future;
+use std::panic::{self, AssertUnwindSafe, UnwindSafe};
 use std::pin::{Pin, pin};
 use std::sync::Arc;
 use std::task::{Context, Poll, Wake, Waker};
@@ -36,11 +39,146 @@ pub fn block_on<F: Future>(future: F) -> F::Output {
     }
 }
 
+/// Runs every future at once and resolves to their outputs, in the order the futures were given.
+pub fn join_all<I>(futures: I) -> JoinAll<I::Item>
+where
+    I: IntoIterator,
+    I::Item: Future,
+{
+    JoinAll {
+        slots: futures
+            .into_iter()
+            .map(|future| Slot::Pending(Box::pin(future)))
+            .collect(),
+    }
+}
+
+enum Slot<F: Future> {
+    Pending(Pin<Box<F>>),
+    Done(Option<F::Output>),
+}
+
+/// Future for [`join_all`].
+pub struct JoinAll<F: Future> {
+    slots: Vec<Slot<F>>,
+}
+
+impl<F: Future> fmt::Debug for JoinAll<F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("JoinAll")
+            .field("futures", &self.slots.len())
+            .finish()
+    }
+}
+
+impl<F: Future> Unpin for JoinAll<F> {}
+
+impl<F: Future> Future for JoinAll<F> {
+    type Output = Vec<F::Output>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut all_done = true;
+        for slot in &mut self.slots {
+            if let Slot::Pending(future) = slot {
+                match future.as_mut().poll(cx) {
+                    Poll::Ready(output) => *slot = Slot::Done(Some(output)),
+                    Poll::Pending => all_done = false,
+                }
+            }
+        }
+        if !all_done {
+            return Poll::Pending;
+        }
+        Poll::Ready(
+            std::mem::take(&mut self.slots)
+                .into_iter()
+                .filter_map(|slot| match slot {
+                    Slot::Done(output) => output,
+                    Slot::Pending(_) => None,
+                })
+                .collect(),
+        )
+    }
+}
+
+/// Turns a panic inside the future into an `Err` carrying the panic payload.
+///
+/// Wrap a future that is not `UnwindSafe` in [`AssertUnwindSafe`] first.
+pub fn catch_unwind<F: Future + UnwindSafe>(future: F) -> CatchUnwind<F> {
+    CatchUnwind {
+        future: Box::pin(future),
+    }
+}
+
+/// Future for [`catch_unwind`].
+pub struct CatchUnwind<F> {
+    future: Pin<Box<F>>,
+}
+
+impl<F> fmt::Debug for CatchUnwind<F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CatchUnwind").finish_non_exhaustive()
+    }
+}
+
+impl<F: Future + UnwindSafe> Future for CatchUnwind<F> {
+    type Output = Result<F::Output, Box<dyn Any + Send>>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let future = self.future.as_mut();
+        match panic::catch_unwind(AssertUnwindSafe(|| future.poll(cx))) {
+            Ok(Poll::Ready(output)) => Poll::Ready(Ok(output)),
+            Ok(Poll::Pending) => Poll::Pending,
+            Err(payload) => Poll::Ready(Err(payload)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::time::Duration;
+
+    #[test]
+    fn join_all_keeps_the_order_of_the_futures() {
+        let futures = (0..5).map(|n| async move { n * 2 });
+        assert_eq!(block_on(join_all(futures)), vec![0, 2, 4, 6, 8]);
+        assert_eq!(
+            block_on(join_all(Vec::<std::future::Ready<u8>>::new())),
+            Vec::<u8>::new()
+        );
+    }
+
+    #[test]
+    fn join_all_waits_for_the_slowest() {
+        let slow = WokenLater {
+            done: Arc::new(AtomicBool::new(false)),
+            started: false,
+        };
+        let futures: Vec<LocalBoxFuture<'_, &str>> = vec![Box::pin(async { "quick" }), Box::pin(slow)];
+        assert_eq!(block_on(join_all(futures)), vec!["quick", "woken"]);
+        assert!(format!("{:?}", join_all(Vec::<std::future::Ready<u8>>::new())).contains("JoinAll"));
+    }
+
+    #[test]
+    fn catch_unwind_returns_the_panic_payload() {
+        let outcome = block_on(catch_unwind(async { 5 }));
+        assert_eq!(outcome.ok(), Some(5));
+
+        let outcome = block_on(catch_unwind(async {
+            assert!(std::hint::black_box(false), "boom");
+        }));
+        let payload = outcome.expect_err("the future panicked");
+        assert_eq!(payload.downcast_ref::<&str>(), Some(&"boom"));
+
+        let woken = WokenLater {
+            done: Arc::new(AtomicBool::new(false)),
+            started: false,
+        };
+        assert_eq!(block_on(catch_unwind(woken)).ok(), Some("woken"));
+        assert!(format!("{:?}", catch_unwind(async {})).contains("CatchUnwind"));
+    }
 
     #[test]
     fn ready_futures_complete_immediately() {

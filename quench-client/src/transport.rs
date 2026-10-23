@@ -25,6 +25,15 @@ use std::time::{Duration, Instant};
 use tokio::net::TcpStream;
 
 const MAX_REDIRECTS: usize = 10;
+
+/// What a client does with a 3xx response that carries a `Location`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Redirect {
+    /// Hand the 3xx response to the caller.
+    None,
+    /// Follow up to this many hops, then fail.
+    Limited(usize),
+}
 /// Idle connections kept per host.
 const MAX_IDLE_PER_HOST: usize = 8;
 /// How long an idle connection stays in the pool.
@@ -74,6 +83,7 @@ struct Inner {
     timeout: Option<Duration>,
     max_response_bytes: Option<usize>,
     user_agent: Option<HeaderValue>,
+    redirect: Redirect,
     config: ClientConfig,
 }
 
@@ -92,6 +102,7 @@ pub struct ClientBuilder {
     extra_roots_pem: Vec<Vec<u8>>,
     max_response_bytes: Option<usize>,
     user_agent: Option<String>,
+    redirect: Redirect,
 }
 
 impl Client {
@@ -110,6 +121,7 @@ impl Client {
             extra_roots_pem: Vec::new(),
             max_response_bytes: None,
             user_agent: None,
+            redirect: Redirect::Limited(MAX_REDIRECTS),
         }
     }
 
@@ -280,6 +292,14 @@ impl ClientBuilder {
         self
     }
 
+    /// How redirects are handled (follows up to 10 by default). With [`Redirect::None`] a 3xx response is returned
+    /// like any other, `Location` header included.
+    #[must_use]
+    pub const fn redirect(mut self, policy: Redirect) -> Self {
+        self.redirect = policy;
+        self
+    }
+
     /// Fails a request whose response body exceeds `limit` bytes (unlimited by default).
     #[must_use]
     pub const fn max_response_bytes(mut self, limit: usize) -> Self {
@@ -310,6 +330,7 @@ impl ClientBuilder {
                 #[cfg(feature = "tls")]
                 tls,
                 user_agent,
+                redirect: self.redirect,
                 pool: Mutex::new(HashMap::new()),
                 timeout: self.timeout,
                 max_response_bytes: self.max_response_bytes,
@@ -441,6 +462,28 @@ impl RequestBuilder {
         }
     }
 
+    /// A `multipart/form-data` body; sets the `Content-Type` with its boundary.
+    #[must_use]
+    pub fn multipart(mut self, form: crate::multipart::Form) -> Self {
+        let content_type = form.content_type();
+        self.body = form.into_body();
+        self.header("content-type", content_type)
+    }
+
+    /// Sends `cookies` in one `Cookie` header (`a=1; b=2`).
+    #[must_use]
+    pub fn cookies<K: AsRef<str>, V: AsRef<str>>(self, cookies: &[(K, V)]) -> Self {
+        if cookies.is_empty() {
+            return self;
+        }
+        let line = cookies
+            .iter()
+            .map(|(name, value)| format!("{}={}", name.as_ref(), value.as_ref()))
+            .collect::<Vec<_>>()
+            .join("; ");
+        self.header("cookie", line)
+    }
+
     /// A raw request body; set `Content-Type` yourself.
     #[must_use]
     pub fn body(mut self, body: impl Into<Bytes>) -> Self {
@@ -557,11 +600,16 @@ async fn exchange(
     stream: bool,
 ) -> Result<Response> {
     let mut headers = headers;
-    for _ in 0..=MAX_REDIRECTS {
+    let (follow, hops) = match client.inner.redirect {
+        Redirect::None => (false, 0),
+        Redirect::Limited(limit) => (true, limit),
+    };
+    for _ in 0..=hops {
         let origin = origin_of(&url)?;
         let result = round_trip(client, &origin, &method, &url, &headers, &body).await?;
         let (status, response_headers) = (result.response.status, result.response.headers.clone());
-        let redirect = status.is_redirection()
+        let redirect = follow
+            && status.is_redirection()
             && status != StatusCode::NOT_MODIFIED
             && response_headers.contains_key("location");
 
@@ -629,6 +677,17 @@ async fn exchange(
     Err(Error::Transport("too many redirects".to_string()))
 }
 
+/// `(name, value)` for each `Set-Cookie` header.
+fn set_cookies(headers: &HeaderMap) -> Vec<(String, String)> {
+    headers
+        .get_all("set-cookie")
+        .filter_map(|value| value.to_str().ok())
+        .filter_map(|line| line.split(';').next())
+        .filter_map(|pair| pair.split_once('='))
+        .map(|(name, value)| (name.trim().to_string(), value.trim().to_string()))
+        .collect()
+}
+
 fn error_chain(error: &dyn std::error::Error) -> String {
     let mut out = error.to_string();
     let mut source = error.source();
@@ -668,6 +727,20 @@ impl Response {
     #[must_use]
     pub const fn headers(&self) -> &HeaderMap {
         &self.headers
+    }
+
+    /// The `name=value` pairs of the response's `Set-Cookie` headers (attributes such as `Path` are dropped).
+    #[must_use]
+    pub fn cookies(&self) -> Vec<(String, String)> {
+        set_cookies(&self.headers)
+    }
+
+    /// The value a `Set-Cookie` header gives `name`.
+    #[must_use]
+    pub fn cookie(&self, name: &str) -> Option<String> {
+        self.cookies()
+            .into_iter()
+            .find_map(|(n, value)| (n == name).then_some(value))
     }
 
     /// The whole body. For a [`send_streaming`](RequestBuilder::send_streaming) response this reads the rest

@@ -25,6 +25,11 @@ impl Endpoint for App {
             "/redirect-get" => return redirect(StatusCode::FOUND, "/echo"),
             "/redirect-keep" => return redirect(StatusCode::TEMPORARY_REDIRECT, "/echo"),
             "/loop" => return redirect(StatusCode::FOUND, "/loop"),
+            "/cookies" => {
+                return Response::ok()
+                    .append_header("set-cookie", "session=abc123; Path=/; HttpOnly")
+                    .append_header("set-cookie", "theme = dark ; Secure");
+            }
             "/stream" => {
                 let chunks = quench_core::stream::iter(vec![
                     Ok::<_, std::io::Error>(quench_core::bytes::Bytes::from_static(b"one,")),
@@ -58,6 +63,7 @@ impl Endpoint for App {
                 "path": path,
                 "authorization": header("authorization"),
                 "content_type": header("content-type"),
+                "cookie": header("cookie"),
                 "user_agent": header("user-agent"),
                 "body": String::from_utf8_lossy(&body),
             }),
@@ -185,6 +191,74 @@ async fn redirects_are_followed_with_the_right_method() {
         .unwrap();
     assert_eq!(kept["method"], "POST");
     assert_eq!(kept["body"], r#"{"x":1}"#);
+}
+
+#[tokio::test]
+async fn the_redirect_policy_can_hand_back_the_redirect() {
+    use quench_client::transport::Redirect;
+    let base = plain_server().await;
+
+    let client = Client::builder().redirect(Redirect::None).build().unwrap();
+    let response = client.get(format!("{base}/redirect-get")).send().await.unwrap();
+    assert_eq!(response.status(), StatusCode::FOUND);
+    assert_eq!(response.headers().get("location").and_then(|v| v.to_str().ok()), Some("/echo"));
+
+    let limited = Client::builder().redirect(Redirect::Limited(2)).build().unwrap();
+    let err = limited.get(format!("{base}/loop")).send().await.err().unwrap();
+    assert!(matches!(err, Error::Transport(m) if m.contains("redirect")));
+    let followed = limited.get(format!("{base}/redirect-get")).send().await.unwrap();
+    assert_eq!(followed.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn multipart_bodies_carry_their_boundary() {
+    use quench_client::multipart::{Form, Part};
+    let base = plain_server().await;
+    let form = Form::new()
+        .text("title", "hello")
+        .part("file", Part::bytes(&b"contents"[..]).file_name("a.txt").mime_str("text/plain"));
+    let boundary = form.boundary().to_string();
+    let echoed: Value = Client::new()
+        .post(format!("{base}/echo"))
+        .multipart(form)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(
+        echoed["content_type"],
+        format!("multipart/form-data; boundary={boundary}").as_str()
+    );
+    let body = echoed["body"].as_str().unwrap();
+    assert!(body.contains("name=\"title\"\r\n\r\nhello"));
+    assert!(body.contains("filename=\"a.txt\"\r\nContent-Type: text/plain\r\n\r\ncontents"));
+}
+
+#[tokio::test]
+async fn cookies_are_read_from_responses_and_sent_back() {
+    let base = plain_server().await;
+    let client = Client::new();
+    let response = client.get(format!("{base}/cookies")).send().await.unwrap();
+    assert_eq!(
+        response.cookies(),
+        vec![("session".to_string(), "abc123".to_string()), ("theme".to_string(), "dark".to_string())]
+    );
+    assert_eq!(response.cookie("theme").as_deref(), Some("dark"));
+    assert_eq!(response.cookie("missing"), None);
+
+    let echoed: Value = client
+        .get(format!("{base}/echo"))
+        .cookies(&[("session", "abc123"), ("theme", "dark")])
+        .cookies::<&str, &str>(&[])
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(echoed["cookie"], "session=abc123; theme=dark");
 }
 
 #[tokio::test]

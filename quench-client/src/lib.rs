@@ -4,6 +4,7 @@ use transport::{Client, Response};
 
 #[cfg(feature = "blocking")]
 pub mod blocking;
+pub mod multipart;
 pub mod transport;
 
 #[derive(Error, Debug)]

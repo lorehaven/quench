@@ -19,7 +19,7 @@ set -l matrix \
     "quench-db:postgres tls" \
     "quench-auth:http redis postgres tls" \
     "quench-crypto:argon2 ed25519 rsa jwt totp aead" \
-    "quench-cli:repl" \
+    "quench-cli:tui repl" \
     "quench-serde:toml yaml"
 
 set -l failed 0

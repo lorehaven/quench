@@ -35,6 +35,15 @@ fn provider() -> Arc<CryptoProvider> {
     Arc::new(ring::default_provider())
 }
 
+/// Makes `ring` the process-wide default TLS provider.
+///
+/// For libraries that build their own rustls configuration and ask for "the default" (a Kubernetes client, an
+/// HTTP stack from outside quench). Safe to call from several places and more than once; if something else
+/// installed a provider first, that one stays and this does nothing.
+pub fn install_default_provider() {
+    let _ = ring::default_provider().install_default();
+}
+
 /// How a client verifies servers.
 #[derive(Debug, Clone, Default)]
 pub struct ClientOptions {
@@ -500,4 +509,16 @@ pub fn pem_certificates(pem: &[u8]) -> Result<Vec<CertificateDer<'static>>, Stri
 /// When the document holds no usable key.
 pub fn pem_private_key(pem: &[u8]) -> Result<PrivateKeyDer<'static>, String> {
     PrivateKeyDer::from_pem_slice(pem).map_err(|e| format!("bad PEM private key: {e}"))
+}
+
+#[cfg(test)]
+mod install_tests {
+    use super::*;
+
+    #[test]
+    fn installing_the_default_provider_is_idempotent() {
+        install_default_provider();
+        install_default_provider();
+        assert!(CryptoProvider::get_default().is_some());
+    }
 }

@@ -62,8 +62,8 @@ Features are additive and, unless noted, on by default. Turn them off with `defa
 | `quench-cache` | `request-cache`, `data-cache`, `tls`; `redis` is off by default |
 | `quench-db` | `postgres`, `tls` |
 | `quench-auth` | `http`, `redis`, `postgres`, `tls` |
-| `quench-crypto` | `argon2`, `ed25519`, `rsa`, `jwt` |
-| `quench-cli` | `repl` |
+| `quench-crypto` | `argon2`, `ed25519`, `rsa`, `jwt`, `totp`, `aead` |
+| `quench-cli` | `tui`, `repl` |
 | `quench-serde` | `toml` (default), `yaml` (off by default) |
 
 Dropping every `tls` feature removes `rustls`, `ring` (unless `quench-crypto` still needs it for hashing) and `webpki-roots` from a build: `quench-http` goes from 25 to 17 third-party crates, `quench-client` from 25 to 15, and `quench-db` without `postgres` has 9. `scripts/features.fish` lints every crate with its features off and on one at a time (`-t` also runs the tests).

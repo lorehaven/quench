@@ -17,8 +17,10 @@ path = "src/lib.rs"
 
 [features]
 default = ["repl"]
-# The interactive line editor and REPL loop; on Unix this is what pulls in `libc` for raw mode.
-repl = ["dep:libc"]
+# Terminal control on Unix: key events, size, no-echo password prompt, screen sequences. Pulls in `libc`.
+tui = ["dep:libc"]
+# The interactive line editor and REPL loop (raw mode through `libc`).
+repl = ["tui"]
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true, optional = true }

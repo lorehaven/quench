@@ -17,6 +17,11 @@ struct Echo;
 #[async_trait]
 impl Endpoint for Echo {
     async fn call(&self, mut req: Request) -> Response {
+        match req.uri().path() {
+            "/redirect" => return Response::new(StatusCode::FOUND).header("location", "/elsewhere"),
+            "/cookie" => return Response::ok().append_header("set-cookie", "k=v; Path=/"),
+            _ => {}
+        }
         let body = req
             .take_body()
             .collect_limited(1 << 20)
@@ -128,4 +133,36 @@ fn blocking_calls_return_when_the_response_is_in() {
     );
     assert!(Client::new().get("http://127.0.0.1:1/").send().is_err());
     drop(runtime);
+}
+
+#[test]
+fn blocking_redirects_cookies_and_multipart() {
+    use quench_client::blocking::Client;
+    use quench_client::multipart::Form;
+    use quench_client::transport::Redirect;
+
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .unwrap();
+    let base = server(&runtime);
+
+    let client = Client::builder().redirect(Redirect::None).build().unwrap();
+    let redirected = client.get(format!("{base}/redirect")).send().unwrap();
+    assert_eq!(redirected.status(), StatusCode::FOUND);
+
+    let cookie = client.get(format!("{base}/cookie")).send().unwrap();
+    assert_eq!(cookie.cookies(), vec![("k".to_string(), "v".to_string())]);
+    assert_eq!(cookie.cookie("k").as_deref(), Some("v"));
+
+    let echoed: Value = client
+        .post(format!("{base}/echo"))
+        .multipart(Form::new().text("a", "b"))
+        .cookies(&[("k", "v")])
+        .send()
+        .unwrap()
+        .json()
+        .unwrap();
+    assert!(echoed["body"].as_str().unwrap().contains("name=\"a\"\r\n\r\nb"));
 }

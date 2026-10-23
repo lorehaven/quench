@@ -4,7 +4,8 @@
 //! and nothing needs to be `async`. Like every blocking HTTP client it must not be called from inside an async
 //! runtime (tokio panics when a runtime is started within one).
 
-use crate::transport::{self, Error, HeaderMap, Method, StatusCode};
+use crate::multipart::Form;
+use crate::transport::{self, Error, HeaderMap, Method, Redirect, StatusCode};
 use quench_core::bytes::Bytes;
 use quench_serde::{DeserializeOwned, Serialize};
 use std::sync::Arc;
@@ -110,6 +111,13 @@ impl ClientBuilder {
         self
     }
 
+    /// How redirects are handled; see [`Redirect`].
+    #[must_use]
+    pub fn redirect(mut self, policy: Redirect) -> Self {
+        self.inner = self.inner.redirect(policy);
+        self
+    }
+
     /// Sent as the `User-Agent` of every request.
     #[must_use]
     pub fn user_agent(mut self, value: impl Into<String>) -> Self {
@@ -180,6 +188,20 @@ impl RequestBuilder {
         self
     }
 
+    /// A `multipart/form-data` body; sets the `Content-Type` with its boundary.
+    #[must_use]
+    pub fn multipart(mut self, form: Form) -> Self {
+        self.inner = self.inner.multipart(form);
+        self
+    }
+
+    /// Sends `cookies` in one `Cookie` header.
+    #[must_use]
+    pub fn cookies<K: AsRef<str>, V: AsRef<str>>(mut self, cookies: &[(K, V)]) -> Self {
+        self.inner = self.inner.cookies(cookies);
+        self
+    }
+
     /// Appends `pairs` to the URL as a query string (percent-encoded).
     #[must_use]
     pub fn query<K: AsRef<str>, V: AsRef<str>>(mut self, pairs: &[(K, V)]) -> Self {
@@ -212,6 +234,18 @@ impl Response {
     #[must_use]
     pub const fn headers(&self) -> &HeaderMap {
         self.inner.headers()
+    }
+
+    /// The `name=value` pairs of the response's `Set-Cookie` headers.
+    #[must_use]
+    pub fn cookies(&self) -> Vec<(String, String)> {
+        self.inner.cookies()
+    }
+
+    /// The value a `Set-Cookie` header gives `name`.
+    #[must_use]
+    pub fn cookie(&self, name: &str) -> Option<String> {
+        self.inner.cookie(name)
     }
 
     pub fn bytes(self) -> Result<Bytes> {

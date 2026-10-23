@@ -86,6 +86,20 @@ pub trait StreamExt: Stream {
         FilterMap { stream: self, f }
     }
 
+    /// Treats each item as a future and runs up to `limit` of them at once, yielding outputs as they finish
+    /// (not in source order).
+    fn buffer_unordered(self, limit: usize) -> BufferUnordered<Self>
+    where
+        Self: Sized + Unpin,
+        Self::Item: Future,
+    {
+        BufferUnordered {
+            stream: Some(self),
+            in_flight: FuturesUnordered::new(),
+            limit: limit.max(1),
+        }
+    }
+
     /// Collects every item. Never returns for an endless stream.
     fn collect_vec(self) -> CollectVec<Self>
     where
@@ -231,6 +245,122 @@ impl<S: Stream + Unpin> Future for CollectVec<S> {
     }
 }
 
+/// A set of futures that yields each output as soon as its future finishes.
+///
+/// Every future is polled whenever the set is, which suits the handful of tasks it is used for.
+pub struct FuturesUnordered<Fut> {
+    futures: Vec<Pin<Box<Fut>>>,
+}
+
+impl<Fut> FuturesUnordered<Fut> {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            futures: Vec::new(),
+        }
+    }
+
+    /// Adds a future; it first runs the next time the set is polled.
+    pub fn push(&mut self, future: Fut) {
+        self.futures.push(Box::pin(future));
+    }
+
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.futures.len()
+    }
+
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.futures.is_empty()
+    }
+}
+
+impl<Fut> Default for FuturesUnordered<Fut> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<Fut> std::fmt::Debug for FuturesUnordered<Fut> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FuturesUnordered")
+            .field("futures", &self.futures.len())
+            .finish()
+    }
+}
+
+impl<Fut: Future> Stream for FuturesUnordered<Fut> {
+    type Item = Fut::Output;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Fut::Output>> {
+        if self.futures.is_empty() {
+            return Poll::Ready(None);
+        }
+        for index in 0..self.futures.len() {
+            if let Poll::Ready(output) = self.futures[index].as_mut().poll(cx) {
+                drop(self.futures.swap_remove(index));
+                return Poll::Ready(Some(output));
+            }
+        }
+        Poll::Pending
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.futures.len(), Some(self.futures.len()))
+    }
+}
+
+impl<Fut> FromIterator<Fut> for FuturesUnordered<Fut> {
+    fn from_iter<I: IntoIterator<Item = Fut>>(iter: I) -> Self {
+        Self {
+            futures: iter.into_iter().map(Box::pin).collect(),
+        }
+    }
+}
+
+/// Stream for [`StreamExt::buffer_unordered`].
+pub struct BufferUnordered<S: Stream> {
+    stream: Option<S>,
+    in_flight: FuturesUnordered<S::Item>,
+    limit: usize,
+}
+
+impl<S: Stream> std::fmt::Debug for BufferUnordered<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BufferUnordered")
+            .field("in_flight", &self.in_flight.len())
+            .field("limit", &self.limit)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<S: Stream + Unpin> Stream for BufferUnordered<S>
+where
+    S::Item: Future,
+{
+    type Item = <S::Item as Future>::Output;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = &mut *self;
+        while this.in_flight.len() < this.limit {
+            let Some(stream) = this.stream.as_mut() else {
+                break;
+            };
+            match Pin::new(stream).poll_next(cx) {
+                Poll::Ready(Some(future)) => this.in_flight.push(future),
+                Poll::Ready(None) => this.stream = None,
+                Poll::Pending => break,
+            }
+        }
+        match Pin::new(&mut this.in_flight).poll_next(cx) {
+            Poll::Ready(Some(output)) => Poll::Ready(Some(output)),
+            Poll::Ready(None) if this.stream.is_none() => Poll::Ready(None),
+            Poll::Ready(None) | Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
 /// A stream over an iterator's items, all immediately ready.
 pub fn iter<I: IntoIterator>(items: I) -> Iter<I::IntoIter> {
     Iter {
@@ -330,7 +460,7 @@ impl<S: Unpin, T, F: FnMut(S) -> Fut + Unpin, Fut: Future<Output = Option<(T, S)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::future::block_on;
+    use crate::future::{LocalBoxFuture, block_on};
 
     #[test]
     fn next_walks_an_iterator_stream() {
@@ -363,6 +493,69 @@ mod tests {
             assert_eq!(s.next().await, Some(30));
             assert_eq!(s.next().await, None);
         });
+    }
+
+    #[test]
+    fn futures_unordered_yields_in_completion_order() {
+        block_on(async {
+            let mut set: FuturesUnordered<LocalBoxFuture<'_, u8>> = FuturesUnordered::default();
+            assert!(set.is_empty());
+            assert_eq!(set.next().await, None);
+            set.push(Box::pin(async { 1 }));
+            set.push(Box::pin(async { 2 }));
+            assert_eq!(set.len(), 2);
+            assert_eq!(set.size_hint(), (2, Some(2)));
+            let mut got = set.collect_vec().await;
+            got.sort_unstable();
+            assert_eq!(got, vec![1, 2]);
+            assert!(format!("{:?}", FuturesUnordered::<std::future::Ready<u8>>::new()).contains('0'));
+        });
+    }
+
+    #[test]
+    fn buffer_unordered_limits_concurrency_and_finishes() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let running = std::sync::Arc::new(AtomicUsize::new(0));
+        let peak = std::sync::Arc::new(AtomicUsize::new(0));
+        let (r, p) = (running, peak.clone());
+        let mut got = block_on(
+            iter(0..10)
+                .map(move |n| {
+                    let (r, p) = (r.clone(), p.clone());
+                    async move {
+                        let now = r.fetch_add(1, Ordering::SeqCst) + 1;
+                        p.fetch_max(now, Ordering::SeqCst);
+                        Yield(false).await;
+                        r.fetch_sub(1, Ordering::SeqCst);
+                        n
+                    }
+                })
+                .buffer_unordered(3)
+                .collect_vec(),
+        );
+        got.sort_unstable();
+        assert_eq!(got, (0..10).collect::<Vec<_>>());
+        assert_eq!(peak.load(Ordering::SeqCst), 3);
+
+        let s = iter(0..2).map(|n| async move { n }).buffer_unordered(0);
+        assert!(format!("{s:?}").contains("BufferUnordered"));
+        assert_eq!(block_on(s.collect_vec()), vec![0, 1]);
+    }
+
+    /// Pending once, then ready - lets other futures in a set run in between.
+    struct Yield(bool);
+
+    impl Future for Yield {
+        type Output = ();
+
+        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+            if self.0 {
+                return Poll::Ready(());
+            }
+            self.0 = true;
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
     }
 
     #[test]

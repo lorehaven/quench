@@ -1,4 +1,4 @@
-//! Raw terminal mode on Unix, through `libc` termios.
+//! Raw terminal mode on Unix, through `libc` termios: [`RawMode`] switches a terminal to unbuffered, unechoed input and puts it back when dropped.
 //!
 //! This is the only place in the workspace's CLI crate that needs `unsafe`:
 //! each call is a plain libc function on a file descriptor and a struct the
@@ -14,6 +14,8 @@ use std::io;
 pub struct RawMode {
     fd: i32,
     original: libc::termios,
+    /// How attribute changes are applied: `TCSAFLUSH` drops unread input, `TCSANOW` keeps it.
+    action: libc::c_int,
 }
 
 impl RawMode {
@@ -23,6 +25,20 @@ impl RawMode {
     ///
     /// The OS error if the terminal's attributes cannot be read or set.
     pub fn enable(fd: i32) -> io::Result<Option<Self>> {
+        Self::enable_with(fd, libc::TCSAFLUSH)
+    }
+
+    /// Like [`enable`](Self::enable), but input typed before the switch (and while raw mode lasts) is kept
+    /// instead of discarded - for a program that polls for keys between other work.
+    ///
+    /// # Errors
+    ///
+    /// As [`enable`](Self::enable).
+    pub fn enable_keeping_input(fd: i32) -> io::Result<Option<Self>> {
+        Self::enable_with(fd, libc::TCSANOW)
+    }
+
+    fn enable_with(fd: i32, action: libc::c_int) -> io::Result<Option<Self>> {
         // SAFETY: `isatty` only inspects the descriptor.
         if unsafe { libc::isatty(fd) } != 1 {
             return Ok(None);
@@ -40,10 +56,14 @@ impl RawMode {
         raw.c_cc[libc::VMIN] = 1;
         raw.c_cc[libc::VTIME] = 0;
         // SAFETY: `raw` is a valid termios derived from the one the kernel gave us.
-        if unsafe { libc::tcsetattr(fd, libc::TCSAFLUSH, &raw const raw) } != 0 {
+        if unsafe { libc::tcsetattr(fd, action, &raw const raw) } != 0 {
             return Err(io::Error::last_os_error());
         }
-        Ok(Some(Self { fd, original }))
+        Ok(Some(Self {
+            fd,
+            original,
+            action,
+        }))
     }
 }
 
@@ -51,7 +71,7 @@ impl Drop for RawMode {
     fn drop(&mut self) {
         // SAFETY: restores the attributes saved in `enable`; nothing to do on failure.
         unsafe {
-            libc::tcsetattr(self.fd, libc::TCSAFLUSH, &raw const self.original);
+            libc::tcsetattr(self.fd, self.action, &raw const self.original);
         }
     }
 }
@@ -109,6 +129,23 @@ mod tests {
             before,
             "dropping restores the attributes"
         );
+        close(master);
+        close(slave);
+    }
+
+    #[test]
+    fn keeping_input_uses_the_non_flushing_mode() {
+        let (master, slave) = pty();
+        let before = local_flags(slave);
+        {
+            let raw = RawMode::enable_keeping_input(slave)
+                .unwrap()
+                .expect("a pty is a terminal");
+            assert_eq!(raw.action, libc::TCSANOW);
+            assert_eq!(local_flags(slave) & (libc::ECHO | libc::ICANON), 0);
+        }
+        assert_eq!(local_flags(slave), before);
+        assert!(RawMode::enable_keeping_input(-1).unwrap().is_none());
         close(master);
         close(slave);
     }

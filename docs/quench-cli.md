@@ -4,7 +4,7 @@
 
 ## Features
 
-`repl` (default) is the line editor (`editor`), the REPL loop (`repl`, `prelude::repl_run`) and, on Unix, the termios raw-mode guard that needs `libc`. Without it `quench-cli` has no dependencies at all: the terminal helpers (`print_box_banner`, `print_status`, `repl_prompt`, ...) and `require_binary` remain.
+`tui` (Unix) is terminal control on `libc`: key events (`keys`), size, a no-echo password prompt and screen sequences (`term`). `repl` (default, includes `tui`) adds the line editor (`editor`), the REPL loop (`repl`, `prelude::repl_run`) and the termios raw-mode guard. Without either, `quench-cli` has no dependencies at all: styling (`style`), the terminal helpers (`print_box_banner`, `print_status`, `repl_prompt`, ...) and `require_binary` remain.
 
 ## Public API / Key Types
 
@@ -19,6 +19,18 @@ All in `quench_cli::terminal` (`libs/quench-cli/src/terminal.rs`):
 - Color/formatting constants: `RESET`, `BOLD`, `DIM`, `CYAN`, `BLUE`, `GREEN`, `YELLOW`, `WHITE` (raw ANSI escape sequences), plus `SEP` and `SEP_THIN` (horizontal separator strings).
 
 `quench_cli::prelude` re-exports the subset most callers need: `print_box_banner`, `print_status`, `print_line`, `repl_prompt`, `Tone`, and the color/separator constants. `print_component_preview`, `print_error_line`, and `print_inline` are reachable via `quench_cli::terminal::*` but not re-exported from `prelude`.
+
+## Terminal control (`tui`)
+
+What the full-screen tools used `crossterm` and `rpassword` for.
+
+- **`style`** (always on) — `Stylize` gives any displayable value `.bold()`, `.dim()`, `.underlined()` and the sixteen colours with crossterm's names: `.red()` `.green()` `.yellow()` `.blue()` `.magenta()` `.cyan()` `.white()` are the bright ones, `.dark_red()` ... `.dark_cyan()` the normal ones, `.black()`, `.dark_grey()`, `.grey()`; chaining adjusts one `Styled`, which displays wrapped in ANSI codes. `NO_COLOR` (non-empty) turns the codes off.
+- **`keys`** — `Keys::stdin()` / `Keys::on_fd(fd)` with `poll(timeout)` (is a key ready?) and `read()`. A `KeyEvent` is a `KeyCode` (`Char`, `Enter`, `Esc`, `Backspace`, `Tab`, `BackTab`, arrows, `Home`/`End`, `PageUp`/`PageDown`, `Insert`/`Delete`, `F(1..=12)`) with `Modifiers { ctrl, alt, shift }`. A lone Escape is told apart from the start of a sequence by a 30 ms wait; unknown sequences are skipped. `parse_key(bytes)` is the pure decoder. Pair it with `RawMode` (below) - there are no key-release events, every event is a press.
+- **`term`** — `is_tty(fd)` / `stdin_is_tty()` / `stdout_is_tty()`, `size()` (columns, rows), the escape sequences `ENTER_ALTERNATE_SCREEN`, `LEAVE_ALTERNATE_SCREEN`, `CLEAR_ALL`, `CLEAR_LINE`, `HIDE_CURSOR`, `SHOW_CURSOR`, `move_to(column, row)` and `clear_screen(out)`, and `prompt_password(prompt)` / `read_secret(fd, prompt)`: the prompt goes to standard error, echo is off while the line is read, and a descriptor that is not a terminal is read as it is.
+
+- **`tty::RawMode`** — `RawMode::enable(fd)` puts a terminal in raw mode (no echo, no line buffering, no keyboard signals, no CR translation) and restores it when dropped; `None` for a descriptor that is not a terminal. `enable_keeping_input(fd)` is the same without discarding unread input, for a program that polls for keys between other work.
+
+Unix only; tested through pseudo-terminals (echo really is off, sizes round-trip, keys arrive in pieces).
 
 ## REPL line editor
 
