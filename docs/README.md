@@ -37,6 +37,7 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench Web Components](./quench-web-components.md) — higher-level UI builders on top of Quench Web
 - [Quench DB](./quench-db.md) — ORM/CRUD abstraction plus a migration catalog engine
 - [Quench Log](./quench-log.md) — leveled events, spans, console and rolling-file output
+- [Quench QR](./quench-qr.md) — QR code encoder (ISO 18004, versions 1-40) with SVG output, no dependencies
 - [Quench PG](./quench-pg.md) — PostgreSQL wire-protocol client with SCRAM, TLS, pool
 - [Quench Redis](./quench-redis.md) — Redis client: RESP2/3, pool, cluster routing
 - [Quench Cache](./quench-cache.md) — shared in-process/Redis caching layer
@@ -113,6 +114,7 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ├── quench-serde/           # JSON, urlencoded, Value, Serialize/Deserialize; features toml, yaml
 ├── quench-serde-macros/    # derives for quench-serde
 ├── quench-starter/         # service bootstrap
+├── quench-qr/              # QR code encoder
 ├── quench-tls/             # rustls glue and trust stores
 ├── quench-web/             # server-rendered HTML/CSS/JS page builder
 ├── quench-web-components/  # UI components built on quench-web

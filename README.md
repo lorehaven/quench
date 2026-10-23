@@ -22,6 +22,7 @@ See [docs/](./docs/) for per-crate reference.
 - [Quench Serde Macros](./docs/quench-serde-macros.md) — `#[derive(Serialize, Deserialize)]` for Quench Serde
 - [Quench Core](./docs/quench-core.md) — dependency-free foundations: time, uuid, base64/hex, errors, env, sharded map, versions, bytes
 - [Quench Proto](./docs/quench-proto.md) — HTTP types, an HTTP/1.1 codec for servers and clients, multipart, cookies, WebSocket and SSE
+- [Quench QR](./docs/quench-qr.md) — QR code encoder (ISO 18004, versions 1-40) with SVG output, no dependencies
 - [Quench TLS](./docs/quench-tls.md) — async glue between tokio streams and rustls, with shared trust-store helpers
 - [Quench Log](./docs/quench-log.md) — leveled events, spans, console and rolling-file output
 - [Quench Log Macros](./docs/quench-log-macros.md) — `#[instrument]` for Quench Log

@@ -5,6 +5,8 @@ use ring::hmac;
 /// The hash an HMAC is built on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Algorithm {
+    /// Only for protocols that fix it (TOTP, WebSocket-era tokens); new designs use SHA-256 or better.
+    Sha1,
     Sha256,
     Sha384,
     Sha512,
@@ -13,6 +15,7 @@ pub enum Algorithm {
 impl Algorithm {
     const fn ring(self) -> hmac::Algorithm {
         match self {
+            Self::Sha1 => hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY,
             Self::Sha256 => hmac::HMAC_SHA256,
             Self::Sha384 => hmac::HMAC_SHA384,
             Self::Sha512 => hmac::HMAC_SHA512,

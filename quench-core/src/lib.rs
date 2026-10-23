@@ -1,9 +1,10 @@
 //! Dependency-free foundations shared by every quench crate.
 //!
-//! Replaces `chrono`, `uuid`, `base64`, `anyhow`, `envmnt`, `dashmap`,
+//! Replaces `chrono`, `uuid`, `base32`, `base64`, `anyhow`, `envmnt`, `dashmap`,
 //! `semver`, `bytes`, `inventory` and `tempfile`. Everything except [`random`] and the
 //! filesystem helpers is pure and builds for `wasm32-unknown-unknown`.
 
+pub mod base32;
 pub mod base64;
 pub mod bytes;
 pub mod env;

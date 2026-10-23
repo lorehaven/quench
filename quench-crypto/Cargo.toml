@@ -21,13 +21,17 @@ quench-serde = { workspace = true, optional = true }
 ring = { workspace = true }
 
 [features]
-default = ["argon2", "ed25519", "rsa", "jwt"]
+default = ["argon2", "ed25519", "rsa", "jwt", "totp", "aead"]
 # Argon2id password hashing (and the BLAKE2b it is built on).
 argon2 = []
 # Ed25519 signing keys and verification.
 ed25519 = []
 # RSA PKCS#1 v1.5 verification.
 rsa = []
+# One-time passwords: HOTP (RFC 4226) and TOTP (RFC 6238), with `otpauth://` URLs.
+totp = []
+# ChaCha20-Poly1305 and XChaCha20-Poly1305 authenticated encryption.
+aead = []
 # JSON Web Tokens; needs the signature schemes it supports.
 jwt = ["dep:quench-serde", "ed25519", "rsa"]
 

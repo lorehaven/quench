@@ -8,6 +8,7 @@ use crate::hmac::Algorithm;
 
 const fn ring(algorithm: Algorithm) -> pbkdf2::Algorithm {
     match algorithm {
+        Algorithm::Sha1 => pbkdf2::PBKDF2_HMAC_SHA1,
         Algorithm::Sha256 => pbkdf2::PBKDF2_HMAC_SHA256,
         Algorithm::Sha384 => pbkdf2::PBKDF2_HMAC_SHA384,
         Algorithm::Sha512 => pbkdf2::PBKDF2_HMAC_SHA512,
