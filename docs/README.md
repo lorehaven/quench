@@ -8,6 +8,8 @@ Quench is a modular Rust workspace of shared library crates split out of [Forge]
 docs/
 ├── README.md                 # this file
 ├── quench-archive.md
+├── quench-template.md
+├── quench-pdf.md
 ├── quench-args.md
 ├── quench-auth.md
 ├── quench-cache.md
@@ -41,6 +43,8 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench Log](./quench-log.md) — leveled events, spans, console and rolling-file output
 - [Quench QR](./quench-qr.md) — QR code encoder (ISO 18004, versions 1-40) with SVG output, no dependencies
 - [Quench Archive](./quench-archive.md) — tar, zip, deflate, gzip and zstd (decoder and encoder), no dependencies
+- [Quench Template](./quench-template.md) — Jinja-compatible templates over quench-serde values (filters, tests, macros, imports)
+- [Quench PDF](./quench-pdf.md) — PDF text extraction (xref tables and streams, object streams, fonts, encodings)
 - [Quench Args](./quench-args.md) — command-line parsing with clap-compatible derives, no clap
 - [Quench K8s](./quench-k8s.md) — generic Kubernetes API client (kubeconfig, dynamic resources, discovery, logs, watch)
 - [Quench Schema](./quench-schema.md) — JSON Schema validation over quench-serde values
@@ -103,6 +107,8 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ```text
 .
 ├── quench-archive/         # tar, zip, deflate, gzip, zstd
+├── quench-template/        # Jinja-compatible template engine
+├── quench-pdf/             # PDF text extraction
 ├── quench-args/            # command-line argument parsing
 ├── quench-args-macros/     # its derive macros
 ├── quench-auth/            # relying-party token/session verification

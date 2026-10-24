@@ -326,6 +326,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-pdf"
+version = "0.1.0"
+dependencies = [
+ "quench-archive",
+]
+
+[[package]]
 name = "quench-pg"
 version = "0.1.5"
 dependencies = [
@@ -403,6 +410,13 @@ dependencies = [
  "quench-serde",
  "quench-web",
  "tokio",
+]
+
+[[package]]
+name = "quench-template"
+version = "0.1.0"
+dependencies = [
+ "quench-serde",
 ]
 
 [[package]]

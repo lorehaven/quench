@@ -1,0 +1,22 @@
+[package]
+name = "quench-template"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - a Jinja-compatible template engine over quench-serde values: expressions, filters, tests, loops, macros, imports"
+keywords = ["template", "jinja", "jinja2", "text"]
+categories = ["template-engine", "text-processing"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_template"
+path = "src/lib.rs"
+
+[dependencies]
+quench-serde = { workspace = true }
+
+[lints]
+workspace = true

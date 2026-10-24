@@ -1,0 +1,22 @@
+[package]
+name = "quench-pdf"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - a PDF reader that extracts text page by page: cross-reference tables and streams, object streams, fonts and encodings"
+keywords = ["pdf", "text", "extract"]
+categories = ["parser-implementations", "text-processing"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_pdf"
+path = "src/lib.rs"
+
+[dependencies]
+quench-archive = { workspace = true }
+
+[lints]
+workspace = true

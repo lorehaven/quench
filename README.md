@@ -23,6 +23,8 @@ See [docs/](./docs/) for per-crate reference.
 - [Quench Core](./docs/quench-core.md) — dependency-free foundations: time, uuid, base64/hex, errors, env, sharded map, versions, bytes
 - [Quench Proto](./docs/quench-proto.md) — HTTP types, an HTTP/1.1 codec for servers and clients, multipart, cookies, WebSocket and SSE
 - [Quench QR](./docs/quench-qr.md) — QR code encoder (ISO 18004, versions 1-40) with SVG output, no dependencies
+- [Quench PDF](./docs/quench-pdf.md) — PDF text extraction (xref tables and streams, object streams, fonts, encodings)
+- [Quench Template](./docs/quench-template.md) — Jinja-compatible templates over quench-serde values (filters, tests, macros, imports)
 - [Quench Archive](./docs/quench-archive.md) — tar, zip, deflate, gzip and zstd (decoder and encoder), no dependencies
 - [Quench Args](./docs/quench-args.md) — command-line parsing with clap-compatible derives, no clap
 - [Quench K8s](./docs/quench-k8s.md) — generic Kubernetes API client (kubeconfig, dynamic resources, discovery, logs, watch)
