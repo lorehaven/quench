@@ -23,6 +23,8 @@ pub struct Options {
     pub include_ignored: bool,
     /// Print the test names and stop.
     pub list: bool,
+    /// `--format terse`: a listing without its closing count (what `cargo nextest` reads).
+    pub terse: bool,
     pub threads: Option<usize>,
     /// One character per test.
     pub quiet: bool,
@@ -69,11 +71,13 @@ impl Options {
                     options.threads = value(&mut iter).parse().ok().filter(|&n| n > 0);
                 }
                 "--report-dir" => options.report_dir = Some(PathBuf::from(value(&mut iter))),
-                "--color" | "--format" | "--logfile" | "-Z" | "--report-time" | "--ensure-time" => {
-                    if matches!(arg.as_str(), "--color" | "--format" | "--logfile" | "-Z") {
+                "--format" => options.terse = value(&mut iter) == "terse",
+                "--color" | "--logfile" | "-Z" | "--report-time" | "--ensure-time" => {
+                    if matches!(arg.as_str(), "--color" | "--logfile" | "-Z") {
                         let _ = iter.next();
                     }
                 }
+                "--format=terse" => options.terse = true,
                 other if other.starts_with("--test-threads=") => {
                     options.threads = other["--test-threads=".len()..]
                         .parse()
@@ -178,10 +182,14 @@ pub fn run(
     let title = report_title();
 
     if options.list {
+        // `--ignored --list` names only the ignored tests (how `cargo nextest` tells them apart).
+        selected.retain(|c| !options.only_ignored || c.ignore.is_some());
         for case in &selected {
             let _ = writeln!(out, "{}: test", case.name);
         }
-        let _ = writeln!(out, "\n{} tests, 0 benchmarks", selected.len());
+        if !options.terse {
+            let _ = writeln!(out, "\n{} tests, 0 benchmarks", selected.len());
+        }
         return RunResult {
             exit_code: 0,
             report: Report::new(title),
@@ -647,6 +655,13 @@ mod run_tests {
             "m::ignored: test\nm::pass: test\n\n2 tests, 0 benchmarks\n"
         );
         assert_eq!(result.exit_code, 0);
+        let (_, text) = go(
+            &[&PASS, &IGNORED],
+            &["--list", "--ignored", "--format", "terse"],
+        );
+        assert_eq!(text, "m::ignored: test\n");
+        let (_, text) = go(&[&PASS, &IGNORED], &["--list", "--format", "terse"]);
+        assert_eq!(text, "m::ignored: test\nm::pass: test\n");
         let (_, text) = go(&all(), &["-q", "--test-threads", "1"]);
         let dots = text
             .lines()
