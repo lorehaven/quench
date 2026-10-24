@@ -143,8 +143,14 @@ fn try_expand(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
             );
         };
     };
+    // Clippy exempts `#[test]` functions from these; a harness that does not set `cfg(test)` has to say so.
     Ok(quote! {
-        #[allow(dead_code)]
+        #[allow(
+            dead_code,
+            clippy::future_not_send,
+            clippy::unused_async,
+            clippy::too_many_lines
+        )]
         #function
         #registration
     })
@@ -168,7 +174,11 @@ mod tests {
             ),
         );
         assert!(
-            sync.contains("run_sync") && sync.contains("TestCase"),
+            sync.contains("run_sync")
+                && sync.contains("TestCase")
+                && sync.contains("future_not_send")
+                && sync.contains("unused_async")
+                && sync.contains("too_many_lines"),
             "{sync}"
         );
         let asynchronous = rendered(
