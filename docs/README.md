@@ -12,6 +12,8 @@ docs/
 ├── quench-pdf.md
 ├── quench-convert.md
 ├── quench-html.md
+├── quench-test.md
+├── quench-test-bdd.md
 ├── quench-args.md
 ├── quench-auth.md
 ├── quench-cache.md
@@ -49,6 +51,8 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench PDF](./quench-pdf.md) — PDF text extraction (xref tables and streams, object streams, fonts, encodings)
 - [Quench Convert](./quench-convert.md) — CSV, XML, Android binary XML and GGUF as quench-serde values
 - [Quench HTML](./quench-html.md) — HTML parser with CSS selectors, and CommonMark to HTML
+- [Quench Test](./quench-test.md) — test harness with JSON/HTML result pages, command runner, predicates, mock HTTP server
+- [Quench Test BDD](./quench-test-bdd.md) — Gherkin runner: cucumber expressions, async steps, concurrent scenarios, JSON/HTML pages
 - [Quench Args](./quench-args.md) — command-line parsing with clap-compatible derives, no clap
 - [Quench K8s](./quench-k8s.md) — generic Kubernetes API client (kubeconfig, dynamic resources, discovery, logs, watch)
 - [Quench Schema](./quench-schema.md) — JSON Schema validation over quench-serde values
@@ -117,6 +121,10 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ├── quench-pdf/             # PDF text extraction
 ├── quench-convert/         # CSV, XML, AXML, GGUF readers
 ├── quench-html/            # HTML parser, selectors, Markdown renderer
+├── quench-test/            # test harness, reports, command runner, mock server
+├── quench-test-macros/     # #[quench_test::test]
+├── quench-test-bdd/        # Gherkin runner
+├── quench-test-bdd-macros/ # #[given]/#[when]/#[then], #[derive(World)]
 ├── quench-args/            # command-line argument parsing
 ├── quench-args-macros/     # its derive macros
 ├── quench-auth/            # relying-party token/session verification

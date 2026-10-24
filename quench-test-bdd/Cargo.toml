@@ -1,0 +1,27 @@
+[package]
+name = "quench-test-bdd"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - a light Gherkin test runtime: feature-file parser, cucumber expressions, async steps, concurrent scenarios, JSON and HTML result reports"
+keywords = ["bdd", "gherkin", "cucumber", "test", "report"]
+categories = ["development-tools::testing"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_test_bdd"
+path = "src/lib.rs"
+
+[dependencies]
+quench-args = { workspace = true }
+quench-core = { workspace = true }
+quench-regex = { workspace = true }
+quench-test = { workspace = true }
+quench-test-bdd-macros = { workspace = true }
+tokio = { workspace = true }
+
+[lints]
+workspace = true

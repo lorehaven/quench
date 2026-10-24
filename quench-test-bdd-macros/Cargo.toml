@@ -1,0 +1,23 @@
+[package]
+name = "quench-test-bdd-macros"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - the step attributes and World derive of quench-test-bdd (use them through that crate)"
+keywords = ["bdd", "gherkin", "macro"]
+categories = ["development-tools::testing"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true

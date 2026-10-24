@@ -1,0 +1,31 @@
+[package]
+name = "quench-test"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - a light test runtime with JSON and HTML result reports, plus a command runner, predicates and a mock HTTP server for tests"
+keywords = ["test", "harness", "mock", "assert", "report"]
+categories = ["development-tools::testing"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_test"
+path = "src/lib.rs"
+
+[dependencies]
+quench-core = { workspace = true }
+quench-regex = { workspace = true }
+quench-serde = { workspace = true }
+quench-test-macros = { workspace = true }
+tokio = { workspace = true }
+
+[[test]]
+name = "dogfood"
+path = "tests/dogfood.rs"
+harness = false
+
+[lints]
+workspace = true

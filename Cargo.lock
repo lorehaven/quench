@@ -431,6 +431,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-test"
+version = "0.1.0"
+dependencies = [
+ "quench-core",
+ "quench-regex",
+ "quench-serde",
+ "quench-test-macros",
+ "tokio",
+]
+
+[[package]]
+name = "quench-test-bdd"
+version = "0.1.0"
+dependencies = [
+ "quench-args",
+ "quench-core",
+ "quench-regex",
+ "quench-test",
+ "quench-test-bdd-macros",
+ "tokio",
+]
+
+[[package]]
+name = "quench-test-bdd-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "quench-test-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "quench-tls"
 version = "0.1.6"
 dependencies = [

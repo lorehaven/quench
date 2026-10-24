@@ -24,6 +24,8 @@ See [docs/](./docs/) for per-crate reference.
 - [Quench Proto](./docs/quench-proto.md) — HTTP types, an HTTP/1.1 codec for servers and clients, multipart, cookies, WebSocket and SSE
 - [Quench QR](./docs/quench-qr.md) — QR code encoder (ISO 18004, versions 1-40) with SVG output, no dependencies
 - [Quench HTML](./docs/quench-html.md) — HTML parser with CSS selectors, and CommonMark to HTML
+- [Quench Test](./docs/quench-test.md) — test harness with JSON/HTML result pages, command runner, predicates, mock HTTP server
+- [Quench Test BDD](./docs/quench-test-bdd.md) — Gherkin runner with cucumber expressions, async steps, concurrent scenarios, JSON/HTML pages
 - [Quench Convert](./docs/quench-convert.md) — CSV, XML, Android binary XML and GGUF as quench-serde values
 - [Quench PDF](./docs/quench-pdf.md) — PDF text extraction (xref tables and streams, object streams, fonts, encodings)
 - [Quench Template](./docs/quench-template.md) — Jinja-compatible templates over quench-serde values (filters, tests, macros, imports)
