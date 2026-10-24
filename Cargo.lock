@@ -432,7 +432,7 @@ dependencies = [
 
 [[package]]
 name = "quench-test"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "quench-core",
  "quench-regex",
@@ -443,7 +443,7 @@ dependencies = [
 
 [[package]]
 name = "quench-test-bdd"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "quench-args",
  "quench-core",
@@ -464,7 +464,7 @@ dependencies = [
 
 [[package]]
 name = "quench-test-macros"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "proc-macro2",
  "quote",

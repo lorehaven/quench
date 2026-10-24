@@ -1,6 +1,6 @@
 [package]
 name = "quench-test"
-version = "0.1.0"
+version = "0.1.1"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - a light test runtime with JSON and HTML result reports, plus a command runner, predicates and a mock HTTP server for tests"
