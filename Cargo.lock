@@ -181,6 +181,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-convert"
+version = "0.1.0"
+dependencies = [
+ "quench-serde",
+]
+
+[[package]]
 name = "quench-core"
 version = "0.1.4"
 dependencies = [

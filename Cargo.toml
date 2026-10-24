@@ -30,6 +30,7 @@ members = [
   "quench-archive",
   "quench-template",
   "quench-pdf",
+  "quench-convert",
   "quench-pg",
   "quench-redis",
   "quench-regex",
@@ -75,6 +76,7 @@ quench-proto = { path = "quench-proto", registry = "ennor", version = "0.1.0", d
 quench-tz = { path = "quench-tz", registry = "ennor", version = "0.1.0" }
 quench-tls = { path = "quench-tls", registry = "ennor", version = "0.1.0" }
 quench-qr = { path = "quench-qr", registry = "ennor", version = "0.1.0" }
+quench-convert = { path = "quench-convert", registry = "ennor", version = "0.1.0" }
 quench-pdf = { path = "quench-pdf", registry = "ennor", version = "0.1.0" }
 quench-template = { path = "quench-template", registry = "ennor", version = "0.1.0" }
 quench-archive = { path = "quench-archive", registry = "ennor", version = "0.1.0" }

@@ -1,0 +1,33 @@
+[package]
+name = "quench-convert"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - readers and writers that turn other formats into quench-serde values: CSV, XML, Android binary XML and GGUF metadata"
+keywords = ["csv", "xml", "gguf", "convert", "parser"]
+categories = ["encoding", "parser-implementations"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_convert"
+path = "src/lib.rs"
+
+[features]
+default = ["csv", "xml", "axml", "gguf"]
+# Delimited text (RFC 4180): records as arrays or as objects keyed by the header row.
+csv = []
+# XML text to and from the element tree shape documented in `xml`.
+xml = []
+# Android binary XML (AndroidManifest.xml in an APK) into the same tree shape.
+axml = ["xml"]
+# GGUF model files: header and metadata.
+gguf = []
+
+[dependencies]
+quench-serde = { workspace = true }
+
+[lints]
+workspace = true

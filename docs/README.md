@@ -10,6 +10,7 @@ docs/
 ├── quench-archive.md
 ├── quench-template.md
 ├── quench-pdf.md
+├── quench-convert.md
 ├── quench-args.md
 ├── quench-auth.md
 ├── quench-cache.md
@@ -45,6 +46,7 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench Archive](./quench-archive.md) — tar, zip, deflate, gzip and zstd (decoder and encoder), no dependencies
 - [Quench Template](./quench-template.md) — Jinja-compatible templates over quench-serde values (filters, tests, macros, imports)
 - [Quench PDF](./quench-pdf.md) — PDF text extraction (xref tables and streams, object streams, fonts, encodings)
+- [Quench Convert](./quench-convert.md) — CSV, XML, Android binary XML and GGUF as quench-serde values
 - [Quench Args](./quench-args.md) — command-line parsing with clap-compatible derives, no clap
 - [Quench K8s](./quench-k8s.md) — generic Kubernetes API client (kubeconfig, dynamic resources, discovery, logs, watch)
 - [Quench Schema](./quench-schema.md) — JSON Schema validation over quench-serde values
@@ -77,6 +79,7 @@ Features are additive and, unless noted, on by default. Turn them off with `defa
 | `quench-crypto` | `argon2`, `ed25519`, `rsa`, `jwt`, `totp`, `aead`, `x25519`, `age` |
 | `quench-cli` | `tui`, `repl` |
 | `quench-serde` | `toml` (default), `yaml` (off by default) |
+| `quench-convert` | `csv`, `xml`, `axml`, `gguf` (all default) |
 
 Dropping every `tls` feature removes `rustls`, `ring` (unless `quench-crypto` still needs it for hashing) and `webpki-roots` from a build: `quench-http` goes from 25 to 17 third-party crates, `quench-client` from 25 to 15, and `quench-db` without `postgres` has 9. `scripts/features.fish` lints every crate with its features off and on one at a time (`-t` also runs the tests).
 
@@ -109,6 +112,7 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ├── quench-archive/         # tar, zip, deflate, gzip, zstd
 ├── quench-template/        # Jinja-compatible template engine
 ├── quench-pdf/             # PDF text extraction
+├── quench-convert/         # CSV, XML, AXML, GGUF readers
 ├── quench-args/            # command-line argument parsing
 ├── quench-args-macros/     # its derive macros
 ├── quench-auth/            # relying-party token/session verification

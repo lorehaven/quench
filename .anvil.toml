@@ -1,6 +1,7 @@
 [release]
 registry = "ennor"
 packages = [
+    "quench-archive",
     "quench-args",
     "quench-args-macros",
     "quench-auth",
@@ -8,6 +9,7 @@ packages = [
     "quench-cli",
     "quench-client",
     "quench-config",
+    "quench-convert",
     "quench-core",
     "quench-core-macros",
     "quench-crypto",
@@ -18,6 +20,7 @@ packages = [
     "quench-log",
     "quench-log-macros",
     "quench-mail",
+    "quench-pdf",
     "quench-pg",
     "quench-proto",
     "quench-qr",
@@ -30,6 +33,7 @@ packages = [
     "quench-serde",
     "quench-serde-macros",
     "quench-starter",
+    "quench-template",
     "quench-tls",
     "quench-tz",
     "quench-web",

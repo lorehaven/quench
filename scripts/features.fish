@@ -20,7 +20,8 @@ set -l matrix \
     "quench-auth:http redis postgres tls" \
     "quench-crypto:argon2 ed25519 rsa jwt totp aead x25519 age" \
     "quench-cli:tui repl" \
-    "quench-serde:toml yaml"
+    "quench-serde:toml yaml" \
+    "quench-convert:csv xml axml gguf"
 
 set -l failed 0
 for entry in $matrix
