@@ -1,6 +1,6 @@
 [package]
 name = "quench-redis"
-version = "0.1.6"
+version = "0.1.7"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - a Redis client: RESP2/RESP3, pooled connections with reconnect, pipelines and cluster routing (CRC16 slots, MOVED/ASK)"

@@ -1,6 +1,6 @@
 [package]
 name = "quench-qr"
-version = "0.1.0"
+version = "0.1.1"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - a QR code encoder (ISO 18004, byte mode, versions 1-40) with SVG output, no dependencies"

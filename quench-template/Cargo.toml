@@ -1,6 +1,6 @@
 [package]
 name = "quench-template"
-version = "0.1.1"
+version = "0.1.2"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - a Jinja-compatible template engine over quench-serde values: expressions, filters, tests, loops, macros, imports"

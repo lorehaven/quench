@@ -1,6 +1,6 @@
 [package]
 name = "quench-log"
-version = "0.1.7"
+version = "0.1.8"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - leveled logging with fields and spans: plain-text console plus rolling JSON file logs"

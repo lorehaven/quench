@@ -1,6 +1,6 @@
 [package]
 name = "quench-test-bdd"
-version = "0.1.1"
+version = "0.1.2"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - a light Gherkin test runtime: feature-file parser, cucumber expressions, async steps, concurrent scenarios, JSON and HTML result reports"

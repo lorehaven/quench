@@ -1,6 +1,6 @@
 [package]
 name = "quench-tz"
-version = "0.1.1"
+version = "0.1.2"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - IANA time zones: offsets, daylight saving and local-time resolution, with the zone database built in"
