@@ -21,7 +21,8 @@ set -l matrix \
     "quench-crypto:argon2 ed25519 rsa jwt totp aead x25519 age" \
     "quench-cli:tui repl" \
     "quench-serde:toml yaml" \
-    "quench-convert:csv xml axml gguf"
+    "quench-convert:csv xml axml gguf" \
+    "quench-html:parse markdown"
 
 set -l failed 0
 for entry in $matrix

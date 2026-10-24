@@ -104,6 +104,20 @@ impl Walk {
         self
     }
 
+    /// Skips what a search tool such as `grep -r` skips by default: hidden files and directories, and
+    /// whatever the `.gitignore`, `.ignore`, `.git/info/exclude` and global git ignore files exclude (see
+    /// [`ignore`](crate::ignore)). The root itself is never skipped.
+    #[must_use]
+    pub fn standard_filters(mut self) -> Self {
+        let mut ignorer = crate::ignore::Ignorer::new(&self.root, true, true);
+        let mut previous = self.filter.take();
+        self.filter = Some(Box::new(move |entry| {
+            !ignorer.is_ignored(entry.path(), entry.file_type().is_dir())
+                && previous.as_mut().is_none_or(|keep| keep(entry))
+        }));
+        self
+    }
+
     /// Entries for which `keep` is false are skipped, and a skipped directory is not entered.
     #[must_use]
     pub fn filter_entry(mut self, keep: impl FnMut(&Entry) -> bool + 'static) -> Self {
@@ -401,5 +415,75 @@ mod tests {
             .collect();
         assert!(results.iter().any(Result::is_err));
         assert!(results.len() < 100);
+    }
+
+    #[test]
+    fn standard_filters_skip_hidden_and_ignored_files() {
+        let dir = TempDir::new().unwrap();
+        let p = dir.path();
+        fs::create_dir_all(p.join(".git/info")).unwrap();
+        fs::create_dir_all(p.join("src/gen")).unwrap();
+        fs::create_dir_all(p.join("target/debug")).unwrap();
+        fs::create_dir_all(p.join(".hidden")).unwrap();
+        fs::write(
+            p.join(".gitignore"),
+            "target/
+*.tmp
+!keep.tmp
+",
+        )
+        .unwrap();
+        fs::write(p.join(".git/info/exclude"), "secret.txt\n").unwrap();
+        fs::write(p.join("src/.ignore"), "gen/\n").unwrap();
+        for file in [
+            "a.rs",
+            "x.tmp",
+            "keep.tmp",
+            "secret.txt",
+            ".dot",
+            "src/b.rs",
+            "src/gen/g.rs",
+            "target/debug/t",
+            ".hidden/h",
+        ] {
+            fs::write(p.join(file), "x").unwrap();
+        }
+        let got = names(Walk::new(p).sort_by_file_name().standard_filters(), p);
+        assert_eq!(got, ["", "a.rs", "keep.tmp", "src", "src/b.rs"]);
+        // A walk starting below the repository root still honours the parents' files.
+        let got = names(
+            Walk::new(p.join("src"))
+                .sort_by_file_name()
+                .standard_filters(),
+            &p.join("src"),
+        );
+        assert_eq!(got, ["", "b.rs"]);
+        // Composed with a filter of its own.
+        let got = names(
+            Walk::new(p)
+                .sort_by_file_name()
+                .filter_entry(|e| e.depth() == 0 || e.file_name() != "a.rs")
+                .standard_filters(),
+            p,
+        );
+        assert!(!got.contains(&"a.rs".to_string()) && got.contains(&"keep.tmp".to_string()));
+        // Outside a repository `.gitignore` is not honoured, `.ignore` is.
+        let plain = TempDir::new().unwrap();
+        fs::write(plain.path().join(".gitignore"), "a.txt\n").unwrap();
+        fs::write(plain.path().join(".ignore"), "b.txt\n").unwrap();
+        for file in ["a.txt", "b.txt", "c.txt"] {
+            fs::write(plain.path().join(file), "x").unwrap();
+        }
+        let got = names(
+            Walk::new(plain.path())
+                .sort_by_file_name()
+                .standard_filters(),
+            plain.path(),
+        );
+        assert!(
+            got.contains(&"a.txt".to_string())
+                && !got.contains(&"b.txt".to_string())
+                && got.contains(&"c.txt".to_string())
+        );
     }
 }

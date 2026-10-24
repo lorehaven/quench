@@ -23,6 +23,7 @@ See [docs/](./docs/) for per-crate reference.
 - [Quench Core](./docs/quench-core.md) — dependency-free foundations: time, uuid, base64/hex, errors, env, sharded map, versions, bytes
 - [Quench Proto](./docs/quench-proto.md) — HTTP types, an HTTP/1.1 codec for servers and clients, multipart, cookies, WebSocket and SSE
 - [Quench QR](./docs/quench-qr.md) — QR code encoder (ISO 18004, versions 1-40) with SVG output, no dependencies
+- [Quench HTML](./docs/quench-html.md) — HTML parser with CSS selectors, and CommonMark to HTML
 - [Quench Convert](./docs/quench-convert.md) — CSV, XML, Android binary XML and GGUF as quench-serde values
 - [Quench PDF](./docs/quench-pdf.md) — PDF text extraction (xref tables and streams, object streams, fonts, encodings)
 - [Quench Template](./docs/quench-template.md) — Jinja-compatible templates over quench-serde values (filters, tests, macros, imports)

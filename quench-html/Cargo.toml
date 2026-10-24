@@ -1,0 +1,26 @@
+[package]
+name = "quench-html"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - HTML without dependencies: a tolerant parser with CSS selectors for extraction, and a CommonMark to HTML renderer"
+keywords = ["html", "css", "selectors", "markdown", "commonmark"]
+categories = ["parser-implementations", "web-programming"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_html"
+path = "src/lib.rs"
+
+[features]
+default = ["parse", "markdown"]
+# The HTML parser, the document tree and CSS selectors.
+parse = []
+# CommonMark to HTML.
+markdown = []
+
+[lints]
+workspace = true

@@ -273,6 +273,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-html"
+version = "0.1.0"
+
+[[package]]
 name = "quench-http"
 version = "0.1.10"
 dependencies = [

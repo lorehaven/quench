@@ -14,6 +14,7 @@ pub mod error;
 pub mod fs;
 pub mod future;
 pub mod hex;
+pub mod ignore;
 pub mod map;
 pub mod process;
 pub mod random;
