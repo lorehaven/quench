@@ -46,7 +46,7 @@ mod tests {
             .collect()
     }
 
-    #[test]
+    #[quench_test::test]
     fn rfc_5869_test_cases() {
         // Test case 1.
         let okm = sha256(

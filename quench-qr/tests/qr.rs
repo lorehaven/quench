@@ -1,5 +1,8 @@
 //! The encoder against a reference symbol, every version and level, and the invariants of the layout.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_qr::{EcLevel, Error, QrCode};
 
 /// "Hello, World" at level M, as `qrencode -8 -l M` draws it (the same mask, so every module matches).
@@ -75,7 +78,7 @@ const fn level_bits(level: EcLevel) -> u32 {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn a_small_symbol_matches_the_reference_encoder() {
     let code = QrCode::new("Hello, World").unwrap();
     assert_eq!(
@@ -97,7 +100,7 @@ fn a_small_symbol_matches_the_reference_encoder() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn the_smallest_version_that_fits_is_chosen_and_the_limits_are_exact() {
     assert_eq!(QrCode::new("").unwrap().version(), 1);
     assert_eq!(QrCode::new(vec![b'a'; 14]).unwrap().version(), 1);
@@ -131,7 +134,7 @@ fn the_smallest_version_that_fits_is_chosen_and_the_limits_are_exact() {
     assert!(error.to_string().contains("1274"));
 }
 
-#[test]
+#[quench_test::test]
 fn every_version_and_level_lays_out_consistently() {
     for level in [EcLevel::L, EcLevel::M, EcLevel::Q, EcLevel::H] {
         for len in [0usize, 1, 7, 14, 22, 40, 90, 150, 280, 450, 700, 1000, 1273] {
@@ -181,14 +184,14 @@ fn every_version_and_level_lays_out_consistently() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn encoding_is_deterministic_and_data_dependent() {
     assert_eq!(QrCode::new("same").unwrap(), QrCode::new("same").unwrap());
     assert_ne!(QrCode::new("one").unwrap(), QrCode::new("two").unwrap());
     assert!(format!("{:?}", QrCode::new("x").unwrap()).contains("version"));
 }
 
-#[test]
+#[quench_test::test]
 fn modules_outside_the_symbol_are_light() {
     let code = QrCode::new("x").unwrap();
     assert!(
@@ -196,7 +199,7 @@ fn modules_outside_the_symbol_are_light() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn the_svg_is_a_scaled_document_with_a_quiet_zone() {
     let code = QrCode::new("Hello, World").unwrap();
     let svg = code.to_svg(200);
@@ -216,7 +219,7 @@ fn the_svg_is_a_scaled_document_with_a_quiet_zone() {
     assert!(QrCode::new("x").unwrap().to_svg(1).contains("width=\"29\""));
 }
 
-#[test]
+#[quench_test::test]
 fn a_full_payload_fills_every_version_at_every_level() {
     for level in [EcLevel::L, EcLevel::M, EcLevel::Q, EcLevel::H] {
         let mut previous = 0;
@@ -238,3 +241,5 @@ fn a_full_payload_fills_every_version_at_every_level() {
         }
     }
 }
+
+quench_test::main!();

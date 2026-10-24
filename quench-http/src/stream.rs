@@ -42,7 +42,7 @@ mod tests {
     use super::*;
     use quench_core::stream::StreamExt;
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn a_receiver_streams_until_its_senders_are_gone() {
         let (tx, rx) = mpsc::channel(4);
         tx.send(1).await.unwrap();
@@ -51,7 +51,7 @@ mod tests {
         assert_eq!(receiver_stream(rx).collect_vec().await, vec![1, 2]);
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn a_reader_streams_in_chunks_and_a_failure_ends_it() {
         struct Failing;
         impl AsyncRead for Failing {

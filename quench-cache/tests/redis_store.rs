@@ -7,6 +7,8 @@
 //! running.
 
 #![cfg(feature = "redis")]
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_cache::CacheStore;
 use quench_cache::store::RedisStore;
@@ -33,7 +35,7 @@ async fn cluster_store(prefix: &str) -> Option<CacheStore> {
     ))
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn values_round_trip_and_expire() {
     let Some(url) = url() else { return };
     let store = CacheStore::Redis(
@@ -70,7 +72,7 @@ async fn values_round_trip_and_expire() {
 
 /// `clear` must take this store's keys and leave everything else alone - the
 /// Redis may not be ours exclusively.
-#[tokio::test]
+#[quench_test::test]
 async fn clear_is_scoped_to_the_prefix() {
     let Some(url) = url() else { return };
     let ours = CacheStore::Redis(
@@ -96,7 +98,7 @@ async fn clear_is_scoped_to_the_prefix() {
 
 /// The same round trip against a cluster. Keys spread across slots, so this is
 /// really a test that the client follows `MOVED` rather than failing on it.
-#[tokio::test]
+#[quench_test::test]
 async fn cluster_values_round_trip_and_expire() {
     let Some(store) = cluster_store("forge-cluster").await else {
         return;
@@ -132,7 +134,7 @@ async fn cluster_values_round_trip_and_expire() {
 /// `clear` has to walk every primary: with enough keys they are certain to
 /// land on more than one node, and a single-node `SCAN` would miss most of
 /// them while still reporting success.
-#[tokio::test]
+#[quench_test::test]
 async fn cluster_clear_sweeps_every_primary() {
     let Some(ours) = cluster_store("forge-cluster-clear").await else {
         return;
@@ -173,7 +175,7 @@ async fn single(prefix: &str) -> Option<CacheStore> {
     ))
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn take_is_atomic_and_single_use() {
     let Some(store) = single("forge-take").await else {
         return;
@@ -188,7 +190,7 @@ async fn take_is_atomic_and_single_use() {
         .expect("removing a missing key is fine");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn sets_hold_members_and_expire() {
     let Some(store) = single("forge-sets").await else {
         return;
@@ -238,7 +240,7 @@ async fn sets_hold_members_and_expire() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn clear_walks_many_pages() {
     let Some(store) = single("forge-many").await else {
         return;
@@ -255,7 +257,7 @@ async fn clear_walks_many_pages() {
     assert_eq!(store.get("k1199").await.expect("get"), None);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn bad_stored_json_is_a_serialization_error() {
     let Some(url) = url() else { return };
     let store = RedisStore::connect(&url, "forge-corrupt")
@@ -297,7 +299,7 @@ async fn bad_stored_json_is_a_serialization_error() {
     store.remove("bad").await.expect("remove");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn connecting_validates_its_input() {
     assert!(
         matches!(RedisStore::connect("  ,  ", "p").await, Err(quench_cache::CacheError::Backend(m)) if m.contains("no Redis URL"))
@@ -317,7 +319,7 @@ async fn connecting_validates_its_input() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn store_reports_what_it_is() {
     let Some(url) = url() else { return };
     let store = RedisStore::connect(&url, "forge-info")
@@ -339,3 +341,5 @@ async fn store_reports_what_it_is() {
     );
     unprefixed.remove("forge-info-bare").await.expect("remove");
 }
+
+quench_test::main!();

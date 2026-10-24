@@ -56,7 +56,7 @@ async fn fetch(id: u64) -> u64 {
     id * 2
 }
 
-#[test]
+#[quench_test::test]
 fn sync_functions_run_inside_a_span_with_their_arguments() {
     let mut result = 0;
     let records = capture(|| result = add(2, 3));
@@ -72,7 +72,7 @@ fn sync_functions_run_inside_a_span_with_their_arguments() {
     assert_eq!(records[0].spans.len(), 1);
 }
 
-#[test]
+#[quench_test::test]
 fn options_apply() {
     let mut result = 0;
     let records = capture(|| result = with_options(4, "hush"));
@@ -90,7 +90,7 @@ fn options_apply() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn the_span_level_follows_the_option() {
     let sink = MemorySink::new();
     with_default(
@@ -105,14 +105,14 @@ fn the_span_level_follows_the_option() {
     assert!(records[0].spans.is_empty());
 }
 
-#[test]
+#[quench_test::test]
 fn skip_all_records_no_arguments() {
     let records = capture(|| nothing_recorded(9));
     assert_eq!(records[0].spans[0].name, "nothing_recorded");
     assert!(records[0].spans[0].fields.is_empty());
 }
 
-#[test]
+#[quench_test::test]
 fn methods_record_self() {
     let service = Service { name: "billing" };
     let mut result = 0;
@@ -129,7 +129,7 @@ fn methods_record_self() {
     assert_eq!(fields[1], ("n".to_string(), FieldValue::Text("1".into())));
 }
 
-#[test]
+#[quench_test::test]
 fn async_functions_keep_the_span_across_awaits() {
     let mut result = 0;
     let records = capture(|| result = quench_core::future::block_on(fetch(21)));

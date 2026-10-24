@@ -11,7 +11,7 @@ static ENV_LOCK: Mutex<()> = Mutex::new(());
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
-#[test]
+#[quench_test::test]
 fn gatehouse_health_url_appends_the_ready_path_and_strips_a_trailing_slash() {
     let _guard = ENV_LOCK
         .lock()
@@ -28,7 +28,7 @@ fn gatehouse_health_url_appends_the_ready_path_and_strips_a_trailing_slash() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn gatehouse_health_url_defaults_to_a_bare_ready_path_when_unset() {
     let _guard = ENV_LOCK
         .lock()
@@ -39,7 +39,7 @@ fn gatehouse_health_url_defaults_to_a_bare_ready_path_when_unset() {
     assert_eq!(gatehouse_health_url(), "/health/ready");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn wait_for_services_returns_once_the_dependency_answers_successfully() {
     let listener = TcpListener::bind("127.0.0.1:0")
         .await

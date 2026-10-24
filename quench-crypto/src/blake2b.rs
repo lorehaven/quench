@@ -106,7 +106,7 @@ mod tests {
     use quench_core::hex;
 
     // RFC 7693 appendix A and the reference test vectors.
-    #[test]
+    #[quench_test::test]
     fn known_digests() {
         assert_eq!(
             hex::encode(blake2b(64, b"abc")),
@@ -122,7 +122,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn lengths_and_block_boundaries() {
         for out in [1, 20, 32, 48, 64] {
             assert_eq!(blake2b(out, b"x").len(), out);

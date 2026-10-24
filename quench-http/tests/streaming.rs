@@ -3,7 +3,11 @@
 //! chunked body driven by an item stream rather than a fixed buffer.
 //! Proved over a real socket, since chunked framing is a wire-level
 //! concern `Endpoint::call` dispatch alone can't exercise.
-#![allow(clippy::items_after_statements)] // test-local helper types sit next to the code that uses them
+#![allow(clippy::items_after_statements)]
+// test-local helper types sit next to the code that uses them
+
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_core::async_trait;
 use quench_core::bytes::Bytes;
@@ -51,7 +55,7 @@ fn read_all(stream: &mut StdTcpStream, timeout: Duration) -> String {
     String::from_utf8_lossy(&buf).into_owned()
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn streamed_items_arrive_as_chunked_body_over_a_real_socket() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -104,7 +108,7 @@ async fn streamed_items_arrive_as_chunked_body_over_a_real_socket() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_mid_stream_error_ends_the_response_instead_of_hanging() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
 
@@ -140,3 +144,5 @@ async fn a_mid_stream_error_ends_the_response_instead_of_hanging() {
         "expected the mid-stream error to surface"
     );
 }
+
+quench_test::main!();

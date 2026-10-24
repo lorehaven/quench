@@ -13,12 +13,12 @@ fn module(root: &Path, name: &str, manifest: &str, migrations: &[(&str, &str)]) 
     }
 }
 
-#[test]
+#[quench_test::test]
 fn module_scope_defaults_to_schema() {
     assert_eq!(ModuleScope::default(), ModuleScope::Schema);
 }
 
-#[test]
+#[quench_test::test]
 fn migration_since_defaults_to_zero_when_untagged() {
     let migration = Migration {
         id: "0001-a".to_string(),
@@ -32,7 +32,7 @@ fn migration_since_defaults_to_zero_when_untagged() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn migration_since_parses_a_tagged_version() {
     let migration = Migration {
         id: "0001-a".to_string(),
@@ -46,13 +46,13 @@ fn migration_since_parses_a_tagged_version() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn load_rejects_a_missing_root() {
     let err = Catalog::load("/nonexistent/path/does-not-exist").unwrap_err();
     assert!(matches!(err, CatalogError::MissingCatalog { .. }));
 }
 
-#[test]
+#[quench_test::test]
 fn load_finds_modules_and_exposes_them() {
     let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     module(
@@ -79,7 +79,7 @@ changes = [{ sql = "SELECT 1" }]
     assert_eq!(catalog.modules().count(), 1);
 }
 
-#[test]
+#[quench_test::test]
 fn fallback_schema_uses_the_module_name_for_schema_scoped_modules() {
     let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     module(
@@ -93,7 +93,7 @@ fn fallback_schema_uses_the_module_name_for_schema_scoped_modules() {
     assert_eq!(module.manifest.fallback_schema(), "sage");
 }
 
-#[test]
+#[quench_test::test]
 fn fallback_schema_is_public_for_database_scoped_modules() {
     let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     module(
@@ -107,7 +107,7 @@ fn fallback_schema_is_public_for_database_scoped_modules() {
     assert_eq!(module.manifest.fallback_schema(), "public");
 }
 
-#[test]
+#[quench_test::test]
 fn migrations_up_to_excludes_migrations_tagged_after_the_requested_version() {
     let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     module(
@@ -142,7 +142,7 @@ changes = []
     assert_eq!(up_to_0_3.len(), 2);
 }
 
-#[test]
+#[quench_test::test]
 fn load_rejects_a_migration_since_ahead_of_its_module_version() {
     let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     module(
@@ -164,7 +164,7 @@ changes = []
     assert!(matches!(err, CatalogError::MigrationAheadOfModule { .. }));
 }
 
-#[test]
+#[quench_test::test]
 fn load_rejects_an_unsatisfied_requirement() {
     let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     module(
@@ -177,7 +177,7 @@ fn load_rejects_an_unsatisfied_requirement() {
     assert!(matches!(err, CatalogError::UnknownModule { .. }));
 }
 
-#[test]
+#[quench_test::test]
 fn load_rejects_a_version_mismatched_requirement() {
     let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     module(
@@ -196,7 +196,7 @@ fn load_rejects_a_version_mismatched_requirement() {
     assert!(matches!(err, CatalogError::UnsatisfiedRequirement { .. }));
 }
 
-#[test]
+#[quench_test::test]
 fn requirement_table_form_deserializes_with_an_explicit_schema() {
     use quench_db::catalog::ModuleManifest;
     let manifest: ModuleManifest = quench_serde::toml::from_str(
@@ -208,7 +208,7 @@ fn requirement_table_form_deserializes_with_an_explicit_schema() {
     assert_eq!(manifest.requires[0].schema.as_deref(), Some("shared"));
 }
 
-#[test]
+#[quench_test::test]
 fn catalog_error_messages_are_readable() {
     let err = CatalogError::UnknownModule {
         name: "sage".to_string(),

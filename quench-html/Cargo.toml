@@ -10,6 +10,7 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+autotests = false
 
 [lib]
 name = "quench_html"
@@ -24,3 +25,18 @@ markdown = []
 
 [lints]
 workspace = true
+
+[[test]]
+name = "html"
+path = "tests/html.rs"
+required-features = ["parse"]
+harness = false
+
+[[test]]
+name = "markdown"
+path = "tests/markdown.rs"
+required-features = ["markdown"]
+harness = false
+
+[dev-dependencies]
+quench-test = { workspace = true }

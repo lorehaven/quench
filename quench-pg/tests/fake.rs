@@ -1,6 +1,9 @@
 //! The client against a scripted server: authentication variants, TLS negotiation,
 //! and the malformed input a real server never sends.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::base64::STANDARD;
 use quench_crypto::hash::sha256;
 use quench_crypto::hmac::{self, Algorithm};
@@ -76,7 +79,7 @@ async fn session() -> (Connection, DuplexStream) {
     (conn, task.await.unwrap())
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn startup_sends_the_expected_parameters_and_collects_server_state() {
     let (mut conn, mut server) = pair();
     let task = tokio::spawn(async move {
@@ -112,7 +115,7 @@ async fn startup_sends_the_expected_parameters_and_collects_server_state() {
     assert_eq!(conn.transaction_status(), b'I');
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn cleartext_passwords_are_sent_when_asked() {
     let (mut conn, mut server) = pair();
     let task = tokio::spawn(async move {
@@ -129,7 +132,7 @@ async fn cleartext_passwords_are_sent_when_asked() {
     assert_eq!(task.await.unwrap(), (b'p', b"pw\0".to_vec()));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn unsupported_authentication_is_a_clear_error() {
     for (kind, extra, needle) in [
         (5u32, vec![1u8, 2, 3, 4], "MD5"),
@@ -149,7 +152,7 @@ async fn unsupported_authentication_is_a_clear_error() {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_missing_password_is_reported_before_anything_is_sent() {
     let (client, mut server) = tokio::io::duplex(1 << 16);
     let mut conn = Connection::from_stream(
@@ -232,14 +235,14 @@ async fn scram_server(mut server: DuplexStream, password: &str, forge_signature:
         .unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn scram_completes_against_an_independent_server_implementation() {
     let (mut conn, server) = pair();
     tokio::spawn(scram_server(server, "pw", false));
     conn.startup().await.unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_wrong_password_fails_scram() {
     let (mut conn, server) = pair();
     tokio::spawn(scram_server(server, "other", false));
@@ -248,7 +251,7 @@ async fn a_wrong_password_fails_scram() {
     assert!(conn.is_closed());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_server_that_does_not_know_the_password_is_rejected() {
     let (mut conn, server) = pair();
     tokio::spawn(scram_server(server, "pw", true));
@@ -259,7 +262,7 @@ async fn a_server_that_does_not_know_the_password_is_rejected() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn scram_needs_the_right_mechanism_and_a_sane_order() {
     let (mut conn, mut server) = pair();
     tokio::spawn(async move {
@@ -291,7 +294,7 @@ async fn scram_needs_the_right_mechanism_and_a_sane_order() {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn errors_and_surprises_during_startup() {
     let (mut conn, mut server) = pair();
     tokio::spawn(async move {
@@ -326,7 +329,7 @@ async fn errors_and_surprises_during_startup() {
     assert!(conn.is_closed());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn malformed_messages_close_the_connection() {
     // A length below the minimum.
     let (mut conn, mut server) = pair();
@@ -372,7 +375,7 @@ async fn malformed_messages_close_the_connection() {
     ));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_data_row_without_a_description_is_a_protocol_error() {
     let (mut conn, mut server) = session().await;
     tokio::spawn(async move {
@@ -388,7 +391,7 @@ async fn a_data_row_without_a_description_is_a_protocol_error() {
     assert!(conn.is_closed() || conn.simple_query("SELECT 1").await.is_err());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn invalid_utf8_in_a_value_is_a_protocol_error() {
     let (mut conn, mut server) = session().await;
     tokio::spawn(async move {
@@ -422,7 +425,7 @@ async fn invalid_utf8_in_a_value_is_a_protocol_error() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_server_that_hangs_up_mid_query_closes_the_connection() {
     let (mut conn, mut server) = session().await;
     tokio::spawn(async move {
@@ -439,7 +442,7 @@ async fn a_server_that_hangs_up_mid_query_closes_the_connection() {
     assert!(conn.looks_dead());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn extended_protocol_results_and_unknown_messages_are_handled() {
     let (mut conn, mut server) = session().await;
     let task = tokio::spawn(async move {
@@ -497,7 +500,7 @@ async fn extended_protocol_results_and_unknown_messages_are_handled() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn too_many_parameters_are_refused_up_front() {
     let (mut conn, _server) = session().await;
     let values: Vec<i32> = vec![0; 40_000];
@@ -508,7 +511,7 @@ async fn too_many_parameters_are_refused_up_front() {
     assert!(!conn.is_closed());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn an_error_in_the_middle_of_a_result_is_reported_after_the_sync() {
     let (mut conn, mut server) = session().await;
     tokio::spawn(async move {
@@ -599,7 +602,7 @@ async fn answer_ssl_request(stream: &mut tokio::net::TcpStream, answer: u8) {
 }
 
 #[cfg(feature = "tls")]
-#[tokio::test]
+#[quench_test::test]
 async fn a_server_without_tls_is_fine_for_prefer_and_fatal_for_require() {
     let port = tcp_server(|mut stream| async move {
         answer_ssl_request(&mut stream, b'N').await;
@@ -690,7 +693,7 @@ async fn tls_server(port_tx: tokio::sync::oneshot::Sender<u16>) {
 }
 
 #[cfg(feature = "tls")]
-#[tokio::test]
+#[quench_test::test]
 async fn tls_is_negotiated_and_verified_when_asked() {
     // `require` accepts any certificate.
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -729,7 +732,7 @@ async fn tls_is_negotiated_and_verified_when_asked() {
 }
 
 #[cfg(not(feature = "tls"))]
-#[tokio::test]
+#[quench_test::test]
 async fn without_the_tls_feature_prefer_stays_plain_and_require_is_refused() {
     let port = tcp_server(|mut stream| async move {
         // No SSLRequest: the startup message comes first.
@@ -757,7 +760,7 @@ async fn without_the_tls_feature_prefer_stays_plain_and_require_is_refused() {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn connecting_can_time_out() {
     let port = tcp_server(|mut stream| async move {
         // Accept and say nothing.
@@ -775,7 +778,7 @@ async fn connecting_can_time_out() {
 }
 
 #[cfg(unix)]
-#[tokio::test]
+#[quench_test::test]
 async fn unix_sockets_are_used_for_slash_hosts() {
     let dir = quench_core::tmp::TempDir::new().unwrap();
     let path = dir.path().join(".s.PGSQL.5432");
@@ -807,10 +810,12 @@ async fn unix_sockets_are_used_for_slash_hosts() {
     ));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn looks_dead_notices_a_peer_that_vanished() {
     let (mut conn, server) = session().await;
     assert!(!conn.looks_dead());
     drop(server);
     assert!(conn.looks_dead());
 }
+
+quench_test::main!();

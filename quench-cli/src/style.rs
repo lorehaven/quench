@@ -303,7 +303,7 @@ mod tests {
     use super::*;
 
     // `NO_COLOR` is process-wide, so every assertion about it lives in one test.
-    #[test]
+    #[quench_test::test]
     fn codes_wrap_the_text_unless_no_color_is_set() {
         // SAFETY of env use: this is the only test in the crate that touches `NO_COLOR`.
         let saved = std::env::var_os("NO_COLOR");

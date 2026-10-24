@@ -10,7 +10,7 @@ fn lowercased(head: &str) -> String {
     head.to_lowercase()
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn http_client_get_sends_a_plain_get_and_parses_the_json_body() {
     let (base_url, handle) = serve_once("200 OK", r#"{"ok":true}"#).await;
     let client = HttpClient::new(&base_url).expect("build client");
@@ -23,7 +23,7 @@ async fn http_client_get_sends_a_plain_get_and_parses_the_json_body() {
     assert_eq!(captured.path, "/things/1");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn http_client_post_put_and_delete_send_their_method_and_json_body() {
     for (method, body_sent) in [
         ("POST", json!({"name": "a"})),
@@ -53,7 +53,7 @@ async fn http_client_post_put_and_delete_send_their_method_and_json_body() {
     assert_eq!(captured.method, "DELETE");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn http_client_surfaces_the_status_and_body_on_a_non_success_response() {
     let (base_url, handle) = serve_once("404 Not Found", "no such thing").await;
     let client = HttpClient::new(&base_url).expect("build client");
@@ -69,7 +69,7 @@ async fn http_client_surfaces_the_status_and_body_on_a_non_success_response() {
     handle.await.expect("server task");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn http_client_builder_can_disable_tls_verification() {
     let client = HttpClient::builder("http://localhost")
         .tls_verify(false)
@@ -77,7 +77,7 @@ async fn http_client_builder_can_disable_tls_verification() {
     assert!(client.is_ok());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn basic_auth_client_sends_the_basic_authorization_header() {
     let (base_url, handle) = serve_once("200 OK", r#"{"ok":true}"#).await;
     let client = BasicAuthClient::new(&base_url, "alice", "secret").expect("build client");
@@ -89,7 +89,7 @@ async fn basic_auth_client_sends_the_basic_authorization_header() {
     assert!(lowercased(&captured.head).contains("authorization: basic"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn basic_auth_client_builder_supports_every_combinator() {
     let (base_url, handle) = serve_once("200 OK", r#"{"ok":true}"#).await;
     let client = BasicAuthClient::builder(&base_url)
@@ -120,7 +120,7 @@ async fn basic_auth_client_builder_supports_every_combinator() {
     handle.await.expect("server task");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn basic_auth_client_delete_expect_success_ignores_a_2xx_body() {
     let (base_url, handle) = serve_once("204 No Content", "").await;
     let client = BasicAuthClient::new(&base_url, "alice", "secret").expect("build client");
@@ -132,7 +132,7 @@ async fn basic_auth_client_delete_expect_success_ignores_a_2xx_body() {
     handle.await.expect("server task");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn basic_auth_client_delete_expect_success_surfaces_a_failure_status() {
     let (base_url, handle) = serve_once("500 Internal Server Error", "boom").await;
     let client = BasicAuthClient::new(&base_url, "alice", "secret").expect("build client");
@@ -147,7 +147,7 @@ async fn basic_auth_client_delete_expect_success_surfaces_a_failure_status() {
     handle.await.expect("server task");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn basic_auth_client_delete_returns_the_parsed_body_on_success() {
     let (base_url, handle) = serve_once("200 OK", r#"{"ok":true}"#).await;
     let client = BasicAuthClient::new(&base_url, "alice", "secret").expect("build client");
@@ -156,7 +156,7 @@ async fn basic_auth_client_delete_returns_the_parsed_body_on_success() {
     handle.await.expect("server task");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn bearer_auth_client_sends_the_bearer_authorization_header() {
     let (base_url, handle) = serve_once("200 OK", r#"{"ok":true}"#).await;
     let client = BearerAuthClient::new(&base_url, "tok-123").expect("build client");
@@ -167,7 +167,7 @@ async fn bearer_auth_client_sends_the_bearer_authorization_header() {
     assert!(lowercased(&captured.head).contains("bearer tok-123"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn bearer_auth_client_with_tls_verify_false_still_posts_correctly() {
     let (base_url, handle) = serve_once("200 OK", r#"{"ok":true}"#).await;
     let client =
@@ -182,7 +182,7 @@ async fn bearer_auth_client_with_tls_verify_false_still_posts_correctly() {
     assert_eq!(captured.method, "POST");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn client_credentials_client_exchanges_a_token_then_calls_the_target_with_it() {
     let (token_url, token_handle) = serve_once(
         "200 OK",
@@ -211,7 +211,7 @@ async fn client_credentials_client_exchanges_a_token_then_calls_the_target_with_
     assert!(lowercased(&api_request.head).contains("bearer exchanged"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn client_credentials_client_caches_the_token_across_calls() {
     // The token endpoint is only wired to accept ONE connection - if
     // `access_token` mistakenly re-exchanged on the second `get`, that
@@ -252,7 +252,7 @@ async fn client_credentials_client_caches_the_token_across_calls() {
     assert_eq!(second_api.path, "/b");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn client_credentials_client_post_exchanges_a_token_and_sends_the_body() {
     let (token_url, token_handle) = serve_once(
         "200 OK",
@@ -281,7 +281,7 @@ async fn client_credentials_client_post_exchanges_a_token_and_sends_the_body() {
     assert!(api_request.body.contains("\"n\""));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn client_credentials_client_surfaces_a_refused_token_exchange() {
     let (token_url, token_handle) = serve_once("401 Unauthorized", "bad client secret").await;
     let client = ClientCredentialsClient::builder("http://127.0.0.1:1")
@@ -302,7 +302,7 @@ async fn client_credentials_client_surfaces_a_refused_token_exchange() {
     token_handle.await.expect("token server task");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn client_credentials_client_delete_expect_success_covers_both_branches() {
     let (token_url, _token_handle) =
         serve_once("200 OK", r#"{"access_token":"tok","expires_in":3600}"#).await;
@@ -343,7 +343,7 @@ async fn client_credentials_client_delete_expect_success_covers_both_branches() 
 
 const DEAD: &str = "http://127.0.0.1:1";
 
-#[tokio::test]
+#[quench_test::test]
 async fn every_client_reports_a_connection_failure_with_context() {
     let http = HttpClient::new(DEAD).unwrap();
     for message in [
@@ -408,7 +408,7 @@ async fn every_client_reports_a_connection_failure_with_context() {
     assert!(credentials.delete_expect_success("/x").await.is_err());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn an_unparseable_token_response_is_reported() {
     let (token_url, handle) = serve_once("200 OK", "this is not json").await;
     let client = ClientCredentialsClient::builder(DEAD)
@@ -425,7 +425,7 @@ async fn an_unparseable_token_response_is_reported() {
     handle.await.unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn error_statuses_carry_the_response_body() {
     let (base, handle) = serve_once("500 Internal Server Error", "kaput").await;
     let message = format!(
@@ -457,7 +457,7 @@ async fn error_statuses_carry_the_response_body() {
     handle.await.unwrap();
 }
 
-#[test]
+#[quench_test::test]
 fn debug_output_never_shows_secrets() {
     let basic = BasicAuthClient::new(DEAD, "user", "hunter2").unwrap();
     assert!(!format!("{basic:?}").contains("hunter2"));
@@ -477,7 +477,7 @@ fn debug_output_never_shows_secrets() {
     assert!(format!("{built:?}").contains("redacted"));
 }
 
-#[test]
+#[quench_test::test]
 fn builders_validate_their_inputs() {
     assert!(
         BasicAuthClient::builder(DEAD)

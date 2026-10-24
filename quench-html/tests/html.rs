@@ -2,6 +2,8 @@
 
 #![cfg(feature = "parse")]
 #![allow(clippy::too_many_lines)]
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_html::{Document, NodeKind, Selector, decode_entities};
 
@@ -10,7 +12,7 @@ fn texts(doc: &Document, css: &str) -> Vec<String> {
     doc.select(&selector).map(|n| n.text()).collect()
 }
 
-#[test]
+#[quench_test::test]
 fn builds_html_head_and_body() {
     let doc = Document::parse("<!DOCTYPE html><title>T</title><p>one<p>two");
     let html = doc.root_element();
@@ -56,7 +58,7 @@ fn builds_html_head_and_body() {
     assert_eq!(texts(&doc, "body"), ["abc"]);
 }
 
-#[test]
+#[quench_test::test]
 fn implicit_end_tags() {
     let doc = Document::parse("<ul><li>a<li>b<ul><li>c</ul><li>d</ul><dl><dt>t<dd>d<dt>t2</dl>");
     assert_eq!(texts(&doc, "ul > li"), ["a", "bc", "c", "d"]);
@@ -85,7 +87,7 @@ fn implicit_end_tags() {
     assert_eq!(texts(&doc, "td"), ["xy"]);
 }
 
-#[test]
+#[quench_test::test]
 fn raw_text_comments_and_entities() {
     let doc = Document::parse(
         "<script>if (a < b && c) { x = '</p>'; }</script><style>p > a { }</style><textarea>\n<b>&amp;</textarea><title>a &lt; b</title><p>x",
@@ -122,7 +124,7 @@ fn raw_text_comments_and_entities() {
     assert_eq!(texts(&doc, "p"), ["1 < 2 && 3 <> 4 <3"]);
 }
 
-#[test]
+#[quench_test::test]
 fn attributes_and_tags_are_read_loosely() {
     let doc = Document::parse(
         "<DIV ID=Main CLASS='x  y' data-a = \"1\" disabled DATA-A=2 / lang=en><IMG SRC=a.png/><br/><input value=a/b>text</DIV>",
@@ -163,7 +165,8 @@ fn attributes_and_tags_are_read_loosely() {
     }
 }
 
-#[test]
+#[quench_test::test]
+#[allow(clippy::eq_op)]
 fn tree_navigation() {
     let doc = Document::parse("<div id=a><p>1</p><p>2<b>x</b></p><span>3</span></div>");
     let div = doc.select(&Selector::parse("#a").unwrap()).next().unwrap();
@@ -206,7 +209,7 @@ fn tree_navigation() {
     assert_ne!(div, b);
 }
 
-#[test]
+#[quench_test::test]
 fn selectors() {
     let doc = Document::parse(
         "<div id=main class='box wide'><ul class=list><li class=a>1<li class=b>2<li class='a c'>3<li>4</ul>\
@@ -282,7 +285,7 @@ fn selectors() {
     assert!(!sel.matches(doc.root()));
 }
 
-#[test]
+#[quench_test::test]
 fn selector_errors() {
     for bad in [
         "",
@@ -319,3 +322,5 @@ fn selector_errors() {
     // Escapes and unusual names are fine.
     assert!(Selector::parse("a\\:b, .x\\.y, [data-x='1'], é").is_ok());
 }
+
+quench_test::main!();

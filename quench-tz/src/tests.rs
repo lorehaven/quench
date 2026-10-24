@@ -13,7 +13,7 @@ fn warsaw() -> Zone {
     Zone::named("Europe/Warsaw").expect("in the database")
 }
 
-#[test]
+#[quench_test::test]
 fn offsets_follow_daylight_saving() {
     let w = warsaw();
     let winter = w.offset_at(utc(2026, 1, 15, 12, 0, 0));
@@ -44,7 +44,7 @@ fn offsets_follow_daylight_saving() {
     assert_eq!(w.offset_at(utc(1850, 1, 1, 0, 0, 0)).abbreviation, "LMT");
 }
 
-#[test]
+#[quench_test::test]
 fn local_fields_and_the_other_direction() {
     let w = warsaw();
     let at = utc(2026, 7, 1, 12, 0, 0);
@@ -76,7 +76,7 @@ fn local_fields_and_the_other_direction() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn clocks_forward_leave_a_gap_and_clocks_back_repeat_an_hour() {
     let w = warsaw();
     // 2026-03-29: 02:00 CET jumps to 03:00 CEST.
@@ -104,7 +104,7 @@ fn clocks_forward_leave_a_gap_and_clocks_back_repeat_an_hour() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn unusual_zones() {
     // Half-hour and 45-minute offsets, southern-hemisphere daylight saving, no daylight saving.
     let kolkata = Zone::named("Asia/Kolkata").unwrap();
@@ -139,7 +139,7 @@ fn unusual_zones() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn the_database_can_be_listed_and_queried_by_name() {
     let names: Vec<&str> = Zone::names().collect();
     assert!(names.len() > 500, "{}", names.len());
@@ -174,7 +174,7 @@ fn the_database_can_be_listed_and_queried_by_name() {
     assert_eq!(Zone::named("Europe/Warsaw").unwrap().data, w.data);
 }
 
-#[test]
+#[quench_test::test]
 fn fixed_zones_never_change() {
     let utc_zone = Zone::utc();
     assert_eq!(utc_zone.name(), "UTC");
@@ -231,7 +231,7 @@ fn tzif(rule: &str) -> Vec<u8> {
     v
 }
 
-#[test]
+#[quench_test::test]
 fn tzif_files_can_be_read() {
     let zone = Zone::from_tzif("Custom", &tzif("AAA-1BBB-2,M3.5.0,M10.5.0")).unwrap();
     assert_eq!(zone.name(), "Custom");
@@ -252,7 +252,7 @@ fn tzif_files_can_be_read() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn damaged_tzif_data_is_an_error() {
     let good = tzif("AAA-1");
     assert!(Zone::from_tzif("x", b"").is_err());
@@ -269,7 +269,7 @@ fn damaged_tzif_data_is_an_error() {
     assert_eq!(TzifError("x").to_string(), "invalid TZif data: x");
 }
 
-#[test]
+#[quench_test::test]
 fn version_one_files_are_read_without_a_rule() {
     let mut v = Vec::new();
     v.extend_from_slice(b"TZif\0");
@@ -289,7 +289,7 @@ fn version_one_files_are_read_without_a_rule() {
     assert_eq!(zone.offset_at(Time::from_unix(600)).utc_offset, 3600);
 }
 
-#[test]
+#[quench_test::test]
 fn the_local_zone_comes_from_the_environment() {
     // `TZ` is process-wide, so everything about it is in one test.
     let saved = std::env::var_os("TZ");
@@ -314,7 +314,7 @@ fn the_local_zone_comes_from_the_environment() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn invalid_calendar_fields_resolve_to_nothing() {
     let w = warsaw();
     let bad = Civil {

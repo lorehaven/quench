@@ -361,7 +361,7 @@ mod tests {
         Gitignore::parse(rules).matched(path, dir)
     }
 
-    #[test]
+    #[quench_test::test]
     fn names_and_anchoring() {
         assert_eq!(m("target", "target", true), Match::Ignore);
         assert_eq!(m("target", "a/b/target", false), Match::Ignore);
@@ -375,7 +375,7 @@ mod tests {
         assert_eq!(m("x", "", false), Match::None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn globs() {
         assert_eq!(m("*.log", "a/b.log", false), Match::Ignore);
         assert_eq!(m("*.log", "a/b.logx", false), Match::None);
@@ -394,7 +394,7 @@ mod tests {
         assert_eq!(m("\\", "x", false), Match::None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn double_star() {
         assert_eq!(m("**/foo", "foo", false), Match::Ignore);
         assert_eq!(m("**/foo", "a/b/foo", false), Match::Ignore);
@@ -407,7 +407,7 @@ mod tests {
         assert_eq!(m("/a/*/c", "a/b/d/c", false), Match::None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn negation_comments_and_escapes() {
         let rules = "*.log\n!keep.log\n# comment\n\\#hash\n\\!bang\ntrailing   \nspaced\\ \n\r\n";
         let g = Gitignore::parse(rules);
@@ -426,7 +426,7 @@ mod tests {
         assert_eq!(m("dir/", "a\\dir", true), Match::Ignore);
     }
 
-    #[test]
+    #[quench_test::test]
     fn global_rules_have_no_directory() {
         let g = Gitignore::parse("/build\nname\n**/deep.txt\nsrc/x\n");
         assert_eq!(g.matched_names("/home/u/p/build", true), Match::None);
@@ -435,7 +435,7 @@ mod tests {
         assert_eq!(g.matched_names("/home/u/p/src/x", false), Match::None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn precedence_between_files() {
         use crate::tmp::TempDir;
         let dir = TempDir::new().unwrap();

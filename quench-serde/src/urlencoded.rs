@@ -217,13 +217,13 @@ mod tests {
     use super::*;
     use std::collections::{BTreeMap, HashMap};
 
-    #[test]
+    #[quench_test::test]
     fn encodes_like_a_form() {
         assert_eq!(encode("a b&c=d/é*-._~"), "a+b%26c%3Dd%2F%C3%A9*-._%7E");
         assert_eq!(encode(""), "");
     }
 
-    #[test]
+    #[quench_test::test]
     fn decodes_escapes_plus_and_leaves_bad_ones() {
         assert_eq!(decode("a+b%26c%3dd%C3%A9"), "a b&c=dé");
         assert_eq!(decode("100%"), "100%");
@@ -232,7 +232,7 @@ mod tests {
         assert_eq!(decode(""), "");
     }
 
-    #[test]
+    #[quench_test::test]
     fn round_trips_every_byte_value() {
         let all: String = (1..=0xd7ff_u32)
             .step_by(7)
@@ -241,7 +241,7 @@ mod tests {
         assert_eq!(decode(&encode(&all)), all);
     }
 
-    #[test]
+    #[quench_test::test]
     fn pairs() {
         assert_eq!(
             parse_pairs("a=1&b=&c&&d=x%20y"),
@@ -262,7 +262,7 @@ mod tests {
         tags: Vec<String>,
     }
 
-    #[test]
+    #[quench_test::test]
     fn reads_typed_structs_from_text() {
         let form: Form =
             from_str("name=Ada+L&age=36&admin=true&score=1.5&tags=a&tags=b&tags=c").unwrap();
@@ -282,7 +282,7 @@ mod tests {
         assert_eq!(form.tags, ["only"]);
     }
 
-    #[test]
+    #[quench_test::test]
     fn type_errors_name_the_field() {
         let e = from_str::<Form>("name=x&age=old&admin=true&score=1&tags=a&tags=b").unwrap_err();
         assert_eq!(e.path(), "age");
@@ -291,13 +291,13 @@ mod tests {
         assert_eq!(e.to_string(), "missing field `name`");
     }
 
-    #[test]
+    #[quench_test::test]
     fn json_stays_strict_after_a_form_read() {
         let _ = from_str::<Form>("name=x");
         assert!(crate::json::from_str::<u8>("\"5\"").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn maps_and_pair_lists() {
         let map: HashMap<String, String> = from_str("a=1&b=2").unwrap();
         assert_eq!(map["b"], "2");
@@ -308,7 +308,7 @@ mod tests {
         assert_eq!(to_string(&[("k", "v w")]).unwrap(), "k=v+w");
     }
 
-    #[test]
+    #[quench_test::test]
     fn writes_structs() {
         let form = Form {
             name: "Ada L".into(),
@@ -325,7 +325,7 @@ mod tests {
         assert_eq!(to_string(&()).unwrap(), "");
     }
 
-    #[test]
+    #[quench_test::test]
     fn writes_every_scalar_kind() {
         let value = crate::json!({"s": "x", "b": false, "i": -3, "u": 3, "f": 0.5, "n": null, "list": [1, null, 2]});
         assert_eq!(
@@ -334,7 +334,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn unwritable_shapes_are_errors() {
         let nested = crate::json!({"a": {"b": 1}});
         let e = to_string(&nested).unwrap_err();
@@ -356,7 +356,7 @@ mod tests {
         assert!(to_string(&crate::json!([[{"x": 1}, 2]])).is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn percent_encoding_is_for_paths_not_forms() {
         assert_eq!(percent_encode("a b&c/d+e~f"), "a%20b%26c%2Fd%2Be~f");
         assert_eq!(percent_encode("é"), "%C3%A9");

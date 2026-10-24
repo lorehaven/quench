@@ -260,7 +260,7 @@ mod tests {
         out
     }
 
-    #[test]
+    #[quench_test::test]
     fn rfc_7748_section_5_2_vectors() {
         assert_eq!(
             x25519(
@@ -278,7 +278,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn rfc_7748_iterated_vectors() {
         let mut k = BASEPOINT;
         let mut u = BASEPOINT;
@@ -299,7 +299,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn rfc_7748_section_6_1_key_agreement() {
         let alice = hex("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a");
         let bob = hex("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb");
@@ -318,7 +318,7 @@ mod tests {
         assert_eq!(x25519(&bob, &alice_public), shared);
     }
 
-    #[test]
+    #[quench_test::test]
     fn the_top_bit_of_the_point_is_ignored_and_small_order_points_give_zero() {
         let k = hex("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a");
         let mut u = hex("de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f");
@@ -329,7 +329,7 @@ mod tests {
         assert_eq!(x25519(&k, &[0u8; 32]), [0u8; 32]);
     }
 
-    #[test]
+    #[quench_test::test]
     fn field_arithmetic_round_trips() {
         for text in [
             "0000000000000000000000000000000000000000000000000000000000000000",

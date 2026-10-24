@@ -61,7 +61,7 @@ mod tests {
     use super::*;
     use std::error::Error as _;
 
-    #[test]
+    #[quench_test::test]
     fn displays_and_sources() {
         let io = Error::from(io::Error::other("boom"));
         assert!(io.to_string().contains("boom") && io.source().is_some());

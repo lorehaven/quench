@@ -49,7 +49,7 @@ impl Endpoint for Status {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn error_bodies_have_the_documented_shapes() {
     let plain = json_error(StatusCode::BAD_REQUEST, "nope");
     assert_eq!(plain.status(), StatusCode::BAD_REQUEST);
@@ -83,7 +83,7 @@ async fn error_bodies_have_the_documented_shapes() {
     assert_eq!(error::UNSUPPORTED, "UNSUPPORTED");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn correlation_ids_are_kept_or_minted() {
     let next = Status(StatusCode::OK);
     let kept = CorrelationId
@@ -109,7 +109,7 @@ async fn correlation_ids_are_kept_or_minted() {
     assert!(format!("{builder:?}").contains("x-correlation-id"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn the_logger_passes_responses_through_untouched() {
     quench_core::env::set("LOG_SKIP_PREFIXES", " /health , ,/assets");
     let logger = FilteredLogger::default();
@@ -136,7 +136,7 @@ async fn the_logger_passes_responses_through_untouched() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn ui_redirects_target_the_login_page() {
     let login = ui::ui_login_redirect();
     assert_eq!(login.status(), StatusCode::FOUND);
@@ -178,7 +178,7 @@ async fn ui_redirects_target_the_login_page() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn static_assets_are_served_safely() {
     let dir = quench_core::tmp::TempDir::new().unwrap();
     std::fs::create_dir_all(dir.path().join("css")).unwrap();

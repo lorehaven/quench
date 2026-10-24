@@ -8,7 +8,7 @@ use quench_web::framework::app::AppShellBuilder;
 use quench_web::framework::theme::Theme;
 use quench_web::html::builder::elements::div;
 
-#[test]
+#[quench_test::test]
 fn default_build_has_a_header_with_nav_and_a_footer() {
     let page = AppShellBuilder::new().build().page(div().text("content"));
 
@@ -18,7 +18,7 @@ fn default_build_has_a_header_with_nav_and_a_footer() {
     assert!(page.contains("content"));
 }
 
-#[test]
+#[quench_test::test]
 fn with_header_false_omits_the_header_entirely() {
     let page = AppShellBuilder::new()
         .with_header(false)
@@ -28,7 +28,7 @@ fn with_header_false_omits_the_header_entirely() {
     assert!(!page.contains("<header"));
 }
 
-#[test]
+#[quench_test::test]
 fn with_nav_false_keeps_the_header_but_drops_the_nav_trigger() {
     let page = AppShellBuilder::new().with_nav(false).build().page(div());
 
@@ -36,7 +36,7 @@ fn with_nav_false_keeps_the_header_but_drops_the_nav_trigger() {
     assert!(!page.contains("q-shell-nav-trigger"));
 }
 
-#[test]
+#[quench_test::test]
 fn an_unsupported_default_theme_falls_back_to_the_first_supported_one() {
     let page = AppShellBuilder::new()
         .supported_themes(vec![Theme::BootstrapDark, Theme::BootstrapLight])
@@ -52,7 +52,7 @@ fn an_unsupported_default_theme_falls_back_to_the_first_supported_one() {
     assert!(!page.contains("themes/default-dark.css\""));
 }
 
-#[test]
+#[quench_test::test]
 #[should_panic(expected = "failed to build app shell")]
 fn build_panics_when_an_unsupported_locale_file_is_missing() {
     let _ = AppShellBuilder::new()
@@ -60,7 +60,7 @@ fn build_panics_when_an_unsupported_locale_file_is_missing() {
         .build();
 }
 
-#[test]
+#[quench_test::test]
 fn try_build_reports_the_missing_locale_file_as_an_error_instead_of_panicking() {
     let error = AppShellBuilder::new()
         .supported_locales(vec!["xx-XX".to_string()])

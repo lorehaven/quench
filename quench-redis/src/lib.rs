@@ -107,3 +107,6 @@ impl Redis {
             .collect())
     }
 }
+
+#[cfg(test)]
+quench_test::main!();

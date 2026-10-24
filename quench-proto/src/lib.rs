@@ -38,3 +38,6 @@ pub use method::Method;
 pub use status::StatusCode;
 pub use uri::Uri;
 pub use version::Version;
+
+#[cfg(test)]
+quench_test::main!();

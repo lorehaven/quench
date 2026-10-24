@@ -503,7 +503,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn scalars_decode_by_type() {
         assert_eq!(decode_text(oid::BOOL, "t"), Value::Bool(true));
         assert_eq!(decode_text(oid::BOOL, "f"), Value::Bool(false));
@@ -545,7 +545,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn json_columns_are_parsed() {
         assert_eq!(
             decode_text(oid::JSONB, r#"{"a": [1, 2]}"#),
@@ -558,7 +558,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn bytea_round_trips() {
         assert_eq!(decode_text(oid::BYTEA, "\\x00ff10"), json!([0, 255, 16]));
         assert_eq!(
@@ -572,7 +572,7 @@ mod tests {
         assert_eq!(decode_bytea("\\x").unwrap(), b"");
     }
 
-    #[test]
+    #[quench_test::test]
     fn timestamps_are_normalised_to_utc() {
         let cases = [
             ("2026-10-23 01:38:00+00", "2026-10-23T01:38:00Z"),
@@ -620,7 +620,7 @@ mod tests {
         assert!(parse_timestamp("2026-10-23 01:38:00:01+00", false).is_none());
     }
 
-    #[test]
+    #[quench_test::test]
     fn arrays_parse() {
         assert_eq!(decode_text(1007, "{1,2,3}"), json!([1, 2, 3]));
         assert_eq!(
@@ -649,7 +649,7 @@ mod tests {
         assert!(array_element(12345).is_none());
     }
 
-    #[test]
+    #[quench_test::test]
     fn parameters_encode_as_text() {
         assert_eq!("x".to_sql(), Some("x".into()));
         assert_eq!(String::from("y").to_sql(), Some("y".into()));
@@ -692,7 +692,7 @@ mod tests {
         assert_eq!(PgArray::<i32>(vec![]).to_sql(), Some("{}".into()));
     }
 
-    #[test]
+    #[quench_test::test]
     fn typed_reads() {
         assert_eq!(String::from_sql(&col(oid::TEXT), Some("s")).unwrap(), "s");
         assert!(bool::from_sql(&col(oid::BOOL), Some("t")).unwrap());

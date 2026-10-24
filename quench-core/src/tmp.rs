@@ -60,7 +60,7 @@ impl Drop for TempDir {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn creates_and_removes() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().to_path_buf();
@@ -79,20 +79,20 @@ mod tests {
         assert!(!path.exists());
     }
 
-    #[test]
+    #[quench_test::test]
     fn directories_are_distinct() {
         let (a, b) = (TempDir::new().unwrap(), TempDir::new().unwrap());
         assert_ne!(a.path(), b.path());
     }
 
-    #[test]
+    #[quench_test::test]
     fn into_path_keeps_the_directory() {
         let kept = TempDir::new().unwrap().into_path();
         assert!(kept.is_dir());
         fs::remove_dir_all(&kept).unwrap();
     }
 
-    #[test]
+    #[quench_test::test]
     fn new_in_uses_the_parent_and_fails_when_missing() {
         let parent = TempDir::new().unwrap();
         let child = TempDir::new_in(parent.path()).unwrap();

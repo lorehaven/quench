@@ -27,3 +27,6 @@ pub mod zip;
 pub mod zstd;
 
 pub use error::{Error, Result};
+
+#[cfg(test)]
+quench_test::main!();

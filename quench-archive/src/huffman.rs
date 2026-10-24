@@ -85,7 +85,7 @@ mod tests {
             .sum()
     }
 
-    #[test]
+    #[quench_test::test]
     fn small_alphabets() {
         assert_eq!(code_lengths(&[0, 0, 0], 15), vec![0, 0, 0]);
         assert_eq!(code_lengths(&[0, 7, 0], 15), vec![0, 1, 0]);
@@ -93,7 +93,7 @@ mod tests {
         assert_eq!(code_lengths(&[1, 1, 2], 15), vec![2, 2, 1]);
     }
 
-    #[test]
+    #[quench_test::test]
     fn lengths_are_complete_and_limited() {
         // Fibonacci-like frequencies make an unrestricted tree very deep.
         let mut frequencies = vec![1u32, 1];

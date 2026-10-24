@@ -5,7 +5,7 @@
 use quench_db::prelude::Db;
 use quench_starter::common::db::DbWrapper;
 
-#[tokio::test]
+#[quench_test::test]
 async fn an_empty_url_without_the_opt_in_refuses_to_start_but_succeeds_once_allowed() {
     // Sequential within one test so the two states of `ALLOW_IN_MEMORY_DB`
     // never race against another test in this binary.

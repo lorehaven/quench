@@ -1,5 +1,8 @@
 //! The result model, its JSON and the HTML page.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_test::report::{self, Case, Report, Status, StepResult, Suite, file_stem, html};
 
 fn sample() -> Report {
@@ -46,7 +49,7 @@ fn sample() -> Report {
     report
 }
 
-#[test]
+#[quench_test::test]
 fn json_round_trips() {
     let report = sample();
     let text = report.to_json();
@@ -72,7 +75,7 @@ fn json_round_trips() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn html_is_escaped_and_informative() {
     let page = html(&sample());
     assert!(
@@ -101,7 +104,7 @@ fn html_is_escaped_and_informative() {
     assert!(page.contains("All tests passed") && page.contains("100.0%"));
 }
 
-#[test]
+#[quench_test::test]
 fn merging_adds_up() {
     let mut a = sample();
     a.started = 100;
@@ -120,7 +123,7 @@ fn merging_adds_up() {
     assert_eq!(merged.summary().total(), 8);
 }
 
-#[test]
+#[quench_test::test]
 fn files_are_written_with_an_index() {
     let dir = std::env::temp_dir().join(format!("quench-test-report-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -162,22 +165,29 @@ fn files_are_written_with_an_index() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-#[test]
+#[quench_test::test]
 fn the_directory_follows_the_environment() {
     // Environment variables are process-wide, so everything about them is in this one test.
-    let saved: Vec<_> = ["QUENCH_TEST_REPORT", "QUENCH_TEST_REPORT_DIR"]
+    let saved: Vec<_> = ["QUENCH_TEST_REPORT", "QUENCH_TEST_REPORT_DIR", "NEXTEST"]
         .iter()
         .map(|k| (*k, std::env::var_os(k)))
         .collect();
     quench_core::env::remove("QUENCH_TEST_REPORT");
     quench_core::env::remove("QUENCH_TEST_REPORT_DIR");
+    quench_core::env::remove("NEXTEST");
     let default = report::report_directory().unwrap();
-    assert!(default.ends_with("quench-test"), "{default:?}");
+    assert!(default.ends_with("quench-test"), "{}", default.display());
     quench_core::env::set("QUENCH_TEST_REPORT_DIR", "/tmp/somewhere");
     assert_eq!(
         report::report_directory().unwrap(),
         std::path::PathBuf::from("/tmp/somewhere")
     );
+    // Under nextest there is no whole run to report on, unless a directory was asked for by name.
+    quench_core::env::remove("QUENCH_TEST_REPORT_DIR");
+    quench_core::env::set("NEXTEST", "1");
+    assert!(report::report_directory().is_none());
+    quench_core::env::set("QUENCH_TEST_REPORT_DIR", "/tmp/somewhere");
+    assert!(report::report_directory().is_some());
     quench_core::env::set("QUENCH_TEST_REPORT", "off");
     assert!(report::report_directory().is_none());
     for (key, value) in saved {
@@ -187,3 +197,5 @@ fn the_directory_follows_the_environment() {
         }
     }
 }
+
+quench_test::main!();

@@ -203,7 +203,7 @@ mod tests {
         Date::from_ymd(y, m, day).expect("a real date")
     }
 
-    #[test]
+    #[quench_test::test]
     fn construction_and_fields() {
         assert_eq!(Date::EPOCH.ymd(), (1970, 1, 1));
         assert_eq!(d(2024, 2, 29).ymd(), (2024, 2, 29));
@@ -227,7 +227,7 @@ mod tests {
         assert_eq!(Date::days_in_month(2023, 4), 30);
     }
 
-    #[test]
+    #[quench_test::test]
     fn day_arithmetic() {
         assert_eq!(d(2024, 2, 28).add_days(2), Some(d(2024, 3, 1)));
         assert_eq!(d(2023, 3, 1).add_days(-1), Some(d(2023, 2, 28)));
@@ -238,7 +238,7 @@ mod tests {
         assert_eq!(d(2026, 1, 1).add_days(i64::MAX / 2), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn month_arithmetic_clamps_to_the_end_of_the_month() {
         assert_eq!(d(2026, 1, 31).add_months(1), Some(d(2026, 2, 28)));
         assert_eq!(d(2024, 1, 31).add_months(1), Some(d(2024, 2, 29)));
@@ -252,7 +252,7 @@ mod tests {
         assert_eq!(d(2026, 5, 5).add_months(i32::MIN), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn text_forms() {
         assert_eq!(d(2026, 9, 5).to_string(), "2026-09-05");
         assert_eq!(format!("{:?}", d(2026, 9, 5)), "Date(2026-09-05)");
@@ -282,7 +282,7 @@ mod tests {
         assert!(Date::parse_from_str("2026-09-05", "%Y-%m-%").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn dates_and_civil_fields_convert() {
         let civil = d(2026, 10, 23).at(13, 45, 59);
         assert_eq!(

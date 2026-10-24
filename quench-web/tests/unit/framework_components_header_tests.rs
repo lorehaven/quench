@@ -3,7 +3,7 @@
 use quench_web::framework::components::header::HeaderBuilder;
 use quench_web::html::builder::elements::div;
 
-#[test]
+#[quench_test::test]
 fn header_builder_without_nav_omits_the_nav_trigger() {
     let html = HeaderBuilder::new().label("nav_label").build().render();
     assert!(html.starts_with("<header"));
@@ -13,7 +13,7 @@ fn header_builder_without_nav_omits_the_nav_trigger() {
     assert!(!html.contains("q-shell-nav-trigger"));
 }
 
-#[test]
+#[quench_test::test]
 fn with_nav_adds_the_nav_trigger_and_a_custom_panel() {
     let html = HeaderBuilder::new()
         .label("nav_label")

@@ -6,6 +6,8 @@
     unused_imports,
     dead_code
 )]
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 #[cfg(feature = "axml")]
 use quench_convert::axml;
@@ -21,7 +23,7 @@ use quench_serde::{Value, json};
 // ---------------------------------------------------------------- csv
 
 #[cfg(feature = "csv")]
-#[test]
+#[quench_test::test]
 fn csv_records_and_quoting() {
     let text = "a,b,c\r\n1,\"two, 2\",\"say \"\"hi\"\"\"\r\n\r\n\"multi\nline\",,\n";
     let rows = csv::records(text, b',', false).unwrap();
@@ -68,7 +70,7 @@ fn csv_records_and_quoting() {
 }
 
 #[cfg(feature = "csv")]
-#[test]
+#[quench_test::test]
 fn csv_errors_and_leniency() {
     // Lenient by default, as csv readers usually are.
     assert_eq!(
@@ -97,7 +99,7 @@ fn csv_errors_and_leniency() {
 }
 
 #[cfg(feature = "csv")]
-#[test]
+#[quench_test::test]
 fn csv_values() {
     let rows = csv::parse(
         "name, qty ,\nbolt,4,x,y\nnut\n",
@@ -125,7 +127,7 @@ fn csv_values() {
 }
 
 #[cfg(feature = "csv")]
-#[test]
+#[quench_test::test]
 fn csv_writing_round_trips() {
     let rows = vec![
         json!({"name": "bolt", "note": "has, comma", "n": 4, "gone": null}),
@@ -151,7 +153,7 @@ fn csv_writing_round_trips() {
 // ---------------------------------------------------------------- xml
 
 #[cfg(feature = "xml")]
-#[test]
+#[quench_test::test]
 fn xml_parses_the_tree() {
     let doc = xml::parse(
         "\u{FEFF}<?xml version=\"1.0\"?><!DOCTYPE note [<!ENTITY x \"y\">]>\n<!-- c --><a:root xmlns:a='u' id=\"1\" q='say &quot;hi&quot;'>\n  <item n=\"1\">one &amp; &lt;two&gt; &#65;&#x42;</item>\n  <item/>\n  <![CDATA[<raw & text>]]>tail<?pi x?>\n</a:root><!-- end -->\n",
@@ -174,7 +176,7 @@ fn xml_parses_the_tree() {
 }
 
 #[cfg(feature = "xml")]
-#[test]
+#[quench_test::test]
 fn xml_whitespace_and_writing() {
     let source = "<r>\n  <a> x </a>\n  <b/>\n</r>";
     let trimmed = xml::parse(source).unwrap();
@@ -210,7 +212,7 @@ fn xml_whitespace_and_writing() {
 }
 
 #[cfg(feature = "xml")]
-#[test]
+#[quench_test::test]
 fn xml_errors() {
     for bad in [
         "",
@@ -375,7 +377,7 @@ fn build_axml(utf8: bool, attrs: &[Attr]) -> Vec<u8> {
 }
 
 #[cfg(feature = "axml")]
-#[test]
+#[quench_test::test]
 fn axml_reads_real_manifests() {
     let minimal = axml::parse(include_bytes!("fixtures/minimal.axml")).unwrap();
     assert_eq!(xml::tag(&minimal), Some("manifest"));
@@ -404,7 +406,7 @@ fn axml_reads_real_manifests() {
 }
 
 #[cfg(feature = "axml")]
-#[test]
+#[quench_test::test]
 fn axml_value_types() {
     let ns = 1;
     let attrs = [
@@ -469,7 +471,7 @@ fn axml_value_types() {
 }
 
 #[cfg(feature = "axml")]
-#[test]
+#[quench_test::test]
 fn axml_errors() {
     let good = build_axml(false, &[]);
     assert_eq!(axml::parse(b"").unwrap_err().format(), "axml");
@@ -590,7 +592,7 @@ fn build_gguf(version: u32) -> Vec<u8> {
 }
 
 #[cfg(feature = "gguf")]
-#[test]
+#[quench_test::test]
 fn gguf_reads_every_value_type() {
     for version in [1, 2, 3] {
         let bytes = build_gguf(version);
@@ -636,7 +638,7 @@ fn gguf_reads_every_value_type() {
 }
 
 #[cfg(feature = "gguf")]
-#[test]
+#[quench_test::test]
 fn gguf_errors() {
     let good = build_gguf(3);
     assert!(gguf::parse(b"", &gguf::Options::default()).is_err());
@@ -739,3 +741,5 @@ fn gguf_errors() {
     scalar_array.extend_from_slice(&7u32.to_le_bytes());
     assert!(gguf::parse(&scalar_array, &gguf::Options::default()).is_ok());
 }
+
+quench_test::main!();

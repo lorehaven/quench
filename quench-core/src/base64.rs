@@ -150,7 +150,7 @@ mod tests {
         ("foobar", "Zm9vYmFy"),
     ];
 
-    #[test]
+    #[quench_test::test]
     fn rfc4648_vectors() {
         for (plain, encoded) in VECTORS {
             assert_eq!(STANDARD.encode(plain), encoded);
@@ -163,7 +163,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn alphabets_differ_on_62_and_63() {
         let bytes = [0xfb, 0xff, 0xbf];
         assert_eq!(STANDARD.encode(bytes), "+/+/");
@@ -173,7 +173,7 @@ mod tests {
         assert_eq!(URL_SAFE.decode("+/+/"), Err(DecodeError::InvalidByte(0)));
     }
 
-    #[test]
+    #[quench_test::test]
     fn round_trips_every_length_and_byte() {
         let all: Vec<u8> = (0..=255).collect();
         for len in 0..=all.len() {
@@ -184,7 +184,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_bad_alphabet_bytes() {
         assert_eq!(STANDARD.decode("Zm9*"), Err(DecodeError::InvalidByte(3)));
         assert_eq!(STANDARD.decode("Zm 9"), Err(DecodeError::InvalidByte(2)));
@@ -195,7 +195,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_bad_padding() {
         for bad in [
             "Zg=", "Zg", "Zg===", "Z===", "====", "Zm9v=", "=Zg=", "Zg=a", "Zm=9",
@@ -212,7 +212,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_impossible_lengths() {
         assert_eq!(STANDARD_NO_PAD.decode("Z"), Err(DecodeError::InvalidLength));
         assert_eq!(
@@ -223,7 +223,7 @@ mod tests {
         assert_eq!(STANDARD.decode("Zm9vY"), Err(DecodeError::InvalidLength));
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_non_zero_trailing_bits() {
         // "Zh==" would decode to 'f' with stray low bits set.
         assert_eq!(STANDARD.decode("Zh=="), Err(DecodeError::NonCanonical));
@@ -231,7 +231,7 @@ mod tests {
         assert_eq!(URL_SAFE_NO_PAD.decode("Zh"), Err(DecodeError::NonCanonical));
     }
 
-    #[test]
+    #[quench_test::test]
     fn errors_display() {
         for e in [
             DecodeError::InvalidByte(3),

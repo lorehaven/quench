@@ -25,7 +25,7 @@ fn user(roles: Vec<Role>, permissions: &[(&str, &[&str])]) -> User {
     .unwrap()
 }
 
-#[test]
+#[quench_test::test]
 fn passwords_use_argon2id_with_unique_salts() {
     let first = User::new(
         "first".into(),
@@ -50,7 +50,7 @@ fn passwords_use_argon2id_with_unique_salts() {
     assert!(!first.verify_password("wrong"));
 }
 
-#[test]
+#[quench_test::test]
 fn an_ordinary_user_holds_only_what_is_granted() {
     let user = user(vec![Role::User], &[("sage", &["read"])]);
 
@@ -62,7 +62,7 @@ fn an_ordinary_user_holds_only_what_is_granted() {
 /// The whole point of a flat action set rather than an ordered level: two
 /// unrelated actions on the same service are independently grantable, and
 /// holding one says nothing about the other.
-#[test]
+#[quench_test::test]
 fn actions_on_one_service_are_independent() {
     let user = user(vec![Role::User], &[("switchboard", &["launch"])]);
 
@@ -73,7 +73,7 @@ fn actions_on_one_service_are_independent() {
 
 /// The wildcard is the whole reason adding a service to the estate does not mean
 /// re-granting anything to administrators.
-#[test]
+#[quench_test::test]
 fn wildcard_roles_reach_a_service_with_no_grant_written_down() {
     for role in [Role::Admin, Role::Service] {
         let holder = user(vec![role.clone()], &[]);
@@ -87,7 +87,7 @@ fn wildcard_roles_reach_a_service_with_no_grant_written_down() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn the_plain_user_role_is_not_a_wildcard() {
     assert!(!Role::User.is_wildcard());
     assert!(!user(vec![Role::User], &[]).can("sage", "read"));
@@ -96,7 +96,7 @@ fn the_plain_user_role_is_not_a_wildcard() {
 /// A row that will not parse as `{service: [action, ...]}` reads as no grants
 /// at all, not a partial one - "no access" is the safe direction for that
 /// failure to go.
-#[test]
+#[quench_test::test]
 fn an_unreadable_permissions_column_reads_as_no_grants() {
     let mut user = user(vec![Role::User], &[("sage", &["read"])]);
     user.permissions = quench_serde::json!("not an object");
@@ -106,20 +106,20 @@ fn an_unreadable_permissions_column_reads_as_no_grants() {
 }
 
 /// Omit this from `columns` and CRUD silently drops the column on every write.
-#[test]
+#[quench_test::test]
 fn permissions_is_a_persisted_column() {
     use quench_db::prelude::Model;
     assert!(User::columns().contains(&"permissions"));
 }
 
-#[test]
+#[quench_test::test]
 fn a_fresh_user_is_neither_disabled_nor_locked() {
     let user = user(vec![Role::User], &[]);
     assert!(!user.is_disabled());
     assert!(!user.is_locked());
 }
 
-#[test]
+#[quench_test::test]
 fn failed_logins_below_the_threshold_do_not_lock() {
     let mut u = user(vec![Role::User], &[]);
     for _ in 0..4 {
@@ -129,7 +129,7 @@ fn failed_logins_below_the_threshold_do_not_lock() {
     assert!(!u.is_locked());
 }
 
-#[test]
+#[quench_test::test]
 fn the_nth_failed_login_locks_and_resets_the_counter() {
     let mut u = user(vec![Role::User], &[]);
     for _ in 0..5 {
@@ -141,14 +141,14 @@ fn the_nth_failed_login_locks_and_resets_the_counter() {
     assert_eq!(u.failed_login_attempts, 0);
 }
 
-#[test]
+#[quench_test::test]
 fn a_lock_expires_on_its_own_once_the_duration_passes() {
     let mut u = user(vec![Role::User], &[]);
     u.locked_until = Some(quench_core::time::Time::now() - quench_core::time::Duration::seconds(1));
     assert!(!u.is_locked());
 }
 
-#[test]
+#[quench_test::test]
 fn a_successful_login_clears_the_failure_count_and_stamps_last_login() {
     let mut u = user(vec![Role::User], &[]);
     u.record_failed_login(5, quench_core::time::Duration::minutes(15));
@@ -161,7 +161,7 @@ fn a_successful_login_clears_the_failure_count_and_stamps_last_login() {
     assert!(u.last_login_at.is_some());
 }
 
-#[test]
+#[quench_test::test]
 fn disabled_is_driven_by_disabled_at_alone() {
     let mut u = user(vec![Role::User], &[]);
     assert!(!u.is_disabled());
@@ -169,7 +169,7 @@ fn disabled_is_driven_by_disabled_at_alone() {
     assert!(u.is_disabled());
 }
 
-#[test]
+#[quench_test::test]
 fn role_parse_round_trips_through_display_and_rejects_unknown_values() {
     for role in [Role::Admin, Role::User, Role::Service] {
         assert_eq!(Role::parse(&role.to_string()), Some(role));
@@ -178,7 +178,7 @@ fn role_parse_round_trips_through_display_and_rejects_unknown_values() {
     assert_eq!(Role::parse("nonsense"), None);
 }
 
-#[test]
+#[quench_test::test]
 fn hashes_from_other_argon2_builds_still_verify_and_new_ones_keep_the_same_cost() {
     // Produced by the reference `argon2` CLI (`-id -m 14 -t 2 -p 1`), i.e. not
     // by this crate - stored hashes outlive library upgrades.

@@ -10,10 +10,12 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = "README.md"
+autotests = false
 
 [lib]
 name = "quench_auth"
 path = "src/lib.rs"
+harness = false
 
 [dependencies]
 quench-log = { workspace = true }
@@ -39,21 +41,41 @@ postgres = ["quench-db/postgres"]
 # `https://` for the SSO and JWKS clients, `rediss://` and `sslmode=require` for the stores.
 tls = ["quench-client/tls", "quench-http?/tls", "quench-db/tls", "quench-cache/tls"]
 
-[[test]]
-name = "http_middleware_auth"
-required-features = ["http"]
 
-[[test]]
-name = "http_middleware_require_write"
-required-features = ["http"]
 
-[[test]]
-name = "http_sso_client"
-required-features = ["http"]
 
-[[test]]
-name = "http_ui"
-required-features = ["http"]
 
 [lints]
 workspace = true
+
+[[test]]
+name = "http_middleware_auth"
+path = "tests/http_middleware_auth.rs"
+required-features = ["http"]
+harness = false
+
+[[test]]
+name = "http_middleware_require_write"
+path = "tests/http_middleware_require_write.rs"
+required-features = ["http"]
+harness = false
+
+[[test]]
+name = "http_sso_client"
+path = "tests/http_sso_client.rs"
+required-features = ["http"]
+harness = false
+
+[[test]]
+name = "http_ui"
+path = "tests/http_ui.rs"
+required-features = ["http"]
+harness = false
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false
+
+[dev-dependencies]
+quench-test = { workspace = true }

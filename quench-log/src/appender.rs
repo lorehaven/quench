@@ -194,7 +194,7 @@ mod tests {
     use super::*;
     use quench_core::tmp::TempDir;
 
-    #[test]
+    #[quench_test::test]
     fn periods_and_names() {
         let t = Time::from_ymd_hms(2026, 10, 3, 14, 5, 6).unwrap();
         assert_eq!(period(Rotation::Never, t), "");
@@ -204,7 +204,7 @@ mod tests {
         assert_eq!(file_name("svc", "log", "2026-10-03"), "svc.2026-10-03.log");
     }
 
-    #[test]
+    #[quench_test::test]
     fn writes_append_to_the_current_file() {
         let dir = TempDir::new().unwrap();
         let mut writer = RollingWriter::new(dir.path(), "app", "log", Rotation::Never, 0).unwrap();
@@ -225,7 +225,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn daily_files_are_named_for_today() {
         let dir = TempDir::new().unwrap();
         let mut writer = RollingWriter::new(dir.path(), "svc", "log", Rotation::Daily, 0).unwrap();
@@ -234,7 +234,7 @@ mod tests {
         assert!(dir.path().join(&expected).is_file(), "{expected}");
     }
 
-    #[test]
+    #[quench_test::test]
     fn rolling_to_a_new_period_starts_a_new_file_and_prunes() {
         let dir = TempDir::new().unwrap();
         for day in ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04"] {
@@ -274,7 +274,7 @@ mod tests {
         assert!(dir.path().join("svc.2999-01-01.log").is_file());
     }
 
-    #[test]
+    #[quench_test::test]
     fn the_writer_thread_flushes_on_guard_drop() {
         let dir = TempDir::new().unwrap();
         let writer = RollingWriter::new(dir.path(), "bg", "log", Rotation::Never, 0).unwrap();
@@ -289,7 +289,7 @@ mod tests {
         assert!(text.starts_with("line 0\n") && text.ends_with("line 199\n"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn sending_after_shutdown_is_harmless() {
         let dir = TempDir::new().unwrap();
         let (queue, guard) = non_blocking(
@@ -300,7 +300,7 @@ mod tests {
         assert_eq!(fs::read_to_string(dir.path().join("late.log")).unwrap(), "");
     }
 
-    #[test]
+    #[quench_test::test]
     fn opening_in_a_missing_directory_fails() {
         let dir = TempDir::new().unwrap();
         assert!(

@@ -2,6 +2,9 @@
 //! runtime-configured `BASE_PATH` (an env var, so it can't be baked into
 //! the `&'static str` route patterns `#[get]`/... register).
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
@@ -31,7 +34,7 @@ fn get(uri: &str, container: &Arc<quench_http::di::Container>) -> Request {
     )
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn requests_inside_the_prefix_are_dispatched_with_it_stripped() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
 
@@ -44,7 +47,7 @@ async fn requests_inside_the_prefix_are_dispatched_with_it_stripped() {
     assert_eq!(resp.status(), StatusCode::OK);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn requests_outside_the_prefix_404_before_reaching_inner_routes() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
 
@@ -57,7 +60,7 @@ async fn requests_outside_the_prefix_404_before_reaching_inner_routes() {
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn prefix_match_is_segment_aware_not_a_bare_string_prefix() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
 
@@ -71,7 +74,7 @@ async fn prefix_match_is_segment_aware_not_a_bare_string_prefix() {
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn empty_or_root_prefix_mounts_at_the_root_unchanged() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
 
@@ -83,3 +86,5 @@ async fn empty_or_root_prefix_mounts_at_the_root_unchanged() {
     let resp = mounted.call(get("/thing", &container)).await;
     assert_eq!(resp.status(), StatusCode::OK);
 }
+
+quench_test::main!();

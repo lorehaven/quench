@@ -120,7 +120,7 @@ mod tests {
         std::future::poll_fn(|cx| reader.poll_body(cx, decoder)).await
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn reads_a_fixed_body_and_leaves_pipelined_bytes() {
         let (mut peer, local) = tokio::io::duplex(1024);
         peer.write_all(b"helloNEXT").await.unwrap();
@@ -136,7 +136,7 @@ mod tests {
         assert!(reader.buffered().is_empty());
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn a_short_body_is_an_unexpected_eof() {
         let (mut peer, local) = tokio::io::duplex(1024);
         peer.write_all(b"abc").await.unwrap();
@@ -153,7 +153,7 @@ mod tests {
         ));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn read_to_eof_bodies_end_on_close() {
         let (mut peer, local) = tokio::io::duplex(1024);
         peer.write_all(b"all of it").await.unwrap();
@@ -167,7 +167,7 @@ mod tests {
         assert!(next(&mut reader, &mut decoder).await.unwrap().is_none());
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn chunked_bodies_surface_decoder_errors() {
         let (mut peer, local) = tokio::io::duplex(1024);
         peer.write_all(b"zz\r\n").await.unwrap();
@@ -179,7 +179,7 @@ mod tests {
         ));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn consume_compacts_a_large_consumed_prefix() {
         let (mut peer, local) = tokio::io::duplex(256 * 1024);
         peer.write_all(&vec![b'x'; 80 * 1024]).await.unwrap();

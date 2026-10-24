@@ -3,6 +3,8 @@
 //!
 //! The gatehouse URL and cookie names are process-global, so every test holds `ENV_LOCK`.
 #![allow(clippy::await_holding_lock)]
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_auth::domain::jwt::{Claims, JwtConfig};
 use quench_auth::domain::realm;
@@ -105,7 +107,7 @@ fn mock_gatehouse(status: &'static str, body: &'static str) -> String {
     format!("http://{addr}")
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn authentication_follows_the_session_cookie() {
     let _guard = ENV_LOCK.lock().unwrap();
     let config = config(true);
@@ -157,7 +159,7 @@ async fn authentication_follows_the_session_cookie() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn revoked_sessions_stop_authenticating_everywhere() {
     let _guard = ENV_LOCK.lock().unwrap();
     let config = config(true);
@@ -187,7 +189,7 @@ async fn revoked_sessions_stop_authenticating_everywhere() {
     assert!(is_ui_authenticated(&req(&self::container().await), &config).await);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn the_current_user_comes_from_extensions_dev_mode_or_the_cookie() {
     let _guard = ENV_LOCK.lock().unwrap();
     let config = config(true);
@@ -251,7 +253,7 @@ async fn the_current_user_comes_from_extensions_dev_mode_or_the_cookie() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn the_status_endpoint_always_answers_200() {
     let _guard = ENV_LOCK.lock().unwrap();
     let config = config(true);
@@ -291,7 +293,7 @@ async fn the_status_endpoint_always_answers_200() {
     assert!(dev.contains("\"username\":\"dev\""));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn refresh_delegation_exchanges_the_refresh_cookie() {
     let _guard = ENV_LOCK.lock().unwrap();
     let refresh_cookie = format!("{}=old-refresh", realm::refresh_cookie_name());
@@ -351,7 +353,7 @@ async fn refresh_delegation_exchanges_the_refresh_cookie() {
     quench_core::env::remove("GATEHOUSE_URL");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn login_delegation_prefers_a_valid_refresh_cookie() {
     let _guard = ENV_LOCK.lock().unwrap();
     quench_core::env::set("GATEHOUSE_CLIENT_ID", "svc-client");
@@ -392,7 +394,7 @@ async fn login_delegation_prefers_a_valid_refresh_cookie() {
     quench_core::env::remove("GATEHOUSE_URL");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn the_callback_without_a_state_cookie_goes_back_to_login() {
     let _guard = ENV_LOCK.lock().unwrap();
     quench_core::env::set("GATEHOUSE_CLIENT_ID", "svc-client");
@@ -407,7 +409,7 @@ async fn the_callback_without_a_state_cookie_goes_back_to_login() {
     quench_core::env::remove("GATEHOUSE_URL");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn logout_hands_the_browser_to_gatehouse() {
     let _guard = ENV_LOCK.lock().unwrap();
     quench_core::env::remove("GATEHOUSE_URL");
@@ -434,7 +436,7 @@ async fn logout_hands_the_browser_to_gatehouse() {
     quench_core::env::remove("GATEHOUSE_URL");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn redirect_targets_are_validated() {
     let _guard = ENV_LOCK.lock().unwrap();
     quench_core::env::remove("AUTH_REDIRECT_HOSTS");
@@ -488,3 +490,5 @@ async fn redirect_targets_are_validated() {
         None
     );
 }
+
+quench_test::main!();

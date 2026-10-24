@@ -10,10 +10,12 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+autotests = false
 
 [lib]
 name = "quench_starter"
 path = "src/lib.rs"
+harness = false
 
 [dependencies]
 quench-cli = { workspace = true, features = ["repl"] }
@@ -29,3 +31,26 @@ tokio = { workspace = true }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "boot"
+path = "tests/boot.rs"
+harness = false
+
+[[test]]
+name = "http_health"
+path = "tests/http_health.rs"
+harness = false
+
+[[test]]
+name = "http_ui_redirects"
+path = "tests/http_ui_redirects.rs"
+harness = false
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false
+
+[dev-dependencies]
+quench-test = { workspace = true }

@@ -3,7 +3,7 @@
 use quench_starter::metrics::*;
 use std::time::Duration;
 
-#[test]
+#[quench_test::test]
 fn test_metrics_success() {
     let metrics = RequestMetrics::new();
     metrics.record_success(100);
@@ -16,7 +16,7 @@ fn test_metrics_success() {
     assert_eq!(snap.avg_latency_ms, 150); // (100 + 200) / 2
 }
 
-#[test]
+#[quench_test::test]
 fn test_metrics_error() {
     let metrics = RequestMetrics::new();
     metrics.record_success(100);
@@ -29,7 +29,7 @@ fn test_metrics_error() {
     assert!(snap.last_error.as_ref().unwrap().contains("timeout"));
 }
 
-#[test]
+#[quench_test::test]
 fn test_timed_block() {
     let block = TimedBlock::new();
     std::thread::sleep(Duration::from_millis(10));

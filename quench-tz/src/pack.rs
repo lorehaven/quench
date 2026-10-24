@@ -266,7 +266,7 @@ mod tests {
         ]
     }
 
-    #[test]
+    #[quench_test::test]
     fn packing_round_trips_and_shares_identical_zones() {
         let zones = sample();
         let bytes: &'static [u8] = Box::leak(pack("2026x", &zones).into_boxed_slice());
@@ -284,7 +284,7 @@ mod tests {
         assert!(format!("{db:?}").contains("Database"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn damaged_input_is_refused_not_trusted() {
         assert!(Database::open(b"").is_none());
         assert!(Database::open(b"NOPE").is_none());
@@ -307,7 +307,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn varints_and_zigzag() {
         let mut out = Vec::new();
         for v in [0u64, 1, 127, 128, 300, u64::from(u32::MAX), u64::MAX >> 1] {

@@ -90,7 +90,7 @@ mod tests {
     use super::*;
     use std::error::Error as _;
 
-    #[test]
+    #[quench_test::test]
     fn server_errors_split_kind_and_message() {
         let err =
             ServerError::parse("WRONGTYPE Operation against a key holding the wrong kind of value");
@@ -103,7 +103,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn display_and_sources() {
         let all = [
             Error::Io(io::Error::other("x")),

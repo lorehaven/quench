@@ -933,3 +933,6 @@ fn collect(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+quench_test::main!();

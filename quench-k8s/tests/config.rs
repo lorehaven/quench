@@ -1,5 +1,8 @@
 //! Kubeconfig and service-account configuration, and the small value helpers.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use std::path::Path;
 
 use quench_core::base64;
@@ -35,7 +38,7 @@ users:
     )
 }
 
-#[test]
+#[quench_test::test]
 fn a_kubeconfig_with_a_token_and_embedded_ca() {
     let config =
         Config::from_kubeconfig_str(&kubeconfig("    token: abc123", ""), None, None).unwrap();
@@ -58,7 +61,7 @@ fn a_kubeconfig_with_a_token_and_embedded_ca() {
     assert!(other.ca_pem.is_none());
 }
 
-#[test]
+#[quench_test::test]
 fn client_certificates_basic_auth_and_token_files() {
     let cert = base64::STANDARD.encode("CERT");
     let key = base64::STANDARD.encode("KEY");
@@ -100,7 +103,7 @@ fn client_certificates_basic_auth_and_token_files() {
     assert_eq!(anonymous.auth, Auth::None);
 }
 
-#[test]
+#[quench_test::test]
 fn certificate_files_are_read_relative_to_the_kubeconfig() {
     let dir = std::env::temp_dir().join(format!("quench-k8s-cfg-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -131,7 +134,7 @@ users: [{name: u, user: {client-certificate: client.crt, client-key: client.key}
     std::fs::remove_dir_all(&dir).ok();
 }
 
-#[test]
+#[quench_test::test]
 fn unusable_kubeconfigs_are_described() {
     let check = |text: &str, context: Option<&str>, wanted: &str| {
         let error = Config::from_kubeconfig_str(text, context, None).unwrap_err();
@@ -198,7 +201,7 @@ fn unusable_kubeconfigs_are_described() {
     check(no_cluster, None, "names no cluster");
 }
 
-#[test]
+#[quench_test::test]
 fn the_service_account_directory_makes_a_config() {
     let dir = std::env::temp_dir().join(format!("quench-k8s-sa-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -229,7 +232,7 @@ fn the_service_account_directory_makes_a_config() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
-#[test]
+#[quench_test::test]
 fn inference_uses_the_environment() {
     // KUBECONFIG, HOME and the service host are process-wide, so all of it is in one test.
     let saved: Vec<_> = [
@@ -297,7 +300,7 @@ fn inference_uses_the_environment() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
-#[test]
+#[quench_test::test]
 fn plurals_are_guessed_like_kubernetes_names_them() {
     for (kind, plural) in [
         ("Pod", "pods"),
@@ -349,7 +352,7 @@ fn plurals_are_guessed_like_kubernetes_names_them() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn objects_expose_their_metadata() {
     let pod = json::parse(
         r#"{"kind":"Pod","metadata":{"name":"web","namespace":"forge","uid":"u-1","resourceVersion":"12",
@@ -392,7 +395,7 @@ fn objects_expose_their_metadata() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn lines_handle_errors_and_missing_final_breaks() {
     let chunk = |s: &'static [u8]| Ok::<_, Error>(quench_core::bytes::Bytes::from_static(s));
     let collected = lines(Box::pin(iter(vec![chunk(b"a\n\nb"), chunk(b"c\r\n")])))
@@ -428,3 +431,5 @@ async fn lines_handle_errors_and_missing_final_breaks() {
         .is_empty()
     );
 }
+
+quench_test::main!();

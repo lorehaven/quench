@@ -323,3 +323,6 @@ impl FromStr for Zone {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+quench_test::main!();

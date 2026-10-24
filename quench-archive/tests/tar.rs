@@ -1,5 +1,8 @@
 //! tar reading against archives written by GNU tar, and writing read back by this reader.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_archive::Error;
 use quench_archive::tar::{Builder, Entry, EntryKind, Header, Reader};
 
@@ -16,7 +19,7 @@ fn find<'a, 'b>(entries: &'b [Entry<'a>], path: &str) -> &'b Entry<'a> {
         .unwrap_or_else(|| panic!("no {path}"))
 }
 
-#[test]
+#[quench_test::test]
 fn reads_a_ustar_archive() {
     let bytes = include_bytes!("fixtures/ustar.tar");
     let entries = read(bytes);
@@ -44,7 +47,7 @@ fn deep() -> String {
     format!("{}leaf.txt", "deeply/".repeat(18))
 }
 
-#[test]
+#[quench_test::test]
 fn reads_gnu_long_names() {
     let bytes = include_bytes!("fixtures/gnu.tar");
     let entries = read(bytes);
@@ -52,7 +55,7 @@ fn reads_gnu_long_names() {
     assert!(deep().len() > 100);
 }
 
-#[test]
+#[quench_test::test]
 fn reads_pax_headers() {
     let bytes = include_bytes!("fixtures/pax.tar");
     let entries = read(bytes);
@@ -61,7 +64,7 @@ fn reads_pax_headers() {
     assert_eq!(find(&entries, "ünï/ü.txt").data, b"uni\n");
 }
 
-#[test]
+#[quench_test::test]
 fn the_writer_and_the_reader_agree() {
     let long_name = format!("{}file.txt", "directory/".repeat(30));
     let mut builder = Builder::new();
@@ -112,7 +115,7 @@ fn the_writer_and_the_reader_agree() {
     assert_eq!(find(&entries, "empty").data, b"");
 }
 
-#[test]
+#[quench_test::test]
 fn large_numbers_use_base_256() {
     let mut builder = Builder::new();
     builder
@@ -130,14 +133,14 @@ fn large_numbers_use_base_256() {
     assert_eq!((entry.uid, entry.mtime), (u64::MAX >> 8, 1 << 40));
 }
 
-#[test]
+#[quench_test::test]
 fn the_writer_refuses_unusable_paths() {
     let mut builder = Builder::new();
     assert!(builder.append_file("", b"").is_err());
     assert!(builder.append_file("a\0b", b"").is_err());
 }
 
-#[test]
+#[quench_test::test]
 fn damaged_archives_are_errors() {
     let mut builder = Builder::new();
     builder.append_file("a.txt", b"data").unwrap();
@@ -193,7 +196,7 @@ fn reseal(archive: &mut [u8]) {
     archive[148..156].copy_from_slice(format!("{sum:06o}\0 ").as_bytes());
 }
 
-#[test]
+#[quench_test::test]
 fn a_huge_declared_size_is_truncation_not_allocation() {
     let mut builder = Builder::new();
     builder.append(&Header::file("big"), &[]).unwrap();
@@ -209,7 +212,7 @@ fn a_huge_declared_size_is_truncation_not_allocation() {
     ));
 }
 
-#[test]
+#[quench_test::test]
 fn pax_records_override_the_header() {
     let record = |key: &str, value: &str| {
         let body = format!(" {key}={value}\n");
@@ -257,3 +260,5 @@ fn pax_records_override_the_header() {
     );
     assert_eq!(entry.data, b"x");
 }
+
+quench_test::main!();

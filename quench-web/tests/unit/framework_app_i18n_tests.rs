@@ -9,23 +9,23 @@ use quench_web::framework::app::{
     available_locales, generate_translations_js, validate_locales_exist,
 };
 
-#[test]
+#[quench_test::test]
 fn available_locales_is_empty_with_no_i18n_directory() {
     assert_eq!(available_locales().unwrap(), Vec::<String>::new());
 }
 
-#[test]
+#[quench_test::test]
 fn validating_no_locales_always_succeeds() {
     assert!(validate_locales_exist(&[]).is_ok());
 }
 
-#[test]
+#[quench_test::test]
 fn validating_a_locale_with_no_file_fails() {
     let error = validate_locales_exist(&["en-US".to_string()]).unwrap_err();
     assert!(error.to_string().contains("en-US.ftl"));
 }
 
-#[test]
+#[quench_test::test]
 fn generate_translations_js_is_an_empty_dictionary_with_no_i18n_directory() {
     let js = generate_translations_js(&["en-US".to_string()]);
     assert_eq!(js, "window.qTranslations = {};");
@@ -63,7 +63,7 @@ z = last
         dir
     }
 
-    #[test]
+    #[quench_test::test]
     fn lists_ftl_files_sorted() {
         let dir = bundle();
         assert_eq!(
@@ -77,7 +77,7 @@ z = last
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn validates_against_the_directory() {
         let dir = bundle();
         assert!(validate_locales_exist_in(dir.path(), &["en-US".into(), "pl-PL".into()]).is_ok());
@@ -85,7 +85,7 @@ z = last
         assert!(e.to_string().contains("fr-FR.ftl"), "{e}");
     }
 
-    #[test]
+    #[quench_test::test]
     fn translations_are_sorted_json_with_variable_tokens() {
         let dir = bundle();
         let json = parse_ftl_in(dir.path(), None).unwrap();
@@ -95,7 +95,7 @@ z = last
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn only_supported_locales_are_included() {
         let dir = bundle();
         let json = parse_ftl_in(dir.path(), Some(&["pl-PL".to_string()])).unwrap();
@@ -103,7 +103,7 @@ z = last
         assert_eq!(parse_ftl_in(dir.path(), Some(&[])).unwrap(), "{}");
     }
 
-    #[test]
+    #[quench_test::test]
     fn a_broken_file_names_itself() {
         let dir = TempDir::new().unwrap();
         fs::write(dir.path().join("xx.ftl"), "this is not fluent\n").unwrap();
@@ -114,7 +114,7 @@ z = last
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn a_missing_directory_is_an_empty_dictionary() {
         let dir = TempDir::new().unwrap();
         assert_eq!(parse_ftl_in(&dir.path().join("nope"), None).unwrap(), "{}");

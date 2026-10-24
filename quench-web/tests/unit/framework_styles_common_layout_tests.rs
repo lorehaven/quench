@@ -2,7 +2,7 @@
 
 use quench_web::framework::styles::common::{content, footer, header};
 
-#[test]
+#[quench_test::test]
 fn header_is_one_rule_with_a_nested_nav_trigger() {
     let rules = header();
     assert_eq!(rules.len(), 1);
@@ -13,7 +13,7 @@ fn header_is_one_rule_with_a_nested_nav_trigger() {
     assert!(rendered.contains("&:active {"));
 }
 
-#[test]
+#[quench_test::test]
 fn content_is_the_scroll_area_and_its_inner_wrapper() {
     let rules = content();
     assert_eq!(rules.len(), 2);
@@ -29,7 +29,7 @@ fn content_is_the_scroll_area_and_its_inner_wrapper() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn footer_is_one_rule() {
     let rules = footer();
     assert_eq!(rules.len(), 1);

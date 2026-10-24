@@ -146,7 +146,7 @@ mod tests {
     }
 
     // RFC 8032 section 7.1, tests 1 and 2.
-    #[test]
+    #[quench_test::test]
     fn rfc8032_vectors() {
         let key = SigningKey::from_seed(&seed(
             "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
@@ -175,7 +175,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn verification_rejects_tampering() {
         let key = SigningKey::generate();
         let signature = key.sign(b"message");
@@ -194,7 +194,7 @@ mod tests {
         ));
     }
 
-    #[test]
+    #[quench_test::test]
     fn pkcs8_round_trips_in_the_dalek_v2_layout() {
         let key = SigningKey::generate();
         let der = key.to_pkcs8_der();
@@ -208,7 +208,7 @@ mod tests {
         assert_eq!(back.sign(b"x"), key.sign(b"x"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn pkcs8_v1_is_read() {
         let seed = [9u8; 32];
         let mut v1 = PKCS8_V1_PREFIX.to_vec();
@@ -219,7 +219,7 @@ mod tests {
     }
 
     // The exact bytes ed25519-dalek 3 writes for the seed [42; 32].
-    #[test]
+    #[quench_test::test]
     fn matches_the_bytes_ed25519_dalek_wrote() {
         let expected = "3051020101300506032b6570042204202a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a812100197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61";
         let key = SigningKey::from_seed(&[42u8; 32]);
@@ -232,7 +232,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn pkcs8_v2_is_read_too() {
         // What `ring` generates: v2, 83 bytes, public key included.
         let rng = ring::rand::SystemRandom::new();
@@ -250,7 +250,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_malformed_private_keys() {
         for bad in [&b""[..], &[0u8; 48], &[0x30; 10], &PKCS8_V1_PREFIX[..]] {
             assert_eq!(SigningKey::from_pkcs8_der(bad).unwrap_err(), KeyError);
@@ -261,7 +261,7 @@ mod tests {
         assert!(KeyError.to_string().contains("Ed25519"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn debug_never_shows_the_seed() {
         let key = SigningKey::from_seed(&[7u8; 32]);
         let shown = format!("{key:?}");

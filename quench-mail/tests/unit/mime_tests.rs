@@ -37,7 +37,7 @@ fn qp_decode(encoded: &str) -> Vec<u8> {
     out
 }
 
-#[test]
+#[quench_test::test]
 fn normalize_crlf_handles_every_line_ending() {
     assert_eq!(normalize_crlf("a\nb"), "a\r\nb");
     assert_eq!(normalize_crlf("a\r\nb"), "a\r\nb");
@@ -46,7 +46,7 @@ fn normalize_crlf_handles_every_line_ending() {
     assert_eq!(normalize_crlf(""), "");
 }
 
-#[test]
+#[quench_test::test]
 fn plain_header_text_is_printable_ascii() {
     assert!(is_plain_header_text("Hello, world! \t~"));
     assert!(!is_plain_header_text("caf\u{e9}"));
@@ -54,7 +54,7 @@ fn plain_header_text_is_printable_ascii() {
     assert!(!is_plain_header_text("bell\u{7}"));
 }
 
-#[test]
+#[quench_test::test]
 fn encoded_words_round_trip_and_stay_within_75_characters() {
     for text in [
         "Zażółć gęślą jaźń",
@@ -69,7 +69,7 @@ fn encoded_words_round_trip_and_stay_within_75_characters() {
     assert!(encoded_words("").is_empty());
 }
 
-#[test]
+#[quench_test::test]
 fn unstructured_leaves_plain_text_alone_and_encodes_the_rest() {
     assert_eq!(unstructured("Confirm your address"), "Confirm your address");
     let encoded = unstructured("Potwierdź adres");
@@ -77,7 +77,7 @@ fn unstructured_leaves_plain_text_alone_and_encodes_the_rest() {
     assert!(is_plain_header_text(&encoded));
 }
 
-#[test]
+#[quench_test::test]
 fn phrase_quotes_specials_and_encodes_non_ascii() {
     assert_eq!(phrase("Alice Liddell"), "Alice Liddell");
     assert_eq!(phrase("Liddell, Alice"), "\"Liddell, Alice\"");
@@ -88,7 +88,7 @@ fn phrase_quotes_specials_and_encodes_non_ascii() {
     assert!(encoded.starts_with("=?UTF-8?B?") && is_plain_header_text(&encoded));
 }
 
-#[test]
+#[quench_test::test]
 fn short_headers_are_not_folded() {
     assert_eq!(
         fold_header("Subject", "Hello there"),
@@ -96,7 +96,7 @@ fn short_headers_are_not_folded() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn long_headers_fold_at_spaces_within_78_columns() {
     let value = "word ".repeat(40);
     let folded = fold_header("Subject", value.trim());
@@ -109,7 +109,7 @@ fn long_headers_fold_at_spaces_within_78_columns() {
     assert_eq!(unfolded, format!("Subject: {}", value.trim()));
 }
 
-#[test]
+#[quench_test::test]
 fn folding_never_splits_a_token_longer_than_a_line() {
     let long = "x".repeat(200);
     let folded = fold_header("X-Long", &long);
@@ -118,7 +118,7 @@ fn folding_never_splits_a_token_longer_than_a_line() {
     assert!(folded.contains(&long));
 }
 
-#[test]
+#[quench_test::test]
 fn seven_bit_detection() {
     assert!(is_7bit("plain\r\ntext"));
     assert!(!is_7bit("caf\u{e9}"));
@@ -132,7 +132,7 @@ fn seven_bit_detection() {
     )));
 }
 
-#[test]
+#[quench_test::test]
 fn quoted_printable_known_vectors() {
     assert_eq!(quoted_printable("hello"), "hello");
     assert_eq!(quoted_printable("caf\u{e9}"), "caf=C3=A9");
@@ -143,14 +143,14 @@ fn quoted_printable_known_vectors() {
     assert_eq!(quoted_printable(""), "");
 }
 
-#[test]
+#[quench_test::test]
 fn quoted_printable_protects_trailing_whitespace() {
     assert_eq!(quoted_printable("trailing "), "trailing=20");
     assert_eq!(quoted_printable("trailing\t"), "trailing=09");
     assert_eq!(quoted_printable("a \r\nb"), "a=20\r\nb");
 }
 
-#[test]
+#[quench_test::test]
 fn quoted_printable_lines_never_exceed_76_and_round_trip() {
     for text in [
         "x".repeat(500),
@@ -171,7 +171,7 @@ fn quoted_printable_lines_never_exceed_76_and_round_trip() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn a_line_of_exactly_76_characters_needs_no_soft_break() {
     let text = "a".repeat(76);
     assert_eq!(quoted_printable(&text), text);

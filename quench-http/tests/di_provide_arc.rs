@@ -3,7 +3,11 @@
 //! `provide`d as-is - that would key it on `TypeId::of::<Arc<T>>()`
 //! instead of `TypeId::of::<T>()`, and no `Arc<T>`-shaped dependency would
 //! ever find it.
-#![allow(clippy::unused_async)] // `#[injectable]` constructors are async by contract
+#![allow(clippy::unused_async)]
+// `#[injectable]` constructors are async by contract
+
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_http::di::ContainerBuilder;
 use quench_http::prelude::injectable;
@@ -24,7 +28,7 @@ async fn provide_consumer(dep: Arc<AlreadyArced>) -> Consumer {
     Consumer { dep }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn provide_arc_is_findable_by_dependents_declaring_arc_t() {
     let already: Arc<AlreadyArced> = Arc::new(AlreadyArced { label: "pre-arced" });
 
@@ -46,3 +50,5 @@ async fn provide_arc_is_findable_by_dependents_declaring_arc_t() {
         .get::<Consumer>()
         .expect("Consumer resolved via the pre-arced dependency");
 }
+
+quench_test::main!();

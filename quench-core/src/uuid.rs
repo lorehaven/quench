@@ -137,7 +137,7 @@ impl fmt::Display for Simple {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn v4_has_version_and_variant_bits() {
         for _ in 0..64 {
             let id = Uuid::new_v4();
@@ -147,12 +147,12 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn v4_values_differ() {
         assert_ne!(Uuid::new_v4(), Uuid::new_v4());
     }
 
-    #[test]
+    #[quench_test::test]
     fn displays_hyphenated_and_simple() {
         let id = Uuid::from_bytes([
             0x12, 0x3e, 0x45, 0x67, 0xe8, 0x9b, 0x12, 0xd3, 0xa4, 0x56, 0x42, 0x66, 0x14, 0x17,
@@ -167,7 +167,7 @@ mod tests {
         assert_eq!(id.version(), 1);
     }
 
-    #[test]
+    #[quench_test::test]
     fn nil_is_all_zero() {
         assert_eq!(
             Uuid::NIL.to_string(),
@@ -177,7 +177,7 @@ mod tests {
         assert_eq!(Uuid::default(), Uuid::NIL);
     }
 
-    #[test]
+    #[quench_test::test]
     fn parses_both_forms_in_any_case() {
         let want = Uuid::parse("123e4567-e89b-12d3-a456-426614174000").unwrap();
         assert_eq!(
@@ -194,7 +194,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn round_trips_random_ids() {
         for _ in 0..64 {
             let id = Uuid::new_v4();
@@ -203,7 +203,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_malformed_text() {
         for bad in [
             "",
@@ -222,7 +222,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn orders_bytewise() {
         let low = Uuid::from_bytes([0; 16]);
         let high = Uuid::from_bytes([1; 16]);

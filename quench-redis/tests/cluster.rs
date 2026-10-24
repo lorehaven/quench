@@ -2,7 +2,11 @@
 //! `CLUSTER SLOTS` / `CLUSTER NODES`, `GET` / `SET` / `SCAN`, `ASKING`, and the
 //! `MOVED` / `ASK` / `CLUSTERDOWN` replies a real cluster gives.
 
-#![allow(clippy::significant_drop_tightening)] // tests hold guards for their whole body on purpose
+#![allow(clippy::significant_drop_tightening)]
+// tests hold guards for their whole body on purpose
+
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_redis::resp::{Value, decode};
 use quench_redis::{ClusterClient, Error, Redis, cmd, key_slot};
@@ -245,7 +249,7 @@ fn key_on(low: bool, tag: &str) -> String {
         .unwrap()
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn commands_are_routed_by_slot() {
     let (cluster, urls) = start().await;
     let redis = Redis::connect_cluster(&[&urls[0]]).await.unwrap();
@@ -284,7 +288,7 @@ async fn commands_are_routed_by_slot() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn hash_tags_keep_related_keys_together() {
     let (cluster, urls) = start().await;
     let redis = Redis::connect_cluster(&[&urls[1]]).await.unwrap();
@@ -301,7 +305,7 @@ async fn hash_tags_keep_related_keys_together() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn moved_replies_update_the_routing_table() {
     let (cluster, urls) = start().await;
     let redis = Redis::connect_cluster(&[&urls[0]]).await.unwrap();
@@ -329,7 +333,7 @@ async fn moved_replies_update_the_routing_table() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn ask_redirects_send_asking_first() {
     let (cluster, urls) = start().await;
     let redis = Redis::connect_cluster(&[&urls[0]]).await.unwrap();
@@ -351,7 +355,7 @@ async fn ask_redirects_send_asking_first() {
     assert!(cluster.commands_seen[0].load(Ordering::SeqCst) > before);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn endless_redirects_give_up() {
     let (cluster, urls) = start().await;
     let redis = Redis::connect_cluster(&[&urls[0]]).await.unwrap();
@@ -366,7 +370,7 @@ async fn endless_redirects_give_up() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn clusterdown_triggers_a_topology_refresh_and_a_retry() {
     let (cluster, urls) = start().await;
     let redis = Redis::connect_cluster(&[&urls[0]]).await.unwrap();
@@ -378,7 +382,7 @@ async fn clusterdown_triggers_a_topology_refresh_and_a_retry() {
     assert_eq!(cluster.topology_reads.load(Ordering::SeqCst), 2);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn other_errors_pass_through() {
     let (_, urls) = start().await;
     let redis = Redis::connect_cluster(&[&urls[0]]).await.unwrap();
@@ -392,7 +396,7 @@ async fn other_errors_pass_through() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_dead_node_makes_the_client_relearn_the_topology() {
     let (cluster, urls) = start().await;
     let redis = Redis::connect_cluster(&[&urls[0], &urls[1]]).await.unwrap();
@@ -411,7 +415,7 @@ async fn a_dead_node_makes_the_client_relearn_the_topology() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn per_node_commands_and_primaries() {
     let (cluster, urls) = start().await;
     let redis = Redis::connect_cluster(&[&urls[0]]).await.unwrap();
@@ -452,7 +456,7 @@ async fn per_node_commands_and_primaries() {
     assert_eq!(found, expected);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn connecting_needs_a_reachable_seed() {
     assert!(matches!(
         ClusterClient::connect(&[]).await,
@@ -474,3 +478,5 @@ async fn connecting_needs_a_reachable_seed() {
     assert_eq!(cluster.nodes().len(), 2);
     assert!(format!("{cluster:?}").contains("ClusterClient"));
 }
+
+quench_test::main!();

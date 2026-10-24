@@ -273,7 +273,7 @@ mod tests {
         to_string(&j(text)).unwrap()
     }
 
-    #[test]
+    #[quench_test::test]
     fn scalars() {
         assert_eq!(out("null"), "null\n");
         assert_eq!(out("true"), "true\n");
@@ -292,7 +292,7 @@ mod tests {
         assert_eq!(to_string(&Value::Float(f64::NAN)).unwrap(), ".nan\n");
     }
 
-    #[test]
+    #[quench_test::test]
     fn block_layout_matches_serde_yaml() {
         let value = j(
             r#"{"name":"x","list":["a",{"b":1,"c":[1,2]},["n1","n2"]],"empty_map":{},"empty_seq":[],"nested":{"k":{"deep":true}}}"#,
@@ -303,13 +303,13 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn sequence_documents() {
         assert_eq!(out(r#"[1,[2,3],{"a":1}]"#), "- 1\n- - 2\n  - 3\n- a: 1\n");
         assert_eq!(out(r#"[{"a":1,"b":{"c":2}}]"#), "- a: 1\n  b:\n    c: 2\n");
     }
 
-    #[test]
+    #[quench_test::test]
     fn strings_are_quoted_exactly_when_needed() {
         let plain = [
             "plain",
@@ -355,7 +355,7 @@ mod tests {
         assert_eq!(to_string(&Value::from("it's: x")).unwrap(), "'it''s: x'\n");
     }
 
-    #[test]
+    #[quench_test::test]
     fn control_characters_and_odd_whitespace_use_double_quotes() {
         assert_eq!(
             to_string(&Value::from("ctl\u{1}x")).unwrap(),
@@ -379,7 +379,7 @@ mod tests {
         assert_eq!(both, "\"quote ' and \\x01\"\n");
     }
 
-    #[test]
+    #[quench_test::test]
     fn multiline_strings_become_block_scalars() {
         assert_eq!(out(r#"{"m":"line1\nline2\n"}"#), "m: |\n  line1\n  line2\n");
         assert_eq!(out(r#"{"m":"a\nb"}"#), "m: |-\n  a\n  b\n");
@@ -394,7 +394,7 @@ mod tests {
         assert_eq!(out(r#"{"m":"a\u0001\nb"}"#), "m: \"a\\x01\\nb\"\n");
     }
 
-    #[test]
+    #[quench_test::test]
     fn keys_are_quoted_like_values() {
         assert_eq!(
             out(r#"{"key with space":1,"a: b":2,"":3,"true":4,"x\ny":5}"#),
@@ -402,7 +402,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn everything_round_trips() {
         let docs = [
             r#"{"a":[1,2,{"b":[true,null,"x"],"c":{}}],"d":"multi\nline","e":"  spaced  ","f":["- x","? y",": z"]}"#,
@@ -417,7 +417,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn multiple_documents() {
         let text = to_string_all(&[j(r#"{"a":1}"#), j("[1,2]"), j(r#""s""#)]).unwrap();
         assert_eq!(text, "a: 1\n---\n- 1\n- 2\n---\ns\n");

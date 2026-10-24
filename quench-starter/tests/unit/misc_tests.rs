@@ -10,7 +10,7 @@ use quench_starter::resilience::{
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-#[tokio::test]
+#[quench_test::test]
 async fn readiness_follows_the_init_future() {
     let state = HealthState::live();
     assert!(state.is_live() && !state.is_ready());
@@ -34,7 +34,7 @@ async fn readiness_follows_the_init_future() {
     assert!(dead.is_ready());
 }
 
-#[test]
+#[quench_test::test]
 fn base_paths_normalise() {
     for (raw, expected) in [
         ("", "/"),
@@ -53,7 +53,7 @@ fn base_paths_normalise() {
     assert_eq!(with_base_path("/"), "/");
 }
 
-#[test]
+#[quench_test::test]
 fn metrics_render_for_prometheus_and_reset() {
     let metrics = RequestMetrics::default();
     metrics.record_success(30);
@@ -88,7 +88,7 @@ fn metrics_render_for_prometheus_and_reset() {
     assert!(format!("{metrics:?}").contains("RequestMetrics"));
 }
 
-#[test]
+#[quench_test::test]
 fn every_error_class_gets_its_own_message() {
     for (error, needle) in [
         ("operation timed out", "timed out"),
@@ -105,7 +105,7 @@ fn every_error_class_gets_its_own_message() {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn retries_give_up_after_the_configured_attempts() {
     let calls = Arc::new(AtomicU32::new(0));
     let seen = calls.clone();
@@ -131,7 +131,7 @@ async fn retries_give_up_after_the_configured_attempts() {
     assert!(format!("{config:?}").contains("max_attempts"));
 }
 
-#[test]
+#[quench_test::test]
 fn the_circuit_breaker_recovers_through_half_open() {
     let breaker = CircuitBreaker::new(2, 2, 0);
     breaker.call_succeeded();
@@ -172,7 +172,7 @@ fn the_circuit_breaker_recovers_through_half_open() {
     assert!(!slow.is_available(), "still inside the timeout");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn dependency_waits_and_the_gatehouse_probe_url() {
     quench_core::env::set("GATEHOUSE_URL", "https://gate.example.com/");
     assert_eq!(

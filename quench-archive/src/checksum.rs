@@ -163,7 +163,7 @@ pub fn xxh64(data: &[u8], seed: u64) -> u64 {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn known_values() {
         assert_eq!(crc32(b""), 0);
         assert_eq!(crc32(b"123456789"), 0xCBF4_3926);
@@ -173,7 +173,7 @@ mod tests {
         assert_eq!(xxh64(b"abc", 0), 0x44BC_2CF5_AD77_0999);
     }
 
-    #[test]
+    #[quench_test::test]
     fn crc_is_incremental() {
         let mut crc = Crc32::default();
         crc.update(b"1234");
@@ -181,7 +181,7 @@ mod tests {
         assert_eq!(crc.finish(), 0xCBF4_3926);
     }
 
-    #[test]
+    #[quench_test::test]
     fn long_inputs_hash_through_every_path() {
         // 100 bytes covers the 32-byte stripes, the 8- and 4-byte tails and the single bytes.
         let data: Vec<u8> = (0..100u8).collect();

@@ -93,7 +93,7 @@ mod tests {
             .collect()
     }
 
-    #[test]
+    #[quench_test::test]
     fn single_string_and_number() {
         assert_eq!(from_params::<String>(&p(&[("a", "x/y")])).unwrap(), "x/y");
         assert_eq!(from_params::<u64>(&p(&[("id", "42")])).unwrap(), 42);
@@ -107,7 +107,7 @@ mod tests {
         assert!(from_params::<bool>(&p(&[("flag", "true")])).unwrap());
     }
 
-    #[test]
+    #[quench_test::test]
     fn tuple_reads_positionally() {
         let v: (String, i64) = from_params(&p(&[("a", "n"), ("b", "-7")])).unwrap();
         assert_eq!(v, ("n".to_string(), -7));
@@ -116,7 +116,7 @@ mod tests {
         assert_eq!(single.0, "only");
     }
 
-    #[test]
+    #[quench_test::test]
     fn captures_are_percent_decoded() {
         assert_eq!(
             from_params::<String>(&p(&[("n", "..%2fetc%20x")])).unwrap(),
@@ -144,7 +144,7 @@ mod tests {
         id: u32,
     }
 
-    #[test]
+    #[quench_test::test]
     fn struct_reads_by_name() {
         let b: Blob = from_params(&p(&[("name", "a/b"), ("digest", "sha256:1")])).unwrap();
         assert_eq!((b.name.as_str(), b.digest.as_str()), ("a/b", "sha256:1"));
@@ -153,7 +153,7 @@ mod tests {
         assert_eq!(n.id, 9);
     }
 
-    #[test]
+    #[quench_test::test]
     fn struct_errors_describe_the_data_not_the_shape() {
         let e = from_params::<Numbered>(&p(&[("id", "x")])).unwrap_err();
         assert!(
@@ -164,7 +164,7 @@ mod tests {
         assert!(e.to_string().contains("missing field `digest`"), "{e}");
     }
 
-    #[test]
+    #[quench_test::test]
     fn no_captures() {
         assert!(from_params::<String>(&[]).is_err());
         assert_eq!(

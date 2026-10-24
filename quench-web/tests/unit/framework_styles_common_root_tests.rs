@@ -3,7 +3,7 @@
 use quench_web::framework::styles::common::root;
 use quench_web::styling::css::CssRule;
 
-#[test]
+#[quench_test::test]
 fn root_declares_the_shell_custom_properties_and_base_rules() {
     let rules = root();
     assert_eq!(rules.len(), 5);

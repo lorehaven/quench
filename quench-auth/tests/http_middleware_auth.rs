@@ -1,5 +1,8 @@
 //! `Auth` middleware scenarios against quench-http.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_auth::domain::jwt::JwtConfig;
 use quench_auth::domain::session::SessionDb;
 use quench_auth::http::middleware::auth::Auth;
@@ -82,7 +85,7 @@ fn request(container: &Arc<quench_http::di::Container>, headers: &[(&str, &str)]
     )
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn auth_disabled_bypasses_verification_entirely() {
     let mut cfg = config();
     cfg.auth_enabled = false;
@@ -93,7 +96,7 @@ async fn auth_disabled_bypasses_verification_entirely() {
     assert_eq!(resp.status(), StatusCode::OK);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn no_token_at_all_is_unauthorized_with_a_www_authenticate_challenge() {
     let app = app(config()).await;
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
@@ -107,7 +110,7 @@ async fn no_token_at_all_is_unauthorized_with_a_www_authenticate_challenge() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_browser_with_no_token_is_redirected_to_the_gatehouse_login_when_configured() {
     // Held only around the env mutation, not the `.await`s below: this is
     // the one test in this binary that touches `GATEHOUSE_URL`, so nothing
@@ -137,7 +140,7 @@ async fn a_browser_with_no_token_is_redirected_to_the_gatehouse_login_when_confi
     quench_core::env::remove("GATEHOUSE_URL");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_garbage_bearer_token_is_unauthorized() {
     let app = app(config()).await;
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
@@ -150,7 +153,7 @@ async fn a_garbage_bearer_token_is_unauthorized() {
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_valid_bearer_token_for_this_service_is_accepted_and_claims_reach_the_handler() {
     let cfg = config();
     let token = cfg
@@ -177,7 +180,7 @@ async fn a_valid_bearer_token_for_this_service_is_accepted_and_claims_reach_the_
     assert_eq!(&body[..], b"someone");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_token_valid_for_a_different_service_is_unauthorized() {
     let cfg = config();
     let token = cfg
@@ -201,7 +204,7 @@ async fn a_token_valid_for_a_different_service_is_unauthorized() {
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_session_bound_token_needs_an_active_session_in_the_container() {
     let session_db: Arc<SessionDb> = SessionDb::init(CacheStore::in_memory());
     let (session, _refresh_token) = session_db.create("someone", 900).await.unwrap();
@@ -235,3 +238,5 @@ async fn a_session_bound_token_needs_an_active_session_in_the_container() {
         .await;
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
+
+quench_test::main!();

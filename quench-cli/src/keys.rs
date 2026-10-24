@@ -449,7 +449,7 @@ mod tests {
         shift: true,
     };
 
-    #[test]
+    #[quench_test::test]
     fn plain_keys() {
         assert_eq!(key(b"a"), (KeyCode::Char('a'), Modifiers::NONE, 1));
         assert_eq!(key(b"Q"), (KeyCode::Char('Q'), SHIFT, 1));
@@ -473,7 +473,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn control_and_alt_keys() {
         assert_eq!(key(b"\x01"), (KeyCode::Char('a'), CTRL, 1));
         assert_eq!(key(b"\x03"), (KeyCode::Char('c'), CTRL, 1));
@@ -484,7 +484,7 @@ mod tests {
         assert_eq!(key(b"\x1b\x1b"), (KeyCode::Esc, Modifiers::NONE, 1));
     }
 
-    #[test]
+    #[quench_test::test]
     fn cursor_and_editing_keys() {
         for (bytes, code) in [
             (&b"\x1b[A"[..], KeyCode::Up),
@@ -514,7 +514,7 @@ mod tests {
         assert_eq!(key(b"\x1b[Z"), (KeyCode::BackTab, SHIFT, 3));
     }
 
-    #[test]
+    #[quench_test::test]
     fn function_keys() {
         for (bytes, n) in [
             (&b"\x1bOP"[..], 1),
@@ -533,7 +533,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn modifier_parameters() {
         assert_eq!(key(b"\x1b[1;2A"), (KeyCode::Up, SHIFT, 6));
         assert_eq!(key(b"\x1b[1;3C"), (KeyCode::Right, ALT, 6));
@@ -552,7 +552,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn partial_and_unknown_input() {
         assert_eq!(parse_key(b""), Parsed::Incomplete);
         assert_eq!(parse_key(b"\x1b"), Parsed::Incomplete);
@@ -588,7 +588,7 @@ mod tests {
         unsafe { libc::close(fd) };
     }
 
-    #[test]
+    #[quench_test::test]
     fn the_reader_assembles_keys_and_tells_escape_from_sequences() {
         let (rd, wr) = pipe();
         let mut keys = Keys::on_fd(rd);
@@ -626,7 +626,7 @@ mod tests {
         let _ = Keys::stdin();
     }
 
-    #[test]
+    #[quench_test::test]
     fn an_unfinished_sequence_is_dropped_rather_than_wedging_the_reader() {
         let (rd, wr) = pipe();
         let mut keys = Keys::on_fd(rd);

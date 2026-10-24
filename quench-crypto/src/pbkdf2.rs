@@ -40,7 +40,7 @@ mod tests {
     use quench_core::hex;
 
     // RFC 7914 section 11.
-    #[test]
+    #[quench_test::test]
     fn rfc7914_vectors() {
         let mut out = [0u8; 64];
         derive(Algorithm::Sha256, 1, b"salt", b"passwd", &mut out);
@@ -55,7 +55,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn verification_and_zero_iterations() {
         let mut key = [0u8; 32];
         derive(Algorithm::Sha512, 10, b"salt", b"pw", &mut key);

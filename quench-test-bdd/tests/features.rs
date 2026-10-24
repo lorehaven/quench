@@ -1,3 +1,5 @@
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 // Step functions take their captures by value, as the attribute parses them.
 #![allow(
     clippy::needless_pass_by_value,
@@ -150,7 +152,7 @@ Feature: Arithmetic
       Then a cucumbers are ripe
 "#;
 
-#[test]
+#[quench_test::test]
 fn passing_features_are_reported() {
     let root = dir("good", &[("a.feature", GOOD)]);
     let summary = run(&root, options(&root));
@@ -162,7 +164,7 @@ fn passing_features_are_reported() {
     assert!(root.join("out/t.html").exists() && root.join("out/index.html").exists());
 }
 
-#[test]
+#[quench_test::test]
 fn failures_undefined_and_ambiguous_steps_fail_their_scenario() {
     let text = "Feature: Bad\n  Scenario: wrong\n    Given a total of 1\n    Then the total is 2\n    And the total is 1\n\n  Scenario: undefined\n    Given nothing matches this\n\n  Scenario: panics\n    Then it blows up\n\n  Scenario: ambiguous\n    Then a cucumber is ripe\n";
     let root = dir("bad", &[("b.feature", text)]);
@@ -177,7 +179,7 @@ fn failures_undefined_and_ambiguous_steps_fail_their_scenario() {
     assert_eq!(summary.steps.skipped, 1);
 }
 
-#[test]
+#[quench_test::test]
 fn tags_names_and_filters_select_scenarios() {
     let root = dir("sel", &[("a.feature", GOOD)]);
     let mut o = options(&root);
@@ -188,7 +190,7 @@ fn tags_names_and_filters_select_scenarios() {
     assert_eq!(run(&root, o).scenarios.total(), 2);
 }
 
-#[test]
+#[quench_test::test]
 fn fail_fast_skips_the_rest() {
     let text = "Feature: F\n  Scenario: one\n    Then it blows up\n\n  Scenario: two\n    Given a total of 1\n";
     let root = dir("ff", &[("c.feature", text)]);
@@ -202,10 +204,12 @@ fn fail_fast_skips_the_rest() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn unparsable_files_fail_the_run() {
     let root = dir("parse", &[("d.feature", "Scenario: orphan\n")]);
     let summary = run(&root, options(&root));
     assert!(summary.failed());
     assert_eq!(summary.parse_errors, 1);
 }
+
+quench_test::main!();

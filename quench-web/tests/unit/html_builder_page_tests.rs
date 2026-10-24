@@ -3,7 +3,7 @@
 use quench_web::html::builder::elements::{div, p, span};
 use quench_web::html::builder::page::{Link, PageBuilder, Script, pretty_print_html};
 
-#[test]
+#[quench_test::test]
 fn link_carries_its_rel_href_and_extra_attrs() {
     let link = Link::new("stylesheet", "/app.css").attr("media", "screen");
     assert_eq!(link.rel, "stylesheet");
@@ -11,20 +11,20 @@ fn link_carries_its_rel_href_and_extra_attrs() {
     assert_eq!(link.attrs.get("media"), Some(&"screen".to_string()));
 }
 
-#[test]
+#[quench_test::test]
 fn a_linked_script_defers_by_default() {
     let script = Script::new("/app.js");
     assert!(!script.is_inline());
     assert_eq!(script.render(), "<script src=\"/app.js\" defer></script>");
 }
 
-#[test]
+#[quench_test::test]
 fn immediate_removes_the_default_defer() {
     let script = Script::new("/app.js").immediate();
     assert_eq!(script.render(), "<script src=\"/app.js\"></script>");
 }
 
-#[test]
+#[quench_test::test]
 fn crossorigin_is_included_when_set() {
     let script = Script::new("/app.js").immediate().crossorigin("anonymous");
     assert_eq!(
@@ -33,20 +33,20 @@ fn crossorigin_is_included_when_set() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn an_inline_script_does_not_defer_by_default_and_reports_itself_as_inline() {
     let script = Script::inline("console.log(1)");
     assert!(script.is_inline());
     assert_eq!(script.render(), "<script>console.log(1)</script>");
 }
 
-#[test]
+#[quench_test::test]
 fn defer_can_be_re_enabled_on_an_inline_script() {
     let script = Script::inline("console.log(1)").defer();
     assert_eq!(script.render(), "<script defer>console.log(1)</script>");
 }
 
-#[test]
+#[quench_test::test]
 fn script_converts_from_owned_and_borrowed_strings() {
     let owned: Script = "a".to_string().into();
     let borrowed: Script = "b".into();
@@ -56,7 +56,7 @@ fn script_converts_from_owned_and_borrowed_strings() {
     assert_eq!(by_ref.render(), "<script>c</script>");
 }
 
-#[test]
+#[quench_test::test]
 fn the_js_macro_builds_an_inline_script_with_format_arguments() {
     let name = "world";
     let script = quench_web::js!("console.log('hello {}')", name);
@@ -66,7 +66,7 @@ fn the_js_macro_builds_an_inline_script_with_format_arguments() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn page_builder_assembles_title_links_scripts_and_content() {
     let html = PageBuilder::new()
         .title("My Page")
@@ -82,7 +82,7 @@ fn page_builder_assembles_title_links_scripts_and_content() {
     assert!(html.contains("hello"));
 }
 
-#[test]
+#[quench_test::test]
 fn head_link_static_attrs_are_merged_onto_every_link() {
     let html = PageBuilder::new()
         .title("t")
@@ -95,13 +95,13 @@ fn head_link_static_attrs_are_merged_onto_every_link() {
     assert!(html.contains("rel=\"preload\""));
 }
 
-#[test]
+#[quench_test::test]
 #[should_panic(expected = "called `Option::unwrap()` on a `None` value")]
 fn build_panics_without_content() {
     let _ = PageBuilder::new().title("t").build();
 }
 
-#[test]
+#[quench_test::test]
 fn pretty_print_html_indents_element_tags() {
     // The writer always emits a full document: a bare fragment gets an
     // implied <html><head></head><body>...</body></html> wrapped around it.
@@ -112,7 +112,7 @@ fn pretty_print_html_indents_element_tags() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn pretty_print_html_preserves_preformatted_tag_content_verbatim() {
     // `pre`/`script`/`style`/`code`/`textarea` must not have their inner
     // whitespace reformatted - that would change what they mean.
@@ -120,7 +120,7 @@ fn pretty_print_html_preserves_preformatted_tag_content_verbatim() {
     assert!(pretty.contains("<pre>  a\n   b  </pre>"));
 }
 
-#[test]
+#[quench_test::test]
 fn pretty_print_html_escapes_attribute_values() {
     let pretty = pretty_print_html("<div title=\"a&b\"></div>");
     assert!(pretty.contains("title=\"a&amp;b\""));
@@ -131,7 +131,7 @@ fn pretty_print_html_escapes_attribute_values() {
 // The parser decodes entities on the way in, so a serializer that writes text
 // nodes back verbatim turns any displayed text into live markup.
 
-#[test]
+#[quench_test::test]
 fn pretty_print_html_escapes_text_nodes() {
     let pretty = pretty_print_html("<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>");
     assert!(
@@ -141,7 +141,7 @@ fn pretty_print_html_escapes_text_nodes() {
     assert!(!pretty.contains("<script>"), "{pretty}");
 }
 
-#[test]
+#[quench_test::test]
 fn pretty_print_html_keeps_ampersands_and_quotes_valid_in_text() {
     let pretty = pretty_print_html("<p>a &amp; b &quot;c&quot; &lt;d&gt;</p>");
     assert!(
@@ -150,14 +150,14 @@ fn pretty_print_html_keeps_ampersands_and_quotes_valid_in_text() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn pretty_print_html_does_not_double_escape_on_a_second_pass() {
     let once = pretty_print_html("<p>&lt;b&gt; &amp; more</p>");
     let twice = pretty_print_html(&once);
     assert_eq!(once, twice);
 }
 
-#[test]
+#[quench_test::test]
 fn pretty_print_html_still_writes_script_and_style_bodies_verbatim() {
     let pretty = pretty_print_html(
         "<script>if (a < b && c > d) { x = \"y\"; }</script><style>a > b { color: red }</style>",
@@ -169,7 +169,7 @@ fn pretty_print_html_still_writes_script_and_style_bodies_verbatim() {
     assert!(pretty.contains("a > b { color: red }"), "{pretty}");
 }
 
-#[test]
+#[quench_test::test]
 fn pretty_print_html_escapes_the_text_inside_pre_code_and_textarea() {
     for tag in ["pre", "code", "textarea"] {
         let pretty = pretty_print_html(&format!(
@@ -183,13 +183,13 @@ fn pretty_print_html_escapes_the_text_inside_pre_code_and_textarea() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn pretty_print_html_keeps_the_whitespace_inside_pre_while_escaping() {
     let pretty = pretty_print_html("<pre>  a &lt; b\n   c  </pre>");
     assert!(pretty.contains("<pre>  a &lt; b\n   c  </pre>"), "{pretty}");
 }
 
-#[test]
+#[quench_test::test]
 fn text_set_on_an_element_reaches_the_page_escaped() {
     let hostile = "<img src=x onerror=alert(document.cookie)>";
     let html = PageBuilder::new()
@@ -204,7 +204,7 @@ fn text_set_on_an_element_reaches_the_page_escaped() {
     assert!(html.contains("a &amp; b"));
 }
 
-#[test]
+#[quench_test::test]
 fn raw_text_is_still_markup_for_the_callers_that_ask_for_it() {
     let html = PageBuilder::new()
         .title("t")
@@ -213,7 +213,7 @@ fn raw_text_is_still_markup_for_the_callers_that_ask_for_it() {
     assert!(html.contains("<b>"), "{html}");
 }
 
-#[test]
+#[quench_test::test]
 fn an_attribute_and_text_holding_the_same_hostile_string_are_both_safe() {
     let hostile = "\"><script>alert(1)</script>";
     let html = PageBuilder::new()

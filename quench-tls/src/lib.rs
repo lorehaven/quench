@@ -550,10 +550,13 @@ pub fn pem_private_key(pem: &[u8]) -> Result<PrivateKeyDer<'static>, String> {
 mod install_tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn installing_the_default_provider_is_idempotent() {
         install_default_provider();
         install_default_provider();
         assert!(CryptoProvider::get_default().is_some());
     }
 }
+
+#[cfg(test)]
+quench_test::main!();

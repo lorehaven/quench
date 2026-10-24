@@ -1,5 +1,8 @@
 //! The client against a mock API server that records what it was asked.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use std::sync::{Arc, Mutex};
 
 use quench_core::async_trait;
@@ -112,7 +115,7 @@ fn pods(client: &Client, ns: &str) -> Api {
     client.namespaced(&ApiResource::pod(), ns)
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn get_and_get_opt_build_the_right_paths_and_map_404() {
     let (base, seen) = server(|s| {
         if s.path.ends_with("/missing") {
@@ -160,7 +163,7 @@ async fn get_and_get_opt_build_the_right_paths_and_map_404() {
     assert_eq!(seen.lock().unwrap()[0].method, "GET");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn paths_for_groups_cluster_scope_and_odd_names() {
     let (base, seen) = server(|_| ok(&json!({"items": []}))).await;
     let client = client(&base);
@@ -217,7 +220,7 @@ async fn paths_for_groups_cluster_scope_and_odd_names() {
     assert_eq!(ApiResource::pod().api_version(), "v1");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_namespaced_object_needs_a_namespace() {
     let (base, seen) = server(|_| ok(&json!({}))).await;
     let client = client(&base);
@@ -241,7 +244,7 @@ async fn a_namespaced_object_needs_a_namespace() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn lists_follow_pages_and_send_selectors() {
     let (base, seen) = server(|s| {
         if s.query.contains("continue=page2") {
@@ -291,7 +294,7 @@ async fn lists_follow_pages_and_send_selectors() {
     assert_eq!(single.items.len(), 1);
 }
 
-#[tokio::test]
+#[quench_test::test]
 #[allow(clippy::too_many_lines)] // one server, many calls, checked together
 async fn create_replace_patch_and_delete_send_what_they_should() {
     let (base, seen) = server(|s| {
@@ -433,7 +436,7 @@ async fn create_replace_patch_and_delete_send_what_they_should() {
     assert!(calls[11].body.contains("Orphan"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn logs_are_text_and_can_stream_with_the_right_query() {
     let (base, seen) = server(|s| {
         if s.path.contains("/gone/") {
@@ -513,7 +516,7 @@ async fn logs_are_text_and_can_stream_with_the_right_query() {
     assert!(api.log_stream("gone", &LogParams::default()).await.is_err());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn watches_decode_events() {
     let (base, seen) = server(|_| {
         let body = [
@@ -559,7 +562,7 @@ async fn watches_decode_events() {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn bad_watch_lines_are_decode_errors() {
     let (base, _) = server(|_| {
         Response::text(
@@ -584,7 +587,7 @@ async fn bad_watch_lines_are_decode_errors() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn authentication_is_sent_every_time_and_files_are_reread() {
     let (base, seen) = server(|_| ok(&json!({}))).await;
     let dir = std::env::temp_dir().join(format!("quench-k8s-auth-{}", std::process::id()));
@@ -649,7 +652,7 @@ async fn authentication_is_sent_every_time_and_files_are_reread() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn failures_that_are_not_status_objects_still_become_errors() {
     let (base, _) = server(|s| match s.path.as_str() {
         "/plain" => Response::text(StatusCode::INTERNAL_SERVER_ERROR, "boom\n"),
@@ -684,7 +687,7 @@ async fn failures_that_are_not_status_objects_still_become_errors() {
     ));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn discovery_lists_preferred_versions_and_skips_subresources() {
     let (base, seen) = server(|s| match s.path.as_str() {
         "/apis" => ok(&json!({"groups": [
@@ -755,8 +758,10 @@ async fn discovery_lists_preferred_versions_and_skips_subresources() {
     assert!(seen.lock().unwrap().len() >= 5);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn discovery_fails_when_the_group_list_does() {
     let (base, _) = server(|_| status(403, "Forbidden", "no discovery for you")).await;
     assert!(client(&base).discover().await.unwrap_err().is_forbidden());
 }
+
+quench_test::main!();

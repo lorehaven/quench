@@ -20,7 +20,7 @@ pub fn eq(a: &[u8], b: &[u8]) -> bool {
 mod tests {
     use super::eq;
 
-    #[test]
+    #[quench_test::test]
     fn compares_bytes() {
         assert!(eq(b"", b""));
         assert!(eq(b"secret", b"secret"));

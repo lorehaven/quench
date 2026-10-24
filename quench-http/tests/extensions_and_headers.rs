@@ -3,6 +3,9 @@
 //! exist for `quench-auth`'s middleware, which stashes claims in the
 //! request's extensions and sets two cookies on one response.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::async_trait;
 use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
@@ -54,7 +57,7 @@ fn get(container: &Arc<quench_http::di::Container>) -> Request {
     )
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn extension_set_by_middleware_is_readable_by_the_handler() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
     let app: Arc<dyn Endpoint> = Arc::new(ReadClaims);
@@ -71,7 +74,7 @@ async fn extension_set_by_middleware_is_readable_by_the_handler() {
     assert_eq!(&body[..], b"alice");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn extension_missing_is_a_clear_error_not_a_panic() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
     let app = ReadClaims;
@@ -80,7 +83,7 @@ async fn extension_missing_is_a_clear_error_not_a_panic() {
     assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn append_header_keeps_both_values_where_a_plain_header_would_overwrite() {
     let resp = Response::ok()
         .append_header("set-cookie", "session=a")
@@ -94,3 +97,5 @@ async fn append_header_keeps_both_values_where_a_plain_header_would_overwrite() 
         .collect();
     assert_eq!(values, vec!["session=a", "refresh=b"]);
 }
+
+quench_test::main!();

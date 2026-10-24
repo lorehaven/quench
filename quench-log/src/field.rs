@@ -162,7 +162,7 @@ pub fn debug(value: &dyn Debug) -> FieldValue {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn plain_types_stay_typed() {
         assert_eq!(42_u8.field_value(), FieldValue::U64(42));
         assert_eq!((-3_i32).field_value(), FieldValue::I64(-3));
@@ -185,14 +185,14 @@ mod tests {
         assert!(!1_u8.field_value().is_empty());
     }
 
-    #[test]
+    #[quench_test::test]
     fn display_and_debug_forms() {
         assert_eq!(display(&"x y").to_string(), "x y");
         assert_eq!(debug(&"x y").to_string(), "\"x y\"");
         assert_eq!(debug(&vec![1, 2]), FieldValue::Text("[1, 2]".into()));
     }
 
-    #[test]
+    #[quench_test::test]
     fn text_form() {
         for (value, text) in [
             (FieldValue::Bool(true), "true"),

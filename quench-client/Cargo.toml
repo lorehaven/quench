@@ -10,6 +10,7 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+autotests = false
 
 [dependencies]
 quench-log = { workspace = true }
@@ -25,13 +26,30 @@ tls = ["quench-proto/tls"]
 # `quench_client::blocking`: the same client for synchronous programs (a private tokio runtime per client).
 blocking = ["tokio/rt"]
 
-[[test]]
-name = "blocking"
-required-features = ["blocking"]
 
 [dev-dependencies]
+quench-test = { workspace = true }
 quench-http = { workspace = true, features = ["tls"] }
 tokio = { workspace = true }
 
 [lints]
 workspace = true
+
+[lib]
+harness = false
+
+[[test]]
+name = "blocking"
+path = "tests/blocking.rs"
+required-features = ["blocking"]
+harness = false
+
+[[test]]
+name = "transport"
+path = "tests/transport.rs"
+harness = false
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false

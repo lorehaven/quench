@@ -3,6 +3,9 @@
 //! field plus optional `conversation_id`/`project_id` text fields - see
 //! `docker/sage-service/src/routers/files.rs`'s `FileUploadForm`).
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::bytes::Bytes as RawBytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
@@ -46,7 +49,7 @@ fn sample_body() -> String {
     )
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn reads_a_text_field_and_a_file_field_by_name() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
     let mut req = multipart_request(sample_body(), &container);
@@ -77,7 +80,7 @@ async fn reads_a_text_field_and_a_file_field_by_name() {
     assert_eq!(file_bytes.unwrap(), RawBytes::from_static(b"hello world"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn missing_boundary_is_rejected_before_reading_any_field() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
     let mut headers = HeaderMap::new();
@@ -96,7 +99,7 @@ async fn missing_boundary_is_rejected_before_reading_any_field() {
     assert_eq!(err.into_response().status(), StatusCode::BAD_REQUEST);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn whole_stream_body_limit_is_respected() {
     // A limit smaller than the sample body's file field.
     let container = Arc::new(
@@ -134,3 +137,5 @@ async fn whole_stream_body_limit_is_respected() {
         "reading past the 5-byte whole-stream limit should fail somewhere"
     );
 }
+
+quench_test::main!();

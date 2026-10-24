@@ -170,7 +170,7 @@ impl PartialEq<&Self> for Method {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn standard_methods_round_trip() {
         for name in [
             "GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH",
@@ -184,7 +184,7 @@ mod tests {
         assert_eq!(Method::default(), Method::GET);
     }
 
-    #[test]
+    #[quench_test::test]
     fn extension_methods_are_tokens() {
         let m = Method::from_bytes(b"PURGE").unwrap();
         assert_eq!(m.as_str(), "PURGE");
@@ -193,7 +193,7 @@ mod tests {
         assert_eq!(Method::try_from("M-SEARCH").unwrap().as_str(), "M-SEARCH");
     }
 
-    #[test]
+    #[quench_test::test]
     fn invalid_methods_are_rejected() {
         for bad in [&b""[..], b"GE T", b"G\xc3\xa9T", b"GET\r\n", b"a/b"] {
             assert_eq!(Method::from_bytes(bad), Err(InvalidMethod), "{bad:?}");
@@ -202,7 +202,7 @@ mod tests {
         assert!("lower case".parse::<Method>().is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn safety_and_idempotency() {
         assert!(
             Method::GET.is_safe()
@@ -219,7 +219,7 @@ mod tests {
         assert!(!Method::POST.is_idempotent() && !Method::PATCH.is_idempotent());
     }
 
-    #[test]
+    #[quench_test::test]
     fn comparisons_with_strings_and_references() {
         assert_eq!(Method::GET, "GET");
         assert!(Method::GET.eq("GET"));

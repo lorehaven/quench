@@ -10,10 +10,12 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+autotests = false
 
 [lib]
 name = "quench_proto"
 path = "src/lib.rs"
+harness = false
 
 [dependencies]
 quench-core = { workspace = true }
@@ -33,20 +35,30 @@ sse = []
 # Re-exports `quench-tls` as `quench_proto::tls`; pulls in rustls and ring.
 tls = ["dep:quench-tls"]
 
-[[test]]
-name = "h1_client"
-required-features = ["client", "server"]
 
-[[test]]
-name = "h1_server"
-required-features = ["server"]
 
-[[test]]
-name = "throughput"
-required-features = ["client", "server"]
 
 [dev-dependencies]
+quench-test = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "h1_client"
+path = "tests/h1_client.rs"
+required-features = ["client", "server"]
+harness = false
+
+[[test]]
+name = "h1_server"
+path = "tests/h1_server.rs"
+required-features = ["server"]
+harness = false
+
+[[test]]
+name = "throughput"
+path = "tests/throughput.rs"
+required-features = ["client", "server"]
+harness = false

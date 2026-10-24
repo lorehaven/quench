@@ -139,7 +139,7 @@ mod tests {
         Value::UInt(i)
     }
 
-    #[test]
+    #[quench_test::test]
     fn insertion_order_is_kept() {
         let mut map = Map::new();
         map.insert("z", n(1));
@@ -157,7 +157,7 @@ mod tests {
         assert!(!map.is_empty());
     }
 
-    #[test]
+    #[quench_test::test]
     fn replacing_keeps_the_position() {
         let mut map = Map::new();
         map.insert("a", n(1));
@@ -170,7 +170,7 @@ mod tests {
         assert_eq!(map.get("a"), Some(&n(9)));
     }
 
-    #[test]
+    #[quench_test::test]
     fn remove_shifts_later_entries() {
         let mut map: Map = [("a", n(1)), ("b", n(2)), ("c", n(3)), ("d", n(4))]
             .into_iter()
@@ -190,7 +190,7 @@ mod tests {
         assert!(map.contains_key("e") && !map.contains_key("b"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn mutation_in_place() {
         let mut map = Map::new();
         map.insert("a", n(1));
@@ -203,7 +203,7 @@ mod tests {
         assert_eq!(map.get("a"), Some(&n(3)));
     }
 
-    #[test]
+    #[quench_test::test]
     fn equality_ignores_order() {
         let a: Map = [("x", n(1)), ("y", n(2))].into_iter().collect();
         let b: Map = [("y", n(2)), ("x", n(1))].into_iter().collect();
@@ -214,7 +214,7 @@ mod tests {
         assert_ne!(a, d);
     }
 
-    #[test]
+    #[quench_test::test]
     fn iteration_forms() {
         let map: Map = [("a", n(1)), ("b", n(2))].into_iter().collect();
         assert_eq!(map.iter().len(), 2);

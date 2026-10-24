@@ -2,7 +2,7 @@
 
 use quench_web_components::forms::{FormInput, FormSelect, FormTextarea};
 
-#[test]
+#[quench_test::test]
 fn a_bare_form_input_has_no_label_wrapper() {
     let html = FormInput::new("email").build().render();
     assert!(html.starts_with("<input"));
@@ -12,7 +12,7 @@ fn a_bare_form_input_has_no_label_wrapper() {
     assert!(!html.contains("required"));
 }
 
-#[test]
+#[quench_test::test]
 fn a_labelled_form_input_wraps_the_label_and_input_together() {
     let html = FormInput::new("email")
         .label("Email address")
@@ -31,7 +31,7 @@ fn a_labelled_form_input_wraps_the_label_and_input_together() {
     assert!(html.contains("required=\"required\""));
 }
 
-#[test]
+#[quench_test::test]
 fn a_bare_form_select_lists_its_options_with_none_selected() {
     let html = FormSelect::new("role")
         .option("admin", "Administrator")
@@ -46,7 +46,7 @@ fn a_bare_form_select_lists_its_options_with_none_selected() {
     assert!(!html.contains("selected"));
 }
 
-#[test]
+#[quench_test::test]
 fn a_form_select_marks_the_selected_option_and_can_be_required_and_labelled() {
     let html = FormSelect::new("role")
         .label("Role")
@@ -73,7 +73,7 @@ fn a_form_select_marks_the_selected_option_and_can_be_required_and_labelled() {
     assert!(!html[admin_tag_start..admin_tag_end].contains("selected"));
 }
 
-#[test]
+#[quench_test::test]
 fn a_bare_form_textarea_has_no_optional_attributes() {
     let html = FormTextarea::new("bio").build().render();
     assert!(html.starts_with("<textarea"));
@@ -82,7 +82,7 @@ fn a_bare_form_textarea_has_no_optional_attributes() {
     assert!(!html.contains("cols"));
 }
 
-#[test]
+#[quench_test::test]
 fn a_full_form_textarea_carries_every_optional_attribute_and_its_value_as_text() {
     let html = FormTextarea::new("bio")
         .label("Biography")

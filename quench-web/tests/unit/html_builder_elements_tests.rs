@@ -5,7 +5,7 @@ use quench_web::html::builder::elements::*;
 
 type Constructor = (fn() -> Element, &'static str);
 
-#[test]
+#[quench_test::test]
 fn every_bare_tag_constructor_renders_its_own_tag() {
     let constructors: &[Constructor] = &[
         (button, "button"),
@@ -39,17 +39,17 @@ fn every_bare_tag_constructor_renders_its_own_tag() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn element_builds_an_arbitrary_tag_by_name() {
     assert_eq!(element("custom-tag").render(), "<custom-tag></custom-tag>");
 }
 
-#[test]
+#[quench_test::test]
 fn checkbox_is_an_input_of_type_checkbox() {
     assert_eq!(checkbox().render(), "<input type=\"checkbox\"></input>");
 }
 
-#[test]
+#[quench_test::test]
 fn style_wraps_its_content_in_a_style_tag_unescaped_by_the_caller() {
     // `style`/`script` use `Element::text`, which HTML-escapes - exactly
     // right for a text node, but worth pinning down since CSS/JS content
@@ -58,7 +58,7 @@ fn style_wraps_its_content_in_a_style_tag_unescaped_by_the_caller() {
     assert_eq!(html, "<style>a &gt; b { color: red; }</style>");
 }
 
-#[test]
+#[quench_test::test]
 fn script_wraps_its_content_in_a_script_tag() {
     let html = script("console.log('hi')".to_string()).render();
     assert_eq!(html, "<script>console.log(&#39;hi&#39;)</script>");

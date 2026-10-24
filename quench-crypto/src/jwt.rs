@@ -524,7 +524,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn eddsa_round_trip_with_a_kid() {
         let (enc, dec, _) = keypair();
         let mut header = Header::new(Algorithm::EdDSA);
@@ -543,7 +543,7 @@ mod tests {
     const JSONWEBTOKEN_EDDSA: &str = "eyJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSIsImtpZCI6ImtleS0xIn0.eyJzdWIiOiJhZGEiLCJhdWQiOlsic3ZjIl0sInNjb3BlIjoicmVhZCB3cml0ZSIsImV4cCI6NDEwMjQ0NDgwMCwiaWF0IjoxNzAwMDAwMDAwLCJzaWQiOm51bGx9.IE2FQi1bzZhe-AkkKs_7wPnXt2_lcH4zjmZ-fALwuVp4FtV0H9AbkrDvaADmPWpbbxYz41VhpXEmcOGL_e52BA";
     const JSONWEBTOKEN_HS256: &str = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZGEiLCJhdWQiOltdLCJzY29wZSI6InMiLCJleHAiOjQxMDI0NDQ4MDAsImlhdCI6MTcwMDAwMDAwMCwic2lkIjpudWxsfQ.oHQ-TaKv0zmpNOAJ7M7Wp-g8jhZZMfXComEzWbDG-BA";
 
-    #[test]
+    #[quench_test::test]
     fn tokens_from_jsonwebtoken_verify_and_ours_are_byte_identical() {
         let (enc, dec, _) = keypair();
         let data = decode::<Claims>(JSONWEBTOKEN_EDDSA, &dec, &lenient()).unwrap();
@@ -588,7 +588,7 @@ mod tests {
     }
 
     // RFC 7515 appendix A.1 (the token is long expired, so only the signature is checked).
-    #[test]
+    #[quench_test::test]
     fn rfc7515_hs256_example() {
         let token = "eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
         let secret = URL_SAFE_NO_PAD.decode("AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow").unwrap();
@@ -617,7 +617,7 @@ mod tests {
     }
 
     // RFC 8037 appendix A.4: an EdDSA signature over a non-JSON payload.
-    #[test]
+    #[quench_test::test]
     fn rfc8037_eddsa_example() {
         let token = "eyJhbGciOiJFZERTQSJ9.RXhhbXBsZSBvZiBFZDI1NTE5IHNpZ25pbmc.hgyY0il_MGCjP0JzlnLWG1PPOt7-09PGcvMg3AIbQR6dWbhijcNR4ki4iylGjg5BhVsPt9g7sVvpAr_MuM0KAg";
         let key =
@@ -634,7 +634,7 @@ mod tests {
         ));
     }
 
-    #[test]
+    #[quench_test::test]
     fn expiry_uses_a_sixty_second_leeway() {
         let (enc, dec, _) = keypair();
         let encode_with =
@@ -659,7 +659,7 @@ mod tests {
         assert!(decode::<Claims>(&encode_with(now() - 5), &dec, &strict).is_ok());
     }
 
-    #[test]
+    #[quench_test::test]
     fn required_claims_are_enforced() {
         let (enc, dec, _) = keypair();
         let partial = |value: &Value| encode(&Header::new(Algorithm::EdDSA), value, &enc).unwrap();
@@ -693,7 +693,7 @@ mod tests {
         ));
     }
 
-    #[test]
+    #[quench_test::test]
     fn not_before_is_checked_when_asked() {
         let (enc, dec, _) = keypair();
         let future =
@@ -718,7 +718,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn issuer_and_audience_checks() {
         let (enc, dec, _) = keypair();
         let make = |extra: Value| {
@@ -769,7 +769,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn tampering_is_rejected_in_every_part() {
         let (enc, dec, _) = keypair();
         let token = encode(
@@ -796,7 +796,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn algorithm_confusion_is_refused() {
         let (enc, dec, key) = keypair();
         let token = encode(
@@ -835,7 +835,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn malformed_tokens() {
         let (_, dec, _) = keypair();
         for junk in ["", "a", "a.b", "a.b.c.d", "....", "e30.e30.e30"] {
@@ -871,7 +871,7 @@ mod tests {
         ));
     }
 
-    #[test]
+    #[quench_test::test]
     fn keys_must_match_the_algorithm_when_signing() {
         let (enc, _, _) = keypair();
         let secret = EncodingKey::from_secret(b"s");
@@ -910,7 +910,7 @@ mod tests {
         assert!(format!("{direct:?}").contains("Ed25519"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn jwk_components() {
         assert_eq!(
             DecodingKey::from_ed_components("11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo").unwrap(),
@@ -935,7 +935,7 @@ mod tests {
         assert!(DecodingKey::from_rsa_components("AQAB", "!").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn debug_hides_secrets() {
         assert!(!format!("{:?}", DecodingKey::from_secret(b"hunter2")).contains("hunter2"));
         assert!(!format!("{:?}", EncodingKey::from_secret(b"hunter2")).contains("hunter2"));
@@ -946,7 +946,7 @@ mod tests {
         assert!(format!("{:?}", DecodingKey::Rsa(vec![1])).contains("Rsa"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn errors_display() {
         for (kind, text) in [
             (ErrorKind::InvalidToken, "InvalidToken"),
@@ -976,7 +976,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn rs256_tokens_verify() {
         // Signed by `openssl dgst -sha256 -sign` over a JWT signing input.
         let n = "3onLyxXV9Zuk_ZTBUg5b600ezgWnXw9HWj5OHGo1YFmBizNvytdo7ICD9rN4o7pGdHE8hKpRLdsiMbNGUO1Q9ZUpkMh3Fl9355KEkCELEQdRmZQKihJuZihn5ncYT1WT73EE4-KhMJA6rUf11tNcFzGkd1sn-9jA5efepL2YMk3B2ofz9fQMvNtVd5O0bcGQBTearblKloB1Dc80ZKb5xanaIR8S-2R331-j6otc9ngdb_V5Vo5Aqv-uZUQ8IMFWNvyGOwGfIxn8rW2TPNqpJWd9L8O6eSlh5jozY5ft2-YHyOjptr2RZNdgTB2F1dtT-NVVqTTZeJSJR7glLCB219A";

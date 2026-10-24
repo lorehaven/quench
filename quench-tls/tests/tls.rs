@@ -1,5 +1,8 @@
 //! The rustls glue against a real handshake, using the fixture CA and `localhost` leaf.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_tls::{
     ClientOptions, TlsAcceptor, TlsConnector, client_config, client_config_with_identity,
     load_server_config, root_store, server_name,
@@ -30,7 +33,7 @@ fn trusting() -> TlsConnector {
     TlsConnector::new(client_config(&options).unwrap())
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_full_handshake_carries_data_both_ways() {
     let (client_io, server_io) = tokio::io::duplex(1 << 16);
     let acceptor = acceptor();
@@ -57,7 +60,7 @@ async fn a_full_handshake_carries_data_both_ways() {
     assert_eq!(&server.await.unwrap(), b"ping!");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn large_transfers_survive_the_session_buffer_limits() {
     let (client_io, server_io) = tokio::io::duplex(4096);
     let acceptor = acceptor();
@@ -78,7 +81,7 @@ async fn large_transfers_survive_the_session_buffer_limits() {
     assert_eq!(server.await.unwrap(), expected);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn an_untrusted_certificate_fails_the_client_handshake() {
     let (client_io, server_io) = tokio::io::duplex(1 << 16);
     let acceptor = acceptor();
@@ -93,7 +96,7 @@ async fn an_untrusted_certificate_fails_the_client_handshake() {
     assert_eq!(err.kind(), std::io::ErrorKind::InvalidData, "{err}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_name_mismatch_fails_the_client_handshake() {
     let (client_io, server_io) = tokio::io::duplex(1 << 16);
     let acceptor = acceptor();
@@ -107,7 +110,7 @@ async fn a_name_mismatch_fails_the_client_handshake() {
     assert_eq!(err.kind(), std::io::ErrorKind::InvalidData, "{err}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn accepting_any_certificate_skips_verification() {
     let (client_io, server_io) = tokio::io::duplex(1 << 16);
     let acceptor = acceptor();
@@ -132,7 +135,7 @@ async fn accepting_any_certificate_skips_verification() {
     assert_eq!(got, "hi");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn plain_text_sent_to_a_tls_server_is_rejected() {
     let (mut client_io, server_io) = tokio::io::duplex(1 << 16);
     let acceptor = acceptor();
@@ -144,7 +147,7 @@ async fn plain_text_sent_to_a_tls_server_is_rejected() {
     assert!(server.await.unwrap().is_err());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_peer_that_vanishes_mid_handshake_is_an_eof_error() {
     let (client_io, server_io) = tokio::io::duplex(1 << 16);
     drop(client_io);
@@ -152,7 +155,7 @@ async fn a_peer_that_vanishes_mid_handshake_is_an_eof_error() {
     assert_eq!(err.kind(), std::io::ErrorKind::UnexpectedEof);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn truncation_without_close_notify_is_reported() {
     let (client_io, server_io) = tokio::io::duplex(1 << 16);
     let acceptor = acceptor();
@@ -172,7 +175,7 @@ async fn truncation_without_close_notify_is_reported() {
     assert_eq!(buf, b"partial");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn reading_after_close_notify_keeps_returning_eof() {
     let (client_io, server_io) = tokio::io::duplex(1 << 16);
     let acceptor = acceptor();
@@ -190,7 +193,7 @@ async fn reading_after_close_notify_keeps_returning_eof() {
     assert_eq!(tls.write(&[]).await.unwrap(), 0);
 }
 
-#[test]
+#[quench_test::test]
 fn server_names_accept_dns_and_ip_literals() {
     assert!(server_name("example.com").is_ok());
     assert!(server_name("127.0.0.1").is_ok());
@@ -199,7 +202,7 @@ fn server_names_accept_dns_and_ip_literals() {
     assert!(server_name("").is_err());
 }
 
-#[test]
+#[quench_test::test]
 fn trust_stores_include_webpki_roots_and_extras() {
     let base = root_store(&ClientOptions::default()).unwrap();
     assert!(base.len() > 100, "webpki-roots are present");
@@ -236,7 +239,7 @@ fn trust_stores_include_webpki_roots_and_extras() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn system_roots_honour_ssl_cert_file() {
     // SAFETY-free: tests in this binary that read the variable are the two below, serialised by one lock.
     static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -252,7 +255,7 @@ fn system_roots_honour_ssl_cert_file() {
     assert!(with_file.len() > base.len());
 }
 
-#[test]
+#[quench_test::test]
 fn missing_or_broken_server_credentials_load_as_none() {
     assert!(load_server_config(fixture("nope.pem"), fixture("server.key")).is_none());
     assert!(load_server_config(fixture("server.pem"), fixture("nope.key")).is_none());
@@ -263,7 +266,7 @@ fn missing_or_broken_server_credentials_load_as_none() {
     assert!(load_server_config(fixture("README.md"), fixture("server.key")).is_none());
 }
 
-#[test]
+#[quench_test::test]
 fn acceptors_and_connectors_are_cheap_to_clone() {
     let _copy = acceptor();
     let from_arc = TlsAcceptor::from(Arc::new(
@@ -360,7 +363,7 @@ mod flaky {
         )
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn a_read_error_from_the_transport_surfaces() {
         let (mut tls, mode) = connected(|mut s| async move {
             let _ = s.read_u8().await;
@@ -372,7 +375,7 @@ mod flaky {
         assert_eq!(err.to_string(), "read failed");
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn write_errors_surface_from_write_flush_and_shutdown() {
         let (mut tls, mode) = connected(|mut s| async move {
             let mut sink = Vec::new();
@@ -385,7 +388,7 @@ mod flaky {
         assert!(tls.shutdown().await.is_err());
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn a_transport_that_accepts_zero_bytes_is_a_write_zero_error() {
         let (mut tls, mode) = connected(|mut s| async move {
             let mut sink = Vec::new();
@@ -397,7 +400,7 @@ mod flaky {
         assert_eq!(err.kind(), io::ErrorKind::WriteZero);
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn flush_errors_from_the_transport_surface() {
         let (mut tls, mode) = connected(|mut s| async move {
             let mut sink = Vec::new();
@@ -409,7 +412,7 @@ mod flaky {
         assert!(tls.flush().await.is_err());
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn handshakes_fail_cleanly_when_the_transport_breaks() {
         let (client_io, _server_io) = tokio::io::duplex(1 << 16);
         let mode = Arc::new(AtomicU8::new(WRITE_ERROR));
@@ -449,7 +452,7 @@ mod flaky {
         assert_eq!(err.kind(), io::ErrorKind::WriteZero);
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn a_tiny_pipe_exercises_backpressure_in_both_directions() {
         let (client_io, server_io) = tokio::io::duplex(64);
         let acceptor = acceptor();
@@ -481,7 +484,7 @@ mod flaky {
         assert_eq!(server.await.unwrap(), expected);
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn tls_1_2_only_servers_work_with_and_without_verification() {
         let chain = pem_certificates(&std::fs::read(fixture("server.pem")).unwrap()).unwrap();
         let key = pem_private_key(&std::fs::read(fixture("server.key")).unwrap()).unwrap();
@@ -525,7 +528,7 @@ mod flaky {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn pem_helpers_parse_and_reject() {
         let cert = std::fs::read(fixture("server.pem")).unwrap();
         assert_eq!(pem_certificates(&cert).unwrap().len(), 1);
@@ -581,7 +584,7 @@ fn server_options() -> ClientOptions {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_client_certificate_is_presented_when_one_is_configured() {
     let (client_io, server_io) = tokio::io::duplex(1 << 16);
     let acceptor = mutual_acceptor();
@@ -612,7 +615,7 @@ async fn a_client_certificate_is_presented_when_one_is_configured() {
     server.await.unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn without_a_client_certificate_a_mutual_server_refuses() {
     let (client_io, server_io) = tokio::io::duplex(1 << 16);
     let acceptor = mutual_acceptor();
@@ -632,7 +635,7 @@ async fn without_a_client_certificate_a_mutual_server_refuses() {
     assert!(outcome.is_err() || outcome.unwrap().is_empty());
 }
 
-#[test]
+#[quench_test::test]
 fn a_bad_client_identity_is_described() {
     let options = server_options();
     let cert = std::fs::read(fixture("client.pem")).unwrap();
@@ -657,3 +660,5 @@ fn a_bad_client_identity_is_described() {
     };
     assert!(client_config_with_identity(&lax, &cert, &key).is_ok());
 }
+
+quench_test::main!();

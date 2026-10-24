@@ -260,7 +260,7 @@ impl PartialEq<u16> for StatusCode {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn constants_and_classes() {
         assert_eq!(StatusCode::OK.as_u16(), 200);
         assert!(StatusCode::CONTINUE.is_informational());
@@ -274,7 +274,7 @@ mod tests {
         assert_eq!(u16::from(StatusCode::IM_A_TEAPOT), 418);
     }
 
-    #[test]
+    #[quench_test::test]
     fn parsing() {
         assert_eq!(StatusCode::from_u16(404).unwrap(), StatusCode::NOT_FOUND);
         assert_eq!(
@@ -296,7 +296,7 @@ mod tests {
         assert!(InvalidStatusCode.to_string().contains("invalid"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn reasons_and_display() {
         assert_eq!(StatusCode::OK.canonical_reason(), Some("OK"));
         assert_eq!(StatusCode::OK.to_string(), "200 OK");
@@ -310,7 +310,7 @@ mod tests {
         assert_eq!(format!("{:?}", StatusCode::OK), "200");
     }
 
-    #[test]
+    #[quench_test::test]
     fn every_registered_code_has_a_reason() {
         for code in 100..600u16 {
             let status = StatusCode::from_u16(code).unwrap();

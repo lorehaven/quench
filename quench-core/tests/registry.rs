@@ -1,5 +1,8 @@
 //! `submit!` from outside the crate, the way `#[get]`/`#[injectable]` use it.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::registry::Registry;
 use quench_core::submit;
 
@@ -12,7 +15,7 @@ submit!(ENTRIES, Entry, Entry("first"));
 submit!(ENTRIES, Entry, Entry("second"));
 submit!(ENTRIES, Entry, Entry("third"));
 
-#[test]
+#[quench_test::test]
 fn constructors_register_before_main() {
     let names: Vec<&str> = ENTRIES.iter().map(|e| e.0).collect();
     assert_eq!(names.len(), 3);
@@ -23,7 +26,7 @@ fn constructors_register_before_main() {
     assert!(!ENTRIES.is_empty());
 }
 
-#[test]
+#[quench_test::test]
 fn iteration_is_newest_first() {
     static LOCAL: Registry<Entry> = Registry::new();
     static A: Entry = Entry("a");
@@ -36,3 +39,5 @@ fn iteration_is_newest_first() {
     assert_eq!(fresh.len(), 0);
     assert!(format!("{LOCAL:?}").contains("Registry"));
 }
+
+quench_test::main!();

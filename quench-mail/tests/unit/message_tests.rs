@@ -18,12 +18,12 @@ fn headers(wire: &str) -> &str {
     wire.split("\r\n\r\n").next().unwrap()
 }
 
-#[test]
+#[quench_test::test]
 fn a_minimal_message_builds() {
     assert!(base().build().is_ok());
 }
 
-#[test]
+#[quench_test::test]
 fn missing_pieces_are_reported() {
     assert_eq!(
         Message::builder()
@@ -51,7 +51,7 @@ fn missing_pieces_are_reported() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn a_bcc_only_message_still_has_a_recipient() {
     assert!(
         Message::builder()
@@ -63,7 +63,7 @@ fn a_bcc_only_message_still_has_a_recipient() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn an_invalid_address_anywhere_fails_the_build_with_that_address() {
     for builder in [
         base().from("not an address"),
@@ -80,13 +80,13 @@ fn an_invalid_address_anywhere_fails_the_build_with_that_address() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn the_first_error_wins() {
     let err = base().to("first-bad").to("second-bad").build().unwrap_err();
     assert_eq!(err, BuildError::InvalidAddress("first-bad".into()));
 }
 
-#[test]
+#[quench_test::test]
 fn header_injection_is_refused() {
     assert_eq!(
         base()
@@ -108,7 +108,7 @@ fn header_injection_is_refused() {
     ));
 }
 
-#[test]
+#[quench_test::test]
 fn reserved_and_malformed_header_names_are_refused() {
     for name in [
         "From",
@@ -136,7 +136,7 @@ fn reserved_and_malformed_header_names_are_refused() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn envelope_defaults_to_the_from_address_and_lists_every_recipient_once() {
     let message = base()
         .to("Alice <alice@example.org>")
@@ -168,7 +168,7 @@ fn envelope_defaults_to_the_from_address_and_lists_every_recipient_once() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn envelope_from_can_differ_from_the_header() {
     let message = base().envelope_from("bounces@example.com").build().unwrap();
     assert_eq!(message.envelope().from.as_str(), "bounces@example.com");
@@ -176,7 +176,7 @@ fn envelope_from_can_differ_from_the_header() {
     assert!(!wire(&message).contains("bounces@"));
 }
 
-#[test]
+#[quench_test::test]
 fn bcc_recipients_are_delivered_to_but_never_named() {
     let message = base().bcc("secret@example.net").build().unwrap();
     assert!(
@@ -190,7 +190,7 @@ fn bcc_recipients_are_delivered_to_but_never_named() {
     assert!(!wire(&message).to_ascii_lowercase().contains("bcc"));
 }
 
-#[test]
+#[quench_test::test]
 fn a_text_message_has_the_expected_headers_and_body() {
     let text = wire(&base().build().unwrap());
     let head = headers(&text);
@@ -207,7 +207,7 @@ fn a_text_message_has_the_expected_headers_and_body() {
     assert!(text.ends_with("\r\n\r\nFollow the link.\r\n"));
 }
 
-#[test]
+#[quench_test::test]
 fn every_line_ends_in_crlf_and_the_message_is_ascii() {
     let message = base()
         .subject("Zażółć gęślą jaźń")
@@ -227,7 +227,7 @@ fn every_line_ends_in_crlf_and_the_message_is_ascii() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn message_id_uses_the_sender_domain_and_is_unique() {
     let a = base().build().unwrap();
     let b = base().build().unwrap();
@@ -236,7 +236,7 @@ fn message_id_uses_the_sender_domain_and_is_unique() {
     assert!(wire(&a).contains(&format!("Message-ID: {}", a.message_id())));
 }
 
-#[test]
+#[quench_test::test]
 fn non_ascii_subject_and_names_become_encoded_words() {
     let message = base()
         .from("Zoë Łukasz <noreply@example.com>")
@@ -261,7 +261,7 @@ fn non_ascii_subject_and_names_become_encoded_words() {
     assert!(head.is_ascii());
 }
 
-#[test]
+#[quench_test::test]
 fn a_display_name_with_specials_is_quoted() {
     let message = base()
         .to("\"Liddell, Alice\" <alice@example.org>")
@@ -275,7 +275,7 @@ fn a_display_name_with_specials_is_quoted() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn several_recipients_share_a_header() {
     let message = base()
         .to("b@example.org")
@@ -290,7 +290,7 @@ fn several_recipients_share_a_header() {
     assert!(text.contains("Reply-To: Support <help@example.com>"));
 }
 
-#[test]
+#[quench_test::test]
 fn long_recipient_lists_fold_below_78_columns() {
     let mut builder = base();
     for i in 0..12 {
@@ -302,7 +302,7 @@ fn long_recipient_lists_fold_below_78_columns() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn custom_headers_are_written() {
     let message = base()
         .header("Auto-Submitted", "auto-generated")
@@ -314,7 +314,7 @@ fn custom_headers_are_written() {
     assert!(text.contains("X-Forge-Kind: verification"));
 }
 
-#[test]
+#[quench_test::test]
 fn non_ascii_body_is_quoted_printable() {
     let message = base().text("Zażółć gęślą jaźń").build().unwrap();
     let text = wire(&message);
@@ -322,7 +322,7 @@ fn non_ascii_body_is_quoted_printable() {
     assert!(text.contains("Za=C5=BC=C3=B3=C5=82=C4=87"));
 }
 
-#[test]
+#[quench_test::test]
 fn html_only_is_a_single_html_part() {
     let message = Message::builder()
         .from("a@b.c")
@@ -335,7 +335,7 @@ fn html_only_is_a_single_html_part() {
     assert!(!text.contains("multipart"));
 }
 
-#[test]
+#[quench_test::test]
 fn text_and_html_make_multipart_alternative_with_html_last() {
     let message = base().html("<p>Follow the link.</p>").build().unwrap();
     let text = wire(&message);
@@ -359,7 +359,7 @@ fn text_and_html_make_multipart_alternative_with_html_last() {
     assert!(text.contains("<p>Follow the link.</p>\r\n--"));
 }
 
-#[test]
+#[quench_test::test]
 fn boundaries_differ_between_messages() {
     let boundary = |m: &Message| {
         wire(m)
@@ -374,7 +374,7 @@ fn boundaries_differ_between_messages() {
     assert_ne!(boundary(&a), boundary(&b));
 }
 
-#[test]
+#[quench_test::test]
 fn a_body_that_is_not_newline_terminated_still_ends_in_crlf() {
     let text = wire(&base().text("no newline").build().unwrap());
     assert!(text.ends_with("no newline\r\n"));
@@ -383,7 +383,7 @@ fn a_body_that_is_not_newline_terminated_still_ends_in_crlf() {
     assert!(!text.ends_with("\r\n\r\n"));
 }
 
-#[test]
+#[quench_test::test]
 fn prebuilt_mailboxes_keep_their_display_name_verbatim() {
     use quench_mail::{Address, Mailbox};
     let from = Mailbox::new(

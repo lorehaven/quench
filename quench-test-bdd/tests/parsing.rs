@@ -1,3 +1,6 @@
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_test_bdd::expression::Matcher;
 use quench_test_bdd::gherkin::{self, StepKind};
 use quench_test_bdd::tags::Tags;
@@ -6,7 +9,7 @@ fn args(pattern: &str, text: &str) -> Option<Vec<String>> {
     Matcher::new(pattern, false).expect("pattern").matches(text)
 }
 
-#[test]
+#[quench_test::test]
 fn expressions_capture_typed_parameters() {
     assert_eq!(
         args("I have {int} cucumber(s)", "I have 12 cucumbers"),
@@ -47,7 +50,7 @@ fn expressions_capture_typed_parameters() {
     assert_eq!(args(r"back\\slash", r"back\slash"), Some(vec![]));
 }
 
-#[test]
+#[quench_test::test]
 fn bad_patterns_are_rejected() {
     for pattern in ["{nope}", "open {int", "open (maybe"] {
         assert!(Matcher::new(pattern, false).is_err(), "{pattern}");
@@ -61,7 +64,7 @@ fn bad_patterns_are_rejected() {
     assert_eq!(regex.matches("5 and x"), Some(vec!["5".into(), "x".into()]));
 }
 
-#[test]
+#[quench_test::test]
 fn tag_expressions() {
     let tags = |t: &[&str]| t.iter().map(ToString::to_string).collect::<Vec<_>>();
     let e = Tags::parse("@a and (@b or not @c)").expect("parse");
@@ -127,7 +130,7 @@ Feature: Shop
       Then ok
 ";
 
-#[test]
+#[quench_test::test]
 fn gherkin_structure() {
     let f = gherkin::parse(FEATURE).expect("parse");
     assert_eq!(f.name, "Shop");
@@ -172,7 +175,7 @@ fn gherkin_structure() {
     assert_eq!(one.expand().len(), 1);
 }
 
-#[test]
+#[quench_test::test]
 fn gherkin_errors_name_the_line() {
     for (text, line) in [
         ("", 1),
@@ -198,7 +201,7 @@ fn gherkin_errors_name_the_line() {
     assert!(error.to_string().contains("x.feature"));
 }
 
-#[test]
+#[quench_test::test]
 fn step_arguments_and_outcomes() {
     use quench_test_bdd::step::{Context, StepOutcome, parse_argument};
     let feature = gherkin::parse("Feature: f\n  Scenario: s\n    Given x\n").expect("parse");
@@ -222,7 +225,7 @@ fn step_arguments_and_outcomes() {
     assert_eq!(Err::<(), _>("bad").into_result(), Err("bad".to_string()));
 }
 
-#[test]
+#[quench_test::test]
 fn options_come_from_the_command_line() {
     use quench_args::{Args, Command};
     use quench_test_bdd::Options;
@@ -248,3 +251,5 @@ fn options_come_from_the_command_line() {
     assert!(options.fail_fast && options.quiet);
     assert_eq!(options.report_dir, Some("out".into()));
 }
+
+quench_test::main!();

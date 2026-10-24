@@ -720,7 +720,7 @@ mod tests {
         ]
     }
 
-    #[test]
+    #[quench_test::test]
     fn the_rfc_handshake_example() {
         assert_eq!(accept_key(KEY), "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
         assert_eq!(
@@ -732,7 +732,7 @@ mod tests {
         assert_ne!(generated, generate_key());
     }
 
-    #[test]
+    #[quench_test::test]
     fn validates_upgrade_requests() {
         assert_eq!(check(&upgrade_headers()).unwrap(), KEY);
         let without = |name: &str| -> Vec<(&str, &str)> {
@@ -781,7 +781,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn accept_builds_the_switching_response() {
         let response = accept(
             &Method::GET,
@@ -807,7 +807,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn rfc_6455_frame_examples() {
         // Unmasked "Hello" (section 5.7).
         let (frame, used) = decode_frame(&[0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f], false, 1024)
@@ -848,7 +848,7 @@ mod tests {
         assert_eq!(ping.opcode, Opcode::Ping);
     }
 
-    #[test]
+    #[quench_test::test]
     fn extended_lengths_round_trip() {
         for len in [0usize, 1, 125, 126, 127, 65_535, 65_536, 70_000] {
             let payload = vec![0xab; len];
@@ -863,7 +863,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn partial_frames_ask_for_more() {
         let mut out = Vec::new();
         encode_frame(&mut out, true, Opcode::Binary, &[7u8; 300], None);
@@ -888,7 +888,7 @@ mod tests {
         assert_eq!(decode_frame(&huge[..9], false, 1 << 20).unwrap(), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn framing_violations_are_detected_at_the_header() {
         let cases: [(&[u8], bool, ProtocolError); 12] = [
             (&[0xc1, 0x00], false, ProtocolError::ReservedBits),
@@ -942,7 +942,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn protocol_errors_map_to_close_codes() {
         assert_eq!(ProtocolError::InvalidUtf8.close_code(), 1007);
         assert_eq!(ProtocolError::InvalidClosePayload.close_code(), 1007);
@@ -967,7 +967,7 @@ mod tests {
         assert!(Opcode::Ping.is_control() && !Opcode::Text.is_control());
     }
 
-    #[test]
+    #[quench_test::test]
     fn close_payload_rules() {
         assert_eq!(CloseFrame::parse(&[]).unwrap(), None);
         assert_eq!(
@@ -1019,7 +1019,7 @@ mod tests {
         )
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn exchanges_text_and_binary_both_ways() {
         let (mut client, mut server) = pair();
         client.send(Message::Text("héllo".into())).await.unwrap();
@@ -1040,7 +1040,7 @@ mod tests {
         assert!(format!("{client:?}").contains("Client"));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn pings_are_answered_and_pongs_surface() {
         let (mut client, mut server) = pair();
         client
@@ -1068,7 +1068,7 @@ mod tests {
         ));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn the_closing_handshake_completes_from_either_side() {
         let (mut client, mut server) = pair();
         client.close(1000, "done").await.unwrap();
@@ -1097,7 +1097,7 @@ mod tests {
         assert_eq!(client.recv().await.unwrap(), None);
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn an_empty_close_is_echoed_empty() {
         let (mut client, mut server) = pair();
         client.send(Message::Close(None)).await.unwrap();
@@ -1105,7 +1105,7 @@ mod tests {
         assert_eq!(client.recv().await.unwrap(), Some(Message::Close(None)));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn long_close_reasons_are_truncated_on_a_char_boundary() {
         let (mut client, mut server) = pair();
         client.close(1000, &"é".repeat(100)).await.unwrap();
@@ -1124,7 +1124,7 @@ mod tests {
         ));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn oversized_close_payloads_are_refused() {
         let (mut client, _server) = pair();
         let result = client
@@ -1158,7 +1158,7 @@ mod tests {
         out
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn reassembles_fragments_with_interleaved_control_frames() {
         let mut wire = masked(false, Opcode::Text, b"Hel");
         wire.extend(masked(true, Opcode::Ping, b"mid"));
@@ -1174,7 +1174,7 @@ mod tests {
         assert_eq!(pong, [0x8a, 0x03, b'm', b'i', b'd']);
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn utf8_is_checked_on_the_whole_message() {
         // "é" split across two fragments is fine.
         let mut wire = masked(false, Opcode::Text, &[0xc3]);
@@ -1194,7 +1194,7 @@ mod tests {
         assert_eq!(ws.recv().await.unwrap(), None);
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn sequencing_violations_close_with_1002() {
         let cases: Vec<Vec<u8>> = vec![
             masked(true, Opcode::Continuation, b"orphan"),
@@ -1222,7 +1222,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn size_limits_close_with_1009() {
         let (mut ws, mut peer) = raw_server(&masked(true, Opcode::Binary, &vec![0u8; 1001])).await;
         assert!(matches!(
@@ -1257,7 +1257,7 @@ mod tests {
         ));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn eof_in_the_middle_of_a_message_is_an_error_but_clean_eof_is_none() {
         let (mut ws, peer) = raw_server(&masked(false, Opcode::Text, b"half")).await;
         drop(peer);
@@ -1268,7 +1268,7 @@ mod tests {
         assert!(ws.is_closed());
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn frames_arriving_in_dribs_are_assembled() {
         let (a, mut b) = tokio::io::duplex(1024);
         let mut ws = WebSocket::new(a, Role::Server, Config::default());
@@ -1287,7 +1287,7 @@ mod tests {
         let _ = task.await;
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn pings_after_our_close_are_not_answered() {
         let (mut ws, mut peer) = raw_server(&masked(true, Opcode::Ping, b"x")).await;
         ws.close(1000, "").await.unwrap();
@@ -1306,7 +1306,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn error_display_and_sources() {
         use std::error::Error as _;
         let io = Error::from(std::io::Error::other("boom"));
@@ -1317,7 +1317,7 @@ mod tests {
         assert!(Error::ControlTooLong.to_string().contains("125"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn client_handshake_headers_carry_the_key() {
         let headers = client_handshake_headers(KEY);
         assert!(
@@ -1332,7 +1332,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn the_client_helper_masks_frames() {
         let (a, mut b) = tokio::io::duplex(1024);
         let mut ws = client(a, Config::default());

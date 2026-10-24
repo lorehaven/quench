@@ -157,7 +157,7 @@ impl Config {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn full_url() {
         let c = Config::from_url("rediss://app:p%40ss@cache.example.com:6380/3?connect_timeout=2&command_timeout=1500#insecure").unwrap();
         assert_eq!(
@@ -176,7 +176,7 @@ mod tests {
         assert_eq!(c.address(), "cache.example.com:6380");
     }
 
-    #[test]
+    #[quench_test::test]
     fn defaults_and_shapes() {
         let c = Config::from_url("redis://localhost").unwrap();
         assert_eq!(
@@ -213,7 +213,7 @@ mod tests {
         assert!(Config::from_url("redis://h?other=1&flag").is_ok());
     }
 
-    #[test]
+    #[quench_test::test]
     fn bad_urls() {
         for bad in [
             "http://h",

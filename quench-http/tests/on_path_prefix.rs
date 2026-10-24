@@ -3,6 +3,9 @@
 //! discovered routes are one flat router rather than per-scope middleware
 //! stacks.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::async_trait;
 use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
@@ -42,7 +45,7 @@ fn get(path: &str, container: &Arc<quench_http::di::Container>) -> Request {
     )
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn middleware_runs_only_for_matching_paths() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
     let app: Arc<dyn Endpoint> = Arc::new(AlwaysOk);
@@ -52,7 +55,7 @@ async fn middleware_runs_only_for_matching_paths() {
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn middleware_is_skipped_outside_the_prefix() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
     let app: Arc<dyn Endpoint> = Arc::new(AlwaysOk);
@@ -61,3 +64,5 @@ async fn middleware_is_skipped_outside_the_prefix() {
     let resp = app.call(get("/health", &container)).await;
     assert_eq!(resp.status(), StatusCode::OK);
 }
+
+quench_test::main!();

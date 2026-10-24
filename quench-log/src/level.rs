@@ -173,7 +173,7 @@ fn is_target(text: &str) -> bool {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn levels_order_and_parse() {
         assert!(
             Level::Trace < Level::Debug
@@ -201,7 +201,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn level_filters() {
         assert!(LevelFilter::From(Level::Info).allows(Level::Info));
         assert!(LevelFilter::From(Level::Info).allows(Level::Error));
@@ -209,7 +209,7 @@ mod tests {
         assert!(!LevelFilter::Off.allows(Level::Error));
     }
 
-    #[test]
+    #[quench_test::test]
     fn a_bare_level_is_the_default() {
         let f = Filter::parse("warn").unwrap();
         assert!(f.enabled(Level::Warn, "anything::at_all"));
@@ -217,7 +217,7 @@ mod tests {
         assert_eq!(Filter::level(Level::Debug), Filter::parse("debug").unwrap());
     }
 
-    #[test]
+    #[quench_test::test]
     fn targets_match_their_modules_and_longest_wins() {
         let f =
             Filter::parse("info,quench_http=debug,quench_http::server=trace,hyper=warn,noisy=off")
@@ -236,7 +236,7 @@ mod tests {
         assert!(!f.enabled(Level::Debug, "other"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn a_bare_target_turns_it_fully_on() {
         let f = Filter::parse("my_crate").unwrap();
         assert!(f.enabled(Level::Trace, "my_crate::x"));
@@ -244,7 +244,7 @@ mod tests {
         assert!(f.enabled(Level::Error, "elsewhere"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn directives_without_a_default_leave_errors_on() {
         let f = Filter::parse("a=debug").unwrap();
         assert!(f.enabled(Level::Debug, "a"));
@@ -252,7 +252,7 @@ mod tests {
         assert!(!f.enabled(Level::Warn, "b"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn off_and_span_directives() {
         let f = Filter::parse("off,a=info").unwrap();
         assert!(!f.enabled(Level::Error, "b"));
@@ -261,7 +261,7 @@ mod tests {
         assert!(span.enabled(Level::Debug, "a"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn bad_filters_are_errors() {
         for bad in ["", "   ", ",,", "a=loud", "x y"] {
             assert!(Filter::parse(bad).is_err(), "{bad:?}");

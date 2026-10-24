@@ -243,7 +243,7 @@ mod tests {
         )
     }
 
-    #[test]
+    #[quench_test::test]
     fn scoped_dispatchers_receive_events_and_nest() {
         let (outer, outer_sink) = dispatcher(Level::Info);
         let (inner, inner_sink) = dispatcher(Level::Debug);
@@ -273,7 +273,7 @@ mod tests {
         assert_eq!(inner_records[0].target, "t");
     }
 
-    #[test]
+    #[quench_test::test]
     fn the_scope_unwinds_on_panic() {
         let (d, _) = dispatcher(Level::Info);
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -283,14 +283,14 @@ mod tests {
         SCOPED.with(|stack| assert!(stack.borrow().is_empty()));
     }
 
-    #[test]
+    #[quench_test::test]
     fn a_dispatcher_with_no_sinks_enables_nothing() {
         let empty = Dispatcher::new(Filter::level(Level::Trace));
         assert!(!empty.enabled(Level::Error, "t"));
         assert!(format!("{empty:?}").contains("sinks"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn the_filter_is_applied_per_target() {
         let sink = MemorySink::new();
         let d = Dispatcher::new(Filter::parse("warn,loud=trace").unwrap()).with_sink(sink);
@@ -299,7 +299,7 @@ mod tests {
         assert!(d.enabled(Level::Warn, "quiet"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn nothing_installed_means_nothing_enabled() {
         // (runs on a thread with no scoped dispatcher; the global one is set by
         // other tests in this binary only through `set_global`, which these don't call)
@@ -313,7 +313,7 @@ mod tests {
         .unwrap();
     }
 
-    #[test]
+    #[quench_test::test]
     fn sinks_can_be_shared() {
         let sink = MemorySink::new();
         let shared: Arc<dyn Sink> = Arc::new(sink.clone());
@@ -324,7 +324,7 @@ mod tests {
         assert_eq!(sink.records()[0].message, "via arc");
     }
 
-    #[test]
+    #[quench_test::test]
     fn already_set_displays() {
         assert!(AlreadySet.to_string().contains("already installed"));
     }

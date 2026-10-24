@@ -10,7 +10,7 @@ use quench_cli::terminal::{
     print_component_preview, print_error_line, print_inline, print_line, print_status, repl_prompt,
 };
 
-#[test]
+#[quench_test::test]
 fn ansi_constants_are_non_empty_escape_sequences() {
     for code in [RESET, BOLD, DIM, CYAN, BLUE, GREEN, YELLOW, WHITE] {
         assert!(code.starts_with('\x1b'));
@@ -19,7 +19,7 @@ fn ansi_constants_are_non_empty_escape_sequences() {
     assert!(!SEP_THIN.is_empty());
 }
 
-#[test]
+#[quench_test::test]
 fn repl_prompt_wraps_the_app_name_and_context_together() {
     let prompt = repl_prompt("quench", "auth");
     assert!(prompt.contains("quench"));
@@ -27,13 +27,13 @@ fn repl_prompt_wraps_the_app_name_and_context_together() {
     assert!(prompt.ends_with("> "));
 }
 
-#[test]
+#[quench_test::test]
 fn print_box_banner_does_not_panic_for_any_title_length() {
     print_box_banner("Title", "Subtitle");
     print_box_banner("", "");
 }
 
-#[test]
+#[quench_test::test]
 fn print_status_does_not_panic_for_every_tone() {
     print_status(Tone::Info, "INFO", "message");
     print_status(Tone::Success, "OK", "message");
@@ -41,18 +41,18 @@ fn print_status_does_not_panic_for_every_tone() {
     print_status(Tone::Error, "ERROR", "message");
 }
 
-#[test]
+#[quench_test::test]
 fn print_component_preview_does_not_panic() {
     print_component_preview("nav", "the top navigation bar");
 }
 
-#[test]
+#[quench_test::test]
 fn print_line_and_print_error_line_do_not_panic() {
     print_line("stdout line");
     print_error_line("stderr line");
 }
 
-#[test]
+#[quench_test::test]
 fn print_inline_flushes_without_a_trailing_newline() {
     print_inline("partial");
 }

@@ -1,6 +1,8 @@
 //! PDF text extraction: real files from several producers, and hand-built files for the corners.
 
 #![allow(clippy::cast_possible_truncation, clippy::format_push_string)]
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_archive::checksum::adler32;
 use quench_pdf::{Document, Error, extract_pages, extract_text};
@@ -11,7 +13,7 @@ fn pages(bytes: &[u8]) -> Vec<String> {
 
 // ---------------------------------------------------------------- real files
 
-#[test]
+#[quench_test::test]
 fn reads_files_from_real_producers() {
     let reportlab = pages(include_bytes!("fixtures/rl_canvas.pdf"));
     assert_eq!(reportlab.len(), 2);
@@ -135,7 +137,7 @@ fn text_of(content: &str, font_object: Vec<u8>, extra: &[Vec<u8>]) -> String {
     pages(&one_page(content.as_bytes(), font_object, extra)).remove(0)
 }
 
-#[test]
+#[quench_test::test]
 fn shows_strings_with_spacing_and_line_breaks() {
     assert_eq!(
         text_of(
@@ -215,7 +217,7 @@ fn shows_strings_with_spacing_and_line_breaks() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn decodes_fonts() {
     // Differences name glyphs: Adobe names, `uniXXXX`, `uXXXX` and `a_b` ligatures.
     let diffs = "/Encoding << /BaseEncoding /WinAnsiEncoding /Differences [65 /eacute /uni0042 /u0043 /f_i /nonsense] >>";
@@ -346,7 +348,7 @@ fn lzw(data: &[u8]) -> Vec<u8> {
     out
 }
 
-#[test]
+#[quench_test::test]
 fn undoes_stream_filters() {
     let content = b"BT /F1 12 Tf 72 700 Td (filtered text) Tj ET";
     let hex: Vec<u8> = content
@@ -416,7 +418,7 @@ fn undoes_stream_filters() {
     assert_eq!(pages(&build(&objects, ""))[0], "filtered text");
 }
 
-#[test]
+#[quench_test::test]
 fn form_xobjects_and_inline_images() {
     let form = stream(
         "/Type /XObject /Subtype /Form /BBox [0 0 100 100] /Matrix [1 0 0 1 0 0]",
@@ -444,7 +446,7 @@ fn form_xobjects_and_inline_images() {
     assert!(got.starts_with('x'));
 }
 
-#[test]
+#[quench_test::test]
 fn page_trees_and_inheritance() {
     let objects = vec![
         b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
@@ -476,7 +478,7 @@ fn page_trees_and_inheritance() {
     assert_eq!(pages(&build(&cyclic, "")).len(), 1);
 }
 
-#[test]
+#[quench_test::test]
 fn damaged_files_are_rebuilt_or_refused() {
     let good = one_page(b"BT /F1 12 Tf (survivor) Tj ET", font(""), &[]);
     // A wrong startxref.
@@ -537,7 +539,7 @@ fn damaged_files_are_rebuilt_or_refused() {
     assert!(extract_pages(text.as_bytes()).is_ok());
 }
 
-#[test]
+#[quench_test::test]
 fn objects_of_every_kind_parse() {
     // Names with escapes, nested containers, reals and odd numbers in a dictionary the reader must skip over.
     let objects = vec![
@@ -659,7 +661,7 @@ fn content_with(extra: &str, data: &[u8]) -> Vec<u8> {
     )
 }
 
-#[test]
+#[quench_test::test]
 fn larger_streams_exercise_every_filter_path() {
     let mut content = String::new();
     for i in 0..60 {
@@ -723,10 +725,12 @@ fn larger_streams_exercise_every_filter_path() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn a_damaged_cross_reference_stream_file_is_rebuilt_from_its_object_streams() {
     let good = include_bytes!("fixtures/qpdf_objstm.pdf");
     let at = good.windows(9).rposition(|w| w == b"startxref").unwrap();
     let wrong = [&good[..at], b"startxref\n9\n%%EOF\n"].concat();
     assert_eq!(pages(&wrong), pages(good));
 }
+
+quench_test::main!();

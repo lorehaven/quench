@@ -4,7 +4,7 @@ use quench_web_components::dom::{
     on_dom_ready, set_select_value, toggle_modal, update_from_select,
 };
 
-#[test]
+#[quench_test::test]
 fn on_dom_ready_wraps_every_block_in_one_listener() {
     let js = on_dom_ready(&["a();".to_string(), "b();".to_string()]);
     assert_eq!(
@@ -13,7 +13,7 @@ fn on_dom_ready_wraps_every_block_in_one_listener() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn toggle_modal_names_the_overlay_panel_and_class_it_toggles() {
     let js = toggle_modal("modal-overlay", "modal-side", "show");
     assert!(js.contains("getElementsByClassName('modal-overlay')"));
@@ -21,7 +21,7 @@ fn toggle_modal_names_the_overlay_panel_and_class_it_toggles() {
     assert!(js.contains("classList.toggle('show')"));
 }
 
-#[test]
+#[quench_test::test]
 fn update_from_select_reads_the_selects_value_into_the_update_function() {
     let js = update_from_select("locale-select", "updateLocale");
     assert_eq!(
@@ -30,7 +30,7 @@ fn update_from_select_reads_the_selects_value_into_the_update_function() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn set_select_value_guards_against_a_missing_select() {
     let js = set_select_value("theme-select", "getTheme");
     assert!(js.contains("document.getElementById('theme-select')"));

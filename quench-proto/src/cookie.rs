@@ -320,7 +320,7 @@ pub fn cookie_value<'a>(header: &'a str, name: &str) -> Option<&'a str> {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn parses_name_and_value() {
         let c = Cookie::parse("  session = abc123 ").unwrap();
         assert_eq!((c.name(), c.value()), ("session", "abc123"));
@@ -329,7 +329,7 @@ mod tests {
         assert_eq!("k=v".parse::<Cookie>().unwrap().name(), "k");
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_missing_pairs_and_empty_names() {
         assert_eq!(Cookie::parse("novalue"), Err(ParseError::MissingPair));
         assert_eq!(Cookie::parse(""), Err(ParseError::MissingPair));
@@ -339,7 +339,7 @@ mod tests {
         assert!(ParseError::EmptyName.to_string().contains("empty"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn parses_every_attribute() {
         let c = Cookie::parse(
             "id=1; Path=/app; Domain=example.com; Max-Age=3600; Secure; HttpOnly; SameSite=Strict; Expires=Wed, 21 Oct 2037 07:28:00 GMT",
@@ -353,7 +353,7 @@ mod tests {
         assert_eq!(c.expires().unwrap().timestamp(), 2_139_722_880);
     }
 
-    #[test]
+    #[quench_test::test]
     fn attribute_names_are_case_insensitive_and_lenient() {
         let c = Cookie::parse("a=b; PATH=/x; sEcUrE; samesite=LAX; max-age=oops; domain=; unknown=1; flag; expires=garbage; samesite=bogus").unwrap();
         assert_eq!(c.path(), Some("/x"));
@@ -382,7 +382,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn negative_and_huge_max_ages() {
         assert_eq!(
             Cookie::parse("a=b; Max-Age=-5").unwrap().max_age(),
@@ -398,7 +398,7 @@ mod tests {
         assert_eq!(Cookie::parse("a=b; Max-Age=-").unwrap().max_age(), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn builds_and_serialises_in_a_stable_order() {
         let builder = Cookie::build(("sid", "tok"))
             .path("/")
@@ -433,7 +433,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn same_site_none_implies_secure_unless_set() {
         assert_eq!(
             Cookie::build(("a", "b"))
@@ -456,7 +456,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn serialised_cookies_parse_back() {
         let original = Cookie::build(("k", "v"))
             .path("/p")
@@ -469,7 +469,7 @@ mod tests {
         assert_eq!(Cookie::parse(&original.to_string()).unwrap(), original);
     }
 
-    #[test]
+    #[quench_test::test]
     fn request_cookie_headers() {
         let header = "a=1; b=two ; broken; =noname; c=3=3;a=shadowed";
         let pairs: Vec<_> = parse_cookie_header(header).collect();
@@ -483,7 +483,7 @@ mod tests {
         assert_eq!(cookie_value("", "a"), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn same_site_displays() {
         assert_eq!(SameSite::Strict.to_string(), "Strict");
         assert_eq!(SameSite::Lax.to_string(), "Lax");

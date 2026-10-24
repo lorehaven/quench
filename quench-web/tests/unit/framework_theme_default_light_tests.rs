@@ -4,7 +4,7 @@ use quench_web::framework::theme::ThemeSpec;
 use quench_web::framework::theme::default_light::DefaultLightTheme;
 use quench_web::styling::css::CssRule;
 
-#[test]
+#[quench_test::test]
 fn default_light_declares_its_own_palette_and_three_color_utilities() {
     let rules = DefaultLightTheme::colors();
     assert_eq!(rules.len(), 4);

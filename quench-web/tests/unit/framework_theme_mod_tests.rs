@@ -2,7 +2,7 @@
 
 use quench_web::framework::theme::{Theme, theme_shared};
 
-#[test]
+#[quench_test::test]
 fn each_theme_display_matches_its_documented_slug() {
     assert_eq!(Theme::DefaultDark.to_string(), "default-dark");
     assert_eq!(Theme::DefaultLight.to_string(), "default-light");
@@ -10,7 +10,7 @@ fn each_theme_display_matches_its_documented_slug() {
     assert_eq!(Theme::BootstrapLight.to_string(), "bootstrap-light");
 }
 
-#[test]
+#[quench_test::test]
 fn theme_dispatches_to_the_matching_stylesheet() {
     // Each theme's own accent colour, to prove `Theme::theme` reached the
     // right implementation rather than always the same one.
@@ -20,7 +20,7 @@ fn theme_dispatches_to_the_matching_stylesheet() {
     assert!(Theme::theme(Theme::BootstrapLight).contains("#dc3545"));
 }
 
-#[test]
+#[quench_test::test]
 fn theme_shared_concatenates_every_shared_style_module() {
     let shared = theme_shared();
     // One selector from each of root/header/content/footer/elements/modal,

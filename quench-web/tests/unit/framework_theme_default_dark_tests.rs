@@ -4,7 +4,7 @@ use quench_web::framework::theme::ThemeSpec;
 use quench_web::framework::theme::default_dark::DefaultDarkTheme;
 use quench_web::styling::css::CssRule;
 
-#[test]
+#[quench_test::test]
 fn default_dark_declares_its_own_palette_and_three_color_utilities() {
     let rules = DefaultDarkTheme::colors();
     assert_eq!(rules.len(), 4);

@@ -1,3 +1,6 @@
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 #[cfg(feature = "data-cache")]
 #[path = "unit/data_cache_tests.rs"]
 mod data_cache_tests;
@@ -7,3 +10,5 @@ mod request_cache_tests;
 #[cfg(feature = "data-cache")]
 #[path = "unit/store_tests.rs"]
 mod store_tests;
+
+quench_test::main!();

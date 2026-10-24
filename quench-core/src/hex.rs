@@ -65,27 +65,27 @@ pub fn decode(input: impl AsRef<[u8]>) -> Result<Vec<u8>, DecodeError> {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn encodes_both_cases() {
         assert_eq!(encode([0x00, 0x0f, 0xa5, 0xff]), "000fa5ff");
         assert_eq!(encode_upper([0x00, 0x0f, 0xa5, 0xff]), "000FA5FF");
         assert_eq!(encode(""), "");
     }
 
-    #[test]
+    #[quench_test::test]
     fn decodes_either_case() {
         assert_eq!(decode("000fA5Ff").unwrap(), [0x00, 0x0f, 0xa5, 0xff]);
         assert_eq!(decode("").unwrap(), Vec::<u8>::new());
     }
 
-    #[test]
+    #[quench_test::test]
     fn round_trips_every_byte() {
         let all: Vec<u8> = (0..=255).collect();
         assert_eq!(decode(encode(&all)).unwrap(), all);
         assert_eq!(decode(encode_upper(&all)).unwrap(), all);
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_bad_input() {
         assert_eq!(decode("abc"), Err(DecodeError::OddLength));
         assert_eq!(decode("0g"), Err(DecodeError::InvalidByte(1)));

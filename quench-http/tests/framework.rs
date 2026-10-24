@@ -1,6 +1,9 @@
 //! The framework's building blocks one by one: bodies, extractors, responses,
 //! routing and the server entry points.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::async_trait;
 use quench_core::bytes::Bytes;
 use quench_core::stream::{self, StreamExt};
@@ -74,7 +77,7 @@ async fn body_text(response: Response) -> String {
 
 // ---- bodies ---------------------------------------------------------------------
 
-#[tokio::test]
+#[quench_test::test]
 async fn inbound_bodies_collect_within_their_limit() {
     assert_eq!(InboundBody::empty().collect_limited(10).await.unwrap(), "");
     assert_eq!(
@@ -101,7 +104,7 @@ async fn inbound_bodies_collect_within_their_limit() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn inbound_bodies_stream_and_convert() {
     let mut body = InboundBody::from_bytes("abc");
     assert_eq!(body.next().await.unwrap().unwrap(), "abc");
@@ -120,7 +123,7 @@ struct Item {
     id: u32,
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn handler_results_become_responses() {
     assert_eq!(().into_response().status(), StatusCode::NO_CONTENT);
     let text = "plain".into_response();
@@ -165,7 +168,7 @@ struct Search {
     page: Option<u32>,
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn path_parameters_are_typed() {
     let mut builder = Router::builder();
     builder.route(
@@ -206,7 +209,7 @@ async fn path_parameters_are_typed() {
     assert!(body_text(bad).await.contains("invalid path parameter"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn query_strings_are_typed() {
     let mut req = simple("/s?q=rust+lang&page=2", "").await;
     let query = Query::<Search>::from_request(&mut req).await.unwrap();
@@ -232,7 +235,7 @@ async fn query_strings_are_typed() {
     assert_eq!(err.into_response().status(), StatusCode::BAD_REQUEST);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn json_bodies_are_typed_and_limited() {
     let mut req = simple("/", r#"{"id": 3, "name": "n"}"#).await;
     let body = Json::<Params>::from_request(&mut req).await.unwrap();
@@ -263,7 +266,7 @@ async fn json_bodies_are_typed_and_limited() {
     assert_eq!(BodyLimit::default().0, 2 * 1024 * 1024);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn form_bodies_are_typed() {
     let mut req = simple("/", "q=a+b&page=4").await;
     let form = Form::<Search>::from_request(&mut req).await.unwrap();
@@ -279,7 +282,7 @@ async fn form_bodies_are_typed() {
     assert!(err.to_string().contains("invalid form body"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn raw_bytes_and_per_route_limits() {
     let mut req = simple("/", "raw bytes").await;
     let bytes = quench_http::extract::Bytes::from_request(&mut req)
@@ -326,7 +329,7 @@ struct Claims(&'static str);
 #[derive(Debug)]
 struct Service(u8);
 
-#[tokio::test]
+#[quench_test::test]
 async fn extensions_and_injected_services() {
     let mut req = simple("/", "").await;
     req.extensions_mut().insert(Claims("alice"));
@@ -364,7 +367,7 @@ async fn extensions_and_injected_services() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn extract_errors_name_their_cause() {
     for (err, needle) in [
         (
@@ -392,7 +395,7 @@ fn extract_errors_name_their_cause() {
 
 // ---- requests -------------------------------------------------------------------
 
-#[tokio::test]
+#[quench_test::test]
 async fn requests_expose_their_parts() {
     let c = container().await;
     let mut headers = HeaderMap::new();
@@ -425,7 +428,7 @@ async fn requests_expose_their_parts() {
 
 // ---- responses ------------------------------------------------------------------
 
-#[tokio::test]
+#[quench_test::test]
 async fn responses_build_headers_and_bodies() {
     let response = Response::new(StatusCode::CREATED)
         .header("X-Mixed-Case", "v1")
@@ -472,7 +475,7 @@ async fn responses_build_headers_and_bodies() {
     assert_eq!(body_text(Response::from("lit")).await, "lit");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn streaming_and_event_responses() {
     let chunks: Vec<Result<Bytes, std::io::Error>> = vec![
         Ok(Bytes::from_static(b"one")),
@@ -494,7 +497,7 @@ async fn streaming_and_event_responses() {
 
 // ---- routing --------------------------------------------------------------------
 
-#[tokio::test]
+#[quench_test::test]
 async fn routers_pick_by_path_then_method() {
     let ok = |label: &'static str| {
         Arc::new(Probe(move |_req: Request| async move {
@@ -533,7 +536,7 @@ async fn routers_pick_by_path_then_method() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn mounted_routers_see_paths_without_the_prefix() {
     let inner = Arc::new(Probe(|req: Request| async move {
         Response::text(StatusCode::OK, req.uri().path().to_string())
@@ -582,7 +585,7 @@ async fn mounted_routers_see_paths_without_the_prefix() {
 // ---- servers --------------------------------------------------------------------
 
 #[cfg(unix)]
-#[tokio::test]
+#[quench_test::test]
 async fn serve_http_stops_on_sigterm() {
     let app: Arc<dyn Endpoint> = Arc::new(Probe(|_req: Request| async { Response::ok() }));
     let server = tokio::spawn(quench_http::server::serve_http(
@@ -605,7 +608,7 @@ async fn serve_http_stops_on_sigterm() {
 }
 
 #[cfg(feature = "tls")]
-#[tokio::test]
+#[quench_test::test]
 async fn serve_https_binds_and_load_tls_rejects_missing_files() {
     assert!(
         quench_http::server::load_tls("/nonexistent/cert.pem", "/nonexistent/key.pem").is_none()
@@ -626,7 +629,7 @@ async fn serve_https_binds_and_load_tls_rejects_missing_files() {
     server.abort();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn binding_a_taken_address_is_an_error() {
     let taken = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = taken.local_addr().unwrap();
@@ -637,3 +640,5 @@ async fn binding_a_taken_address_is_an_error() {
             .is_err()
     );
 }
+
+quench_test::main!();

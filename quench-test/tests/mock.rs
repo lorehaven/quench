@@ -1,5 +1,8 @@
 //! The mock server, driven by hand-written HTTP.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_serde::json;
 use quench_test::mock::matchers::{
     any, basic_auth, body_bytes, body_json, body_json_string, body_string, body_string_contains,
@@ -41,7 +44,7 @@ fn body_of(response: &str) -> &str {
     response.split_once("\r\n\r\n").map_or("", |(_, b)| b)
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[quench_test::test(flavor = "multi_thread", worker_threads = 2)]
 async fn answers_from_rules_and_404s_otherwise() {
     let server = MockServer::start().await;
     assert!(server.uri().starts_with("http://127.0.0.1:"));
@@ -105,7 +108,7 @@ async fn answers_from_rules_and_404s_otherwise() {
     server.verify().await;
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[quench_test::test(flavor = "multi_thread", worker_threads = 2)]
 async fn matchers_look_at_the_whole_request() {
     let server = MockServer::start().await;
     let ok = || ResponseTemplate::new(200);
@@ -207,7 +210,7 @@ async fn matchers_look_at_the_whole_request() {
     assert_eq!(body_of(&get(&server, "/closure", "")), "closure");
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[quench_test::test(flavor = "multi_thread", worker_threads = 2)]
 async fn priority_limits_and_requests() {
     let server = MockServer::start().await;
     Mock::given(any())
@@ -260,7 +263,7 @@ async fn priority_limits_and_requests() {
     assert!(format!("{server:?}").starts_with("MockServer(127.0.0.1:"));
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[quench_test::test(flavor = "multi_thread", worker_threads = 2)]
 async fn expectations_are_verified() {
     let server = MockServer::start().await;
     Mock::given(path("/once"))
@@ -308,7 +311,7 @@ async fn expectations_are_verified() {
     server.reset().await;
 }
 
-#[test]
+#[quench_test::test]
 fn dropping_a_server_with_unmet_expectations_panics() {
     let result = std::panic::catch_unwind(|| {
         let runtime = tokio::runtime::Builder::new_current_thread()
@@ -327,7 +330,7 @@ fn dropping_a_server_with_unmet_expectations_panics() {
     assert!(result.is_err());
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[quench_test::test(flavor = "multi_thread", worker_threads = 2)]
 async fn keep_alive_chunked_bodies_and_delays() {
     let server = MockServer::start().await;
     Mock::given(path("/a"))
@@ -402,7 +405,7 @@ async fn keep_alive_chunked_bodies_and_delays() {
 
 /// A test that blocks its own (single-threaded) runtime while waiting for the answer, as one that waits for a
 /// spawned process does, still gets one: the server has a thread of its own.
-#[tokio::test]
+#[quench_test::test]
 async fn answers_while_the_test_runtime_is_blocked() {
     let server = MockServer::start().await;
     Mock::given(path("/blocked"))
@@ -411,3 +414,5 @@ async fn answers_while_the_test_runtime_is_blocked() {
         .await;
     assert_eq!(body_of(&get(&server, "/blocked", "")), "ok");
 }
+
+quench_test::main!();

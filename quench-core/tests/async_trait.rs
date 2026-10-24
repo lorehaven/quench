@@ -1,5 +1,8 @@
 //! `#[async_trait]` as the rest of quench uses it: object-safe async traits.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -37,7 +40,7 @@ impl Store for Memory {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn works_as_a_trait_object() {
     let store: Arc<dyn Store> = Arc::new(Memory::default());
     block_on(async {
@@ -49,7 +52,7 @@ fn works_as_a_trait_object() {
     });
 }
 
-#[test]
+#[quench_test::test]
 fn futures_are_send() {
     let store: Arc<dyn Store> = Arc::new(Memory::default());
     let worker = {
@@ -82,7 +85,7 @@ impl Mutating for Counter {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn mutable_and_by_value_receivers() {
     block_on(async {
         let mut counter = Counter(1);
@@ -129,7 +132,7 @@ impl Combine for Joiner {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn many_borrows_generics_and_static_constructors() {
     block_on(async {
         let joiner = Joiner::build().await;
@@ -159,7 +162,7 @@ impl Local for Shared {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn question_send_allows_non_send_state() {
     let log = Rc::new(RefCell::new(Vec::new()));
     let local: Box<dyn Local> = Box::new(Shared(Rc::clone(&log)));
@@ -183,7 +186,7 @@ impl<T: Store> Store for Wrapper<T> {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn generic_impls_compose() {
     block_on(async {
         let wrapped = Wrapper(Memory::default());
@@ -212,10 +215,12 @@ impl Fallible for Task {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn question_mark_and_early_return_work() {
     block_on(async {
         assert_eq!(Task.run(true).await, Ok(7));
         assert!(Task.run(false).await.is_err());
     });
 }
+
+quench_test::main!();

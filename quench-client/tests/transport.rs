@@ -2,6 +2,9 @@
 //! `quench_client::transport` against a real quench-http server, over plain
 //! HTTP and over TLS with a self-signed certificate (`tests/fixtures`).
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_client::transport::{Client, Error};
 use quench_core::async_trait;
 use quench_http::di::ContainerBuilder;
@@ -110,7 +113,7 @@ async fn tls_server() -> String {
     format!("https://{addr}")
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn json_post_sends_body_and_content_type() {
     let base = plain_server().await;
     let echoed: Value = Client::new()
@@ -127,7 +130,7 @@ async fn json_post_sends_body_and_content_type() {
     assert_eq!(echoed["body"], r#"{"a":1}"#);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn form_basic_and_bearer_auth_are_encoded() {
     let base = plain_server().await;
     let client = Client::new();
@@ -161,7 +164,7 @@ async fn form_basic_and_bearer_auth_are_encoded() {
     assert_eq!(echoed["authorization"], "Bearer tok");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn redirects_are_followed_with_the_right_method() {
     let base = plain_server().await;
     let client = Client::new();
@@ -193,7 +196,7 @@ async fn redirects_are_followed_with_the_right_method() {
     assert_eq!(kept["body"], r#"{"x":1}"#);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn the_redirect_policy_can_hand_back_the_redirect() {
     use quench_client::transport::Redirect;
     let base = plain_server().await;
@@ -232,7 +235,7 @@ async fn the_redirect_policy_can_hand_back_the_redirect() {
     assert_eq!(followed.status(), StatusCode::OK);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn multipart_bodies_carry_their_boundary() {
     use quench_client::multipart::{Form, Part};
     let base = plain_server().await;
@@ -261,7 +264,7 @@ async fn multipart_bodies_carry_their_boundary() {
     assert!(body.contains("filename=\"a.txt\"\r\nContent-Type: text/plain\r\n\r\ncontents"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn cookies_are_read_from_responses_and_sent_back() {
     let base = plain_server().await;
     let client = Client::new();
@@ -289,7 +292,7 @@ async fn cookies_are_read_from_responses_and_sent_back() {
     assert_eq!(echoed["cookie"], "session=abc123; theme=dark");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_redirect_loop_gives_up() {
     let base = plain_server().await;
     let err = Client::new()
@@ -301,7 +304,7 @@ async fn a_redirect_loop_gives_up() {
     assert!(matches!(err, Error::Transport(m) if m.contains("redirect")));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn timeouts_and_connection_failures_are_errors() {
     let base = plain_server().await;
     let client = Client::builder()
@@ -330,7 +333,7 @@ async fn timeouts_and_connection_failures_are_errors() {
 }
 
 #[cfg(not(feature = "tls"))]
-#[tokio::test]
+#[quench_test::test]
 async fn https_is_refused_without_the_tls_feature() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -346,7 +349,7 @@ async fn https_is_refused_without_the_tls_feature() {
 }
 
 #[cfg(feature = "tls")]
-#[tokio::test]
+#[quench_test::test]
 async fn self_signed_tls_is_rejected_unless_verification_is_disabled() {
     let base = tls_server().await;
 
@@ -450,7 +453,7 @@ mod pool {
         (format!("http://{addr}"), accepted)
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn sequential_requests_share_one_connection() {
         let (base, accepted) = counting_server().await;
         let client = Client::new();
@@ -468,7 +471,7 @@ mod pool {
         assert_eq!(accepted.load(Ordering::SeqCst), 1, "keep-alive reuse");
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn redirects_reuse_the_connection_and_resolve_relative_targets() {
         let (base, accepted) = counting_server().await;
         let response = Client::new()
@@ -481,7 +484,7 @@ mod pool {
         assert_eq!(accepted.load(Ordering::SeqCst), 1);
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn a_connection_the_server_closed_while_idle_is_replaced() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -524,7 +527,7 @@ mod pool {
         );
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn a_request_that_dies_on_a_reused_connection_is_retried_once() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -573,7 +576,7 @@ mod pool {
         assert_eq!(accepted.load(Ordering::SeqCst), 2);
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn non_idempotent_requests_are_not_replayed_on_a_dead_connection() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -603,7 +606,7 @@ mod pool {
         assert!(matches!(err, Error::Transport(_)), "{err:?}");
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn response_size_limits_are_enforced() {
         let (base, _) = counting_server().await;
         let limited = Client::builder().max_response_bytes(100).build().unwrap();
@@ -630,7 +633,7 @@ mod pool {
         );
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn bad_urls_are_request_errors() {
         let client = Client::new();
         for url in [
@@ -660,7 +663,7 @@ mod pool {
         assert!(matches!(err, Error::Request(_)));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn raw_bodies_and_text_decoding() {
         let (base, _) = counting_server().await;
         let response = Client::new()
@@ -692,7 +695,7 @@ mod pool {
     }
 
     #[cfg(feature = "tls")]
-    #[tokio::test]
+    #[quench_test::test]
     async fn a_private_ca_can_be_trusted_explicitly() {
         let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../quench-tls/tests/fixtures");
         let config =
@@ -738,7 +741,7 @@ mod pool {
         );
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn ipv6_literals_are_connectable() {
         let Ok(listener) = TcpListener::bind("[::1]:0").await else {
             return;
@@ -760,7 +763,7 @@ mod pool {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_client_user_agent_is_sent_and_a_request_can_replace_it() {
     let base = plain_server().await;
     let client = Client::builder().user_agent("conveyor/1").build().unwrap();
@@ -798,7 +801,7 @@ async fn a_client_user_agent_is_sent_and_a_request_can_replace_it() {
     ));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_streamed_response_arrives_chunk_by_chunk_or_whole() {
     use quench_core::stream::StreamExt;
     let base = plain_server().await;
@@ -855,7 +858,7 @@ async fn a_streamed_response_arrives_chunk_by_chunk_or_whole() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn headers_can_be_added_in_bulk_and_the_protocol_types_come_with_the_client() {
     use quench_client::transport::{HeaderMap, HeaderValue, header};
     let base = plain_server().await;
@@ -876,7 +879,7 @@ async fn headers_can_be_added_in_bulk_and_the_protocol_types_come_with_the_clien
     assert_eq!(echoed["authorization"], "Bearer bulk");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn patch_and_head_are_requests_too() {
     let base = plain_server().await;
     let client = Client::new();
@@ -893,7 +896,7 @@ async fn patch_and_head_are_requests_too() {
     assert!(head.status().is_success());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn query_pairs_are_appended_and_encoded() {
     let base = plain_server().await;
     let client = Client::new();
@@ -916,7 +919,7 @@ async fn query_pairs_are_appended_and_encoded() {
 }
 
 #[cfg(feature = "tls")]
-#[test]
+#[quench_test::test]
 #[allow(clippy::redundant_clone)] // the blocking half below needs its own copy only with that feature
 fn a_client_identity_is_accepted_or_refused_at_build_time() {
     let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
@@ -942,3 +945,5 @@ fn a_client_identity_is_accepted_or_refused_at_build_time() {
             .is_ok()
     );
 }
+
+quench_test::main!();

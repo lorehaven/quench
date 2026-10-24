@@ -23,7 +23,7 @@ fn repo() -> InMemoryRepository<Widget> {
     InMemoryRepository::new(InMemoryDb::new())
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn create_then_read_round_trips_the_model() {
     let repo = repo();
     let widget = Widget {
@@ -37,13 +37,13 @@ async fn create_then_read_round_trips_the_model() {
     assert_eq!(found, widget);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn read_of_a_missing_id_is_none_not_an_error() {
     let repo = repo();
     assert!(repo.read("missing").await.expect("read").is_none());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn update_overwrites_the_existing_row() {
     let repo = repo();
     let widget = Widget {
@@ -62,7 +62,7 @@ async fn update_overwrites_the_existing_row() {
     assert_eq!(found.name, "gizmo");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn delete_removes_the_row() {
     let repo = repo();
     let widget = Widget {
@@ -74,13 +74,13 @@ async fn delete_removes_the_row() {
     assert!(repo.read("1").await.expect("read").is_none());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn delete_of_a_missing_id_is_not_an_error() {
     let repo = repo();
     assert!(repo.delete("missing").await.is_ok());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn list_returns_every_row() {
     let repo = repo();
     repo.create(&Widget {
@@ -103,7 +103,7 @@ async fn list_returns_every_row() {
     assert_eq!(all[1].name, "b");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn find_by_matches_only_the_string_valued_column() {
     let repo = repo();
     repo.create(&Widget {
@@ -130,13 +130,13 @@ async fn find_by_matches_only_the_string_valued_column() {
     assert!(none.is_empty());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn find_by_rejects_a_column_the_model_does_not_declare() {
     let repo = repo();
     assert!(repo.find_by("not_a_column", "x").await.is_err());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn create_rejects_a_model_missing_its_primary_key() {
     #[derive(Debug, Serialize, Deserialize, Clone)]
     struct NoId {
@@ -160,14 +160,14 @@ async fn create_rejects_a_model_missing_its_primary_key() {
     assert!(result.is_err());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn in_memory_db_execute_and_migrate_are_no_ops() {
     let db = InMemoryDb::new();
     assert!(db.execute("CREATE TABLE anything").await.is_ok());
     assert!(db.migrate(vec![]).await.is_ok());
 }
 
-#[test]
+#[quench_test::test]
 fn in_memory_db_debug_names_the_type() {
     assert_eq!(format!("{:?}", InMemoryDb::new()), "InMemoryDb");
 }

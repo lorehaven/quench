@@ -269,7 +269,7 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
 
-    #[test]
+    #[quench_test::test]
     fn construction_forms() {
         assert!(Bytes::new().is_empty());
         assert_eq!(Bytes::default().len(), 0);
@@ -283,7 +283,7 @@ mod tests {
         assert_eq!(Vec::from(Bytes::from("hi")), b"hi");
     }
 
-    #[test]
+    #[quench_test::test]
     fn behaves_like_a_slice() {
         let bytes = Bytes::from("hello");
         assert_eq!(bytes.len(), 5);
@@ -296,7 +296,7 @@ mod tests {
         assert_eq!(bytes.to_vec(), b"hello");
     }
 
-    #[test]
+    #[quench_test::test]
     fn slices_share_and_nest() {
         let whole = Bytes::from(String::from("hello world"));
         let world = whole.slice(6..);
@@ -309,13 +309,13 @@ mod tests {
         assert_eq!(stat.slice(1..3), "ta");
     }
 
-    #[test]
+    #[quench_test::test]
     #[should_panic(expected = "out of bounds")]
     fn slice_out_of_bounds_panics() {
         let _ = Bytes::from("abc").slice(2..9);
     }
 
-    #[test]
+    #[quench_test::test]
     fn splitting() {
         let mut bytes = Bytes::from("headerbody");
         let head = bytes.split_to(6);
@@ -330,7 +330,7 @@ mod tests {
         assert!(empty.split_to(0).is_empty());
     }
 
-    #[test]
+    #[quench_test::test]
     fn equality_ordering_hashing() {
         let a = Bytes::from("abc");
         let b = Bytes::from(vec![b'a', b'b', b'c']);
@@ -351,7 +351,7 @@ mod tests {
         assert_eq!(Bytes::from("xabcx").slice(1..4), a);
     }
 
-    #[test]
+    #[quench_test::test]
     fn debug_escapes_non_printables() {
         assert_eq!(
             format!("{:?}", Bytes::from(vec![b'a', 0, b'"', 0xff, b'\n'])),
@@ -360,7 +360,7 @@ mod tests {
         assert_eq!(format!("{:?}", Bytes::new()), "b\"\"");
     }
 
-    #[test]
+    #[quench_test::test]
     fn clones_are_independent_views() {
         let mut a = Bytes::from("abcdef");
         let b = a.clone();

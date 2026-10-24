@@ -10,6 +10,7 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = "README.md"
+autotests = false
 
 [lib]
 name = "quench_db"
@@ -30,16 +31,38 @@ postgres = ["dep:quench-pg"]
 # `sslmode=require|verify-full` for Postgres; has no effect without `postgres`.
 tls = ["quench-pg?/tls"]
 
-[[test]]
-name = "postgres_backend"
-required-features = ["postgres"]
 
-[[test]]
-name = "postgres_runner"
-required-features = ["postgres"]
 
 [dev-dependencies]
+quench-test = { workspace = true }
 tokio = { workspace = true }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "catalog_errors"
+path = "tests/catalog_errors.rs"
+harness = false
+
+[[test]]
+name = "catalog_plan"
+path = "tests/catalog_plan.rs"
+harness = false
+
+[[test]]
+name = "postgres_backend"
+path = "tests/postgres_backend.rs"
+required-features = ["postgres"]
+harness = false
+
+[[test]]
+name = "postgres_runner"
+path = "tests/postgres_runner.rs"
+required-features = ["postgres"]
+harness = false
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false

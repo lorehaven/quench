@@ -2,7 +2,11 @@
 //! registration list, resolve a path parameter and an injected service,
 //! and dispatch through the real router.
 #![allow(clippy::items_after_statements)] // test-local helper types sit next to the code that uses them
-#![allow(clippy::unused_async)] // `#[injectable]` constructors are async by contract
+#![allow(clippy::unused_async)]
+// `#[injectable]` constructors are async by contract
+
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
@@ -37,7 +41,7 @@ async fn get_user(
     Ok(format!("{}, {}", greeter.prefix, params.id))
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn discovered_route_extracts_path_param_and_injected_service() {
     let container = Arc::new(
         ContainerBuilder::new()
@@ -66,3 +70,5 @@ async fn discovered_route_extracts_path_param_and_injected_service() {
         .unwrap();
     assert_eq!(&body[..], b"hello, 42");
 }
+
+quench_test::main!();

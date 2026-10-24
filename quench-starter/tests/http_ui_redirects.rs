@@ -12,6 +12,9 @@
 //! `JwtConfig`, `HealthState`, ...), but a test that only talks to
 //! `quench_http` needs a real touch too - see `base_path()` below.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
@@ -30,7 +33,7 @@ fn get(uri: &str, container: &Arc<quench_http::di::Container>) -> Request {
     )
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn bare_base_path_and_its_trailing_slash_both_redirect() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
     let router: Arc<dyn Endpoint> = Arc::new(discover_routes());
@@ -43,3 +46,5 @@ async fn bare_base_path_and_its_trailing_slash_both_redirect() {
     let resp = app.call(get("/svc/", &container)).await;
     assert_eq!(resp.status(), StatusCode::FOUND);
 }
+
+quench_test::main!();

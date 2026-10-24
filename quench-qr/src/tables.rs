@@ -88,14 +88,14 @@ pub const fn blocks(version: u8, level: EcLevel) -> usize {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn levels_name_themselves() {
         let all = [EcLevel::L, EcLevel::M, EcLevel::Q, EcLevel::H];
         assert_eq!(all.map(EcLevel::index), [0, 1, 2, 3]);
         assert_eq!(all.map(EcLevel::format_bits), [1, 0, 3, 2]);
     }
 
-    #[test]
+    #[quench_test::test]
     fn the_tables_are_looked_up_by_version_and_level() {
         assert_eq!(
             (ecc_per_block(1, EcLevel::L), blocks(1, EcLevel::L)),

@@ -171,3 +171,6 @@ impl QrCode {
         )
     }
 }
+
+#[cfg(test)]
+quench_test::main!();

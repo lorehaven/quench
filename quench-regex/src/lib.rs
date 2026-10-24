@@ -705,3 +705,6 @@ impl Replacer for NoExpand<'_> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+quench_test::main!();

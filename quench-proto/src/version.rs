@@ -56,7 +56,7 @@ impl fmt::Debug for Version {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn displays_and_orders() {
         assert_eq!(Version::HTTP_11.to_string(), "HTTP/1.1");
         assert_eq!(format!("{:?}", Version::HTTP_10), "HTTP/1.0");

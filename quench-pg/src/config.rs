@@ -211,7 +211,7 @@ impl Config {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn a_full_url() {
         let c = Config::from_url("postgres://bob:s3cr%40t@db.example.com:5433/app?sslmode=require&application_name=svc&connect_timeout=3&statement_timeout=2500&options=-c%20search_path%3Dx").unwrap();
         assert_eq!(
@@ -231,7 +231,7 @@ mod tests {
         assert_eq!(c.options.as_deref(), Some("-c search_path=x"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn defaults_fill_the_gaps() {
         let c = Config::from_url("postgresql://localhost").unwrap();
         assert_eq!(
@@ -258,7 +258,7 @@ mod tests {
         assert_eq!((c.port, c.database), (5432, None));
     }
 
-    #[test]
+    #[quench_test::test]
     fn hosts_in_all_their_forms() {
         assert_eq!(
             Config::from_url("postgres://u@[::1]:6000/d").unwrap().host,
@@ -274,7 +274,7 @@ mod tests {
         assert!(Config::from_url("postgres://u@[::1/d").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn ssl_modes() {
         for (text, mode) in [
             ("disable", SslMode::Disable),
@@ -294,7 +294,7 @@ mod tests {
         assert!(Config::from_url("postgres://h/d?sslmode=bogus").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn bad_urls_are_errors() {
         for bad in [
             "mysql://h/d",
@@ -321,7 +321,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn root_certificates_are_read_from_a_file() {
         let dir = quench_core::tmp::TempDir::new().unwrap();
         let path = dir.path().join("root.pem");
@@ -331,7 +331,7 @@ mod tests {
         assert_eq!(c.ssl_root_cert_pem, vec![b"pem bytes".to_vec()]);
     }
 
-    #[test]
+    #[quench_test::test]
     fn startup_parameters() {
         let mut c = Config {
             user: "u".into(),

@@ -116,7 +116,7 @@ mod tests {
     use super::*;
     use quench_core::stream;
 
-    #[test]
+    #[quench_test::test]
     fn formats_fields_in_a_stable_order() {
         let event = Event::new()
             .comment("hi")
@@ -131,7 +131,7 @@ mod tests {
         assert_eq!(&event.to_bytes()[..], event.to_string().as_bytes());
     }
 
-    #[test]
+    #[quench_test::test]
     fn minimal_and_keep_alive_events() {
         assert_eq!(Event::new().data("x").to_string(), "data: x\n\n");
         assert_eq!(Event::new().comment("").to_string(), ":\n\n");
@@ -142,7 +142,7 @@ mod tests {
         assert_eq!(Event::new().data("").to_string(), "data: \n\n");
     }
 
-    #[test]
+    #[quench_test::test]
     fn newlines_cannot_escape_single_line_fields() {
         let event = Event::new()
             .event("a\nevent: injected")
@@ -154,7 +154,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn responses_stream_events_with_event_stream_headers() {
         let events = stream::iter(vec![
             Event::new().data("one"),

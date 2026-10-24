@@ -197,7 +197,7 @@ mod tests {
     use super::*;
     use quench_core::stream::{self, StreamExt};
 
-    #[test]
+    #[quench_test::test]
     fn fixed_bodies_know_their_length() {
         assert_eq!(Body::empty().exact_len(), Some(0));
         assert!(Body::empty().is_empty_body());
@@ -211,7 +211,7 @@ mod tests {
         assert!(format!("{:?}", Body::from("x")).contains("len"));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn full_bodies_yield_once() {
         let mut body = Body::from("once");
         assert_eq!(body.next().await.unwrap().unwrap(), "once");
@@ -220,7 +220,7 @@ mod tests {
         assert!(Body::empty().next().await.is_none());
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn streams_have_no_length_unless_declared() {
         let items = || {
             vec![
@@ -236,7 +236,7 @@ mod tests {
         assert_eq!(sized.collect_limited(10).await.unwrap(), "abc");
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn collect_limited_enforces_the_limit_early_and_late() {
         // Known length: refused without reading.
         let err = Body::from("0123456789")
@@ -262,7 +262,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn collect_limited_reports_stream_errors() {
         let items = vec![
             Ok(Bytes::from_static(b"ab")),

@@ -23,7 +23,7 @@ fn valid(schema_text: &str, instance: &str) -> bool {
     problems(schema_text, instance).is_empty()
 }
 
-#[test]
+#[quench_test::test]
 fn types() {
     assert_eq!(
         messages(r#"{"type":"string"}"#, "5"),
@@ -61,7 +61,7 @@ fn types() {
     ));
 }
 
-#[test]
+#[quench_test::test]
 fn enums_and_constants() {
     assert_eq!(
         messages(r#"{"enum":["a"]}"#, r#""c""#),
@@ -87,7 +87,7 @@ fn enums_and_constants() {
     assert!(!valid(r#"{"const":"1"}"#, "1"));
 }
 
-#[test]
+#[quench_test::test]
 fn strings() {
     assert_eq!(
         messages(r#"{"minLength":3}"#, r#""ab""#),
@@ -128,7 +128,7 @@ fn strings() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn numbers() {
     assert_eq!(
         messages(r#"{"minimum":5}"#, "3"),
@@ -174,7 +174,7 @@ fn numbers() {
     ));
 }
 
-#[test]
+#[quench_test::test]
 fn arrays() {
     assert_eq!(
         messages(r#"{"minItems":2}"#, "[1]"),
@@ -227,7 +227,7 @@ fn arrays() {
     assert!(valid(r#"{"contains":{"type":"string"}}"#, r#"[1,"a"]"#));
 }
 
-#[test]
+#[quench_test::test]
 fn objects() {
     let s = r#"{"properties":{"a":{"type":"string"},"b":{"type":"integer"}},"required":["a","c"],"additionalProperties":false}"#;
     assert_eq!(
@@ -303,7 +303,7 @@ fn objects() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn instance_paths_are_json_pointers() {
     assert_eq!(
         problems(
@@ -317,7 +317,7 @@ fn instance_paths_are_json_pointers() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn combinators() {
     assert_eq!(
         messages(
@@ -368,7 +368,7 @@ fn combinators() {
     assert!(valid(conditional, r#"{"a":1,"b":1}"#));
 }
 
-#[test]
+#[quench_test::test]
 fn boolean_schemas_and_references() {
     assert!(valid("true", "1") && !valid("false", "1"));
     assert_eq!(messages("false", "1"), ["False schema does not allow 1"]);
@@ -396,7 +396,7 @@ fn boolean_schemas_and_references() {
     ));
 }
 
-#[test]
+#[quench_test::test]
 fn unknown_keywords_are_annotations() {
     assert!(valid(
         r#"{"description":"x","x-kubernetes-int-or-string":true,"nullable":true,"default":3,"title":"t"}"#,
@@ -404,7 +404,7 @@ fn unknown_keywords_are_annotations() {
     ));
 }
 
-#[test]
+#[quench_test::test]
 fn bad_schemas_are_refused() {
     for (text, wanted) in [
         ("5", "an object or a boolean"),
@@ -439,7 +439,7 @@ fn bad_schemas_are_refused() {
     assert!(Schema::new(&deep).is_err());
 }
 
-#[test]
+#[quench_test::test]
 fn deep_nesting_in_the_instance_is_fine_and_cycles_do_not_hang() {
     let schema = Schema::new(&json::parse(r##"{"$ref":"#"}"##).unwrap()).unwrap();
     assert!(schema.is_valid(&Value::Null));
@@ -450,7 +450,7 @@ fn deep_nesting_in_the_instance_is_fine_and_cycles_do_not_hang() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn errors_display_and_compare() {
     let error = schema(r#"{"type":"string"}"#)
         .validate(&Value::Null)

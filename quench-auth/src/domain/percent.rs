@@ -46,14 +46,14 @@ pub fn decode(input: &str) -> Option<String> {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn round_trips_reserved_and_multibyte_text() {
         let raw = "a b&c=d/é~-._";
         assert_eq!(encode(raw), "a%20b%26c%3Dd%2F%C3%A9~-._");
         assert_eq!(decode(&encode(raw)).as_deref(), Some(raw));
     }
 
-    #[test]
+    #[quench_test::test]
     fn decode_keeps_malformed_escapes_and_rejects_bad_utf8() {
         assert_eq!(decode("100%").as_deref(), Some("100%"));
         assert_eq!(decode("%zz").as_deref(), Some("%zz"));

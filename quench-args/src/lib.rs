@@ -255,3 +255,6 @@ pub trait Parser: CommandFactory + FromMatches {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+quench_test::main!();

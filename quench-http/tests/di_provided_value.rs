@@ -1,7 +1,11 @@
 //! A dependency doesn't have to be `#[injectable]` - anything seeded via
 //! `ContainerBuilder::provide` (config read from env, a DB pool built by
 //! `async fn init()`, ...) satisfies the graph just as well.
-#![allow(clippy::unused_async)] // `#[injectable]` constructors are async by contract
+#![allow(clippy::unused_async)]
+// `#[injectable]` constructors are async by contract
+
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_http::prelude::injectable;
 use std::sync::Arc;
@@ -18,7 +22,7 @@ async fn provide_needs_provided_value(dep: Arc<ExternallyConstructed>) -> NeedsP
     NeedsProvidedValue { dep }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn provided_value_satisfies_a_dependency_without_being_injectable() {
     let container = quench_http::di::ContainerBuilder::new()
         .provide(ExternallyConstructed)
@@ -30,3 +34,5 @@ async fn provided_value_satisfies_a_dependency_without_being_injectable() {
         .get::<NeedsProvidedValue>()
         .expect("resolved via the provided ExternallyConstructed");
 }
+
+quench_test::main!();

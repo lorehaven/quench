@@ -1,5 +1,8 @@
 //! The ways loading a catalog and building a plan can fail, and the messages they give.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::tmp::TempDir;
 use quench_db::prelude::{Catalog, InstallRequest, MigrationPlan, PlanError};
 use quench_db::{CatalogError, ModuleManifest};
@@ -17,7 +20,7 @@ fn module(root: &Path, name: &str, manifest: &str, migrations: &[(&str, &str)]) 
 const ONE_MIGRATION: &str =
     "[[migrations]]\nid = \"0001-a\"\nauthor = \"t\"\nchanges = [{ sql = \"SELECT 1\" }]\n";
 
-#[test]
+#[quench_test::test]
 fn requirement_shapes_parse_or_explain_themselves() {
     let temp = TempDir::new().unwrap();
     module(
@@ -76,7 +79,7 @@ fn requirement_shapes_parse_or_explain_themselves() {
     assert!(Catalog::load(temp.path()).is_err());
 }
 
-#[test]
+#[quench_test::test]
 fn broken_catalogs_are_rejected_with_the_cause() {
     let temp = TempDir::new().unwrap();
     std::fs::write(temp.path().join("a-file"), "x").unwrap();
@@ -162,7 +165,7 @@ fn broken_catalogs_are_rejected_with_the_cause() {
     assert!(err.to_string().contains("0001-a"));
 }
 
-#[test]
+#[quench_test::test]
 fn directories_without_a_manifest_are_ignored() {
     let temp = TempDir::new().unwrap();
     std::fs::create_dir_all(temp.path().join("not-a-module")).unwrap();
@@ -177,7 +180,7 @@ fn directories_without_a_manifest_are_ignored() {
     assert_eq!(catalog.len(), 1);
 }
 
-#[test]
+#[quench_test::test]
 fn plan_errors_describe_what_went_wrong() {
     let temp = TempDir::new().unwrap();
     module(
@@ -237,3 +240,5 @@ fn plan_errors_describe_what_went_wrong() {
     assert!(!same_twice.is_empty());
     assert!(InstallRequest::new("core").variables.is_empty());
 }
+
+quench_test::main!();

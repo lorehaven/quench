@@ -1,6 +1,8 @@
 //! Running programs and asserting on them (a POSIX shell stands in for the program under test).
 
 #![allow(clippy::literal_string_with_formatting_args)]
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_test::cmd::{Command, Exactly};
 use quench_test::predicate::prelude::*;
@@ -12,7 +14,7 @@ fn sh(script: &str) -> Command {
     command
 }
 
-#[test]
+#[quench_test::test]
 fn success_failure_and_codes() {
     sh("echo out; echo err >&2")
         .assert()
@@ -33,7 +35,7 @@ fn success_failure_and_codes() {
     assert_eq!(assert.get_output().stdout, b"x\n");
 }
 
-#[test]
+#[quench_test::test]
 fn input_environment_and_directory() {
     sh("cat")
         .write_stdin("from stdin")
@@ -71,7 +73,7 @@ fn input_environment_and_directory() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn timeouts_and_missing_programs() {
     let error = sh("sleep 5")
         .timeout(Duration::from_millis(100))
@@ -97,7 +99,7 @@ fn failure_text(check: impl FnOnce() + std::panic::UnwindSafe) -> String {
         .unwrap_or_default()
 }
 
-#[test]
+#[quench_test::test]
 fn failed_assertions_show_everything() {
     let text = failure_text(|| {
         let _ = sh("echo seen; echo oops >&2; exit 2").assert().success();
@@ -138,3 +140,5 @@ fn failed_assertions_show_everything() {
             .contains("could not run")
     );
 }
+
+quench_test::main!();

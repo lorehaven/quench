@@ -72,7 +72,7 @@ mod tests {
         public_key_from_components(&hex::decode(N).unwrap(), &[0x01, 0x00, 0x01])
     }
 
-    #[test]
+    #[quench_test::test]
     fn verifies_an_openssl_signature() {
         let signature = hex::decode(SIGNATURE).unwrap();
         assert!(verify_pkcs1_sha256(&key(), MESSAGE, &signature));
@@ -84,7 +84,7 @@ mod tests {
         assert!(!verify_pkcs1_sha256(b"not a key", MESSAGE, &signature));
     }
 
-    #[test]
+    #[quench_test::test]
     fn built_keys_match_the_der_openssl_wrote() {
         // The SubjectPublicKeyInfo ends with the RSAPublicKey we build.
         let spki = hex::decode(SPKI).unwrap();
@@ -97,7 +97,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn integers_are_minimal_and_non_negative() {
         assert_eq!(der_integer(&[0x00, 0x00, 0x7f]), [0x02, 0x01, 0x7f]);
         assert_eq!(der_integer(&[0x80]), [0x02, 0x02, 0x00, 0x80]);
@@ -109,7 +109,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn lengths_use_short_and_long_forms() {
         assert_eq!(der_length(0), [0x00]);
         assert_eq!(der_length(0x7f), [0x7f]);

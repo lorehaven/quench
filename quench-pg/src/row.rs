@@ -200,7 +200,7 @@ mod tests {
         )
     }
 
-    #[test]
+    #[quench_test::test]
     fn typed_access_by_name_and_position() {
         let row = row();
         assert_eq!((row.len(), row.is_empty()), (4, false));
@@ -218,7 +218,7 @@ mod tests {
         assert_eq!(row.columns().len(), 4);
     }
 
-    #[test]
+    #[quench_test::test]
     fn values_and_whole_rows() {
         let row = row();
         assert_eq!(row.value("id").unwrap(), json!(7));
@@ -239,7 +239,7 @@ mod tests {
         note: Option<String>,
     }
 
-    #[test]
+    #[quench_test::test]
     fn rows_deserialize_into_structs_and_tuples() {
         let row = row();
         assert_eq!(

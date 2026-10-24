@@ -21,7 +21,7 @@ fn alice() -> User {
     .unwrap()
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn users_are_found_by_name() {
     let (db, users) = setup().await;
     db.repository::<User>().create(&alice()).await.unwrap();
@@ -31,7 +31,7 @@ async fn users_are_found_by_name() {
     assert!(format!("{users:?}").contains("Base"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn validation_checks_the_password() {
     let (db, users) = setup().await;
     db.repository::<User>().create(&alice()).await.unwrap();
@@ -40,7 +40,7 @@ async fn validation_checks_the_password() {
     assert!(users.validate("nobody", "x").await.is_none());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn disabled_and_locked_accounts_cannot_authenticate() {
     let (db, users) = setup().await;
     let repo = db.repository::<User>();
@@ -70,7 +70,7 @@ async fn disabled_and_locked_accounts_cannot_authenticate() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn the_model_maps_to_the_users_table() {
     assert_eq!(User::table_name().rsplit('.').next(), Some("users"));
     assert_eq!(User::primary_key_name(), "username");
@@ -90,7 +90,7 @@ fn the_model_maps_to_the_users_table() {
     assert_eq!(columns.len(), 19);
 }
 
-#[test]
+#[quench_test::test]
 fn users_survive_a_serialization_round_trip() {
     let user = alice();
     let back: User = quench_serde::from_value(&quench_serde::to_value(&user)).unwrap();

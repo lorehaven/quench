@@ -1,10 +1,12 @@
 //! `CacheStore::from_env` reads process-global variables, so every case lives in one test.
 
 #![cfg(feature = "redis")]
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_cache::CacheStore;
 
-#[tokio::test]
+#[quench_test::test]
 async fn the_environment_picks_the_backend() {
     for key in ["CACHE_URL", "REDIS_URL", "CACHE_CLUSTER", "REDIS_CLUSTER"] {
         quench_core::env::remove(key);
@@ -43,3 +45,5 @@ async fn the_environment_picks_the_backend() {
         quench_core::env::remove(key);
     }
 }
+
+quench_test::main!();

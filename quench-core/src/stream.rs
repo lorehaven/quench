@@ -462,7 +462,7 @@ mod tests {
     use super::*;
     use crate::future::{LocalBoxFuture, block_on};
 
-    #[test]
+    #[quench_test::test]
     fn next_walks_an_iterator_stream() {
         block_on(async {
             let mut s = iter(vec![1, 2, 3]);
@@ -475,7 +475,7 @@ mod tests {
         });
     }
 
-    #[test]
+    #[quench_test::test]
     fn once_and_empty() {
         block_on(async {
             assert_eq!(once("x").next().await, Some("x"));
@@ -483,7 +483,7 @@ mod tests {
         });
     }
 
-    #[test]
+    #[quench_test::test]
     fn map_transforms_and_keeps_size_hint() {
         block_on(async {
             let mut s = iter(1..=3).map(|n| n * 10);
@@ -495,7 +495,7 @@ mod tests {
         });
     }
 
-    #[test]
+    #[quench_test::test]
     fn futures_unordered_yields_in_completion_order() {
         block_on(async {
             let mut set: FuturesUnordered<LocalBoxFuture<'_, u8>> = FuturesUnordered::default();
@@ -514,7 +514,7 @@ mod tests {
         });
     }
 
-    #[test]
+    #[quench_test::test]
     fn buffer_unordered_limits_concurrency_and_finishes() {
         use std::sync::atomic::{AtomicUsize, Ordering};
         let running = std::sync::Arc::new(AtomicUsize::new(0));
@@ -560,7 +560,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn works_through_references_boxes_and_pins() {
         block_on(async {
             let mut inner = iter(vec!['a', 'b']);
@@ -578,7 +578,7 @@ mod tests {
         });
     }
 
-    #[test]
+    #[quench_test::test]
     fn default_size_hint_is_unbounded() {
         struct Never;
         impl Stream for Never {
@@ -591,7 +591,7 @@ mod tests {
         assert_eq!(Never.size_hint(), (0, None));
     }
 
-    #[test]
+    #[quench_test::test]
     fn collect_vec_gathers_everything() {
         assert_eq!(
             block_on(iter(1..=4).map(|n| n * n).collect_vec()),
@@ -600,7 +600,7 @@ mod tests {
         assert_eq!(block_on(empty::<u8>().collect_vec()), Vec::<u8>::new());
     }
 
-    #[test]
+    #[quench_test::test]
     fn filter_map_drops_and_transforms() {
         block_on(async {
             let mut s = iter(1..=6).filter_map(|n| (n % 2 == 0).then_some(n * 10));
@@ -612,14 +612,14 @@ mod tests {
         });
     }
 
-    #[test]
+    #[quench_test::test]
     fn unfold_runs_the_step_until_it_says_stop() {
         let counting = unfold(0u32, |n| async move { (n < 3).then_some((n * 2, n + 1)) });
         assert_eq!(block_on(counting.collect_vec()), vec![0, 2, 4]);
         assert!(format!("{:?}", unfold((), |()| async { None::<((), ())> })).contains("Unfold"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn unfold_stays_finished_and_waits_for_pending_steps() {
         let mut s = unfold((), |()| async { None::<((), ())> });
         block_on(async {
@@ -643,7 +643,7 @@ mod tests {
         assert!(Pin::new(&mut s).poll_next(&mut cx).is_pending());
     }
 
-    #[test]
+    #[quench_test::test]
     fn chain_runs_one_stream_after_the_other() {
         block_on(async {
             let mut s = iter(vec![1, 2]).chain(iter(vec![3]));

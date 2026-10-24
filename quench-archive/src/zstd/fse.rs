@@ -156,7 +156,7 @@ mod tests {
     use super::*;
     use crate::zstd::tables::{LITERAL_LENGTH_DEFAULT, MATCH_LENGTH_DEFAULT, OFFSET_DEFAULT};
 
-    #[test]
+    #[quench_test::test]
     fn default_distributions_build() {
         for (counts, accuracy) in [
             (&LITERAL_LENGTH_DEFAULT[..], 6),
@@ -178,14 +178,14 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn bad_distributions_are_rejected() {
         assert!(Table::build(&[3, 3], 3).is_err());
         assert!(Table::build(&[8, -2], 3).is_err());
         assert_eq!(Table::single(7).cells[0].symbol, 7);
     }
 
-    #[test]
+    #[quench_test::test]
     fn reads_a_distribution() {
         // Accuracy 5 (0 in the low nibble), then counts for two symbols 16 and 16.
         // remaining = 33, threshold = 32, width = 6.

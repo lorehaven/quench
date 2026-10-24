@@ -422,7 +422,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn typing_and_enter() {
         assert_eq!(line(&[], b"hello\r"), "hello");
         assert_eq!(line(&[], b"hello\n"), "hello");
@@ -434,7 +434,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn utf8_text_round_trips() {
         assert_eq!(
             line(&[], "héllo wörld ✓ 🦀\r".as_bytes()),
@@ -445,7 +445,7 @@ mod tests {
         assert_eq!(line(&[], b"a\xffb\r"), "ab");
     }
 
-    #[test]
+    #[quench_test::test]
     fn backspace_and_delete() {
         assert_eq!(line(&[], b"abc\x7f\r"), "ab");
         assert_eq!(line(&[], b"abc\x08\x08\r"), "a");
@@ -467,7 +467,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn cursor_movement() {
         assert_eq!(line(&[], b"abc\x1b[D\x1b[Dx\r"), "axbc");
         assert_eq!(line(&[], b"abc\x1b[D\x1b[Cx\r"), "abcx");
@@ -490,7 +490,7 @@ mod tests {
         assert_eq!(line(&[], b"abc\x1bODx\x1bOCy\r"), "abxcy");
     }
 
-    #[test]
+    #[quench_test::test]
     fn word_wise_editing() {
         assert_eq!(line(&[], b"one two three\x17\r"), "one two ");
         assert_eq!(line(&[], b"one two   \x17\r"), "one ");
@@ -502,7 +502,7 @@ mod tests {
         assert_eq!(line(&[], b"one two\x01\x1bf\x1bf\x1bfX\r"), "one twoX");
     }
 
-    #[test]
+    #[quench_test::test]
     fn kill_commands() {
         assert_eq!(line(&[], b"hello world\x01\x1b[C\x1b[C\x0b\r"), "he");
         assert_eq!(
@@ -523,7 +523,7 @@ mod tests {
         assert_eq!(line(&[], b"abc\x1b[D\x14\r"), "acb");
     }
 
-    #[test]
+    #[quench_test::test]
     fn history_navigation() {
         let history = ["first", "second", "third"];
         assert_eq!(line(&history, b"\x1b[A\r"), "third");
@@ -562,7 +562,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn interrupt_and_end_of_input() {
         assert_eq!(run(&[], b"abc\x03").0, Outcome::Interrupted);
         assert_eq!(run(&[], b"\x04").0, Outcome::Eof);
@@ -579,7 +579,7 @@ mod tests {
         assert!(run(&[], b"x\x03").1.contains("^C"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn unknown_keys_are_ignored() {
         assert_eq!(
             line(&[], b"a\x1b[Zb\x1b[99~c\x1bxd\x1b[1;2Ae\x1b[5~f\r"),
@@ -595,14 +595,14 @@ mod tests {
         assert_eq!(line(&[], b"a\x1bO"), "a");
     }
 
-    #[test]
+    #[quench_test::test]
     fn clear_screen_redraws_the_line() {
         let (outcome, screen) = run(&[], b"ab\x0c\r");
         assert_eq!(outcome, Outcome::Line("ab".into()));
         assert!(screen.contains("\x1b[H\x1b[2J"), "{screen:?}");
     }
 
-    #[test]
+    #[quench_test::test]
     fn redraw_positions_the_cursor_after_the_visible_prompt() {
         let mut history = Vec::new();
         let mut output = Vec::new();
@@ -622,7 +622,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn visible_width_skips_escape_sequences() {
         assert_eq!(visible_width("plain> "), 7);
         assert_eq!(visible_width("\x1b[1;32mgreen\x1b[0m"), 5);
@@ -636,7 +636,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn history_rules() {
         let mut editor = LineEditor::new();
         assert!(editor.add_history_entry("one"));
@@ -672,7 +672,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn io_errors_propagate() {
         let mut output = Vec::new();
         let err = edit_line(&mut [], "> ", &mut Failing, &mut output).unwrap_err();

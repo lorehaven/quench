@@ -11,7 +11,7 @@ fn vars(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
         .collect()
 }
 
-#[test]
+#[quench_test::test]
 fn migration_to_sql_with_substitutes_every_change() {
     let migration = Migration {
         id: "0001-schema".to_string(),
@@ -36,43 +36,43 @@ fn migration_to_sql_with_substitutes_every_change() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn render_leaves_text_without_placeholders_untouched() {
     let out = quench_db::migrations::render("plain text", &BTreeMap::new()).expect("render");
     assert_eq!(out, "plain text");
 }
 
-#[test]
+#[quench_test::test]
 fn render_substitutes_a_known_placeholder() {
     let out = quench_db::migrations::render("hello ${name}!", &vars(&[("name", "world")]))
         .expect("render");
     assert_eq!(out, "hello world!");
 }
 
-#[test]
+#[quench_test::test]
 fn render_trims_whitespace_inside_the_placeholder() {
     let out = quench_db::migrations::render("${ name }", &vars(&[("name", "x")])).expect("render");
     assert_eq!(out, "x");
 }
 
-#[test]
+#[quench_test::test]
 fn render_errors_on_an_unknown_placeholder() {
     let err = quench_db::migrations::render("${missing}", &BTreeMap::new()).unwrap_err();
     assert!(err.to_string().contains("unknown variable 'missing'"));
 }
 
-#[test]
+#[quench_test::test]
 fn render_errors_on_an_unterminated_placeholder() {
     let err = quench_db::migrations::render("${oops", &BTreeMap::new()).unwrap_err();
     assert!(err.to_string().contains("unterminated"));
 }
 
-#[test]
+#[quench_test::test]
 fn change_set_sql_variant_passes_through_verbatim() {
     assert_eq!(ChangeSet::Sql("SELECT 1".to_string()).to_sql(), "SELECT 1");
 }
 
-#[test]
+#[quench_test::test]
 fn change_set_create_schema_and_extension_render_if_not_exists() {
     assert_eq!(
         ChangeSet::CreateSchema {
@@ -90,7 +90,7 @@ fn change_set_create_schema_and_extension_render_if_not_exists() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn change_set_create_table_without_schema_uses_the_bare_name() {
     let sql = ChangeSet::CreateTable {
         schema: None,
@@ -109,7 +109,7 @@ fn change_set_create_table_without_schema_uses_the_bare_name() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn change_set_create_table_qualifies_the_name_with_its_schema() {
     let sql = ChangeSet::CreateTable {
         schema: Some("sage".to_string()),
@@ -125,7 +125,7 @@ fn change_set_create_table_qualifies_the_name_with_its_schema() {
     assert_eq!(sql, "CREATE TABLE IF NOT EXISTS sage.users (email TEXT)");
 }
 
-#[test]
+#[quench_test::test]
 fn change_set_to_sql_with_substitutes_placeholders_in_the_rendered_sql() {
     let sql = ChangeSet::CreateExtension {
         name: "${ext}".to_string(),
@@ -139,7 +139,7 @@ fn write_migration_file(dir: &Path, name: &str, body: &str) {
     std::fs::write(dir.join(name), body).expect("write migration file");
 }
 
-#[test]
+#[quench_test::test]
 fn migration_loader_loads_and_sorts_files_and_their_migrations() {
     let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     write_migration_file(
@@ -173,7 +173,7 @@ changes = [{ sql = "SELECT 1" }]
     assert_eq!(ids, vec!["0001-a", "0002-b", "0003-c"]);
 }
 
-#[test]
+#[quench_test::test]
 fn migration_loader_excludes_named_files() {
     let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     write_migration_file(temp.path(), "module.toml", "name = \"x\"\n");
@@ -193,7 +193,7 @@ changes = []
     assert_eq!(migrations.len(), 1);
 }
 
-#[test]
+#[quench_test::test]
 fn migration_loader_rejects_a_duplicate_prefix_within_one_file() {
     let temp = quench_core::tmp::TempDir::new().expect("tempdir");
     write_migration_file(
@@ -216,7 +216,7 @@ changes = []
     assert!(err.to_string().contains("Duplicate migration prefix"));
 }
 
-#[test]
+#[quench_test::test]
 fn migration_file_deserializes_from_toml() {
     let raw = r#"
 [[migrations]]

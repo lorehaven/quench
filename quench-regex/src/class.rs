@@ -158,7 +158,7 @@ pub fn is_word(c: char) -> bool {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn building_and_negating() {
         let mut set = ClassSet::new();
         set.push('a' as u32, 'c' as u32);
@@ -184,7 +184,7 @@ mod tests {
         assert_eq!(ClassSet::new().as_single(), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn case_folding_follows_the_unicode_orbits() {
         let mut set = ClassSet::new();
         set.push('k' as u32, 'k' as u32);
@@ -205,7 +205,7 @@ mod tests {
         assert_eq!(orbit_of('5'), ['5']);
     }
 
-    #[test]
+    #[quench_test::test]
     fn the_predefined_classes() {
         assert!(word().contains('é') && word().contains('_') && !word().contains('-'));
         assert!(digit().contains('٣') && !digit().contains('x'));

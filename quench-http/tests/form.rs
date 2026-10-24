@@ -2,6 +2,9 @@
 //! HTML `<form method="post">` (no JS/htmx) sends, and what
 //! `switchboard-service`'s `delete_model_form` needs.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::bytes::Bytes as RawBytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
@@ -31,7 +34,7 @@ fn form_request(body: &'static str, container: &Arc<quench_http::di::Container>)
     )
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn decodes_a_url_encoded_body() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
     let mut req = form_request("path=%2Fmnt%2Fdev%2Fhuggingface%2Fhub%2Fmodel", &container);
@@ -42,7 +45,7 @@ async fn decodes_a_url_encoded_body() {
     assert_eq!(value.path, "/mnt/dev/huggingface/hub/model");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn malformed_body_is_a_bad_request() {
     // Missing the required `path` field entirely.
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
@@ -53,3 +56,5 @@ async fn malformed_body_is_a_bad_request() {
     };
     assert_eq!(err.into_response().status(), StatusCode::BAD_REQUEST);
 }
+
+quench_test::main!();

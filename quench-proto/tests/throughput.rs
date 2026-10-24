@@ -2,6 +2,9 @@
 //! `cargo test --release -p quench-proto --test throughput -- --ignored --nocapture`.
 //! It asserts only a very low floor; the printed numbers are for eyeballing regressions.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_proto::h1::client::{ClientConfig, ClientConn, send_request};
 use quench_proto::h1::server::{ServerConfig, Shutdown, serve_connection};
 use quench_proto::{Method, Request, Response, StatusCode, Uri};
@@ -14,7 +17,7 @@ async fn hello(_req: Request) -> Response {
         .body("hello world")
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[quench_test::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "run on demand"]
 async fn keep_alive_requests_per_second() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -66,3 +69,5 @@ async fn keep_alive_requests_per_second() {
     );
     assert!(total / secs > 1_000.0);
 }
+
+quench_test::main!();

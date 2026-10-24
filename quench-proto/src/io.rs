@@ -99,7 +99,7 @@ mod tests {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn upgraded_yields_the_buffered_prefix_before_the_stream() {
         let (mut peer, local) = tokio::io::duplex(64);
         let mut upgraded = Upgraded::new(Box::new(local), Bytes::from_static(b"early"));
@@ -116,7 +116,7 @@ mod tests {
         assert!(format!("{upgraded:?}").contains("Upgraded"));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn a_small_read_buffer_drains_the_prefix_in_pieces() {
         let (_peer, local) = tokio::io::duplex(8);
         let mut upgraded = Upgraded::new(Box::new(local), Bytes::from_static(b"abcdef"));
@@ -128,7 +128,7 @@ mod tests {
         assert_eq!(&four, b"cdef");
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn on_upgrade_runs_the_handler_with_the_stream() {
         let (_peer, local) = tokio::io::duplex(8);
         let (tx, rx) = tokio::sync::oneshot::channel();

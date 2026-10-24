@@ -8,6 +8,8 @@
 //! its own thread (`cargo test`'s default), so nothing else on the same
 //! runtime can deadlock on it.
 #![allow(clippy::await_holding_lock)]
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_auth::domain::sso_client::SsoConfig;
 use quench_auth::http::domain::sso_client::{authorize_redirect, callback};
@@ -69,7 +71,7 @@ fn spawn_mock_gatehouse(body: &'static str) -> String {
     format!("http://{addr}")
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn authorize_redirect_without_gatehouse_url_is_service_unavailable() {
     let _guard = ENV_LOCK.lock().unwrap();
     quench_core::env::remove("GATEHOUSE_URL");
@@ -80,7 +82,7 @@ async fn authorize_redirect_without_gatehouse_url_is_service_unavailable() {
     assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn authorize_redirect_builds_a_pkce_authorize_url_and_sets_the_state_cookie() {
     let _guard = ENV_LOCK.lock().unwrap();
     quench_core::env::set("GATEHOUSE_URL", "https://gate.example.com");
@@ -123,7 +125,7 @@ async fn authorize_redirect_builds_a_pkce_authorize_url_and_sets_the_state_cooki
     quench_core::env::remove("GATEHOUSE_URL");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn callback_without_an_authorize_state_cookie_redirects_to_login() {
     let _guard = ENV_LOCK.lock().unwrap();
     quench_core::env::set("GATEHOUSE_URL", "https://gate.example.com");
@@ -144,7 +146,7 @@ async fn callback_without_an_authorize_state_cookie_redirects_to_login() {
     quench_core::env::remove("GATEHOUSE_URL");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn callback_with_a_state_mismatch_redirects_to_login() {
     let _guard = ENV_LOCK.lock().unwrap();
     quench_core::env::set("GATEHOUSE_URL", "https://gate.example.com");
@@ -172,7 +174,7 @@ async fn callback_with_a_state_mismatch_redirects_to_login() {
     quench_core::env::remove("GATEHOUSE_URL");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn callback_exchanges_the_code_and_sets_session_cookies_on_success() {
     let _guard = ENV_LOCK.lock().unwrap();
     let mock_body = r#"{"access_token":"access-123","refresh_token":"refresh-456"}"#;
@@ -227,3 +229,5 @@ async fn callback_exchanges_the_code_and_sets_session_cookies_on_success() {
 
     quench_core::env::remove("GATEHOUSE_URL");
 }
+
+quench_test::main!();

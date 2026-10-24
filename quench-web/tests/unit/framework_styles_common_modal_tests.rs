@@ -3,7 +3,7 @@
 use quench_web::framework::styles::common::modal;
 use quench_web::styling::css::CssRule;
 
-#[test]
+#[quench_test::test]
 fn modal_returns_the_overlay_and_three_layouts() {
     let rules = modal();
     assert_eq!(rules.len(), 4);

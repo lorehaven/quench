@@ -1,5 +1,8 @@
 //! The HTTP/1.1 server driver, exercised over in-memory pipes with raw wire bytes.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::bytes::Bytes;
 use quench_core::stream::StreamExt;
 use quench_proto::h1::server::{ServerConfig, Shutdown, serve_connection, shutdown_channel};
@@ -49,7 +52,7 @@ fn quick() -> ServerConfig {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn answers_a_simple_get_with_a_content_length() {
     let out = run(
         |_| async { text(StatusCode::OK, "hello") },
@@ -63,7 +66,7 @@ async fn answers_a_simple_get_with_a_content_length() {
     assert!(out.ends_with("\r\n\r\nhello"), "{out}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn keeps_the_connection_alive_for_pipelined_requests() {
     let wire = b"GET /one HTTP/1.1\r\nHost: a\r\n\r\n\r\nPOST /two HTTP/1.1\r\nHost: a\r\nContent-Length: 3\r\n\r\nabcGET /three HTTP/1.1\r\nHost: a\r\nConnection: close\r\n\r\n";
     let out = run(echo, quick(), wire).await;
@@ -79,14 +82,14 @@ async fn keeps_the_connection_alive_for_pipelined_requests() {
     assert!(out.contains("connection: close"), "{out}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn decodes_a_chunked_request_body() {
     let wire = b"POST /up HTTP/1.1\r\nHost: a\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n";
     let out = run(echo, quick(), wire).await;
     assert!(out.ends_with("\r\n\r\nhello world"), "{out}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn streams_unsized_response_bodies_as_chunked() {
     let service = |_req: Request| async {
         let items: Vec<Result<Bytes, std::io::Error>> = vec![
@@ -106,7 +109,7 @@ async fn streams_unsized_response_bodies_as_chunked() {
     assert!(out.ends_with("2\r\nab\r\n4\r\ncdef\r\n0\r\n\r\n"), "{out}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn http_10_clients_get_a_close_delimited_stream() {
     let service = |_req: Request| async {
         let items: Vec<Result<Bytes, std::io::Error>> = vec![Ok(Bytes::from_static(b"raw"))];
@@ -118,7 +121,7 @@ async fn http_10_clients_get_a_close_delimited_stream() {
     assert!(out.ends_with("\r\n\r\nraw"), "{out}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn http_10_keep_alive_is_acknowledged() {
     let wire = b"GET /a HTTP/1.0\r\nConnection: keep-alive\r\n\r\nGET /b HTTP/1.0\r\n\r\n";
     let out = run(|_| async { text(StatusCode::OK, "x") }, quick(), wire).await;
@@ -126,7 +129,7 @@ async fn http_10_keep_alive_is_acknowledged() {
     assert!(out.contains("connection: keep-alive"), "{out}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn head_requests_get_headers_but_no_body() {
     let out = run(
         |_| async { text(StatusCode::OK, "hello") },
@@ -138,7 +141,7 @@ async fn head_requests_get_headers_but_no_body() {
     assert!(out.ends_with("\r\n\r\n"), "{out}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn bodyless_statuses_drop_their_framing_headers() {
     let service = |_req: Request| async {
         Response::new(StatusCode::NO_CONTENT).header("content-length", "9")
@@ -155,7 +158,7 @@ async fn bodyless_statuses_drop_their_framing_headers() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_user_declared_content_length_is_honoured_and_checked() {
     let ok = |_req: Request| async {
         Response::new(StatusCode::OK)
@@ -197,7 +200,7 @@ async fn a_user_declared_content_length_is_honoured_and_checked() {
     assert!(!out.contains("connection: keep-alive"), "{out}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn rejects_request_smuggling_attempts_and_closes() {
     for wire in [
         &b"POST / HTTP/1.1\r\nHost: a\r\nContent-Length: 5\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n"[..],
@@ -214,7 +217,7 @@ async fn rejects_request_smuggling_attempts_and_closes() {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn maps_protocol_errors_to_their_statuses() {
     let out = run(echo, quick(), b"GET / HTTP/2.0\r\nHost: a\r\n\r\n").await;
     assert!(out.starts_with("HTTP/1.1 505 "), "{out}");
@@ -235,7 +238,7 @@ async fn maps_protocol_errors_to_their_statuses() {
     assert!(out.starts_with("HTTP/1.1 431 "), "{out}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_truncated_head_is_an_error_without_a_response() {
     let (mut client, server) = tokio::io::duplex(1024);
     let task =
@@ -250,7 +253,7 @@ async fn a_truncated_head_is_an_error_without_a_response() {
     assert!(task.await.unwrap().is_err());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_stalled_head_times_out() {
     let (mut client, server) = tokio::io::duplex(1024);
     let task =
@@ -268,14 +271,14 @@ async fn a_stalled_head_times_out() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn an_idle_connection_is_closed_quietly() {
     let (_client, server) = tokio::io::duplex(1024);
     let result = serve_connection(server, &echo, &quick(), Shutdown::never()).await;
     assert!(result.is_ok());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn shutdown_closes_idle_connections_and_marks_in_flight_responses() {
     let (handle, shutdown) = shutdown_channel();
     let (mut client, server) = tokio::io::duplex(4096);
@@ -297,7 +300,7 @@ async fn shutdown_closes_idle_connections_and_marks_in_flight_responses() {
     assert!(task.await.unwrap().is_ok());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn shutdown_during_a_request_sends_connection_close() {
     let (handle, shutdown) = shutdown_channel();
     let handle = std::sync::Arc::new(handle);
@@ -326,7 +329,7 @@ async fn shutdown_during_a_request_sends_connection_close() {
     assert!(task.await.unwrap().is_ok());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn expect_continue_gets_an_interim_response() {
     let wire = b"POST / HTTP/1.1\r\nHost: a\r\nExpect: 100-continue\r\nContent-Length: 2\r\nConnection: close\r\n\r\nhi";
     let out = run(echo, quick(), wire).await;
@@ -337,7 +340,7 @@ async fn expect_continue_gets_an_interim_response() {
     assert!(out.ends_with("hi"), "{out}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn unknown_expectations_are_refused() {
     let out = run(
         echo,
@@ -348,7 +351,7 @@ async fn unknown_expectations_are_refused() {
     assert!(out.starts_with("HTTP/1.1 417 "), "{out}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn an_unread_request_body_is_drained_so_the_connection_survives() {
     let body = "x".repeat(200_000);
     let wire = format!(
@@ -369,7 +372,7 @@ async fn an_unread_request_body_is_drained_so_the_connection_survives() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn an_unread_body_past_the_drain_limit_closes_the_connection() {
     let config = ServerConfig {
         drain_limit: 1000,
@@ -390,7 +393,7 @@ async fn an_unread_body_past_the_drain_limit_closes_the_connection() {
     assert!(out.contains("connection: close"), "{out}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn an_early_response_to_a_slow_upload_is_still_delivered() {
     let (mut client, server) = tokio::io::duplex(1 << 16);
     let config = ServerConfig {
@@ -421,7 +424,7 @@ async fn an_early_response_to_a_slow_upload_is_still_delivered() {
     let _ = task.await.unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_truncated_request_body_surfaces_as_a_body_error() {
     let service = |mut req: Request| async move {
         let body = std::mem::take(&mut req.body);
@@ -445,7 +448,7 @@ async fn a_truncated_request_body_surfaces_as_a_body_error() {
     let _ = task.await.unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn bad_chunked_framing_in_the_body_is_reported_to_the_handler() {
     let service = |mut req: Request| async move {
         let body = std::mem::take(&mut req.body);
@@ -466,7 +469,7 @@ async fn bad_chunked_framing_in_the_body_is_reported_to_the_handler() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn upgrades_hand_over_the_raw_stream_with_buffered_bytes() {
     let service = |_req: Request| async {
         Response::new(StatusCode::SWITCHING_PROTOCOLS)
@@ -499,7 +502,7 @@ async fn upgrades_hand_over_the_raw_stream_with_buffered_bytes() {
     assert!(task.await.unwrap().is_ok());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_response_can_stream_the_request_body_back() {
     let service = |mut req: Request| async move {
         let body = std::mem::take(&mut req.body);
@@ -513,7 +516,7 @@ async fn a_response_can_stream_the_request_body_back() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_failing_response_stream_drops_the_connection() {
     let service = |_req: Request| async {
         let items: Vec<Result<Bytes, std::io::Error>> = vec![
@@ -539,7 +542,7 @@ async fn a_failing_response_stream_drops_the_connection() {
     ));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn large_fixed_responses_are_written_whole() {
     let big = "z".repeat(100_000);
     let big2 = big.clone();
@@ -555,7 +558,7 @@ async fn large_fixed_responses_are_written_whole() {
     assert!(out.ends_with(&big), "len {}", out.len());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_slow_reader_trips_the_write_timeout() {
     // The pipe holds 64 bytes and nobody reads: the response cannot be written.
     let (mut client, server) = tokio::io::duplex(64);
@@ -583,7 +586,7 @@ async fn a_slow_reader_trips_the_write_timeout() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn streams_with_a_declared_length_use_content_length() {
     let service = |_req: Request| async {
         let items: Vec<Result<Bytes, std::io::Error>> =
@@ -606,3 +609,5 @@ async fn streams_with_a_declared_length_use_content_length() {
     >::new()));
     assert!(body.next().await.is_none());
 }
+
+quench_test::main!();

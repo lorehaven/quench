@@ -36,7 +36,7 @@ fn login() -> Behavior {
 
 // -- happy paths ----------------------------------------------------
 
-#[tokio::test]
+#[quench_test::test]
 async fn sends_over_implicit_tls_with_a_login() {
     let server = start(Behavior {
         tls: Tls::Implicit,
@@ -64,7 +64,7 @@ async fn sends_over_implicit_tls_with_a_login() {
     assert!(got.data.ends_with("Follow the link.\r\n"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn sends_over_starttls_and_asks_again_after_the_upgrade() {
     let server = start(Behavior {
         tls: Tls::Upgrade,
@@ -101,7 +101,7 @@ async fn sends_over_starttls_and_asks_again_after_the_upgrade() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn sends_without_tls_or_login_when_configured_that_way() {
     let server = start(Behavior::default()).await;
     let mailer = client(&server).security(Security::None).build().unwrap();
@@ -112,7 +112,7 @@ async fn sends_without_tls_or_login_when_configured_that_way() {
     assert!(!got.commands.iter().any(|c| c.starts_with("AUTH")));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn falls_back_to_login_when_plain_is_not_offered() {
     let server = start(Behavior {
         tls: Tls::Implicit,
@@ -130,7 +130,7 @@ async fn falls_back_to_login_when_plain_is_not_offered() {
     assert!(got.commands.contains(&"AUTH LOGIN".to_string()));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn every_recipient_including_bcc_gets_a_rcpt_to() {
     let server = start(Behavior::default()).await;
     let mailer = client(&server).security(Security::None).build().unwrap();
@@ -150,7 +150,7 @@ async fn every_recipient_including_bcc_gets_a_rcpt_to() {
     assert!(!server.last().await.data.contains("d@example.org"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn test_connection_logs_in_without_sending_anything() {
     let server = start(Behavior {
         tls: Tls::Implicit,
@@ -168,7 +168,7 @@ async fn test_connection_logs_in_without_sending_anything() {
     assert!(!got.commands.iter().any(|c| c.starts_with("MAIL")));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_mailer_can_be_cloned_and_reused() {
     let server = start(Behavior::default()).await;
     let mailer = client(&server).security(Security::None).build().unwrap();
@@ -181,7 +181,7 @@ async fn a_mailer_can_be_cloned_and_reused() {
 
 // -- data integrity -------------------------------------------------
 
-#[tokio::test]
+#[quench_test::test]
 async fn lines_starting_with_a_dot_survive_the_trip() {
     let server = start(Behavior::default()).await;
     let mailer = client(&server).security(Security::None).build().unwrap();
@@ -199,7 +199,7 @@ async fn lines_starting_with_a_dot_survive_the_trip() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn dot_stuffing_doubles_leading_dots_and_terminates() {
     assert_eq!(dot_stuff(b"a\r\n.b\r\n"), b"a\r\n..b\r\n.\r\n");
     assert_eq!(dot_stuff(b".x"), b"..x\r\n.\r\n");
@@ -211,7 +211,7 @@ fn dot_stuffing_doubles_leading_dots_and_terminates() {
 
 // -- refusals -------------------------------------------------------
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_wrong_password_is_an_auth_error_and_not_retryable() {
     let server = start(Behavior {
         tls: Tls::Implicit,
@@ -234,7 +234,7 @@ async fn a_wrong_password_is_an_auth_error_and_not_retryable() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_permanent_recipient_refusal_is_reported_and_not_retryable() {
     let server = start(Behavior::default()).await;
     let mailer = client(&server).security(Security::None).build().unwrap();
@@ -258,7 +258,7 @@ async fn a_permanent_recipient_refusal_is_reported_and_not_retryable() {
     assert!(err.to_string().contains("RCPT TO"), "{err}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_temporary_refusal_is_retryable() {
     let server = start(Behavior {
         bad_rcpt_reply: "451 4.3.0 try again later",
@@ -276,7 +276,7 @@ async fn a_temporary_refusal_is_retryable() {
     assert!(err.is_transient(), "{err:?}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_refusal_after_data_is_reported() {
     let server = start(Behavior {
         data_reply: "554 5.7.1 message looks like spam",
@@ -294,7 +294,7 @@ async fn a_refusal_after_data_is_reported() {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_message_over_the_advertised_size_is_not_sent() {
     let server = start(Behavior {
         size: Some(100),
@@ -316,7 +316,7 @@ async fn a_message_over_the_advertised_size_is_not_sent() {
 
 // -- TLS safety -----------------------------------------------------
 
-#[tokio::test]
+#[quench_test::test]
 async fn an_untrusted_certificate_is_refused() {
     let server = start(Behavior {
         tls: Tls::Implicit,
@@ -333,7 +333,7 @@ async fn an_untrusted_certificate_is_refused() {
     assert!(matches!(err, Error::Tls(_)), "{err:?}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_certificate_for_another_name_is_refused() {
     let server = start(Behavior {
         tls: Tls::Implicit,
@@ -351,7 +351,7 @@ async fn a_certificate_for_another_name_is_refused() {
     assert!(matches!(err, Error::Tls(_)), "{err:?}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn starttls_is_required_when_configured_even_if_the_server_hides_it() {
     let server = start(Behavior {
         tls: Tls::Upgrade,
@@ -368,7 +368,7 @@ async fn starttls_is_required_when_configured_even_if_the_server_hides_it() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn data_injected_after_the_starttls_reply_is_rejected() {
     let server = start(Behavior {
         tls: Tls::Upgrade,
@@ -381,7 +381,7 @@ async fn data_injected_after_the_starttls_reply_is_rejected() {
     assert!(matches!(err, Error::Protocol(_)), "{err:?}");
 }
 
-#[test]
+#[quench_test::test]
 fn credentials_without_tls_are_refused_at_build_time() {
     let err = Mailer::builder("mail.example.com")
         .security(Security::None)
@@ -399,7 +399,7 @@ fn credentials_without_tls_are_refused_at_build_time() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn credentials_are_not_sent_when_the_server_offers_no_login() {
     let server = start(Behavior {
         tls: Tls::Implicit,
@@ -425,7 +425,7 @@ async fn credentials_are_not_sent_when_the_server_offers_no_login() {
 
 // -- robustness -----------------------------------------------------
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_silent_server_times_out() {
     let server = start(Behavior {
         silent: true,
@@ -444,7 +444,7 @@ async fn a_silent_server_times_out() {
     assert!(started.elapsed() < Duration::from_secs(3));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_server_that_hangs_up_is_a_protocol_error() {
     let server = start(Behavior {
         hang_up: true,
@@ -456,7 +456,7 @@ async fn a_server_that_hangs_up_is_a_protocol_error() {
     assert!(matches!(err, Error::Protocol(_) | Error::Io(_)), "{err:?}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_refused_connection_is_a_retryable_io_error() {
     let mailer = Mailer::builder("127.0.0.1")
         .port(1)
@@ -471,7 +471,7 @@ async fn a_refused_connection_is_a_retryable_io_error() {
 
 // -- configuration --------------------------------------------------
 
-#[test]
+#[quench_test::test]
 fn default_ports_follow_the_security_mode() {
     // Not observable without connecting; build must at least succeed for each.
     for security in [Security::Tls, Security::StartTls, Security::None] {
@@ -484,7 +484,7 @@ fn default_ports_follow_the_security_mode() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn nonsense_configuration_is_rejected() {
     assert!(matches!(
         Mailer::builder("").build().unwrap_err(),
@@ -513,7 +513,7 @@ fn nonsense_configuration_is_rejected() {
     ));
 }
 
-#[test]
+#[quench_test::test]
 fn the_password_never_shows_up_in_debug_output() {
     let mailer = Mailer::builder("mail.example.com")
         .credentials("noreply@example.com", "hunter2-secret")

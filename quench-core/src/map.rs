@@ -171,7 +171,7 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    #[test]
+    #[quench_test::test]
     fn basic_operations() {
         let map: ShardedMap<String, i32> = ShardedMap::default();
         assert!(map.is_empty());
@@ -188,7 +188,7 @@ mod tests {
         assert!(format!("{map:?}").contains("ShardedMap"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn lookups_borrow_the_key() {
         let map: ShardedMap<String, u8> = ShardedMap::new();
         map.insert("owned".to_string(), 1);
@@ -207,7 +207,7 @@ mod tests {
         assert_eq!(map.remove("owned"), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn spreads_many_keys_and_clears() {
         let map = ShardedMap::new();
         for i in 0..1_000 {
@@ -221,7 +221,7 @@ mod tests {
         assert!(map.is_empty());
     }
 
-    #[test]
+    #[quench_test::test]
     fn retain_filters_and_can_mutate() {
         let map = ShardedMap::new();
         for i in 0..100 {
@@ -236,7 +236,7 @@ mod tests {
         assert_eq!(map.get(&5), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn update_inserts_then_changes() {
         let map: ShardedMap<&str, Vec<u8>> = ShardedMap::new();
         let len = map.update("k", Vec::new, |v| {
@@ -257,7 +257,7 @@ mod tests {
         assert_eq!(map.update_existing(&"missing", |v| v.len()), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn remove_if_checks_the_value() {
         let map = ShardedMap::new();
         map.insert("old", 1);
@@ -268,7 +268,7 @@ mod tests {
         assert_eq!(map.len(), 1);
     }
 
-    #[test]
+    #[quench_test::test]
     fn concurrent_updates_are_not_lost() {
         let map: Arc<ShardedMap<&str, u64>> = Arc::new(ShardedMap::new());
         let threads: Vec<_> = (0..8)
@@ -287,7 +287,7 @@ mod tests {
         assert_eq!(map.get(&"counter"), Some(8_000));
     }
 
-    #[test]
+    #[quench_test::test]
     fn survives_a_panicking_writer() {
         let map: Arc<ShardedMap<i32, i32>> = Arc::new(ShardedMap::new());
         map.insert(1, 1);

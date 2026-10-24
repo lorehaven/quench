@@ -109,12 +109,16 @@ dependencies = [
 [[package]]
 name = "quench-archive"
 version = "0.1.0"
+dependencies = [
+ "quench-test",
+]
 
 [[package]]
 name = "quench-args"
 version = "0.1.0"
 dependencies = [
  "quench-args-macros",
+ "quench-test",
 ]
 
 [[package]]
@@ -139,6 +143,7 @@ dependencies = [
  "quench-log",
  "quench-proto",
  "quench-serde",
+ "quench-test",
  "tokio",
 ]
 
@@ -149,6 +154,7 @@ dependencies = [
  "quench-core",
  "quench-redis",
  "quench-serde",
+ "quench-test",
  "tokio",
 ]
 
@@ -158,6 +164,7 @@ version = "0.1.12"
 dependencies = [
  "libc",
  "quench-core",
+ "quench-test",
 ]
 
 [[package]]
@@ -169,6 +176,7 @@ dependencies = [
  "quench-log",
  "quench-proto",
  "quench-serde",
+ "quench-test",
  "tokio",
 ]
 
@@ -178,6 +186,7 @@ version = "0.1.11"
 dependencies = [
  "quench-core",
  "quench-serde",
+ "quench-test",
 ]
 
 [[package]]
@@ -185,6 +194,7 @@ name = "quench-convert"
 version = "0.1.1"
 dependencies = [
  "quench-serde",
+ "quench-test",
 ]
 
 [[package]]
@@ -193,6 +203,7 @@ version = "0.1.5"
 dependencies = [
  "getrandom 0.4.3",
  "quench-core-macros",
+ "quench-test",
 ]
 
 [[package]]
@@ -210,6 +221,7 @@ version = "0.1.5"
 dependencies = [
  "quench-core",
  "quench-serde",
+ "quench-test",
  "ring",
 ]
 
@@ -222,6 +234,7 @@ dependencies = [
  "quench-log",
  "quench-pg",
  "quench-serde",
+ "quench-test",
  "tokio",
 ]
 
@@ -275,6 +288,9 @@ dependencies = [
 [[package]]
 name = "quench-html"
 version = "0.1.0"
+dependencies = [
+ "quench-test",
+]
 
 [[package]]
 name = "quench-http"
@@ -285,6 +301,7 @@ dependencies = [
  "quench-log",
  "quench-proto",
  "quench-serde",
+ "quench-test",
  "rustls",
  "tokio",
 ]
@@ -306,6 +323,7 @@ dependencies = [
  "quench-core",
  "quench-http",
  "quench-serde",
+ "quench-test",
  "tokio",
 ]
 
@@ -316,6 +334,7 @@ dependencies = [
  "quench-core",
  "quench-log-macros",
  "quench-serde",
+ "quench-test",
 ]
 
 [[package]]
@@ -332,6 +351,7 @@ name = "quench-mail"
 version = "0.1.9"
 dependencies = [
  "quench-core",
+ "quench-test",
  "quench-tls",
  "tokio",
 ]
@@ -341,6 +361,7 @@ name = "quench-pdf"
 version = "0.1.0"
 dependencies = [
  "quench-archive",
+ "quench-test",
 ]
 
 [[package]]
@@ -351,6 +372,7 @@ dependencies = [
  "quench-crypto",
  "quench-log",
  "quench-serde",
+ "quench-test",
  "quench-tls",
  "tokio",
 ]
@@ -361,6 +383,7 @@ version = "0.1.6"
 dependencies = [
  "quench-core",
  "quench-crypto",
+ "quench-test",
  "quench-tls",
  "tokio",
 ]
@@ -368,12 +391,16 @@ dependencies = [
 [[package]]
 name = "quench-qr"
 version = "0.1.0"
+dependencies = [
+ "quench-test",
+]
 
 [[package]]
 name = "quench-redis"
 version = "0.1.6"
 dependencies = [
  "quench-core",
+ "quench-test",
  "quench-tls",
  "tokio",
 ]
@@ -381,6 +408,9 @@ dependencies = [
 [[package]]
 name = "quench-regex"
 version = "0.1.0"
+dependencies = [
+ "quench-test",
+]
 
 [[package]]
 name = "quench-schema"
@@ -388,6 +418,7 @@ version = "0.1.1"
 dependencies = [
  "quench-regex",
  "quench-serde",
+ "quench-test",
 ]
 
 [[package]]
@@ -396,6 +427,7 @@ version = "0.1.5"
 dependencies = [
  "quench-core",
  "quench-serde-macros",
+ "quench-test",
 ]
 
 [[package]]
@@ -419,6 +451,7 @@ dependencies = [
  "quench-http",
  "quench-log",
  "quench-serde",
+ "quench-test",
  "quench-web",
  "tokio",
 ]
@@ -428,6 +461,7 @@ name = "quench-template"
 version = "0.1.1"
 dependencies = [
  "quench-serde",
+ "quench-test",
 ]
 
 [[package]]
@@ -476,6 +510,7 @@ name = "quench-tls"
 version = "0.1.6"
 dependencies = [
  "quench-core",
+ "quench-test",
  "rustls",
  "tokio",
  "webpki-roots",
@@ -486,6 +521,7 @@ name = "quench-tz"
 version = "0.1.1"
 dependencies = [
  "quench-core",
+ "quench-test",
 ]
 
 [[package]]
@@ -494,12 +530,14 @@ version = "0.1.21"
 dependencies = [
  "quench-core",
  "quench-serde",
+ "quench-test",
 ]
 
 [[package]]
 name = "quench-web-components"
 version = "0.1.16"
 dependencies = [
+ "quench-test",
  "quench-web",
 ]
 

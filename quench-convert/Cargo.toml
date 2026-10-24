@@ -10,6 +10,7 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+autotests = false
 
 [lib]
 name = "quench_convert"
@@ -31,3 +32,11 @@ quench-serde = { workspace = true }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "convert"
+path = "tests/convert.rs"
+harness = false
+
+[dev-dependencies]
+quench-test = { workspace = true }

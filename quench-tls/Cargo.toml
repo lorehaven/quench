@@ -10,10 +10,12 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+autotests = false
 
 [lib]
 name = "quench_tls"
 path = "src/lib.rs"
+harness = false
 
 [dependencies]
 quench-core = { workspace = true }
@@ -22,7 +24,13 @@ tokio = { workspace = true, features = ["io-util"] }
 webpki-roots = { workspace = true }
 
 [dev-dependencies]
+quench-test = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "tls"
+path = "tests/tls.rs"
+harness = false

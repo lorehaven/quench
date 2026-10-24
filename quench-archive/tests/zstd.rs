@@ -2,6 +2,8 @@
 //! and hand-built frames for the paths real encoders rarely take.
 
 #![allow(clippy::cast_possible_truncation)]
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_archive::Error;
 use quench_archive::checksum::crc32;
@@ -15,7 +17,7 @@ fn assert_docs(packed: &[u8]) {
     assert_eq!(crc32(&out), 0x39A8_FA7A);
 }
 
-#[test]
+#[quench_test::test]
 fn reads_streams_from_the_reference_encoder() {
     assert_docs(include_bytes!("fixtures/docs-1.zst"));
     assert_docs(include_bytes!("fixtures/docs-19.zst"));
@@ -38,7 +40,7 @@ fn noise(n: usize) -> Vec<u8> {
         .collect()
 }
 
-#[test]
+#[quench_test::test]
 fn the_encoder_round_trips() {
     let text = corpus();
     let packed = compress(&text);
@@ -73,7 +75,7 @@ fn the_encoder_round_trips() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn incompressible_data_costs_little() {
     let data = noise(500_000);
     let packed = compress(&data);
@@ -81,13 +83,13 @@ fn incompressible_data_costs_little() {
     assert_eq!(decompress(&packed, LIMIT).unwrap(), data);
 }
 
-#[test]
+#[quench_test::test]
 fn compression_is_deterministic() {
     let text = corpus();
     assert_eq!(compress(&text), compress(&text));
 }
 
-#[test]
+#[quench_test::test]
 fn concatenated_and_skippable_frames() {
     let a = compress(b"first ");
     let b = compress(b"second");
@@ -112,7 +114,7 @@ fn block(last: bool, kind: u32, size: usize) -> [u8; 3] {
     [word as u8, (word >> 8) as u8, (word >> 16) as u8]
 }
 
-#[test]
+#[quench_test::test]
 fn hand_built_frames() {
     // A raw block, then a run-length block.
     let mut frame = header(7, false);
@@ -141,7 +143,7 @@ fn hand_built_frames() {
     assert!(matches!(decompress(&reserved, 100), Err(Error::Corrupt(_))));
 }
 
-#[test]
+#[quench_test::test]
 fn limits_and_damage_are_errors() {
     let text = corpus();
     let packed = compress(&text);
@@ -212,3 +214,5 @@ fn limits_and_damage_are_errors() {
     skip.extend_from_slice(&10u32.to_le_bytes());
     assert!(matches!(decompress(&skip, 10), Err(Error::Truncated)));
 }
+
+quench_test::main!();

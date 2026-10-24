@@ -10,6 +10,7 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+autotests = false
 
 [lib]
 name = "quench_k8s"
@@ -21,8 +22,19 @@ quench-core = { workspace = true }
 quench-serde = { workspace = true, features = ["yaml"] }
 
 [dev-dependencies]
+quench-test = { workspace = true }
 quench-http = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "net"] }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "api"
+path = "tests/api.rs"
+harness = false
+
+[[test]]
+name = "config"
+path = "tests/config.rs"
+harness = false

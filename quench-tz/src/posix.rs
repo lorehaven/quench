@@ -275,7 +275,7 @@ mod tests {
         (r.utc_offset, r.is_dst, r.abbreviation.to_string())
     }
 
-    #[test]
+    #[quench_test::test]
     fn central_europe() {
         let rule = Rule::parse("CET-1CEST,M3.5.0,M10.5.0/3").expect("valid");
         assert_eq!(
@@ -294,7 +294,7 @@ mod tests {
         assert!(!at(&rule, "2026-10-25T01:00:00Z").1);
     }
 
-    #[test]
+    #[quench_test::test]
     fn the_southern_hemisphere_spans_the_new_year() {
         let rule = Rule::parse("AEST-10AEDT,M10.1.0,M4.1.0/3").expect("valid");
         assert_eq!(
@@ -309,7 +309,7 @@ mod tests {
         assert!(at(&rule, "2027-01-01T00:00:00Z").1);
     }
 
-    #[test]
+    #[quench_test::test]
     fn rules_without_daylight_saving_and_odd_forms() {
         let fixed = Rule::parse("<+03>-3").expect("valid");
         assert_eq!(
@@ -337,7 +337,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn julian_days_and_negative_or_large_times() {
         let j = Rule::parse("EST5EDT,J60,J305").expect("valid");
         // J60 is always 1 March: in a leap year that is the 61st day.
@@ -359,7 +359,7 @@ mod tests {
         assert_eq!(at(&long, "2026-07-15T12:00:00Z").0, 3600);
     }
 
-    #[test]
+    #[quench_test::test]
     fn defaults_follow_the_us_rules() {
         let rule = Rule::parse("EST5EDT").expect("valid");
         assert_eq!(
@@ -372,7 +372,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn bad_rules_are_rejected() {
         for bad in [
             "",

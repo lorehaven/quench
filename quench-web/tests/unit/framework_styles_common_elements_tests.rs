@@ -3,7 +3,7 @@
 use quench_web::framework::styles::common::elements;
 use quench_web::styling::css::CssRule;
 
-#[test]
+#[quench_test::test]
 fn elements_returns_every_shared_widget_rule_exactly_once() {
     let rules = elements();
     assert_eq!(rules.len(), 17);

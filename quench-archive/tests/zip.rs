@@ -1,5 +1,8 @@
 //! zip reading against archives written by Info-ZIP and Python, and writing read back by this reader.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_archive::Error;
 use quench_archive::zip::{Archive, Method, Writer};
 use std::io::Cursor;
@@ -8,7 +11,7 @@ fn open(bytes: &[u8]) -> Archive<Cursor<Vec<u8>>> {
     Archive::new(Cursor::new(bytes.to_vec())).expect("a readable zip")
 }
 
-#[test]
+#[quench_test::test]
 fn reads_deflated_entries() {
     let mut archive = open(include_bytes!("fixtures/deflated.zip"));
     let names: Vec<_> = archive.entries().iter().map(|e| e.name.clone()).collect();
@@ -38,7 +41,7 @@ fn reads_deflated_entries() {
     ));
 }
 
-#[test]
+#[quench_test::test]
 fn reads_stored_entries_and_an_archive_comment() {
     let mut archive = open(include_bytes!("fixtures/stored.zip"));
     assert_eq!(archive.entries()[0].method, Method::Stored);
@@ -49,7 +52,7 @@ fn reads_stored_entries_and_an_archive_comment() {
     assert_eq!(commented.read(0, 100).unwrap().len(), 36);
 }
 
-#[test]
+#[quench_test::test]
 fn reads_zip64_extra_fields() {
     let mut archive = open(include_bytes!("fixtures/forced64.zip"));
     assert_eq!(archive.read_by_name("big.txt", 2000).unwrap().len(), 1100);
@@ -87,7 +90,7 @@ fn zip64_end(zip: &[u8]) -> Vec<u8> {
     out
 }
 
-#[test]
+#[quench_test::test]
 fn reads_a_zip64_end_record() {
     let mut writer = Writer::new();
     writer.add("a", b"zip sixty four").unwrap();
@@ -122,7 +125,7 @@ fn reads_a_zip64_end_record() {
     ));
 }
 
-#[test]
+#[quench_test::test]
 fn the_writer_and_the_reader_agree() {
     let big: Vec<u8> = (0..20_000u32)
         .flat_map(|i| (i % 251).to_le_bytes())
@@ -152,7 +155,7 @@ fn the_writer_and_the_reader_agree() {
     assert_eq!(format!("{writer:?}"), "Writer(0 entries)");
 }
 
-#[test]
+#[quench_test::test]
 fn limits_and_damage_are_errors() {
     let mut writer = Writer::new();
     writer.add("a.txt", &b"abc".repeat(1000)).unwrap();
@@ -218,7 +221,7 @@ fn central_edit(zip: &[u8], edit: impl FnOnce(&mut [u8])) -> Vec<u8> {
     out
 }
 
-#[test]
+#[quench_test::test]
 fn encryption_and_other_methods_are_unsupported() {
     let mut writer = Writer::new();
     writer.add("a.txt", &b"abc".repeat(100)).unwrap();
@@ -262,3 +265,5 @@ fn encryption_and_other_methods_are_unsupported() {
         Err(Error::Unsupported(_))
     ));
 }
+
+quench_test::main!();

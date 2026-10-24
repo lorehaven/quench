@@ -9,7 +9,11 @@
 //! and cargo compiles every integration test file as a separate binary, so
 //! putting unrelated `#[injectable]`s in the same file would have them all
 //! show up in the same graph.
-#![allow(clippy::unused_async)] // `#[injectable]` constructors are async by contract
+#![allow(clippy::unused_async)]
+// `#[injectable]` constructors are async by contract
+
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_http::di::{Container, ContainerBuilder};
 use quench_http::prelude::injectable;
@@ -43,7 +47,7 @@ async fn provide_service(repo: Arc<Repository>) -> Service {
     Service { repo }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn resolves_a_multi_level_chain_in_dependency_order() {
     let container: Container = ContainerBuilder::new()
         .build()
@@ -53,3 +57,5 @@ async fn resolves_a_multi_level_chain_in_dependency_order() {
     let service = container.get::<Service>().expect("Service was constructed");
     assert_eq!(service.repo.config.label, "root");
 }
+
+quench_test::main!();

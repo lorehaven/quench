@@ -213,7 +213,7 @@ mod tests {
         decode(input).unwrap().unwrap()
     }
 
-    #[test]
+    #[quench_test::test]
     fn encodes_commands() {
         let mut out = Vec::new();
         encode_command(
@@ -226,7 +226,7 @@ mod tests {
         assert_eq!(out, b"*2\r\n$4\r\nPING\r\n$0\r\n\r\n");
     }
 
-    #[test]
+    #[quench_test::test]
     fn resp2_scalars() {
         assert_eq!(ok(b"+OK\r\n"), (Value::Simple("OK".into()), 5));
         assert_eq!(ok(b":-42\r\n"), (Value::Int(-42), 6));
@@ -244,7 +244,7 @@ mod tests {
         assert_eq!(ok(b"+OK\r\nextra").1, 5, "only the first value is consumed");
     }
 
-    #[test]
+    #[quench_test::test]
     fn resp2_aggregates() {
         let (value, used) = ok(b"*3\r\n:1\r\n$2\r\nhi\r\n*1\r\n+x\r\n");
         assert_eq!(used, 24);
@@ -263,7 +263,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn resp3_types() {
         assert_eq!(ok(b"_\r\n").0, Value::Nil);
         assert_eq!(ok(b"#t\r\n").0, Value::Bool(true));
@@ -305,7 +305,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn partial_input_asks_for_more() {
         let full = b"*2\r\n$3\r\nfoo\r\n:5\r\n";
         for cut in 0..full.len() {
@@ -320,7 +320,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn malformed_input_is_rejected() {
         for bad in [
             &b"?what\r\n"[..],
@@ -340,7 +340,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn size_and_depth_limits() {
         assert!(decode(b"$999999999999\r\n").is_err());
         assert!(decode(format!("${}\r\n", MAX_BULK + 1).as_bytes()).is_err());
@@ -360,7 +360,7 @@ mod tests {
         assert!(decode(&shallow).unwrap().is_some());
     }
 
-    #[test]
+    #[quench_test::test]
     fn value_text_access() {
         assert_eq!(Value::Bulk(b"hi".to_vec()).as_str(), Some("hi"));
         assert_eq!(Value::Simple("s".into()).as_str(), Some("s"));

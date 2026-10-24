@@ -139,7 +139,7 @@ fn escape(value: &str) -> String {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn encodes_text_and_file_parts() {
         let form = Form::new()
             .text("title", "hello")
@@ -165,7 +165,7 @@ mod tests {
         assert!(body.windows(6).any(|w| w == b"\x00\x01data"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn boundaries_differ_and_names_are_escaped() {
         assert_ne!(Form::new().boundary(), Form::default().boundary());
         let body = Form::new().text("a\r\nb", "v").into_body();

@@ -1,3 +1,6 @@
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 #[path = "unit/framework_app_builder_tests.rs"]
 mod framework_app_builder_tests;
 #[path = "unit/framework_app_i18n_tests.rs"]
@@ -40,3 +43,5 @@ mod html_builder_elements_tests;
 mod html_builder_page_tests;
 #[path = "unit/styling_css_tests.rs"]
 mod styling_css_tests;
+
+quench_test::main!();

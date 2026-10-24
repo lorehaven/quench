@@ -4,7 +4,11 @@
 //! as a child whose stdin and stdout are the slave side of a pty, types into
 //! the master side, and reads the outcome back from a file.
 #![cfg(unix)]
-#![allow(unsafe_code)] // pty plumbing
+#![allow(unsafe_code)]
+// pty plumbing
+
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_cli::editor::LineEditor;
 use std::fs;
@@ -15,7 +19,7 @@ use std::process::{Command, Stdio};
 const CHILD_ENV: &str = "QUENCH_CLI_PTY_OUTCOME_FILE";
 
 /// Runs only inside the child: reads one line and records the outcome.
-#[test]
+#[quench_test::test]
 fn child_reads_one_line() {
     let Ok(path) = std::env::var(CHILD_ENV) else {
         return;
@@ -51,7 +55,7 @@ fn drive(typed: &[u8]) -> String {
     let mut child = Command::new(std::env::current_exe().unwrap())
         .args([
             "--exact",
-            "child_reads_one_line",
+            "pty::child_reads_one_line",
             "--nocapture",
             "--test-threads=1",
         ])
@@ -71,26 +75,26 @@ fn drive(typed: &[u8]) -> String {
     fs::read_to_string(outcome_file).unwrap()
 }
 
-#[test]
+#[quench_test::test]
 fn a_typed_line_comes_back_and_history_is_browsable() {
     let outcomes = drive(b"hello wor\x1b[D\x1b[Dld\r\x1b[A\r");
     assert_eq!(outcomes, "Line(\"hello wldor\")\nLine(\"from history\")\n");
 }
 
-#[test]
+#[quench_test::test]
 fn ctrl_c_and_ctrl_d_end_the_read() {
     let outcomes = drive(b"abc\x03\x04");
     assert_eq!(outcomes, "Interrupted\nEof\n");
 }
 
-#[test]
+#[quench_test::test]
 fn a_plain_stdin_falls_back_to_reading_lines() {
     let dir = quench_core::tmp::TempDir::new().unwrap();
     let outcome_file = dir.path().join("outcome");
     let mut child = Command::new(std::env::current_exe().unwrap())
         .args([
             "--exact",
-            "child_reads_one_line",
+            "pty::child_reads_one_line",
             "--nocapture",
             "--test-threads=1",
         ])
@@ -112,3 +116,5 @@ fn a_plain_stdin_falls_back_to_reading_lines() {
         "Line(\"first line\")\nEof\n"
     );
 }
+
+quench_test::main!();

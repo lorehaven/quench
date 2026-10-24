@@ -3,7 +3,7 @@
 use quench_web::framework::theme::Theme;
 use quench_web_components::components::nav::{NavPanelBuilder, nav_button};
 
-#[test]
+#[quench_test::test]
 fn nav_button_toggles_the_modal_and_shows_a_grip_icon() {
     let html = nav_button().render();
     assert!(html.contains("class=\"q-shell-nav-trigger\""));
@@ -12,7 +12,7 @@ fn nav_button_toggles_the_modal_and_shows_a_grip_icon() {
     assert!(html.contains("class=\"fas fa-grip\""));
 }
 
-#[test]
+#[quench_test::test]
 fn nav_panel_builder_lists_every_supported_locale_with_its_flag() {
     let html = NavPanelBuilder::new()
         .supported_locales(vec!["en-US".to_string(), "pl-PL".to_string()])
@@ -26,7 +26,7 @@ fn nav_panel_builder_lists_every_supported_locale_with_its_flag() {
     assert!(html.contains("value=\"pl-PL\""));
 }
 
-#[test]
+#[quench_test::test]
 fn nav_panel_builder_falls_back_to_the_first_locale_when_the_default_is_unsupported() {
     let html = NavPanelBuilder::new()
         .supported_locales(vec!["en-US".to_string(), "de-DE".to_string()])
@@ -36,7 +36,7 @@ fn nav_panel_builder_falls_back_to_the_first_locale_when_the_default_is_unsuppor
     assert!(html.contains("value=\"en-US\""));
 }
 
-#[test]
+#[quench_test::test]
 fn a_locale_with_no_two_letter_region_gets_no_flag_prefix() {
     let html = NavPanelBuilder::new()
         .supported_locales(vec!["en".to_string()])
@@ -46,7 +46,7 @@ fn a_locale_with_no_two_letter_region_gets_no_flag_prefix() {
     assert!(!html.contains("> en</option>"));
 }
 
-#[test]
+#[quench_test::test]
 fn nav_panel_builder_default_renders_every_theme_variant() {
     let html = NavPanelBuilder::new()
         .supported_locales(vec!["en-US".to_string()])
@@ -64,7 +64,7 @@ fn nav_panel_builder_default_renders_every_theme_variant() {
     assert!(html.contains("bootstrap-light"));
 }
 
-#[test]
+#[quench_test::test]
 fn nav_panel_builder_respects_an_explicit_theme_list_and_default() {
     let html = NavPanelBuilder::new()
         .supported_locales(vec!["en-US".to_string()])

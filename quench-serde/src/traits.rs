@@ -706,7 +706,7 @@ mod tests {
             .expect("should fail")
     }
 
-    #[test]
+    #[quench_test::test]
     fn scalars_round_trip() {
         round_trip(&true);
         round_trip(&'x');
@@ -725,7 +725,7 @@ mod tests {
         round_trip(&-5_i32);
     }
 
-    #[test]
+    #[quench_test::test]
     fn integer_ranges_are_checked() {
         assert!(err::<u8>(Value::from(256)).contains("out of range for u8"));
         assert!(err::<u8>(Value::from(-1)).contains("out of range"));
@@ -736,7 +736,7 @@ mod tests {
         assert_eq!(i8::deserialize(&Value::from(-128)).unwrap(), -128);
     }
 
-    #[test]
+    #[quench_test::test]
     fn type_mismatches_name_both_types() {
         assert_eq!(
             err::<bool>(Value::from("x")),
@@ -773,7 +773,7 @@ mod tests {
         assert!(err::<char>(Value::from(1)).contains("single character"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn floats_accept_integers() {
         assert!((f64::deserialize(&Value::from(3)).unwrap() - 3.0).abs() < f64::EPSILON);
         assert!((f64::deserialize(&Value::from(-3)).unwrap() + 3.0).abs() < f64::EPSILON);
@@ -781,14 +781,14 @@ mod tests {
         assert_eq!(f64::NAN.serialize(), Value::Null);
     }
 
-    #[test]
+    #[quench_test::test]
     fn chars_must_be_single() {
         assert!(err::<char>(Value::from("ab")).contains("single character"));
         assert!(err::<char>(Value::from("")).contains("single character"));
         assert_eq!(char::deserialize(&Value::from("é")).unwrap(), 'é');
     }
 
-    #[test]
+    #[quench_test::test]
     fn options_and_missing_fields() {
         round_trip(&Some(3_u8));
         round_trip(&None::<u8>);
@@ -800,7 +800,7 @@ mod tests {
         assert!(err::<Option<u8>>(Value::from("x")).contains("expected an integer"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn sequences() {
         round_trip(&vec![1_u8, 2, 3]);
         round_trip(&Vec::<String>::new());
@@ -813,7 +813,7 @@ mod tests {
         assert!(err::<[u8; 3]>(Value::from(vec![1, 2])).contains("length 3, found 2"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn sequence_errors_point_at_the_element() {
         let e = Vec::<u8>::deserialize(&Value::from(vec![Value::from(1), Value::from("x")]))
             .unwrap_err();
@@ -821,7 +821,7 @@ mod tests {
         assert!(e.to_string().starts_with("[1]: invalid type"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn maps() {
         let mut hash = HashMap::new();
         hash.insert("a".to_string(), 1_u8);
@@ -839,7 +839,7 @@ mod tests {
         assert_eq!(by_str.serialize().to_string(), r#"{"k":1}"#);
     }
 
-    #[test]
+    #[quench_test::test]
     fn map_errors_point_at_the_key() {
         let value = crate::json::parse(r#"{"ok":1,"bad":"x"}"#).unwrap();
         let e = HashMap::<String, u8>::deserialize(&value).unwrap_err();
@@ -858,7 +858,7 @@ mod tests {
         assert!(e.to_string().contains("single character"), "{e}");
     }
 
-    #[test]
+    #[quench_test::test]
     fn wide_integers_go_through_64_bits() {
         round_trip(&7_u128);
         round_trip(&-7_i128);
@@ -870,7 +870,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn tuples() {
         round_trip(&(1_u8,));
         round_trip(&(1_u8, "two".to_string()));
@@ -900,7 +900,7 @@ mod tests {
         assert_eq!(e.path(), "[1]");
     }
 
-    #[test]
+    #[quench_test::test]
     fn pointers_and_wrappers_are_transparent() {
         assert_eq!(Box::new(5_u8).serialize(), Value::from(5));
         assert_eq!(Rc::new(5_u8).serialize(), Value::from(5));
@@ -917,7 +917,7 @@ mod tests {
         assert_eq!("str".serialize(), Value::from("str"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn value_and_map_are_identity() {
         let v = crate::json::parse(r#"{"a":[1,{"b":null}]}"#).unwrap();
         assert_eq!(v.serialize(), v);
@@ -927,7 +927,7 @@ mod tests {
         assert_eq!(Map::deserialize(&v).unwrap(), m);
     }
 
-    #[test]
+    #[quench_test::test]
     fn time_uuid_path_duration() {
         let t = Time::from_ymd_hms(2026, 9, 29, 12, 0, 0).unwrap();
         assert_eq!(t.serialize(), Value::from("2026-09-29T12:00:00Z"));
@@ -967,7 +967,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn lenient_mode_parses_text_scalars_only_while_active() {
         let text = |s: &str| Value::from(s);
         assert!(u8::deserialize(&text("5")).is_err());
@@ -1010,7 +1010,7 @@ mod tests {
         assert!(Vec::<u8>::deserialize(&Value::from(5)).is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn versions_are_strings() {
         let v = Version::parse("1.2.3-rc.1").unwrap();
         assert_eq!(v.serialize(), Value::from("1.2.3-rc.1"));
@@ -1024,7 +1024,7 @@ mod tests {
         assert!(err::<VersionReq>(Value::Null).contains("requirement string"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn deserialize_owned_is_implied() {
         fn takes<T: DeserializeOwned>(value: &Value) -> T {
             T::deserialize(value).unwrap()

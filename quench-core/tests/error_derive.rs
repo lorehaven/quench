@@ -1,5 +1,8 @@
 //! `#[derive(Error)]` as the rest of quench uses it.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use std::error::Error as StdError;
 use std::io;
 
@@ -54,7 +57,7 @@ fn text(e: &impl StdError) -> String {
     e.to_string()
 }
 
-#[test]
+#[quench_test::test]
 fn display_formats() {
     assert_eq!(text(&Sample::Unit), "plain message");
     assert_eq!(text(&Sample::Tuple("k".into())), "miss for key: k");
@@ -111,7 +114,7 @@ fn display_formats() {
     assert_eq!(text(&Sample::Braces(3)), "{literal} braces and 3");
 }
 
-#[test]
+#[quench_test::test]
 fn sources() {
     let source = |e: &Sample| e.source().map(ToString::to_string);
     assert_eq!(source(&Sample::Unit), None);
@@ -132,7 +135,7 @@ fn sources() {
     assert!(transparent.source().is_none());
 }
 
-#[test]
+#[quench_test::test]
 fn from_enables_question_mark() {
     fn read() -> Result<(), Sample> {
         Err(io::Error::new(io::ErrorKind::NotFound, "gone"))?;
@@ -162,7 +165,7 @@ struct Fixed;
 #[error(transparent)]
 struct Passthrough(#[from] Coded);
 
-#[test]
+#[quench_test::test]
 fn structs() {
     let coded = Coded {
         code: 404,
@@ -191,13 +194,13 @@ struct Generic<T: std::fmt::Debug>(T);
 #[derive(Debug, Error)]
 enum Never {}
 
-#[test]
+#[quench_test::test]
 fn generics_and_empty_enums() {
     assert_eq!(Generic(vec![1, 2]).to_string(), "generic [1, 2]");
     let _: Option<Never> = None;
 }
 
-#[test]
+#[quench_test::test]
 fn works_as_a_boxed_error_and_with_the_catch_all() {
     let boxed: Box<dyn StdError + Send + Sync> = Box::new(Sample::Tuple("x".into()));
     assert_eq!(boxed.to_string(), "miss for key: x");
@@ -224,7 +227,7 @@ enum WithPaths {
     Debugged { path: std::path::PathBuf },
 }
 
-#[test]
+#[quench_test::test]
 fn path_fields_display_like_thiserror() {
     let e = WithPaths::Read {
         path: "/etc/x.toml".into(),
@@ -246,3 +249,5 @@ fn path_fields_display_like_thiserror() {
         "debug form: \"p\""
     );
 }
+
+quench_test::main!();

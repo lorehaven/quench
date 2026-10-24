@@ -1,6 +1,9 @@
 //! Against a real Redis: `CACHE_TEST_REDIS_URL` (see `scripts/test-env.fish`; `foreman db` starts one).
 //! Without it every test here returns early.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::uuid::Uuid;
 use quench_redis::{Client, Config, Connection, Error, PoolOptions, Redis, Value, cmd};
 use std::time::Duration;
@@ -28,7 +31,7 @@ fn key(prefix: &str) -> String {
     format!("quench-test:{prefix}:{}", Uuid::new_v4().simple())
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn strings_numbers_and_expiry() {
     let url = live!();
     let redis = Redis::connect(&url).await.unwrap();
@@ -104,7 +107,7 @@ async fn strings_numbers_and_expiry() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn binary_and_large_values_round_trip() {
     let url = live!();
     let redis = Redis::connect(&url).await.unwrap();
@@ -129,7 +132,7 @@ async fn binary_and_large_values_round_trip() {
     redis.exec::<i64>(&cmd("DEL").arg(&k)).await.unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn sets_lists_and_scan() {
     let url = live!();
     let redis = Redis::connect(&url).await.unwrap();
@@ -205,7 +208,7 @@ async fn sets_lists_and_scan() {
         .unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn server_errors_are_typed_and_the_connection_survives() {
     let url = live!();
     let redis = Redis::connect(&url).await.unwrap();
@@ -239,7 +242,7 @@ async fn server_errors_are_typed_and_the_connection_survives() {
     redis.exec::<i64>(&cmd("DEL").arg(&k)).await.unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn pipelines_return_every_reply_including_errors() {
     let url = live!();
     let client = Client::connect(&url).await.unwrap();
@@ -263,7 +266,7 @@ async fn pipelines_return_every_reply_including_errors() {
     assert!(format!("{client:?}").contains("Client"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn resp3_replies_decode() {
     let url = live!();
     let config = Config::from_url(&url).unwrap();
@@ -310,7 +313,7 @@ async fn resp3_replies_decode() {
     conn.close().await;
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn databases_and_authentication() {
     let url = live!();
     let on_db1 = Config {
@@ -354,7 +357,7 @@ async fn databases_and_authentication() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn dead_connections_are_replaced_transparently() {
     let url = live!();
     let client = Client::connect(&url).await.unwrap();
@@ -373,7 +376,7 @@ async fn dead_connections_are_replaced_transparently() {
     assert_eq!(client.idle_count(), 0);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn command_timeouts_discard_the_connection() {
     let url = live!();
     let config = Config {
@@ -405,7 +408,7 @@ async fn command_timeouts_discard_the_connection() {
     assert_eq!(client.exec::<String>(&cmd("PING")).await.unwrap(), "PONG");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn cancelling_a_command_leaves_the_connection_unusable() {
     let url = live!();
     let mut conn = Connection::connect(&Config::from_url(&url).unwrap())
@@ -420,7 +423,7 @@ async fn cancelling_a_command_leaves_the_connection_unusable() {
     assert!(conn.is_closed());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn the_pool_limits_and_reuses_connections() {
     let url = live!();
     let client = Client::connect_with(
@@ -461,7 +464,7 @@ async fn the_pool_limits_and_reuses_connections() {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn lazy_clients_and_unreachable_servers() {
     let url = live!();
     let lazy = Client::lazy(Config::from_url(&url).unwrap(), PoolOptions::default());
@@ -487,3 +490,5 @@ async fn lazy_clients_and_unreachable_servers() {
             .is_ok()
     );
 }
+
+quench_test::main!();

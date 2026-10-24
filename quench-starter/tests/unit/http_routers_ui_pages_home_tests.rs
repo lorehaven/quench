@@ -20,7 +20,7 @@ async fn request() -> Request {
     )
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn auth_disabled_renders_the_page_straight_through() {
     let config = JwtConfig::for_tests();
     let req = request().await;
@@ -30,7 +30,7 @@ async fn auth_disabled_renders_the_page_straight_through() {
     assert_eq!(response.status(), StatusCode::OK);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn auth_enabled_without_a_session_cookie_redirects_to_login_instead_of_rendering() {
     let mut config = JwtConfig::for_tests();
     config.auth_enabled = true;
@@ -45,7 +45,7 @@ async fn auth_enabled_without_a_session_cookie_redirects_to_login_instead_of_ren
     assert!(response.into_inner().headers.contains_key("location"));
 }
 
-#[test]
+#[quench_test::test]
 fn service_card_builds_a_link_with_the_extra_class_and_both_i18n_keys() {
     let html = service_card("/ui/jobs", "jobs_title", "jobs_desc", "jobs-card").render();
     assert!(html.starts_with("<a"));

@@ -565,7 +565,7 @@ mod tests {
         Ok(out)
     }
 
-    #[test]
+    #[quench_test::test]
     fn boundaries_come_from_the_content_type() {
         assert_eq!(
             parse_boundary("multipart/form-data; boundary=abc").unwrap(),
@@ -604,7 +604,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn reads_text_and_file_fields() {
         let body = form(&[
             ("title", None, "hello"),
@@ -627,7 +627,7 @@ mod tests {
         assert!(format!("{mp:?}").contains("Done"));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn every_chunk_size_gives_the_same_result() {
         let body = form(&[
             ("a", None, "x--XyZ-y\r\n--Xy"),
@@ -647,7 +647,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn preamble_epilogue_and_padding_are_ignored() {
         let body = String::from(
             "this is a preamble\r\nwith lines\r\n--XyZ \t\r\nContent-Disposition: form-data; name=\"a\"\r\n\r\nv\r\n--XyZ--  trailing epilogue\r\nmore",
@@ -656,7 +656,7 @@ mod tests {
         assert_eq!(fields, vec![(Some("a".into()), None, "v".into())]);
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn parts_without_headers_and_empty_bodies() {
         let body = "--XyZ\r\n\r\nbare\r\n--XyZ--";
         let fields = collect(&mut reader(body, 3)).await.unwrap();
@@ -670,7 +670,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn skipped_fields_are_drained() {
         let body = form(&[("skip", None, &"x".repeat(5000)), ("keep", None, "me")]);
         let mut mp = reader(&body, 100);
@@ -682,7 +682,7 @@ mod tests {
         assert!(mp.next_field().await.unwrap().is_none());
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn fields_can_be_streamed_in_pieces() {
         let value = "0123456789".repeat(100);
         let body = form(&[("big", Some("f.txt"), &value)]);
@@ -714,7 +714,7 @@ mod tests {
         assert_eq!(bytes, value.as_str());
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn truncated_bodies_are_errors() {
         for body in [
             "--XyZ\r\nContent-Disposition: form-data; name=\"a\"\r\n\r\nno end",
@@ -731,7 +731,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn malformed_structure_is_rejected() {
         let junk_after_boundary = "--XyZ junk\r\n\r\nx\r\n--XyZ--";
         assert!(matches!(
@@ -755,7 +755,7 @@ mod tests {
         ));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn limits_are_enforced() {
         let body = form(&[("a", None, &"x".repeat(100))]);
         let limits = Limits {
@@ -816,7 +816,7 @@ mod tests {
         ));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn text_fields_must_be_utf8() {
         let mut body = b"--XyZ\r\nContent-Disposition: form-data; name=\"a\"\r\n\r\n".to_vec();
         body.extend_from_slice(&[0xff, 0xfe]);
@@ -825,7 +825,7 @@ mod tests {
         assert!(matches!(collect(&mut mp).await, Err(Error::NotUtf8)));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn stream_errors_surface() {
         let items: Vec<Result<Bytes, std::io::Error>> = vec![
             Ok(Bytes::from_static(b"--XyZ\r\n")),
@@ -838,7 +838,7 @@ mod tests {
         assert!(err.source().is_some());
     }
 
-    #[test]
+    #[quench_test::test]
     fn dispositions_handle_quotes_escapes_and_extended_names() {
         let mut headers = HeaderMap::new();
         headers.append(
@@ -877,7 +877,7 @@ mod tests {
         assert_eq!(disposition(&HeaderMap::new()), (None, None));
     }
 
-    #[test]
+    #[quench_test::test]
     fn errors_display() {
         for err in [
             Error::MissingBoundary,
@@ -895,7 +895,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn compaction_keeps_long_bodies_intact() {
         let value = "abcdefghij".repeat(30_000);
         let body = form(&[("big", None, &value), ("tail", None, "end")]);

@@ -224,7 +224,7 @@ mod tests {
         unsafe { libc::close(fd) };
     }
 
-    #[test]
+    #[quench_test::test]
     fn escape_sequences() {
         assert_eq!(move_to(0, 0), "\x1b[1;1H");
         assert_eq!(move_to(9, 4), "\x1b[5;10H");
@@ -233,7 +233,7 @@ mod tests {
         assert_eq!(out, b"\x1b[2J\x1b[1;1H");
     }
 
-    #[test]
+    #[quench_test::test]
     fn terminals_are_recognised_and_sized() {
         let (master, slave) = pty();
         assert!(is_tty(slave));
@@ -263,7 +263,7 @@ mod tests {
         let _ = (stdin_is_tty(), stdout_is_tty(), size());
     }
 
-    #[test]
+    #[quench_test::test]
     fn a_secret_is_read_without_echo() {
         let (master, slave) = pty();
         // Typed after the prompt is up, as a person would.
@@ -283,7 +283,7 @@ mod tests {
         close(slave);
     }
 
-    #[test]
+    #[quench_test::test]
     fn a_pipe_is_read_as_it_is() {
         let mut fds = [0 as RawFd; 2];
         // SAFETY: `pipe` fills the array.
@@ -299,7 +299,7 @@ mod tests {
         assert!(read_secret(-1, "").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn invalid_utf8_is_an_error() {
         let mut fds = [0 as RawFd; 2];
         // SAFETY: `pipe` fills the array.

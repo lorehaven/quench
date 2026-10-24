@@ -10,10 +10,12 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+autotests = false
 
 [lib]
 name = "quench_serde"
 path = "src/lib.rs"
+harness = false
 
 [dependencies]
 quench-core = { workspace = true }
@@ -28,3 +30,11 @@ yaml = []
 
 [lints]
 workspace = true
+
+[[test]]
+name = "derive"
+path = "tests/derive.rs"
+harness = false
+
+[dev-dependencies]
+quench-test = { workspace = true }

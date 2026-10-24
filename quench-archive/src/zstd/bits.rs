@@ -157,7 +157,7 @@ impl BackwardWriter {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn backward_stream_round_trips() {
         let mut writer = BackwardWriter::new();
         let values = [
@@ -184,7 +184,7 @@ mod tests {
         assert_eq!(reader.peek(5), 0);
     }
 
-    #[test]
+    #[quench_test::test]
     fn peeking_past_the_start_pads_with_zeros() {
         let mut writer = BackwardWriter::new();
         writer.add(0b101, 3);
@@ -193,7 +193,7 @@ mod tests {
         assert_eq!(reader.peek(5), 0b10100);
     }
 
-    #[test]
+    #[quench_test::test]
     fn a_stream_needs_an_end_marker() {
         assert!(matches!(BackwardReader::new(&[]), Err(Error::Truncated)));
         assert!(matches!(
@@ -202,7 +202,7 @@ mod tests {
         ));
     }
 
-    #[test]
+    #[quench_test::test]
     fn forward_reader_reads_little_endian() {
         let mut reader = ForwardReader::new(&[0b1010_0101, 0xFF]);
         assert_eq!(reader.read(4), 0b0101);

@@ -43,7 +43,7 @@ mod tests {
     use quench_core::hex;
 
     // RFC 4231 test cases 1 and 2.
-    #[test]
+    #[quench_test::test]
     fn rfc4231_vectors() {
         let key = [0x0b; 20];
         assert_eq!(
@@ -68,7 +68,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn verification() {
         let tag = sign(Algorithm::Sha256, b"k", "message");
         assert!(verify(Algorithm::Sha256, b"k", "message", &tag));

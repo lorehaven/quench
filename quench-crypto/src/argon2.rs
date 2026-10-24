@@ -452,7 +452,7 @@ mod tests {
     use quench_core::hex;
 
     // RFC 9106 section 5.3: Argon2id, 4 lanes, with a secret and associated data.
-    #[test]
+    #[quench_test::test]
     fn rfc9106_argon2id_vector() {
         let params = Params {
             memory_kib: 32,
@@ -468,7 +468,7 @@ mod tests {
     }
 
     // Hashes of "password"/"somesalt" produced by the `argon2` crate (argon2id, v0x13).
-    #[test]
+    #[quench_test::test]
     fn matches_the_argon2_crate() {
         for (memory_kib, iterations, lanes, expected) in [
             (
@@ -511,7 +511,7 @@ mod tests {
     }
 
     // What `Argon2::default()` stored for existing users: these must keep verifying.
-    #[test]
+    #[quench_test::test]
     fn stored_hashes_from_the_argon2_crate_verify() {
         let stored = "$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHRzb21lc2FsdA$k9ohroejZy1PN5E1SbHNPug6vB8eQAahb5SOAp6iGF4";
         assert!(verify_password("correct horse", stored).unwrap());
@@ -524,7 +524,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn password_hashes_verify() {
         let params = Params {
             memory_kib: 64,
@@ -541,7 +541,7 @@ mod tests {
         assert_ne!(hash, hash_password("hunter2", &params).unwrap());
     }
 
-    #[test]
+    #[quench_test::test]
     fn defaults_match_the_argon2_crate() {
         let params = Params::default();
         assert_eq!(
@@ -561,7 +561,7 @@ mod tests {
         assert!(verify_password("pw", &hash).unwrap());
     }
 
-    #[test]
+    #[quench_test::test]
     fn long_outputs_use_the_extended_hash() {
         let params = Params {
             memory_kib: 32,
@@ -581,7 +581,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn every_input_changes_the_hash() {
         let base = Params {
             memory_kib: 32,
@@ -631,7 +631,7 @@ mod tests {
         assert_eq!(reference, hash_raw(b"pw", b"saltsalt", &base).unwrap());
     }
 
-    #[test]
+    #[quench_test::test]
     fn several_lanes_and_passes() {
         for lanes in [2, 3, 4] {
             for iterations in [1, 3] {
@@ -648,7 +648,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn invalid_parameters_are_refused() {
         let ok = Params {
             memory_kib: 32,
@@ -706,7 +706,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn malformed_hash_strings_are_errors_not_mismatches() {
         for bad in [
             "",

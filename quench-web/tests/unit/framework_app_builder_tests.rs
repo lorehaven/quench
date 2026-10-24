@@ -3,7 +3,7 @@
 use quench_web::framework::app::AppBuilder;
 use quench_web::html::builder::elements::div;
 
-#[test]
+#[quench_test::test]
 fn build_assembles_a_full_page_with_the_active_theme_and_locale_scripts() {
     let html = AppBuilder::new()
         .title("Quench")
@@ -23,7 +23,7 @@ fn build_assembles_a_full_page_with_the_active_theme_and_locale_scripts() {
     assert!(html.contains("id=\"root\""));
 }
 
-#[test]
+#[quench_test::test]
 fn extra_links_and_scripts_are_appended_not_replaced() {
     let html = AppBuilder::new()
         .supported_locales(vec!["en-US".to_string()])
@@ -38,7 +38,7 @@ fn extra_links_and_scripts_are_appended_not_replaced() {
     assert!(html.contains("htmx.org"));
 }
 
-#[test]
+#[quench_test::test]
 fn header_and_footer_are_optional() {
     let without = AppBuilder::new()
         .supported_locales(vec!["en-US".to_string()])

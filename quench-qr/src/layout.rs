@@ -420,7 +420,7 @@ pub fn build(data: &[u8], version: u8, level: EcLevel) -> QrCode {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn capacities_match_the_standards_byte_mode_column() {
         // ISO 18004 table 7 (byte mode) for a few versions and levels.
         assert_eq!(capacity(1, EcLevel::L), 17);
@@ -434,7 +434,7 @@ mod tests {
         assert!(fits(1, EcLevel::M, 14) && !fits(1, EcLevel::M, 15));
     }
 
-    #[test]
+    #[quench_test::test]
     fn version_geometry_is_the_standards() {
         assert_eq!(size_of(1), 21);
         assert_eq!(size_of(40), 177);
@@ -448,7 +448,7 @@ mod tests {
         assert_eq!(alignment_positions(40), [6, 30, 58, 86, 114, 142, 170]);
     }
 
-    #[test]
+    #[quench_test::test]
     fn the_data_stream_is_padded_to_the_capacity() {
         let stream = data_stream(b"hi", 1, EcLevel::M);
         assert_eq!(stream.len(), data_codewords(1, EcLevel::M));
@@ -457,7 +457,7 @@ mod tests {
         assert_eq!(&stream[stream.len() - 2..], [0xec, 0x11].map(|b| b));
     }
 
-    #[test]
+    #[quench_test::test]
     fn every_mask_pattern_is_an_involution_that_spares_function_modules() {
         let mut grid = Grid::new(21);
         grid.function_patterns(1);

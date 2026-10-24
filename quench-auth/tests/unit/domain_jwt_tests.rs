@@ -12,7 +12,7 @@ fn claims(scope: &str) -> Claims {
     )
 }
 
-#[test]
+#[quench_test::test]
 fn realm_tokens_are_accepted_by_every_listed_audience() {
     let claims = Claims::for_audiences(
         "user".to_string(),
@@ -27,7 +27,7 @@ fn realm_tokens_are_accepted_by_every_listed_audience() {
     assert!(!claims.allows("switchboard"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn issued_tokens_round_trip_through_the_audience_check() {
     let mut config = JwtConfig::for_tests_with_signing();
     config.service_name = "gatehouse".to_string();
@@ -48,7 +48,7 @@ async fn issued_tokens_round_trip_through_the_audience_check() {
 /// A service granted several actions carries one token per action - the wire
 /// format is a flat list of space-separated `service:action` pairs, folded
 /// into a set per service.
-#[test]
+#[quench_test::test]
 fn a_scope_carries_roles_and_several_actions_per_service() {
     let claims = claims("user sage:write sage:read warehouse:read");
 
@@ -69,7 +69,7 @@ fn a_scope_carries_roles_and_several_actions_per_service() {
 /// The whole point of dropping the ordered read/write ladder: two actions on
 /// one service are independent, and holding one implies nothing about the
 /// other.
-#[test]
+#[quench_test::test]
 fn actions_on_one_service_are_independent() {
     let claims = claims("user switchboard:launch");
 
@@ -80,7 +80,7 @@ fn actions_on_one_service_are_independent() {
 
 /// A wildcard role short-circuits, which is why an admin's token enumerates
 /// nothing.
-#[test]
+#[quench_test::test]
 fn a_wildcard_role_reaches_a_service_the_scope_never_mentions() {
     for scope in ["admin", "service"] {
         let claims = claims(scope);
@@ -97,7 +97,7 @@ fn a_wildcard_role_reaches_a_service_the_scope_never_mentions() {
 
 /// The reason `has_role` exists at all. The old check was
 /// `scope.contains("admin")`, which a service named `admin` would satisfy.
-#[test]
+#[quench_test::test]
 fn a_permission_cannot_be_mistaken_for_the_role_it_is_named_after() {
     let claims = claims("user admin:read");
 
@@ -107,7 +107,7 @@ fn a_permission_cannot_be_mistaken_for_the_role_it_is_named_after() {
     assert!(!claims.can("admin", "write"));
 }
 
-#[test]
+#[quench_test::test]
 fn an_unknown_role_name_is_not_a_wildcard() {
     // `system` used to be accepted by switchboard's substring check; the realm
     // never issued it.
@@ -116,7 +116,7 @@ fn an_unknown_role_name_is_not_a_wildcard() {
     assert!(!claims.can("sage", "read"));
 }
 
-#[test]
+#[quench_test::test]
 fn narrowing_cannot_widen_a_token_past_the_configured_audiences() {
     let mut config = JwtConfig::for_tests();
     config.audiences = vec!["sage".to_string(), "warehouse".to_string()];
@@ -132,7 +132,7 @@ fn narrowing_cannot_widen_a_token_past_the_configured_audiences() {
     assert!(config.narrow_audiences(&[]).is_empty());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_narrowed_token_is_rejected_by_the_audience_it_excludes() {
     let mut config = JwtConfig::for_tests_with_signing();
     config.service_name = "gatehouse".to_string();
@@ -156,7 +156,7 @@ async fn a_narrowed_token_is_rejected_by_the_audience_it_excludes() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn test_jwt_expiration() {
     let config = JwtConfig::for_tests_with_signing();
 
@@ -176,7 +176,7 @@ async fn test_jwt_expiration() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn test_jwt_iat_future() {
     let config = JwtConfig::for_tests_with_signing();
 

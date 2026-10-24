@@ -1,7 +1,11 @@
 //! Against a real PostgreSQL: `DB_TEST_POSTGRES_URL` (see `scripts/test-env.fish`; `foreman db` starts one).
 //! Without it every test here returns early.
 
-#![allow(clippy::significant_drop_tightening)] // tests hold guards for their whole body on purpose
+#![allow(clippy::significant_drop_tightening)]
+// tests hold guards for their whole body on purpose
+
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_core::time::Time;
 use quench_core::uuid::Uuid;
@@ -38,7 +42,7 @@ fn unique(prefix: &str) -> String {
     format!("{prefix}_{}", Uuid::new_v4().simple())
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn connects_and_reports_server_details() {
     let url = live!();
     let mut conn = connect(&url).await;
@@ -57,7 +61,7 @@ async fn connects_and_reports_server_details() {
     conn.close().await;
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn parameters_and_results_round_trip_by_type() {
     let url = live!();
     let mut conn = connect(&url).await;
@@ -92,7 +96,7 @@ async fn parameters_and_results_round_trip_by_type() {
     conn.close().await;
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn timestamps_are_utc_whatever_the_server_default() {
     let url = live!();
     let mut conn = connect(&url).await;
@@ -110,7 +114,7 @@ async fn timestamps_are_utc_whatever_the_server_default() {
     conn.close().await;
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn every_numeric_type_converts() {
     let url = live!();
     let mut conn = connect(&url).await;
@@ -122,7 +126,7 @@ async fn every_numeric_type_converts() {
     conn.close().await;
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn execute_counts_rows_and_constraints_report_codes() {
     let url = live!();
     let table = unique("t_exec");
@@ -212,7 +216,7 @@ async fn execute_counts_rows_and_constraints_report_codes() {
     conn.close().await;
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn row_count_helpers() {
     let url = live!();
     let mut conn = connect(&url).await;
@@ -239,7 +243,7 @@ async fn row_count_helpers() {
     conn.close().await;
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn scripts_with_several_statements_run_through_the_simple_protocol() {
     let url = live!();
     let table = unique("t_script");
@@ -301,7 +305,7 @@ async fn scripts_with_several_statements_run_through_the_simple_protocol() {
     conn.close().await;
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn transactions_commit_roll_back_and_clean_up_after_themselves() {
     let url = live!();
     let table = unique("t_tx");
@@ -385,7 +389,7 @@ async fn transactions_commit_roll_back_and_clean_up_after_themselves() {
     conn.close().await;
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn notices_and_notifications_do_not_disturb_a_conversation() {
     let url = live!();
     let mut conn = connect(&url).await;
@@ -406,7 +410,7 @@ async fn notices_and_notifications_do_not_disturb_a_conversation() {
     conn.close().await;
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn bad_credentials_and_databases_are_server_errors() {
     let url = live!();
     let mut config = Config::from_url(&url).unwrap();
@@ -433,7 +437,7 @@ async fn bad_credentials_and_databases_are_server_errors() {
 }
 
 #[cfg(feature = "tls")]
-#[tokio::test]
+#[quench_test::test]
 async fn tls_is_negotiated_when_asked_and_refused_when_the_server_has_none() {
     let url = live!();
     let config = Config::from_url(&format!("{url}?sslmode=require")).unwrap();
@@ -466,7 +470,7 @@ async fn connect_with(config: &Config) {
     conn.ping().await.unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn statement_timeouts_abandon_the_connection() {
     let url = live!();
     let mut config = Config::from_url(&url).unwrap();
@@ -489,7 +493,7 @@ async fn statement_timeouts_abandon_the_connection() {
     ));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn cancelling_a_statement_leaves_the_connection_unusable_not_confused() {
     let url = live!();
     let mut conn = connect(&url).await;
@@ -509,7 +513,7 @@ async fn cancelling_a_statement_leaves_the_connection_unusable_not_confused() {
     ));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn the_pool_reuses_connections_and_limits_their_number() {
     let url = live!();
     let options = PoolOptions {
@@ -550,7 +554,7 @@ async fn the_pool_reuses_connections_and_limits_their_number() {
     assert_eq!(pool.idle_count(), 0);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn pooled_helpers_and_concurrent_use() {
     let url = live!();
     let table = unique("t_pool");
@@ -608,7 +612,7 @@ async fn pooled_helpers_and_concurrent_use() {
         .unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn the_pool_discards_connections_that_are_not_clean() {
     let url = live!();
     let pool = Pool::connect_with(
@@ -648,7 +652,7 @@ async fn the_pool_discards_connections_that_are_not_clean() {
     assert!(pool.get().await.unwrap().ping().await.is_ok());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn pooled_connections_run_transactions() {
     let url = live!();
     let pool = Pool::connect(&url).await.unwrap();
@@ -658,7 +662,7 @@ async fn pooled_connections_run_transactions() {
     assert!(format!("{conn:?}").contains("PooledConnection"));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn idle_connections_that_were_killed_are_replaced() {
     let url = live!();
     let pool = Pool::connect_with(
@@ -687,7 +691,7 @@ async fn idle_connections_that_were_killed_are_replaced() {
     again.ping().await.unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn pools_can_start_lazily() {
     let url = live!();
     let pool = Pool::lazy(Config::from_url(&url).unwrap(), PoolOptions::default());
@@ -705,7 +709,7 @@ async fn pools_can_start_lazily() {
     assert!(Pool::connect("not a url").await.is_err());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn max_lifetime_retires_connections_on_return() {
     let url = live!();
     let pool = Pool::connect_with(
@@ -727,7 +731,7 @@ async fn max_lifetime_retires_connections_on_return() {
     assert_eq!(pool.idle_count(), 0);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn idle_timeout_skips_stale_connections() {
     let url = live!();
     let pool = Pool::connect_with(
@@ -746,3 +750,5 @@ async fn idle_timeout_skips_stale_connections() {
     assert_eq!(pool.idle_count(), 0);
     drop(conn);
 }
+
+quench_test::main!();

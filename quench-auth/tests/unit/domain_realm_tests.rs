@@ -5,7 +5,7 @@ use quench_auth::domain::realm::*;
 /// `envmnt` is process-global, so these assertions share one test to keep
 /// them from racing each other - and `GATEHOUSE_URL` is also touched by
 /// `jwks`/`sso_client` tests elsewhere in this binary, hence the shared lock.
-#[test]
+#[quench_test::test]
 fn realm_names_come_from_the_environment() {
     let _guard = crate::env_lock::ENV_LOCK.lock().unwrap();
     quench_core::env::remove("AUTH_DB_SCHEMA");
@@ -41,7 +41,7 @@ fn realm_names_come_from_the_environment() {
 
 /// `AUTH_COOKIE_DOMAIN` is also touched by `cookie_domain_is_applied_...`
 /// below, hence the shared lock.
-#[test]
+#[quench_test::test]
 fn session_and_refresh_cookies_carry_the_expected_attributes() {
     let _guard = crate::env_lock::ENV_LOCK.lock().unwrap();
     quench_core::env::remove("AUTH_COOKIE_NAME");
@@ -80,7 +80,7 @@ fn session_and_refresh_cookies_carry_the_expected_attributes() {
     quench_core::env::remove("REFRESH_TOKEN_TTL_SECS");
 }
 
-#[test]
+#[quench_test::test]
 fn cleared_cookies_are_empty_and_expire_immediately() {
     quench_core::env::remove("AUTH_COOKIE_NAME");
     quench_core::env::remove("AUTH_REFRESH_COOKIE_NAME");
@@ -102,7 +102,7 @@ fn cleared_cookies_are_empty_and_expire_immediately() {
 }
 
 /// Shares `AUTH_COOKIE_DOMAIN` with `session_and_refresh_cookies_...` above.
-#[test]
+#[quench_test::test]
 fn cookie_domain_is_applied_to_realm_cookies_when_set() {
     let _guard = crate::env_lock::ENV_LOCK.lock().unwrap();
     quench_core::env::set("AUTH_COOKIE_DOMAIN", ".example.com");
@@ -118,7 +118,7 @@ fn cookie_domain_is_applied_to_realm_cookies_when_set() {
     assert!(session.domain().is_none());
 }
 
-#[test]
+#[quench_test::test]
 fn authorize_state_cookie_and_its_cleared_counterpart() {
     let cookie = authorize_state_cookie("state-blob");
     assert_eq!(cookie.name(), AUTHORIZE_STATE_COOKIE);
@@ -140,7 +140,7 @@ fn authorize_state_cookie_and_its_cleared_counterpart() {
 
 /// `BASE_PATH` is shared by `base_path` and `ui_path`, so both live in one
 /// test to keep them from racing each other.
-#[test]
+#[quench_test::test]
 fn base_path_normalizes_every_shape_of_raw_value_and_ui_path_builds_on_it() {
     quench_core::env::set("BASE_PATH", "");
     assert_eq!(base_path(), "/");

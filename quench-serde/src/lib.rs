@@ -35,3 +35,6 @@ pub use quench_serde_macros::{Deserialize, Serialize};
 
 #[doc(hidden)]
 pub use private as __private;
+
+#[cfg(test)]
+quench_test::main!();

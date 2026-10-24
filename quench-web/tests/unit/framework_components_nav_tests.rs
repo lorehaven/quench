@@ -3,7 +3,7 @@
 use quench_web::framework::components::nav::{NavPanelBuilder, locale_switch, nav_button};
 use quench_web::framework::theme::Theme;
 
-#[test]
+#[quench_test::test]
 fn nav_button_toggles_the_modal_and_shows_a_grip_icon() {
     let html = nav_button().render();
     assert!(html.contains("class=\"q-shell-nav-trigger\""));
@@ -12,7 +12,7 @@ fn nav_button_toggles_the_modal_and_shows_a_grip_icon() {
     assert!(html.contains("class=\"fas fa-grip\""));
 }
 
-#[test]
+#[quench_test::test]
 fn locale_switch_lists_every_supported_locale_with_its_flag() {
     let html = locale_switch(
         Some(vec!["en-US".to_string(), "pl-PL".to_string()]),
@@ -29,7 +29,7 @@ fn locale_switch_lists_every_supported_locale_with_its_flag() {
     assert!(html.contains("value=\"pl-PL\""));
 }
 
-#[test]
+#[quench_test::test]
 fn locale_switch_falls_back_to_the_first_locale_when_the_default_is_not_supported() {
     let html = locale_switch(
         Some(vec!["en-US".to_string(), "de-DE".to_string()]),
@@ -39,7 +39,7 @@ fn locale_switch_falls_back_to_the_first_locale_when_the_default_is_not_supporte
     assert!(html.contains("value=\"en-US\""));
 }
 
-#[test]
+#[quench_test::test]
 fn a_locale_with_no_two_letter_region_gets_no_flag_prefix() {
     let html = locale_switch(Some(vec!["en".to_string()]), None).render();
     // No region to derive a flag from - the label is just the bare locale,
@@ -48,7 +48,7 @@ fn a_locale_with_no_two_letter_region_gets_no_flag_prefix() {
     assert!(!html.contains("> en</option>"));
 }
 
-#[test]
+#[quench_test::test]
 fn nav_panel_builder_default_renders_locale_and_theme_selects() {
     let html = NavPanelBuilder::new()
         .supported_locales(vec!["en-US".to_string()])
@@ -67,7 +67,7 @@ fn nav_panel_builder_default_renders_locale_and_theme_selects() {
     assert!(html.contains("bootstrap-light"));
 }
 
-#[test]
+#[quench_test::test]
 fn nav_panel_builder_respects_an_explicit_theme_list_and_default() {
     let html = NavPanelBuilder::new()
         .supported_locales(vec!["en-US".to_string()])

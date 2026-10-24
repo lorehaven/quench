@@ -243,7 +243,7 @@ impl<A: FromValue, B: FromValue> FromValue for (A, B) {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn commands_encode_their_arguments() {
         let c = cmd("set")
             .arg("key")
@@ -268,7 +268,7 @@ mod tests {
         assert_eq!(cmd("X").arg(&&"ref").get(1), Some(&b"ref"[..]));
     }
 
-    #[test]
+    #[quench_test::test]
     fn replies_convert() {
         assert_eq!(String::from_value(Value::Bulk(b"x".to_vec())).unwrap(), "x");
         assert_eq!(

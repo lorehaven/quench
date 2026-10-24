@@ -74,6 +74,7 @@ fn is_executable(path: &Path) -> bool {
 }
 
 #[cfg(all(test, unix))]
+#[allow(clippy::wildcard_imports)]
 mod tests {
     use super::*;
     use crate::tmp::TempDir;
@@ -87,7 +88,7 @@ mod tests {
         path
     }
 
-    #[test]
+    #[quench_test::test]
     fn finds_programs_by_path_and_by_name() {
         let dir = TempDir::new().unwrap();
         let tool = make(dir.path(), "quench-tool", 0o755);

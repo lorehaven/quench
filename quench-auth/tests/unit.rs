@@ -1,3 +1,6 @@
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 #[path = "unit/domain_auth_tests.rs"]
 mod domain_auth_tests;
 #[path = "unit/domain_jwks_tests.rs"]
@@ -14,3 +17,5 @@ mod env_lock;
 mod signing_tests;
 #[path = "unit/user_db_tests.rs"]
 mod user_db_tests;
+
+quench_test::main!();

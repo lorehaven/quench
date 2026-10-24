@@ -2,6 +2,9 @@
 //! routes and base-path mounting - the same wiring `http::serve` does,
 //! minus actually opening a socket.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
 use quench_http::http::{HeaderMap, Method, StatusCode, Uri};
@@ -20,7 +23,7 @@ fn get(uri: &str, container: &Arc<quench_http::di::Container>) -> Request {
     )
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn health_live_and_ready_reflect_state_and_swagger_redirects() {
     let health_state = HealthState::live();
     let container = Arc::new(
@@ -56,7 +59,7 @@ async fn health_live_and_ready_reflect_state_and_swagger_redirects() {
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn swagger_routes_redirect_to_the_index() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
     let router: Arc<dyn Endpoint> = Arc::new(discover_routes());
@@ -73,3 +76,5 @@ async fn swagger_routes_redirect_to_the_index() {
             .ends_with("/swagger-ui/index.html")
     );
 }
+
+quench_test::main!();

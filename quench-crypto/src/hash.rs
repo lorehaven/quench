@@ -100,7 +100,7 @@ mod tests {
     use quench_core::hex;
 
     // FIPS 180-4 examples.
-    #[test]
+    #[quench_test::test]
     fn nist_vectors() {
         assert_eq!(
             hex::encode(sha256("")),
@@ -126,7 +126,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn sha1_legacy_matches_the_fips_vectors() {
         assert_eq!(
             hex::encode(sha1_legacy("abc")),
@@ -138,7 +138,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn generic_digest_matches_the_fixed_forms() {
         assert_eq!(digest(Algorithm::Sha256, b"x"), sha256(b"x"));
         assert_eq!(digest(Algorithm::Sha384, b"x"), sha384(b"x"));
@@ -153,7 +153,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn incremental_hashing_equals_one_shot() {
         let mut hasher = Hasher::new(Algorithm::Sha256);
         hasher.update("a");

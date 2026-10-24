@@ -57,7 +57,7 @@ pub fn remainder(data: &[u8], degree: usize) -> Vec<u8> {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn multiplication_follows_the_field() {
         assert_eq!(multiply(0, 123), 0);
         assert_eq!(multiply(1, 123), 123);
@@ -71,13 +71,13 @@ mod tests {
         assert_eq!(power, 1);
     }
 
-    #[test]
+    #[quench_test::test]
     fn the_degree_seven_generator_is_the_standards() {
         // ISO 18004 annex A: x^7 + a^87 x^6 + a^229 x^5 + a^146 x^4 + a^149 x^3 + a^238 x^2 + a^102 x + a^21.
         assert_eq!(generator(7), [127, 122, 154, 164, 11, 68, 117]);
     }
 
-    #[test]
+    #[quench_test::test]
     fn the_worked_example_of_the_standard_checks_out() {
         // ISO 18004 annex I: "01234567" at version 1-M.
         let data = [

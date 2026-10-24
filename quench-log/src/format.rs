@@ -154,7 +154,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn timestamps_have_microseconds() {
         assert_eq!(
             timestamp(Time::from_unix_nanos(1_790_683_200, 123_456_789)),
@@ -163,7 +163,7 @@ mod tests {
         assert_eq!(timestamp(Time::UNIX_EPOCH), "1970-01-01T00:00:00.000000Z");
     }
 
-    #[test]
+    #[quench_test::test]
     fn text_line() {
         assert_eq!(
             text(&record(), false),
@@ -181,7 +181,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn ansi_colours_only_the_level() {
         for (level, code) in [
             (Level::Trace, "35"),
@@ -199,7 +199,7 @@ mod tests {
         assert!(!text(&record(), false).contains('\x1b'));
     }
 
-    #[test]
+    #[quench_test::test]
     fn json_line() {
         let line = json(&record());
         assert!(line.ends_with("}\n"));
@@ -223,7 +223,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn json_without_spans_or_message() {
         let bare = Record {
             spans: vec![],
@@ -243,7 +243,7 @@ mod tests {
         assert!(value["fields"].get("message").is_none());
     }
 
-    #[test]
+    #[quench_test::test]
     fn json_escapes_awkward_text() {
         let tricky = Record {
             message: "quote \" newline \n tab \t".into(),

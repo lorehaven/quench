@@ -2,6 +2,8 @@
 //!
 //! Environment variables are process-global, so the tests take turns on `ENV_LOCK`.
 #![allow(clippy::await_holding_lock)]
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_http::prelude::{ContainerBuilder, Endpoint};
 use quench_starter::http::{discover_and_mount, serve, serve_app};
@@ -41,7 +43,7 @@ async fn wait_ok(client: &quench_client::transport::Client, url: &str) -> bool {
     false
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn plain_http_when_there_is_no_certificate() {
     let _guard = ENV_LOCK.lock().unwrap();
     let port = free_port();
@@ -62,7 +64,7 @@ async fn plain_http_when_there_is_no_certificate() {
     server.abort();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn https_with_an_http_redirect_server() {
     let _guard = ENV_LOCK.lock().unwrap();
     let (https_port, redirect_port) = (free_port(), free_port());
@@ -117,7 +119,7 @@ async fn https_with_an_http_redirect_server() {
     quench_core::env::remove("SERVER_HTTP_REDIRECT_ADDR");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn serve_builds_the_graph_and_reports_readiness() {
     let _guard = ENV_LOCK.lock().unwrap();
     let port = free_port();
@@ -148,3 +150,5 @@ async fn serve_builds_the_graph_and_reports_readiness() {
     server.abort();
     quench_core::env::remove("ALLOW_IN_MEMORY_DB");
 }
+
+quench_test::main!();

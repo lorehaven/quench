@@ -319,7 +319,7 @@ mod tests {
         Uri::parse(text).unwrap()
     }
 
-    #[test]
+    #[quench_test::test]
     fn origin_form() {
         let u = uri("/a/b?x=1&y=2");
         assert_eq!((u.path(), u.query()), ("/a/b", Some("x=1&y=2")));
@@ -336,7 +336,7 @@ mod tests {
         assert_eq!(format!("{:?}", uri("/x")), "\"/x\"");
     }
 
-    #[test]
+    #[quench_test::test]
     fn absolute_form() {
         let u = uri("https://user:pw@Example.com:8443/path/x?q=1");
         assert_eq!(u.scheme(), Some("https"));
@@ -347,7 +347,7 @@ mod tests {
         assert_eq!(u.as_str(), "https://user:pw@Example.com:8443/path/x?q=1");
     }
 
-    #[test]
+    #[quench_test::test]
     fn absolute_form_without_a_path_gets_a_slash() {
         for (raw, normalized) in [
             ("http://h", "http://h/"),
@@ -362,7 +362,7 @@ mod tests {
         assert_eq!(uri("http://h?x=1").query(), Some("x=1"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn authority_form_and_ipv6() {
         let u = uri("example.com:443");
         assert_eq!(
@@ -375,7 +375,7 @@ mod tests {
         assert_eq!(uri("http://[::1]/").port_u16(), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_bad_input() {
         assert_eq!(Uri::parse(""), Err(InvalidUri::Empty));
         for bad in ["/a b", "/a\r\n", "/caf\u{e9}", "/x#frag", "/\x7f"] {
@@ -414,7 +414,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn conversions() {
         assert_eq!("/x".parse::<Uri>().unwrap().path(), "/x");
         assert_eq!(Uri::try_from("/y").unwrap().path(), "/y");
@@ -422,7 +422,7 @@ mod tests {
         assert!(Uri::try_from(String::new()).is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn resolves_redirect_targets() {
         let base = uri("http://h:8080/a/b/c?old=1");
         assert_eq!(

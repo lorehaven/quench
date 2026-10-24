@@ -10,10 +10,12 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+autotests = false
 
 [lib]
 name = "quench_core"
 path = "src/lib.rs"
+harness = false
 
 [dependencies]
 quench-core-macros = { workspace = true }
@@ -23,3 +25,21 @@ getrandom = { workspace = true }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+quench-test = { workspace = true }
+
+[[test]]
+name = "async_trait"
+path = "tests/async_trait.rs"
+harness = false
+
+[[test]]
+name = "error_derive"
+path = "tests/error_derive.rs"
+harness = false
+
+[[test]]
+name = "registry"
+path = "tests/registry.rs"
+harness = false

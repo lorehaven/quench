@@ -48,7 +48,7 @@ fn spawn_server(body: String) -> (String, Arc<AtomicUsize>) {
     (format!("http://{addr}"), hits)
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn resolves_a_known_kid_from_the_published_set_and_then_from_cache() {
     let key = generate_signing_key();
     let body = quench_serde::json!({
@@ -66,7 +66,7 @@ async fn resolves_a_known_kid_from_the_published_set_and_then_from_cache() {
     assert_eq!(hits.load(Ordering::SeqCst), 1);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn an_unknown_kid_is_none_and_the_miss_itself_is_cached() {
     let key = generate_signing_key();
     let body = quench_serde::json!({
@@ -84,7 +84,7 @@ async fn an_unknown_kid_is_none_and_the_miss_itself_is_cached() {
     assert_eq!(hits.load(Ordering::SeqCst), 1);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_malformed_jwks_response_resolves_to_none() {
     let (url, _hits) = spawn_server("not json".to_string());
 
@@ -92,7 +92,7 @@ async fn a_malformed_jwks_response_resolves_to_none() {
     assert!(verifier.resolve("abc").await.is_none());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn an_unreachable_gatehouse_resolves_to_none_instead_of_panicking() {
     // Nothing is listening on this port - the request itself fails.
     let verifier = JwksVerifier::new("http://127.0.0.1:1", true)
@@ -101,7 +101,7 @@ async fn an_unreachable_gatehouse_resolves_to_none_instead_of_panicking() {
     assert!(verifier.resolve("abc").await.is_none());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn new_accepts_both_tls_verify_settings() {
     let key = generate_signing_key();
     let body = quench_serde::json!({
@@ -114,7 +114,7 @@ async fn new_accepts_both_tls_verify_settings() {
     assert!(JwksVerifier::new(&url, true).await.is_ok());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn from_env_requires_gatehouse_url_to_be_set() {
     // `GATEHOUSE_URL` is also touched by realm/sso_client tests in this
     // binary - shared lock to keep this from racing them.

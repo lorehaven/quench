@@ -581,7 +581,7 @@ mod tests {
         "AGE-SECRET-KEY-1GQ9778VQXMMJVE8SK7J6VT8UJ4HDQAJUVSFCWCM02D8GEWQ72PVQ2Y5J33";
     const PUBLIC: &str = "age1t7rxyev2z3rw82stdlrrepyc39nvn86l5078zqkf5uasdy86jp6svpy7pa";
 
-    #[test]
+    #[quench_test::test]
     fn keys_encode_and_decode() {
         let identity: Identity = SECRET.parse().expect("a valid secret key");
         assert_eq!(identity.to_public().to_string(), PUBLIC);
@@ -600,7 +600,7 @@ mod tests {
         assert_eq!(PUBLIC.to_uppercase().parse::<Recipient>(), Ok(recipient));
     }
 
-    #[test]
+    #[quench_test::test]
     fn bad_keys_are_rejected() {
         for bad in [
             "",
@@ -637,7 +637,7 @@ mod tests {
         assert!(bech32_decode("A12uEL5L").is_err(), "mixed case");
     }
 
-    #[test]
+    #[quench_test::test]
     fn encrypt_then_decrypt() {
         let identity = Identity::generate();
         for size in [
@@ -665,7 +665,7 @@ mod tests {
         assert_ne!(a, b);
     }
 
-    #[test]
+    #[quench_test::test]
     fn several_recipients_each_open_it() {
         let (a, b, c) = (
             Identity::generate(),
@@ -691,7 +691,7 @@ mod tests {
         assert_eq!(encrypt(&[], b"x"), Err(Error::NoRecipients));
     }
 
-    #[test]
+    #[quench_test::test]
     fn tampering_is_detected() {
         let identity = Identity::generate();
         let sealed = encrypt(&[identity.to_public()], b"secret value").unwrap();
@@ -746,7 +746,7 @@ mod tests {
         assert_eq!(decrypt(&ids, &renamed), Err(Error::NoMatchingIdentity));
     }
 
-    #[test]
+    #[quench_test::test]
     fn malformed_headers_are_refused() {
         let ids = [Identity::generate()];
         for bad in [
@@ -783,7 +783,7 @@ mod tests {
         ));
     }
 
-    #[test]
+    #[quench_test::test]
     fn armor_round_trips() {
         let identity = Identity::generate();
         let sealed = encrypt(&[identity.to_public()], &vec![7u8; 5000]).unwrap();
@@ -808,7 +808,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn wrapped_stanza_bodies_follow_the_64_column_rule() {
         assert_eq!(wrapped_base64(&[0u8; 32]).lines().count(), 1);
         // 48 bytes encode to exactly 64 columns: the body then ends with an empty line.
@@ -820,7 +820,7 @@ mod tests {
         assert_eq!(wrapped_base64(&[]), "\n");
     }
 
-    #[test]
+    #[quench_test::test]
     fn errors_describe_themselves() {
         for error in [
             Error::Format("f".into()),

@@ -2,7 +2,7 @@
 
 use quench_db::DbError;
 
-#[test]
+#[quench_test::test]
 fn display_messages_match_the_declared_format() {
     assert_eq!(
         DbError::ConnectionError("refused".to_string()).to_string(),
@@ -24,7 +24,7 @@ fn display_messages_match_the_declared_format() {
 }
 
 #[cfg(feature = "postgres")]
-#[test]
+#[quench_test::test]
 fn pg_errors_map_by_kind() {
     let none: DbError = quench_pg::Error::RowCount {
         expected: "exactly one",
@@ -60,7 +60,7 @@ fn pg_errors_map_by_kind() {
     assert!(matches!(DbError::from(server), DbError::QueryError(_)));
 }
 
-#[test]
+#[quench_test::test]
 fn serde_errors_map_to_serialization_error() {
     let err: DbError = quench_serde::Error::new("bad json").into();
     assert!(matches!(err, DbError::SerializationError(_)));

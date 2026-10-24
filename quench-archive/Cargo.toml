@@ -10,10 +10,30 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+autotests = false
 
 [lib]
 name = "quench_archive"
 path = "src/lib.rs"
+harness = false
 
 [lints]
 workspace = true
+
+[[test]]
+name = "tar"
+path = "tests/tar.rs"
+harness = false
+
+[[test]]
+name = "zip"
+path = "tests/zip.rs"
+harness = false
+
+[[test]]
+name = "zstd"
+path = "tests/zstd.rs"
+harness = false
+
+[dev-dependencies]
+quench-test = { workspace = true }

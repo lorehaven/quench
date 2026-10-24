@@ -28,3 +28,6 @@ pub mod version;
 
 pub use error::{Context, Result};
 pub use quench_core_macros::{Error, async_trait};
+
+#[cfg(test)]
+quench_test::main!();

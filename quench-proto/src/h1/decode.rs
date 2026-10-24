@@ -233,7 +233,7 @@ mod tests {
         Ok((out, used, decoder.is_done()))
     }
 
-    #[test]
+    #[quench_test::test]
     fn fixed_length_stops_at_the_boundary() {
         let (out, used, done) = decode_all(Framing::Length(5), b"helloGET /next").unwrap();
         assert_eq!((out.as_slice(), used, done), (&b"hello"[..], 5, true));
@@ -241,7 +241,7 @@ mod tests {
         assert_eq!((out.as_slice(), used, done), (&b"hello"[..], 5, false));
     }
 
-    #[test]
+    #[quench_test::test]
     fn empty_framings_are_done_immediately() {
         for framing in [Framing::None, Framing::Length(0)] {
             let mut decoder = BodyDecoder::new(framing);
@@ -250,7 +250,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn until_close_takes_everything_and_is_never_done() {
         let mut decoder = BodyDecoder::new(Framing::UntilClose);
         let mut out = Vec::new();
@@ -261,7 +261,7 @@ mod tests {
         assert_eq!(decoder.remaining(), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn remaining_counts_down() {
         let mut decoder = BodyDecoder::new(Framing::Length(4));
         assert_eq!(decoder.remaining(), Some(4));
@@ -270,7 +270,7 @@ mod tests {
         assert!(!decoder.reads_to_eof());
     }
 
-    #[test]
+    #[quench_test::test]
     fn chunked_decodes_whole_and_bytewise() {
         let wire = b"5\r\nhello\r\n6;ext=1\r\n world\r\n0\r\n\r\nGET /next";
         for result in [
@@ -284,7 +284,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn chunked_accepts_uppercase_hex_and_trailers() {
         let wire = b"A\r\n0123456789\r\n0\r\nX-Trailer: yes\r\nOther: 1\r\n\r\n";
         for result in [
@@ -298,7 +298,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn chunked_rejects_malformed_input() {
         for bad in [
             &b"zz\r\nhello\r\n"[..],
@@ -326,7 +326,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn chunked_limits_line_and_trailer_sizes() {
         let mut long_line = vec![b'1'; MAX_LINE + 1];
         long_line.extend_from_slice(b"\r\n");
@@ -339,7 +339,7 @@ mod tests {
         assert!(decode_all(Framing::Chunked, &wire).is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn chunked_is_incomplete_without_the_final_blank_line() {
         let (_, _, done) = decode_all(Framing::Chunked, b"3\r\nabc\r\n0\r\n").unwrap();
         assert!(!done);
@@ -348,7 +348,7 @@ mod tests {
         assert!(!done);
     }
 
-    #[test]
+    #[quench_test::test]
     fn encode_chunk_formats_and_skips_empty_data() {
         let mut out = Vec::new();
         encode_chunk(&mut out, b"");

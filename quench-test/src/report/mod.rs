@@ -345,7 +345,9 @@ fn suite_from_value(value: &Value) -> Option<Suite> {
 ///
 /// `QUENCH_TEST_REPORT_DIR` if set, else `quench-test` next to the profile directory of the
 /// running test binary (`target/debug/quench-test`), else `target/quench-test` under the current directory.
-/// `None` when `QUENCH_TEST_REPORT` is `off` or `0`.
+/// `None` when `QUENCH_TEST_REPORT` is `off` or `0`, and under `cargo nextest` (which sets `NEXTEST`) unless
+/// `QUENCH_TEST_REPORT_DIR` asks for it: nextest runs every test in a process of its own, so no process sees the
+/// whole run, and each would overwrite the report of the one before with its single test.
 #[must_use]
 pub fn report_directory() -> Option<PathBuf> {
     if matches!(
@@ -356,6 +358,9 @@ pub fn report_directory() -> Option<PathBuf> {
     }
     if let Some(dir) = std::env::var_os("QUENCH_TEST_REPORT_DIR").filter(|d| !d.is_empty()) {
         return Some(PathBuf::from(dir));
+    }
+    if std::env::var_os("NEXTEST").is_some() {
+        return None;
     }
     let from_exe = std::env::current_exe().ok().and_then(|exe| {
         let deps = exe.parent()?;

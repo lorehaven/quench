@@ -56,13 +56,13 @@ pub fn parse(text: &str) -> Option<Time> {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn formats_the_rfc_example() {
         let time = Time::from_ymd_hms(1994, 11, 6, 8, 49, 37).unwrap();
         assert_eq!(format(&time), "Sun, 06 Nov 1994 08:49:37 GMT");
     }
 
-    #[test]
+    #[quench_test::test]
     fn parses_what_it_formats() {
         let time = parse("Sun, 06 Nov 1994 08:49:37 GMT").unwrap();
         assert_eq!(time.timestamp(), 784_111_777);
@@ -70,7 +70,7 @@ mod tests {
         assert!(parse("  Tue, 01 Jan 2030 00:00:00 GMT ").is_some());
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_other_forms() {
         for bad in [
             "",
@@ -88,7 +88,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn now_is_parseable() {
         assert!(parse(&now()).is_some());
     }

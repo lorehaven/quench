@@ -1,10 +1,12 @@
 //! The `CommonMark` 0.31 specification examples.
 
 #![cfg(feature = "markdown")]
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_html::markdown::to_html;
 
-#[test]
+#[quench_test::test]
 fn passes_the_commonmark_spec() {
     let text = include_str!("fixtures/commonmark-spec.json");
     // The fixture is a JSON array of {"example", "markdown", "html"}; read it without a JSON library.
@@ -60,3 +62,5 @@ fn field(chunk: &str, key: &str) -> String {
     let _ = (i, bytes);
     out
 }
+
+quench_test::main!();

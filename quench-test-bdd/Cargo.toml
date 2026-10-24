@@ -10,6 +10,7 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+autotests = false
 
 [lib]
 name = "quench_test_bdd"
@@ -25,3 +26,13 @@ tokio = { workspace = true }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "features"
+path = "tests/features.rs"
+harness = false
+
+[[test]]
+name = "parsing"
+path = "tests/parsing.rs"
+harness = false

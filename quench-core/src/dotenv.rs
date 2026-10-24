@@ -300,7 +300,7 @@ mod tests {
         (key.to_string(), value.to_string())
     }
 
-    #[test]
+    #[quench_test::test]
     fn plain_lines_comments_and_export() {
         let got = pairs("# top\n\nA=1\n  B = two words  \nexport C=3\nD=\nE=x # note\nF=a#b\n");
         assert_eq!(
@@ -316,7 +316,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn quotes() {
         let got = pairs(
             "A='lit $X \\n'\nB=\"tab\\there \\\"q\\\" \\$X \\\\\"\nC=\"multi\nline\"\nD=\"keeps trailing \"\nE=a\"b c\"'d'\n",
@@ -333,7 +333,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn variables_expand_from_earlier_lines_and_the_environment() {
         // SAFETY of the test: a name unique to it.
         env::set("QUENCH_DOTENV_TEST_HOME", "/home/x");
@@ -350,12 +350,12 @@ mod tests {
         env::remove("QUENCH_DOTENV_TEST_HOME");
     }
 
-    #[test]
+    #[quench_test::test]
     fn crlf_line_endings_work() {
         assert_eq!(pairs("A=1\r\nB='x'\r\n"), [kv("A", "1"), kv("B", "x")]);
     }
 
-    #[test]
+    #[quench_test::test]
     fn malformed_lines_name_their_line() {
         assert_eq!(parse("A=1\nnoequals\n").unwrap_err().line, 2);
         assert!(
@@ -386,7 +386,7 @@ mod tests {
         assert_eq!(parse("A=\"1\nB=2\n").unwrap_err().line, 1);
     }
 
-    #[test]
+    #[quench_test::test]
     fn loading_never_overrides_what_is_set() {
         let dir = TempDir::new().unwrap();
         let file = dir.path().join(".env");
@@ -414,7 +414,7 @@ mod tests {
         assert!(std::error::Error::source(&error).is_some());
     }
 
-    #[test]
+    #[quench_test::test]
     fn find_and_load_search_upwards() {
         // Runs against the real working directory, so only checks consistency.
         match find() {

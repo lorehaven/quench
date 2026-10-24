@@ -1,6 +1,10 @@
 //! Two components that depend on each other are caught as a cycle at
 //! startup rather than deadlocking or blowing the stack.
-#![allow(clippy::unused_async)] // `#[injectable]` constructors are async by contract
+#![allow(clippy::unused_async)]
+// `#[injectable]` constructors are async by contract
+
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_http::di::{ContainerBuilder, DiError};
 use quench_http::prelude::injectable;
@@ -26,7 +30,7 @@ async fn provide_b(a: Arc<A>) -> B {
     B { a }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn mutual_dependency_is_reported_as_a_cycle() {
     let err = ContainerBuilder::new().build().await.unwrap_err();
     match err {
@@ -42,3 +46,5 @@ async fn mutual_dependency_is_reported_as_a_cycle() {
         other => panic!("expected Cycle, got {other:?}"),
     }
 }
+
+quench_test::main!();

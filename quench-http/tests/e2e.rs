@@ -1,5 +1,8 @@
 //! The framework over real sockets: HTTP, HTTPS, WebSocket upgrades and server-sent events.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::async_trait;
 use quench_core::stream;
 use quench_http::di::ContainerBuilder;
@@ -116,7 +119,7 @@ fn url(addr: std::net::SocketAddr, path: &str) -> Uri {
     Uri::parse(&format!("http://{addr}{path}")).unwrap()
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn plain_http_round_trip_and_connection_reuse() {
     let (addr, stop, server) = start().await;
     let mut conn = ClientConn::new(TcpStream::connect(addr).await.unwrap());
@@ -147,7 +150,7 @@ async fn plain_http_round_trip_and_connection_reuse() {
     server.await.unwrap().unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn unknown_paths_are_404s() {
     let (addr, stop, server) = start().await;
     let conn = ClientConn::new(TcpStream::connect(addr).await.unwrap());
@@ -163,7 +166,7 @@ async fn unknown_paths_are_404s() {
     server.await.unwrap().unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn server_sent_events_stream_in_order() {
     let (addr, stop, server) = start().await;
     let conn = ClientConn::new(TcpStream::connect(addr).await.unwrap());
@@ -184,7 +187,7 @@ async fn server_sent_events_stream_in_order() {
     server.await.unwrap().unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn multipart_uploads_stream_through_the_server() {
     let (addr, stop, server) = start().await;
     let big = "x".repeat(300_000);
@@ -206,7 +209,7 @@ async fn multipart_uploads_stream_through_the_server() {
     server.await.unwrap().unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn websocket_upgrade_and_echo() {
     let (addr, stop, server) = start().await;
     let mut tcp = TcpStream::connect(addr).await.unwrap();
@@ -258,7 +261,7 @@ async fn websocket_upgrade_and_echo() {
     server.await.unwrap().unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_plain_get_to_the_websocket_route_is_a_400() {
     let (addr, stop, server) = start().await;
     let conn = ClientConn::new(TcpStream::connect(addr).await.unwrap());
@@ -282,7 +285,7 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 #[cfg(feature = "tls")]
-#[tokio::test]
+#[quench_test::test]
 async fn https_with_a_real_handshake() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -344,7 +347,7 @@ async fn https_with_a_real_handshake() {
     server.await.unwrap().unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn shutdown_returns_promptly_with_idle_keep_alive_connections_open() {
     let (addr, stop, server) = start().await;
     let _idle = TcpStream::connect(addr).await.unwrap();
@@ -363,7 +366,7 @@ async fn shutdown_returns_promptly_with_idle_keep_alive_connections_open() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn the_websocket_extractor_upgrades_and_rejects() {
     let (addr, stop, server) = start().await;
     // A plain GET is refused by the extractor with a 400.
@@ -398,3 +401,5 @@ async fn the_websocket_extractor_upgrades_and_rejects() {
     let _ = stop.send(());
     server.await.unwrap().unwrap();
 }
+
+quench_test::main!();

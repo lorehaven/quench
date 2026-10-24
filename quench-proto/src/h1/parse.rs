@@ -424,7 +424,7 @@ mod tests {
         headers
     }
 
-    #[test]
+    #[quench_test::test]
     fn parses_a_plain_get() {
         let head = req("GET /a/b?x=1 HTTP/1.1\r\nHost: example.com\r\nAccept:  text/html \r\n\r\n")
             .unwrap();
@@ -436,12 +436,12 @@ mod tests {
         assert_eq!(head.headers.get("HOST").unwrap(), "example.com");
     }
 
-    #[test]
+    #[quench_test::test]
     fn http_10_does_not_need_a_host() {
         assert!(req("GET / HTTP/1.0\r\n\r\n").is_ok());
     }
 
-    #[test]
+    #[quench_test::test]
     fn host_is_required_and_unique_on_http_11() {
         assert_eq!(
             req("GET / HTTP/1.1\r\n\r\n").unwrap_err(),
@@ -453,7 +453,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_malformed_request_lines() {
         for bad in [
             "GET /\r\n\r\n",
@@ -479,7 +479,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_smuggling_vectors_in_header_syntax() {
         for bad in [
             "GET / HTTP/1.1\r\nHost: a\r\n X: folded\r\n\r\n",
@@ -497,7 +497,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn enforces_the_limits() {
         let tiny = Limits {
             max_head_bytes: 40,
@@ -546,13 +546,13 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn find_head_end_needs_the_blank_line() {
         assert_eq!(find_head_end(b"GET / HTTP/1.1\r\nHost: a\r\n"), None);
         assert_eq!(find_head_end(b"GET / HTTP/1.1\r\n\r\nrest"), Some(18));
     }
 
-    #[test]
+    #[quench_test::test]
     fn head_must_be_terminated() {
         assert!(matches!(
             lines(b"GET / HTTP/1.1\r\n"),
@@ -560,7 +560,7 @@ mod tests {
         ));
     }
 
-    #[test]
+    #[quench_test::test]
     fn parses_response_heads() {
         let head = parse_response_head(
             b"HTTP/1.1 404 Not Found\r\nContent-Length: 3\r\n\r\n",
@@ -597,7 +597,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn request_framing_follows_the_headers() {
         let v = Version::HTTP_11;
         assert_eq!(request_framing(v, &map(&[])).unwrap(), Framing::None);
@@ -623,7 +623,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn request_framing_rejects_smuggling_combinations() {
         let v = Version::HTTP_11;
         for headers in [
@@ -650,7 +650,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn response_framing_follows_method_status_and_headers() {
         let get = Method::GET;
         let ok = StatusCode::OK;
@@ -690,7 +690,7 @@ mod tests {
         assert!(response_framing(&get, ok, &map(&[("content-length", "x")])).is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn keep_alive_rules() {
         assert!(wants_keep_alive(Version::HTTP_11, &map(&[])));
         assert!(!wants_keep_alive(
@@ -714,7 +714,7 @@ mod tests {
         assert!(!has_token(&map(&[]), "connection", "upgrade"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn heads_serialise_round_trip() {
         let headers = map(&[
             ("content-type", "text/plain"),
@@ -750,7 +750,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn proto_errors_display() {
         assert!(ProtoError::BadRequest("why").to_string().contains("why"));
         assert!(ProtoError::UriTooLong.to_string().contains("too long"));

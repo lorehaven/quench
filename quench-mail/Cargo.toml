@@ -10,6 +10,7 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+autotests = false
 
 [dependencies]
 quench-core = { workspace = true }
@@ -17,7 +18,13 @@ quench-tls = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+quench-test = { workspace = true }
 tokio = { workspace = true }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false

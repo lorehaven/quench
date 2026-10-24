@@ -560,7 +560,7 @@ mod tests {
         Value::Object(entries.iter().map(|(k, v)| (*k, v.clone())).collect())
     }
 
-    #[test]
+    #[quench_test::test]
     fn integers_are_canonical() {
         assert_eq!(Value::from(5_i32), Value::UInt(5));
         assert_eq!(Value::from(5_u8), Value::from(5_i64));
@@ -573,7 +573,7 @@ mod tests {
         assert_eq!(Value::from(i64::MIN), Value::Int(i64::MIN));
     }
 
-    #[test]
+    #[quench_test::test]
     fn non_finite_floats_become_null() {
         assert_eq!(Value::from(f64::NAN), Value::Null);
         assert_eq!(Value::from(f64::INFINITY), Value::Null);
@@ -581,7 +581,7 @@ mod tests {
         assert_eq!(Value::from(1.5_f32), Value::Float(1.5));
     }
 
-    #[test]
+    #[quench_test::test]
     fn conversions() {
         assert_eq!(Value::from(true), Value::Bool(true));
         assert_eq!(Value::from(()), Value::Null);
@@ -598,7 +598,7 @@ mod tests {
         assert_eq!((1..=3).collect::<Value>(), Value::from(vec![1, 2, 3]));
     }
 
-    #[test]
+    #[quench_test::test]
     fn accessors() {
         assert!(Value::Null.is_null());
         assert_eq!(Value::Bool(true).as_bool(), Some(true));
@@ -630,7 +630,7 @@ mod tests {
         assert!(Value::Null.as_bool().is_none());
     }
 
-    #[test]
+    #[quench_test::test]
     fn mutable_accessors() {
         let mut v = Value::from(vec![1]);
         v.as_array_mut().unwrap().push(Value::from(2));
@@ -645,7 +645,7 @@ mod tests {
         assert!(taken.as_object().is_some());
     }
 
-    #[test]
+    #[quench_test::test]
     fn type_names() {
         let names: Vec<_> = [
             Value::Null,
@@ -668,7 +668,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn get_and_index() {
         let v = obj(&[("a", Value::from(vec![10, 20])), ("b", Value::from("x"))]);
         assert_eq!(v.get("b"), Some(&Value::from("x")));
@@ -684,7 +684,7 @@ mod tests {
         assert_eq!(Value::Null.get(0usize), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn get_mut_edits_in_place() {
         let mut v = obj(&[("a", Value::from(vec![1, 2]))]);
         *v.get_mut("a").unwrap().get_mut(1usize).unwrap() = Value::from(99);
@@ -694,7 +694,7 @@ mod tests {
         assert!(v.get_mut(0usize).is_none());
     }
 
-    #[test]
+    #[quench_test::test]
     fn json_pointer() {
         let v = obj(&[
             ("a", obj(&[("b", Value::from(vec![1, 2, 3]))])),
@@ -718,14 +718,14 @@ mod tests {
         assert_eq!(v.pointer("/a/b/0/deeper"), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn display_is_json() {
         let v = obj(&[("a", Value::from(vec![1, 2]))]);
         assert_eq!(v.to_string(), r#"{"a":[1,2]}"#);
         assert_eq!(format!("{v:#}"), "{\n  \"a\": [\n    1,\n    2\n  ]\n}");
     }
 
-    #[test]
+    #[quench_test::test]
     #[allow(clippy::float_cmp)]
     fn compares_with_plain_values_both_ways() {
         let v = obj(&[
@@ -758,12 +758,12 @@ mod tests {
         assert_ne!(v["missing"], "x");
     }
 
-    #[test]
+    #[quench_test::test]
     fn default_is_null() {
         assert_eq!(Value::default(), Value::Null);
     }
 
-    #[test]
+    #[quench_test::test]
     fn assigning_through_an_index_creates_keys() {
         let mut v = Value::Null;
         v["a"] = Value::from(1);
@@ -776,28 +776,28 @@ mod tests {
         assert_eq!(nested, crate::json!({"list": [1, 9], "k": true}));
     }
 
-    #[test]
+    #[quench_test::test]
     #[should_panic(expected = "cannot index a string with the key `k`")]
     fn assigning_a_key_into_a_scalar_panics() {
         let mut v = Value::from("s");
         v["k"] = Value::Null;
     }
 
-    #[test]
+    #[quench_test::test]
     #[should_panic(expected = "out of bounds")]
     fn assigning_past_the_end_of_an_array_panics() {
         let mut v = crate::json!([1]);
         v[3] = Value::Null;
     }
 
-    #[test]
+    #[quench_test::test]
     #[should_panic(expected = "cannot index a number with 0")]
     fn assigning_an_index_into_a_scalar_panics() {
         let mut v = Value::from(1);
         v[0] = Value::Null;
     }
 
-    #[test]
+    #[quench_test::test]
     fn values_compare_with_pointer_sized_integers() {
         let items = [1, 2, 3];
         assert_eq!(Value::from(3u64), items.len());

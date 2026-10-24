@@ -272,7 +272,7 @@ mod tests {
             .collect()
     }
 
-    #[test]
+    #[quench_test::test]
     fn walks_directories_before_their_contents_in_name_order() {
         let dir = tree();
         let got = names(Walk::new(dir.path()).sort_by_file_name(), dir.path());
@@ -291,7 +291,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn entries_know_their_depth_name_and_type() {
         let dir = tree();
         let entries: Vec<Entry> = Walk::new(dir.path())
@@ -314,7 +314,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn max_depth_limits_the_descent() {
         let dir = tree();
         assert_eq!(names(Walk::new(dir.path()).max_depth(0), dir.path()), [""]);
@@ -325,7 +325,7 @@ mod tests {
         assert_eq!(one, ["", "a", "b", "root.txt"]);
     }
 
-    #[test]
+    #[quench_test::test]
     fn filter_entry_prunes_whole_directories() {
         let dir = tree();
         let got = names(
@@ -337,7 +337,7 @@ mod tests {
         assert_eq!(got, ["", "a", "a/one.txt", "root.txt"]);
     }
 
-    #[test]
+    #[quench_test::test]
     fn unsorted_walks_still_visit_everything() {
         let dir = tree();
         let mut got = names(Walk::new(dir.path()), dir.path());
@@ -346,7 +346,7 @@ mod tests {
         assert!(format!("{:?}", Walk::new(dir.path())).contains("Walk"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn a_missing_root_is_an_error_entry() {
         let dir = TempDir::new().unwrap();
         let mut walk = Walk::new(dir.path().join("missing")).into_iter();
@@ -355,7 +355,7 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[test]
+    #[quench_test::test]
     fn an_unreadable_directory_is_an_entry_followed_by_an_error() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tree();
@@ -382,7 +382,7 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[test]
+    #[quench_test::test]
     fn links_are_reported_as_links_unless_followed() {
         use std::os::unix::fs::symlink;
         let dir = tree();
@@ -404,7 +404,7 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[test]
+    #[quench_test::test]
     fn a_link_loop_is_an_error_not_an_endless_walk() {
         use std::os::unix::fs::symlink;
         let dir = tree();
@@ -417,7 +417,7 @@ mod tests {
         assert!(results.len() < 100);
     }
 
-    #[test]
+    #[quench_test::test]
     fn standard_filters_skip_hidden_and_ignored_files() {
         let dir = TempDir::new().unwrap();
         let p = dir.path();

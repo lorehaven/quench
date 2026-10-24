@@ -1117,7 +1117,7 @@ mod tests {
         parse(text).expect_err(text).to_string()
     }
 
-    #[test]
+    #[quench_test::test]
     fn scalars_and_types() {
         assert_eq!(
             y("a: 1\nb: -2\nc: 1.5\nd: true\ne: null\nf: ~\ng: text\nh: 'quoted'\ni: \"dq\"\nj: 0x1f\nk: .inf\nl:\n"),
@@ -1133,7 +1133,7 @@ mod tests {
         assert_eq!(y("yes: no\n"), j(r#"{"yes":"no"}"#));
     }
 
-    #[test]
+    #[quench_test::test]
     fn a_bare_scalar_document() {
         assert_eq!(y("hello"), Value::from("hello"));
         assert_eq!(y("42"), Value::from(42));
@@ -1143,7 +1143,7 @@ mod tests {
         assert_eq!(y("\"x\""), Value::from("x"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn block_mappings_and_sequences() {
         assert_eq!(
             y("a:\n  b:\n    c: 1\n  d: 2\ne: 3\n"),
@@ -1167,7 +1167,7 @@ mod tests {
         assert_eq!(y("empty:\nnext: 1\n"), j(r#"{"empty":null,"next":1}"#));
     }
 
-    #[test]
+    #[quench_test::test]
     fn keys() {
         assert_eq!(
             y("key with spaces: v\n\"quoted key\": v2\n'single key': v3\n1: one\ntrue: t\n~: n\n"),
@@ -1180,7 +1180,7 @@ mod tests {
         assert!(bad("{a: 1, a: 2}").contains("duplicate"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn comments() {
         assert_eq!(
             y("# c\na: 1 # trailing\n# between\nb: 2 #x\nc: 'q # not a comment'\nd: a#b\n"),
@@ -1190,7 +1190,7 @@ mod tests {
         assert_eq!(y("- # first\n  x\n"), j(r#"["x"]"#));
     }
 
-    #[test]
+    #[quench_test::test]
     fn plain_scalars_fold_across_lines() {
         assert_eq!(y("- a\n- b\n  - c\n"), j(r#"["a","b - c"]"#));
         assert_eq!(
@@ -1211,7 +1211,7 @@ mod tests {
         assert!(bad("a: x\n  b: y\n").contains("mapping values are not allowed"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn quoted_scalars() {
         assert_eq!(
             y(r#"a: "q \n \t \" \\ \/ \u00e9 \x41 \U0001F600 \0 \a \b \e \f \r \v \N \_ \L \P \  end""#)["a"].as_str(),
@@ -1243,7 +1243,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn block_scalars() {
         assert_eq!(
             y("s: |\n  line1\n  line2\nt: x\n"),
@@ -1291,7 +1291,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn flow_collections() {
         assert_eq!(
             y("{a: 1, b: [x, y, {c: d}], e: ~, f}"),
@@ -1337,7 +1337,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn anchors_aliases_and_tags() {
         let v =
             y("base: &b {x: 1}\ncopy: *b\nlist: &l [1, 2]\nagain: *l\nscalar: &s text\nuse: *s\n");
@@ -1372,7 +1372,7 @@ mod tests {
         assert_eq!(y("!!str\n"), Value::from(""));
     }
 
-    #[test]
+    #[quench_test::test]
     fn documents() {
         assert_eq!(
             parse_all("---\na: 1\n...\n---\nb: 2\n").unwrap(),
@@ -1404,7 +1404,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn line_endings_and_whitespace() {
         assert_eq!(
             y("a: 1\r\nb:\r\n  - x\r\n  - y\r\n"),
@@ -1416,7 +1416,7 @@ mod tests {
         assert!(bad("a:\n\t- b\n").contains("tabs cannot be used for indentation"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn structural_errors_have_positions() {
         for (text, needle) in [
             ("a: b: c\n", "mapping values are not allowed"),
@@ -1446,7 +1446,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn non_string_keys_are_read_as_their_text() {
         assert_eq!(
             y("1: a\n2.5: b\ntrue: c\nnull: d\n"),

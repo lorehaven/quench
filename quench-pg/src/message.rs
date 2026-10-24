@@ -424,7 +424,7 @@ mod tests {
         out.push(0);
     }
 
-    #[test]
+    #[quench_test::test]
     fn startup_and_ssl_request_wire_forms() {
         let ssl = ssl_request();
         assert_eq!(ssl, [0, 0, 0, 8, 4, 210, 22, 47]);
@@ -437,7 +437,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn simple_frontend_messages() {
         assert_eq!(query("SELECT 1"), b"Q\0\0\0\x0dSELECT 1\0");
         assert_eq!(sync(), [b'S', 0, 0, 0, 4]);
@@ -448,7 +448,7 @@ mod tests {
         assert_eq!(execute("", 0), b"E\0\0\0\x09\0\0\0\0\0");
     }
 
-    #[test]
+    #[quench_test::test]
     fn parse_and_bind_encode_parameters() {
         let parse_msg = parse("", "SELECT $1", &[0]);
         assert_eq!(&parse_msg[..1], b"P");
@@ -466,7 +466,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn sasl_messages() {
         let initial = sasl_initial_response("SCRAM-SHA-256", b"n,,n=,r=abc");
         assert_eq!(initial[0], b'p');
@@ -476,7 +476,7 @@ mod tests {
         assert_eq!(sasl_response(b"c=biws"), b"p\0\0\0\x0ac=biws");
     }
 
-    #[test]
+    #[quench_test::test]
     fn decodes_authentication_requests() {
         assert_eq!(
             decode(b'R', &[0, 0, 0, 0]).unwrap(),
@@ -515,7 +515,7 @@ mod tests {
         assert!(decode(b'R', &[0, 0, 0, 5, 1]).is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn decodes_session_messages() {
         let status = body(|b| {
             cstr(b, "server_version");
@@ -555,7 +555,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn decodes_result_messages() {
         let description = body(|b| {
             b.extend_from_slice(&[0, 1]);
@@ -621,7 +621,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn decodes_errors_and_notices() {
         let fields = b"SERROR\0C42P01\0Mrelation \"x\" does not exist\0\0";
         let Backend::ErrorResponse(err) = decode(b'E', fields).unwrap() else {
@@ -637,7 +637,7 @@ mod tests {
         assert_eq!(notice.message, "hello");
     }
 
-    #[test]
+    #[quench_test::test]
     fn command_tags_report_row_counts() {
         assert_eq!(rows_affected("INSERT 0 3"), 3);
         assert_eq!(rows_affected("UPDATE 12"), 12);

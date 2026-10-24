@@ -22,7 +22,7 @@ fn value<'a>(record: &'a Record, name: &str) -> &'a FieldValue {
         .1
 }
 
-#[test]
+#[quench_test::test]
 fn every_level_macro_logs_at_its_level() {
     let records = capture(Level::Trace, || {
         quench_log::trace!("t");
@@ -47,7 +47,7 @@ fn every_level_macro_logs_at_its_level() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn disabled_levels_do_not_evaluate_their_arguments() {
     let mut evaluated = false;
     let records = capture(Level::Warn, || {
@@ -59,7 +59,7 @@ fn disabled_levels_do_not_evaluate_their_arguments() {
     assert!(records.is_empty() && !evaluated);
 }
 
-#[test]
+#[quench_test::test]
 fn messages_are_formatted() {
     let name = "ada";
     let records = capture(Level::Info, || {
@@ -75,7 +75,7 @@ fn messages_are_formatted() {
     assert!(records[0].fields.is_empty());
 }
 
-#[test]
+#[quench_test::test]
 fn fields_come_in_every_form() {
     let who = "ada";
     let err = std::io::Error::other("disk");
@@ -111,7 +111,7 @@ fn fields_come_in_every_form() {
     assert_eq!(records[2].message, "bare name is a field");
 }
 
-#[test]
+#[quench_test::test]
 fn shorthand_fields_record_the_variable_by_name() {
     let id = 7_u32;
     let path = String::from("/tmp/x");
@@ -129,7 +129,7 @@ fn shorthand_fields_record_the_variable_by_name() {
     assert_eq!(records[2].fields.len(), 1);
 }
 
-#[test]
+#[quench_test::test]
 fn last_field_without_a_trailing_comma() {
     let records = capture(Level::Info, || {
         quench_log::info!(a = 1, b = %"two");
@@ -142,7 +142,7 @@ fn last_field_without_a_trailing_comma() {
     assert_eq!(value(&records[2], "b"), &FieldValue::I64(2));
 }
 
-#[test]
+#[quench_test::test]
 fn optional_fields_vanish_when_none() {
     let records = capture(Level::Info, || {
         let missing: Option<u8> = None;
@@ -152,7 +152,7 @@ fn optional_fields_vanish_when_none() {
     assert_eq!(value(&records[0], "missing"), &FieldValue::Empty);
 }
 
-#[test]
+#[quench_test::test]
 fn the_target_is_the_module_path_unless_given() {
     let records = capture(Level::Info, || {
         quench_log::info!("default target");
@@ -167,7 +167,7 @@ fn the_target_is_the_module_path_unless_given() {
     assert_eq!(records[1].level, Level::Warn);
 }
 
-#[test]
+#[quench_test::test]
 fn event_takes_a_runtime_level() {
     let records = capture(Level::Debug, || {
         for level in [Level::Debug, Level::Error] {
@@ -180,7 +180,7 @@ fn event_takes_a_runtime_level() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn per_target_filters_apply() {
     let sink = MemorySink::new();
     let dispatcher =
@@ -192,7 +192,7 @@ fn per_target_filters_apply() {
     assert_eq!(sink.records().len(), 1);
 }
 
-#[test]
+#[quench_test::test]
 fn spans_attach_their_fields_to_events_inside() {
     let records = capture(Level::Trace, || {
         let outer = quench_log::info_span!("request", id = 7, path = %"/x");
@@ -223,7 +223,7 @@ fn spans_attach_their_fields_to_events_inside() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn spans_can_be_recorded_into_later() {
     let records = capture(Level::Info, || {
         let span = quench_log::info_span!("request", correlation_id = quench_log::field::Empty);
@@ -255,7 +255,7 @@ fn spans_can_be_recorded_into_later() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn disabled_spans_are_inert() {
     let records = capture(Level::Warn, || {
         let span = quench_log::debug_span!("quiet", id = 1);
@@ -269,7 +269,7 @@ fn disabled_spans_are_inert() {
     assert!(Span::none().is_none() && Span::default().is_none());
 }
 
-#[test]
+#[quench_test::test]
 fn span_targets_and_levels() {
     let records = capture(Level::Trace, || {
         let a = quench_log::span!(target: "custom", Level::Warn, "named", k = 1);
@@ -286,7 +286,7 @@ fn span_targets_and_levels() {
     assert_eq!(names, ["named", "t", "w", "e"]);
 }
 
-#[test]
+#[quench_test::test]
 fn in_scope_runs_inside_the_span() {
     let records = capture(Level::Info, || {
         let span = quench_log::info_span!("scoped");
@@ -301,7 +301,7 @@ fn in_scope_runs_inside_the_span() {
     assert!(records[1].spans.is_empty());
 }
 
-#[test]
+#[quench_test::test]
 fn instrumented_futures_enter_the_span_on_every_poll() {
     let records = capture(Level::Info, || {
         quench_core::future::block_on(
@@ -320,7 +320,7 @@ fn instrumented_futures_enter_the_span_on_every_poll() {
     assert!(records[2].spans.is_empty());
 }
 
-#[test]
+#[quench_test::test]
 fn in_current_span_carries_the_span_into_a_future() {
     let records = capture(Level::Info, || {
         let outer = quench_log::info_span!("outer");
@@ -333,7 +333,7 @@ fn in_current_span_carries_the_span_into_a_future() {
     assert!(format!("{:?}", async {}.instrument(Span::none())).contains("Instrumented"));
 }
 
-#[test]
+#[quench_test::test]
 fn level_macros_and_spans_take_an_explicit_target() {
     let records = capture(Level::Trace, || {
         quench_log::trace!(target: "audit", "t");

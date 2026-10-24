@@ -471,13 +471,13 @@ mod tests {
     use super::*;
     use crate::error::ServerError;
 
-    #[test]
+    #[quench_test::test]
     fn crc16_matches_the_redis_vectors() {
         assert_eq!(crc16(b"123456789"), 0x31c3);
         assert_eq!(crc16(b""), 0);
     }
 
-    #[test]
+    #[quench_test::test]
     fn key_slots() {
         assert_eq!(key_slot(b"foo"), 12182);
         assert_eq!(key_slot(b"somekey"), 11058);
@@ -529,7 +529,7 @@ mod tests {
         ])
     }
 
-    #[test]
+    #[quench_test::test]
     fn slot_maps_parse_and_look_up() {
         let map = SlotMap::from_cluster_slots(&slots_reply(), "seed").unwrap();
         assert_eq!(map.node_for(0), Some("10.0.0.1:7000"));
@@ -545,7 +545,7 @@ mod tests {
         assert_eq!(gap.node_for(15), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn missing_hosts_use_the_seed_and_ipv6_is_bracketed() {
         let reply = Value::Array(vec![Value::Array(vec![
             Value::Int(0),
@@ -569,7 +569,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn malformed_slot_replies_are_errors() {
         for bad in [
             Value::Nil,
@@ -606,7 +606,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn assigning_a_slot_splits_ranges() {
         let mut map = SlotMap::from_cluster_slots(&slots_reply(), "s").unwrap();
         map.assign(100, "new:1");
@@ -634,7 +634,7 @@ mod tests {
         assert_eq!(empty.node_for(7), Some("only:1"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn redirects_parse() {
         assert_eq!(
             redirect(&ServerError::parse("MOVED 3999 127.0.0.1:6381")),
@@ -649,7 +649,7 @@ mod tests {
         assert_eq!(redirect(&ServerError::parse("MOVED")), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn addresses_split() {
         assert_eq!(split_address("h:7000").unwrap(), ("h".to_string(), 7000));
         assert_eq!(
@@ -660,7 +660,7 @@ mod tests {
         assert!(split_address("h:port").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn cluster_nodes_lines_yield_healthy_primaries() {
         let line = |flags: &str, address: &str| {
             format!(

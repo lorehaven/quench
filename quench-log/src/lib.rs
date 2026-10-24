@@ -82,7 +82,7 @@ pub enum Error {
 /// This is what every service's `main` calls; `init_with` and
 /// `try_init_with` exist for a caller that wants to build its own `Config`
 /// or handle the error itself (tests included, since a whole test binary
-/// panicking on the second `#[test]` to call `init()` would be worse than
+/// panicking on the second `#[quench_test::test]` to call `init()` would be worse than
 /// unhelpful).
 ///
 /// # Panics
@@ -168,3 +168,6 @@ pub fn subscriber(config: &Config) -> Result<(Dispatcher, Option<Guard>), Error>
 
     Ok((dispatcher, guard))
 }
+
+#[cfg(test)]
+quench_test::main!();

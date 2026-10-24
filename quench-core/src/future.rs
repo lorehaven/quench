@@ -140,7 +140,7 @@ mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::time::Duration;
 
-    #[test]
+    #[quench_test::test]
     fn join_all_keeps_the_order_of_the_futures() {
         let futures = (0..5).map(|n| async move { n * 2 });
         assert_eq!(block_on(join_all(futures)), vec![0, 2, 4, 6, 8]);
@@ -150,7 +150,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn join_all_waits_for_the_slowest() {
         let slow = WokenLater {
             done: Arc::new(AtomicBool::new(false)),
@@ -164,7 +164,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn catch_unwind_returns_the_panic_payload() {
         let outcome = block_on(catch_unwind(async { 5 }));
         assert_eq!(outcome.ok(), Some(5));
@@ -183,7 +183,7 @@ mod tests {
         assert!(format!("{:?}", catch_unwind(async {})).contains("CatchUnwind"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn ready_futures_complete_immediately() {
         assert_eq!(block_on(async { 1 + 1 }), 2);
     }
@@ -214,7 +214,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn parks_until_woken() {
         let future = WokenLater {
             done: Arc::new(AtomicBool::new(false)),
@@ -223,7 +223,7 @@ mod tests {
         assert_eq!(block_on(future), "woken");
     }
 
-    #[test]
+    #[quench_test::test]
     fn boxed_futures_run() {
         let boxed: BoxFuture<'_, u8> = Box::pin(async { 7 });
         assert_eq!(block_on(boxed), 7);

@@ -31,3 +31,6 @@ pub mod rsa;
 pub mod totp;
 #[cfg(feature = "x25519")]
 pub mod x25519;
+
+#[cfg(test)]
+quench_test::main!();

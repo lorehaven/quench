@@ -2,6 +2,9 @@
 //! methods always pass, a write needs the permission, and mounting order
 //! (`Auth` outermost) is what makes `Claims` visible to this middleware.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_auth::domain::jwt::JwtConfig;
 use quench_auth::http::middleware::auth::Auth;
 use quench_auth::http::middleware::require_write::RequireWrite;
@@ -58,7 +61,7 @@ fn request(
     )
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_get_never_needs_write_even_with_no_token() {
     let app = app(config());
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
@@ -69,7 +72,7 @@ async fn a_get_never_needs_write_even_with_no_token() {
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_post_with_a_read_only_token_is_forbidden() {
     let cfg = config();
     let token = cfg
@@ -85,7 +88,7 @@ async fn a_post_with_a_read_only_token_is_forbidden() {
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_post_with_a_write_token_is_allowed() {
     let cfg = config();
     let token = cfg
@@ -101,7 +104,7 @@ async fn a_post_with_a_write_token_is_allowed() {
     assert_eq!(resp.status(), StatusCode::OK);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_post_with_an_admin_wildcard_token_is_allowed() {
     let cfg = config();
     let token = cfg
@@ -116,3 +119,5 @@ async fn a_post_with_an_admin_wildcard_token_is_allowed() {
         .await;
     assert_eq!(resp.status(), StatusCode::OK);
 }
+
+quench_test::main!();

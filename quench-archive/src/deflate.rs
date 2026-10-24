@@ -778,7 +778,7 @@ mod tests {
         packed.len()
     }
 
-    #[test]
+    #[quench_test::test]
     fn round_trips_assorted_inputs() {
         round_trip(b"");
         round_trip(b"a");
@@ -799,7 +799,7 @@ mod tests {
         assert!(round_trip(&noise) <= noise.len() + noise.len() / 1000 + 16);
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_malformed_streams() {
         assert!(matches!(inflate(&[], 10), Err(Error::Truncated)));
         // Reserved block type.
@@ -823,7 +823,7 @@ mod tests {
         assert!(matches!(inflate(&w.out, 100), Err(Error::Corrupt(_))));
     }
 
-    #[test]
+    #[quench_test::test]
     fn output_is_limited() {
         let packed = compress(&vec![7u8; 10_000]);
         assert!(matches!(decompress(&packed, 9_999), Err(Error::Limit(_))));

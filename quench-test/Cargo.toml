@@ -10,6 +10,7 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+autotests = false
 
 [lib]
 name = "quench_test"
@@ -22,10 +23,26 @@ quench-serde = { workspace = true }
 quench-test-macros = { workspace = true }
 tokio = { workspace = true }
 
+
+[lints]
+workspace = true
+
+[[test]]
+name = "cmd"
+path = "tests/cmd.rs"
+harness = false
+
 [[test]]
 name = "dogfood"
 path = "tests/dogfood.rs"
 harness = false
 
-[lints]
-workspace = true
+[[test]]
+name = "mock"
+path = "tests/mock.rs"
+harness = false
+
+[[test]]
+name = "report"
+path = "tests/report.rs"
+harness = false

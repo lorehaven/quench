@@ -763,7 +763,7 @@ mod tests {
         Time::parse_rfc3339(s).unwrap()
     }
 
-    #[test]
+    #[quench_test::test]
     fn epoch_and_unix_conversions() {
         assert_eq!(Time::UNIX_EPOCH.to_rfc3339(), "1970-01-01T00:00:00Z");
         assert_eq!(Time::from_unix(86_400).to_rfc3339(), "1970-01-02T00:00:00Z");
@@ -776,7 +776,7 @@ mod tests {
         assert_eq!(Time::from_unix_millis(-1).subsec_nanos(), 999_000_000);
     }
 
-    #[test]
+    #[quench_test::test]
     fn known_instants() {
         // 2026-09-29T12:00:00Z (the mail test fixture) and a leap-day date.
         let a = Time::from_ymd_hms(2026, 9, 29, 12, 0, 0).unwrap();
@@ -787,7 +787,7 @@ mod tests {
         assert_eq!(b.weekday(), Weekday::Tue);
     }
 
-    #[test]
+    #[quench_test::test]
     fn civil_round_trips_across_centuries() {
         for year in [
             1, 1600, 1900, 1969, 1970, 1999, 2000, 2024, 2100, 2400, 9999,
@@ -803,7 +803,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_impossible_calendar_fields() {
         for (y, mo, d, h, mi, s) in [
             (2026, 0, 1, 0, 0, 0),
@@ -828,7 +828,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn weekdays_cycle() {
         let names: Vec<_> = (0..7)
             .map(|d| (Time::from_unix(d * 86_400)).weekday())
@@ -851,7 +851,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn rfc3339_precision_is_automatic() {
         let base = Time::from_ymd_hms(2026, 1, 2, 3, 4, 5).unwrap();
         assert_eq!(base.to_rfc3339(), "2026-01-02T03:04:05Z");
@@ -871,7 +871,7 @@ mod tests {
         assert_eq!(format!("{base:?}"), "Time(2026-01-02T03:04:05Z)");
     }
 
-    #[test]
+    #[quench_test::test]
     fn parses_rfc3339_variants() {
         let want = Time::from_ymd_hms(2026, 9, 29, 12, 0, 0).unwrap();
         assert_eq!(t("2026-09-29T12:00:00Z"), want);
@@ -891,7 +891,7 @@ mod tests {
         assert_eq!(t("2016-12-31T23:59:60Z"), t("2017-01-01T00:00:00Z"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn formatted_times_parse_back() {
         for secs in [
             -5_000_000_000_i64,
@@ -909,7 +909,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_malformed_rfc3339() {
         for bad in [
             "",
@@ -936,7 +936,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn arithmetic() {
         let a = Time::from_unix(100);
         let mut b = a + Duration::seconds(30);
@@ -952,7 +952,7 @@ mod tests {
         assert_eq!(Time::default(), Time::UNIX_EPOCH);
     }
 
-    #[test]
+    #[quench_test::test]
     fn duration_constructors_and_views() {
         assert_eq!(Duration::days(1), Duration::hours(24));
         assert_eq!(Duration::weeks(1), Duration::days(7));
@@ -975,7 +975,7 @@ mod tests {
         assert_eq!(Duration::default(), Duration::ZERO);
     }
 
-    #[test]
+    #[quench_test::test]
     fn duration_std_conversion() {
         let d = Duration::milliseconds(2_500);
         assert_eq!(d.to_std(), Some(std::time::Duration::from_millis(2_500)));
@@ -986,7 +986,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn duration_display() {
         assert_eq!(Duration::ZERO.to_string(), "0s");
         assert_eq!(Duration::seconds(90).to_string(), "1m30s");
@@ -996,7 +996,7 @@ mod tests {
         assert_eq!(Duration::hours(2).to_string(), "2h");
     }
 
-    #[test]
+    #[quench_test::test]
     fn saturates_instead_of_wrapping() {
         let huge = Time { nanos: i128::MAX };
         assert_eq!(huge.timestamp(), i64::MAX);
@@ -1005,7 +1005,7 @@ mod tests {
         assert_eq!((huge + Duration::days(1)).nanos, i128::MAX);
     }
 
-    #[test]
+    #[quench_test::test]
     fn now_is_close_to_the_system_clock() {
         let before = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -1016,7 +1016,7 @@ mod tests {
         assert!(now - i64::try_from(before).unwrap() < 5);
     }
 
-    #[test]
+    #[quench_test::test]
     fn format_renders_strftime_specifiers() {
         let t = Time::from_ymd_hms(2026, 3, 5, 7, 8, 9).unwrap();
         assert_eq!(t.format("%Y-%m-%d %H:%M:%S"), "2026-03-05 07:08:09");
@@ -1037,7 +1037,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn system_time_converts_both_sides_of_the_epoch() {
         let after = UNIX_EPOCH + std::time::Duration::new(5, 7);
         assert_eq!(Time::from(after), Time::from_unix_nanos(5, 7));

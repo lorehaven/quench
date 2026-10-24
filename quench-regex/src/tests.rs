@@ -15,7 +15,7 @@ fn error(pattern: &str) -> Error {
     Regex::new(pattern).expect_err(pattern)
 }
 
-#[test]
+#[quench_test::test]
 fn literals_classes_and_dots() {
     assert_eq!(spans("abc", "xabcabc"), [(1, 4), (4, 7)]);
     assert_eq!(spans("a.c", "abc a\nc"), [(0, 3)]);
@@ -32,7 +32,7 @@ fn literals_classes_and_dots() {
     assert_eq!(spans(r"\x41\u{e9}B", "Aéb AéB"), [(5, 9)]);
 }
 
-#[test]
+#[quench_test::test]
 fn unicode_classes_and_boundaries() {
     assert_eq!(spans(r"\w+", "zażółć gęślą"), [(0, 10), (11, 19)]);
     assert_eq!(spans(r"\d+", "٣٤ 56"), [(0, 4), (5, 7)]);
@@ -45,7 +45,7 @@ fn unicode_classes_and_boundaries() {
     assert_eq!(spans(r"[^\W\d]+", "ab1c"), [(0, 2), (3, 4)]);
 }
 
-#[test]
+#[quench_test::test]
 fn case_insensitivity_follows_unicode() {
     assert_eq!(spans("(?i)straße", "STRASSE Straße"), [(8, 15)]);
     assert!(re("(?i)k").is_match("\u{212A}"), "the Kelvin sign");
@@ -64,7 +64,7 @@ fn case_insensitivity_follows_unicode() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn anchors_and_multiline() {
     assert_eq!(spans("^a", "a\na"), [(0, 1)]);
     assert_eq!(spans("(?m)^a", "a\na"), [(0, 1), (2, 3)]);
@@ -80,7 +80,7 @@ fn anchors_and_multiline() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn repetition_greedy_and_lazy() {
     assert_eq!(spans("a*", "baaac"), [(0, 0), (1, 4), (5, 5)]);
     assert_eq!(spans("a+?", "aaa"), [(0, 1), (1, 2), (2, 3)]);
@@ -110,7 +110,7 @@ fn repetition_greedy_and_lazy() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn groups_and_captures() {
     let r = re(r"(?P<key>\w+)=(?<value>\d+)(?:;|$)");
     assert_eq!(r.captures_len(), 3);
@@ -152,7 +152,7 @@ fn groups_and_captures() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn matches_and_their_conversions() {
     let m = re("b+").find("abbbc").unwrap();
     assert_eq!((m.start(), m.end(), m.len(), m.range()), (1, 4, 3, 1..4));
@@ -174,7 +174,7 @@ fn matches_and_their_conversions() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn replacement_forms() {
     let r = re(r"(?P<a>\w)(\d)");
     assert_eq!(r.replace("x1 y2", "<$a-$2>"), "<x-1> y2");
@@ -206,7 +206,7 @@ fn replacement_forms() {
     assert_eq!(re("é").replace_all("café", "e"), "cafe");
 }
 
-#[test]
+#[quench_test::test]
 fn splitting() {
     assert_eq!(
         re(r"\s*,\s*").split("a , b,c").collect::<Vec<_>>(),
@@ -221,7 +221,7 @@ fn splitting() {
     assert!(format!("{:?}", re(",").split("a")).contains("Split"));
 }
 
-#[test]
+#[quench_test::test]
 fn empty_matches_do_not_stick_to_the_previous_match() {
     assert_eq!(spans("", "ab"), [(0, 0), (1, 1), (2, 2)]);
     assert_eq!(spans("", "é"), [(0, 0), (2, 2)]);
@@ -230,7 +230,7 @@ fn empty_matches_do_not_stick_to_the_previous_match() {
     assert!(format!("{:?}", re("a").captures_iter("a")).contains("CaptureMatches"));
 }
 
-#[test]
+#[quench_test::test]
 fn alternation_and_nesting() {
     assert_eq!(spans("cat|dog", "hotdog catalog"), [(3, 6), (7, 10)]);
     assert_eq!(spans("a(b|c)*d", "abcbd ad"), [(0, 5), (6, 8)]);
@@ -242,7 +242,7 @@ fn alternation_and_nesting() {
     assert_eq!(spans("(?is)A.B", "a\nb"), [(0, 3)]);
 }
 
-#[test]
+#[quench_test::test]
 fn verbose_mode_ignores_layout() {
     assert_eq!(spans("(?x) a b  c # a comment\n d", "abcd"), [(0, 4)]);
     assert_eq!(spans(r"(?x) \  ", "a b"), [(1, 2)]);
@@ -261,7 +261,7 @@ fn verbose_mode_ignores_layout() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn builder_flags() {
     assert!(
         RegexBuilder::new("^a$")
@@ -285,7 +285,7 @@ fn builder_flags() {
     assert!(format!("{:?}", RegexBuilder::new("x")).contains("RegexBuilder"));
 }
 
-#[test]
+#[quench_test::test]
 fn escaping() {
     assert_eq!(escape("a.b*c"), r"a\.b\*c");
     assert_eq!(escape("(1+1)=[2]"), r"\(1\+1\)=\[2\]");
@@ -298,7 +298,7 @@ fn escaping() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn bad_patterns_are_rejected_with_a_place() {
     let cases = [
         ("(", "unclosed group"),
@@ -350,7 +350,7 @@ fn bad_patterns_are_rejected_with_a_place() {
     assert!(std::error::Error::source(&big).is_none());
 }
 
-#[test]
+#[quench_test::test]
 fn patterns_that_could_blow_up_other_engines_stay_fast() {
     let r = re("(a+)+$");
     let text = format!("{}b", "a".repeat(5000));
@@ -361,7 +361,7 @@ fn patterns_that_could_blow_up_other_engines_stay_fast() {
     assert!(re("a{1000}").is_match(&"a".repeat(1000)));
 }
 
-#[test]
+#[quench_test::test]
 fn literal_prefixes_and_anchors_are_only_shortcuts() {
     assert_eq!(spans("abc[0-9]", "xabcx abc1 abc2"), [(6, 10), (11, 15)]);
     assert_eq!(spans("é+", "aééb"), [(1, 5)]);
@@ -371,12 +371,12 @@ fn literal_prefixes_and_anchors_are_only_shortcuts() {
     assert_eq!(spans("(?:^a|^b)", "ba"), [(0, 1)]);
 }
 
-#[test]
+#[quench_test::test]
 fn repeating_a_repeat_is_allowed() {
     assert_eq!(spans("a**", "aab"), [(0, 2), (3, 3)]);
 }
 
-#[test]
+#[quench_test::test]
 fn the_class_helpers_agree_with_the_tables() {
     assert!(class::is_word('ł') && class::is_word('_') && !class::is_word(' '));
     assert!(class::word().contains('ł'));

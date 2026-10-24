@@ -7,7 +7,7 @@
 
 use quench_cli::repl::{ReplControl, run};
 
-#[test]
+#[quench_test::test]
 fn run_returns_ok_immediately_on_eof_stdin_without_calling_on_line() {
     let mut calls = 0;
     let result = run("prompt> ", |_line| {
@@ -19,7 +19,7 @@ fn run_returns_ok_immediately_on_eof_stdin_without_calling_on_line() {
     assert_eq!(calls, 0);
 }
 
-#[test]
+#[quench_test::test]
 fn repl_control_variants_can_be_constructed() {
     assert!(matches!(
         ReplControl::Continue("next> ".to_string()),

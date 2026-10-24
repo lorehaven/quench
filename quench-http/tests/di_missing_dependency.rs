@@ -1,7 +1,11 @@
 //! A component whose dependency has no `#[injectable]` and isn't
 //! `provide`d fails the whole graph build with a named error, rather than
 //! panicking the first time something tries to use it.
-#![allow(clippy::unused_async)] // `#[injectable]` constructors are async by contract
+#![allow(clippy::unused_async)]
+// `#[injectable]` constructors are async by contract
+
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_http::di::{ContainerBuilder, DiError};
 use quench_http::prelude::injectable;
@@ -19,7 +23,7 @@ async fn provide_needs_unregistered(dep: Arc<NotInjectable>) -> NeedsUnregistere
     NeedsUnregistered { dep }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn missing_dependency_is_reported_by_name_not_a_panic() {
     let err = ContainerBuilder::new().build().await.unwrap_err();
     match err {
@@ -39,3 +43,5 @@ async fn missing_dependency_is_reported_by_name_not_a_panic() {
         other => panic!("expected MissingDependency, got {other:?}"),
     }
 }
+
+quench_test::main!();

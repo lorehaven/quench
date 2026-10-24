@@ -53,7 +53,7 @@ mod tests {
 
     const MANIFEST: &str = "name: web\nreplicas: 3\nlabels:\n  app: web\n  tier: frontend\ncontainers:\n- image: nginx:1.25\n  args: [--port, '8080']\n  env:\n  - A=1\n- image: sidecar\n  args: []\n";
 
-    #[test]
+    #[quench_test::test]
     fn typed_round_trip() {
         let parsed: Deployment = from_str(MANIFEST).unwrap();
         assert_eq!(parsed.replicas, 3);
@@ -64,7 +64,7 @@ mod tests {
         assert_eq!(from_str::<Deployment>(&text).unwrap(), parsed);
     }
 
-    #[test]
+    #[quench_test::test]
     fn editing_a_manifest_as_a_value() {
         // what gantry does: read, annotate, write back
         let mut doc =
@@ -83,14 +83,14 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn type_errors_name_the_path() {
         let e = from_str::<Deployment>("name: x\nreplicas: many\ncontainers: []\n").unwrap_err();
         assert_eq!(e.path(), "replicas");
         assert!(from_str::<Deployment>("name: x").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn several_documents_into_typed_values() {
         let docs: Vec<Container> =
             from_str_all("image: a\nargs: []\n---\nimage: b\nargs: [x]\n").unwrap();
@@ -99,7 +99,7 @@ mod tests {
         assert!(from_str::<Container>("image: a\nargs: []\n---\nimage: b\nargs: []\n").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn to_value_is_the_dynamic_form() {
         assert_eq!(to_value(&vec![1_u8, 2]), Value::from(vec![1, 2]));
     }

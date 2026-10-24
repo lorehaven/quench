@@ -191,7 +191,7 @@ mod tests {
         parse(text).unwrap()
     }
 
-    #[test]
+    #[quench_test::test]
     fn lenient_mode_nests_and_restores() {
         assert!(!lenient());
         {
@@ -206,7 +206,7 @@ mod tests {
         assert!(!lenient());
     }
 
-    #[test]
+    #[quench_test::test]
     fn expectations() {
         assert!(expect_object(&obj("{}")).is_ok());
         assert!(
@@ -242,7 +242,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn fields_honour_aliases_defaults_and_missing() {
         let o = obj(r#"{"old":1,"n":"x"}"#);
         let map = o.as_object().unwrap();
@@ -260,7 +260,7 @@ mod tests {
         assert_eq!(field_or::<u8>(map, &["n"], || 9).unwrap_err().path(), "n");
     }
 
-    #[test]
+    #[quench_test::test]
     fn rest_and_flatten() {
         let o = obj(r#"{"a":1,"b":2,"c":3}"#);
         let map = o.as_object().unwrap();
@@ -273,7 +273,7 @@ mod tests {
         assert_eq!(extra.len(), 2);
     }
 
-    #[test]
+    #[quench_test::test]
     fn flatten_into_merges_objects_only() {
         let mut map = Map::new();
         flatten_into(&mut map, obj(r#"{"x":1}"#));
@@ -283,7 +283,7 @@ mod tests {
         assert_eq!(map.get("value"), Some(&Value::from(7)));
     }
 
-    #[test]
+    #[quench_test::test]
     fn unknown_fields_and_variants() {
         let o = obj(r#"{"a":1,"zzz":2}"#);
         let map = o.as_object().unwrap();
@@ -296,7 +296,7 @@ mod tests {
         assert_eq!(e, "unknown variant `X`, expected one of `A`, `B`");
     }
 
-    #[test]
+    #[quench_test::test]
     fn single_entries_and_tags() {
         let one = obj(r#"{"V":1}"#);
         assert_eq!(single_entry(one.as_object().unwrap()).unwrap().0, "V");

@@ -3,6 +3,9 @@
 //! and that `Limited<_, N>` can override it per-route without touching the
 //! app-wide default.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::bytes::Bytes as RawBytes;
 use quench_http::body::InboundBody;
 use quench_http::di::ContainerBuilder;
@@ -27,7 +30,7 @@ fn request_with_body(body: &'static str, container: &Arc<quench_http::di::Contai
     )
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn json_uses_default_limit_when_nothing_was_provided() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
     let mut req = request_with_body(r#"{"ok":true}"#, &container);
@@ -38,7 +41,7 @@ async fn json_uses_default_limit_when_nothing_was_provided() {
     assert!(value.ok);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn provided_body_limit_rejects_a_body_over_the_configured_cap() {
     // A limit smaller than the body itself - proves the *provided* value is
     // what's actually consulted, not just the compiled-in default.
@@ -57,7 +60,7 @@ async fn provided_body_limit_rejects_a_body_over_the_configured_cap() {
     assert_eq!(err.into_response().status(), StatusCode::BAD_REQUEST);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn provided_body_limit_accepts_a_body_within_the_configured_cap() {
     let container = Arc::new(
         ContainerBuilder::new()
@@ -74,7 +77,7 @@ async fn provided_body_limit_accepts_a_body_within_the_configured_cap() {
     assert!(value.ok);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn bytes_extractor_respects_the_same_body_limit() {
     let container = Arc::new(
         ContainerBuilder::new()
@@ -91,7 +94,7 @@ async fn bytes_extractor_respects_the_same_body_limit() {
     assert_eq!(err.into_response().status(), StatusCode::BAD_REQUEST);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn limited_overrides_the_app_wide_body_limit_for_one_route() {
     // App-wide limit is tiny, but this route asks for more via `Limited`.
     let container = Arc::new(
@@ -108,3 +111,5 @@ async fn limited_overrides_the_app_wide_body_limit_for_one_route() {
         .expect("Limited's own 1KB cap, not the app-wide 1-byte one");
     assert!(value.ok);
 }
+
+quench_test::main!();

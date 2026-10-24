@@ -4,7 +4,7 @@ use quench_auth::domain::signing::{decoding_key, encoding_key, generate_signing_
 use quench_crypto::jwt::{Algorithm, Header, Validation, decode, encode};
 use quench_serde::json;
 
-#[test]
+#[quench_test::test]
 fn generated_keys_sign_and_verify() {
     let generated = generate_signing_key();
     assert_eq!(generated.public_key.len(), 32);
@@ -30,7 +30,7 @@ fn generated_keys_sign_and_verify() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn unreadable_private_keys_are_errors() {
     assert!(encoding_key(b"not a key").is_err());
     assert!(encoding_key(&[]).is_err());

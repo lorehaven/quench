@@ -32,3 +32,6 @@ pub use error::{Error, Result, ServerError};
 pub use pool::{Pool, PoolOptions, PooledConnection};
 pub use row::{Row, RowIndex};
 pub use types::{Column, FromSql, PgArray, ToSql};
+
+#[cfg(test)]
+quench_test::main!();

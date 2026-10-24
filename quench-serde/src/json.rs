@@ -469,7 +469,7 @@ mod tests {
         parse(text).expect_err(text)
     }
 
-    #[test]
+    #[quench_test::test]
     fn scalars() {
         assert_eq!(ok("null"), Value::Null);
         assert_eq!(ok("true"), Value::Bool(true));
@@ -486,7 +486,7 @@ mod tests {
         assert_eq!(ok(" \t\r\n 7 \n"), Value::UInt(7));
     }
 
-    #[test]
+    #[quench_test::test]
     fn integer_edges() {
         assert_eq!(ok("18446744073709551615"), Value::UInt(u64::MAX));
         assert_eq!(ok("-9223372036854775808"), Value::Int(i64::MIN));
@@ -504,7 +504,7 @@ mod tests {
         assert!(matches!(ok("-0.0"), Value::Float(f) if f.is_sign_negative()));
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_bad_numbers() {
         for bad in [
             "01",
@@ -531,7 +531,7 @@ mod tests {
         assert!(rejects("1e999").to_string().contains("out of range"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn strings_and_escapes() {
         assert_eq!(
             ok(r#""a\"b\\c\/d\b\f\n\r\t""#),
@@ -544,7 +544,7 @@ mod tests {
         assert_eq!(ok(r#""""#), Value::from(""));
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_bad_strings() {
         for bad in [
             "\"abc",
@@ -565,7 +565,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn arrays_and_objects() {
         assert_eq!(ok("[]"), Value::Array(vec![]));
         assert_eq!(
@@ -586,7 +586,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn duplicate_keys_keep_the_last_value_in_the_first_position() {
         let v = ok(r#"{"a":1,"b":2,"a":3}"#);
         assert_eq!(v["a"], Value::UInt(3));
@@ -600,7 +600,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_structural_errors() {
         for bad in [
             "",
@@ -638,7 +638,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn errors_say_where() {
         let e = rejects("{\n  \"a\": ,\n}");
         assert_eq!(e.location(), Some((2, 8)));
@@ -648,7 +648,7 @@ mod tests {
         assert!(rejects("1 x").to_string().contains("trailing"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn depth_is_limited() {
         let nested = |n: usize| format!("{}{}", "[".repeat(n), "]".repeat(n));
         assert!(parse(&nested(MAX_DEPTH)).is_ok());
@@ -667,14 +667,14 @@ mod tests {
         assert!(parse(&"[".repeat(100_000)).is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn slices_must_be_utf8() {
         assert_eq!(parse_slice(b"[1]").unwrap(), Value::from(vec![1]));
         let e = parse_slice(b"[\"\xff\"]").unwrap_err();
         assert!(e.to_string().contains("UTF-8"), "{e}");
     }
 
-    #[test]
+    #[quench_test::test]
     fn writes_compact_and_pretty() {
         let v = ok(r#"{"a":[1,2,{"b":null}],"c":{},"d":[],"e":"x"}"#);
         assert_eq!(
@@ -689,7 +689,7 @@ mod tests {
         assert_eq!(to_string_pretty(&Value::Array(vec![])), "[]");
     }
 
-    #[test]
+    #[quench_test::test]
     fn writes_numbers() {
         assert_eq!(to_string(&Value::UInt(u64::MAX)), "18446744073709551615");
         assert_eq!(to_string(&Value::Int(i64::MIN)), "-9223372036854775808");
@@ -717,7 +717,7 @@ mod tests {
         assert_eq!(to_string(&Value::Float(f64::INFINITY)), "null");
     }
 
-    #[test]
+    #[quench_test::test]
     fn writes_escapes() {
         assert_eq!(
             to_string(&Value::from("a\"b\\c\n\r\t\u{8}\u{c}\u{1}\u{1f}é😀/")),
@@ -727,7 +727,7 @@ mod tests {
         assert_eq!(to_string(&key), r#"{"k\"ey":null}"#);
     }
 
-    #[test]
+    #[quench_test::test]
     fn round_trips() {
         for text in [
             "null",

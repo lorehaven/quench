@@ -3,7 +3,7 @@
 use quench_cache::request_cache::*;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[test]
+#[quench_test::test]
 fn test_cache_key_generation() {
     let key1 = RequestCache::generate_key(&["conv1", "hello", "model1"]);
     let key2 = RequestCache::generate_key(&["conv1", "hello", "model1"]);
@@ -13,7 +13,7 @@ fn test_cache_key_generation() {
     assert_ne!(key1, key3);
 }
 
-#[test]
+#[quench_test::test]
 fn test_cache_set_and_get() {
     let cache = RequestCache::new();
     let key = "test_key".to_string();
@@ -50,13 +50,13 @@ fn now() -> u64 {
         .as_secs()
 }
 
-#[test]
+#[quench_test::test]
 fn get_returns_none_for_a_missing_key() {
     let cache = RequestCache::new();
     assert!(cache.get("missing").is_none());
 }
 
-#[test]
+#[quench_test::test]
 fn an_entry_older_than_the_ttl_is_treated_as_a_miss_and_evicted() {
     let cache = RequestCache::with_ttl(0);
     cache.set("key".to_string(), response("x", now()));
@@ -65,7 +65,7 @@ fn an_entry_older_than_the_ttl_is_treated_as_a_miss_and_evicted() {
     assert!(!cache.has("key"));
 }
 
-#[test]
+#[quench_test::test]
 fn has_reflects_whether_the_key_is_present_regardless_of_expiry() {
     let cache = RequestCache::new();
     assert!(!cache.has("key"));
@@ -73,7 +73,7 @@ fn has_reflects_whether_the_key_is_present_regardless_of_expiry() {
     assert!(cache.has("key"));
 }
 
-#[test]
+#[quench_test::test]
 fn clear_empties_the_cache() {
     let cache = RequestCache::new();
     cache.set("a".to_string(), response("x", now()));
@@ -84,7 +84,7 @@ fn clear_empties_the_cache() {
     assert!(!cache.has("b"));
 }
 
-#[test]
+#[quench_test::test]
 fn stats_counts_entries_and_expired_entries_and_sums_content_length() {
     let cache = RequestCache::with_ttl(1000);
     cache.set("fresh".to_string(), response("abc", now()));
@@ -96,7 +96,7 @@ fn stats_counts_entries_and_expired_entries_and_sums_content_length() {
     assert_eq!(stats.total_size_bytes, 6);
 }
 
-#[test]
+#[quench_test::test]
 fn cleanup_expired_removes_only_expired_entries_and_reports_how_many() {
     let cache = RequestCache::with_ttl(1000);
     cache.set("fresh".to_string(), response("abc", now()));
@@ -110,7 +110,7 @@ fn cleanup_expired_removes_only_expired_entries_and_reports_how_many() {
     assert!(!cache.has("stale_two"));
 }
 
-#[test]
+#[quench_test::test]
 fn new_defaults_to_a_twenty_four_hour_ttl_and_default_matches_new() {
     let fresh = RequestCache::new();
     fresh.set("key".to_string(), response("x", now() - 60));

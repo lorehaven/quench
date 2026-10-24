@@ -3,6 +3,9 @@
 //! radix-tree one. These patterns are
 //! lifted verbatim from `warehouse-service`'s docker registry routes.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::async_trait;
 use quench_core::bytes::Bytes;
 use quench_http::body::InboundBody;
@@ -33,7 +36,7 @@ fn get(uri: &str, container: &Arc<quench_http::di::Container>) -> Request {
     )
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn matches_multi_segment_name_before_fixed_suffix() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
 
@@ -70,7 +73,7 @@ async fn matches_multi_segment_name_before_fixed_suffix() {
     assert_eq!(resp.status(), StatusCode::OK);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn unmatched_path_is_404() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
 
@@ -82,7 +85,7 @@ async fn unmatched_path_is_404() {
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn wrong_method_on_matched_path_is_405() {
     let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
 
@@ -101,7 +104,7 @@ async fn wrong_method_on_matched_path_is_405() {
     assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn registration_order_breaks_ties_between_overlapping_patterns() {
     // Mirrors the crates sparse index: a static `/config.json` route has to
     // win over a trailing `/{path:.*}` catch-all covering the same prefix,
@@ -116,3 +119,5 @@ async fn registration_order_breaks_ties_between_overlapping_patterns() {
     let resp = router.dispatch(get("/config.json", &container)).await;
     assert_eq!(resp.status(), StatusCode::OK);
 }
+
+quench_test::main!();

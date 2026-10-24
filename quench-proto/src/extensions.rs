@@ -72,7 +72,7 @@ mod tests {
     #[derive(Debug, PartialEq)]
     struct Claims(&'static str);
 
-    #[test]
+    #[quench_test::test]
     fn stores_one_value_per_type() {
         let mut ext = Extensions::new();
         assert!(ext.is_empty());

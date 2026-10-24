@@ -93,7 +93,7 @@ fn parse_env(content: &str) -> Vec<(String, String)> {
 mod env_tests {
     use super::parse_env;
 
-    #[test]
+    #[quench_test::test]
     fn parses_comments_exports_and_quotes() {
         let env = parse_env("# c\nA=1\nexport B=\"x y\" # tail\nC='z'\nD=v # note\n\nbad\n");
         let get = |k: &str| {
@@ -113,7 +113,7 @@ mod env_tests {
 mod loader_tests {
     use super::{init, load_env_file, load_env_from_ancestors};
 
-    #[test]
+    #[quench_test::test]
     fn existing_variables_win_over_the_file() {
         let dir = quench_core::tmp::TempDir::new().unwrap();
         let file = dir.path().join(".env");
@@ -139,7 +139,7 @@ mod loader_tests {
     }
 
     /// Changes the working directory, so it is the only test here that does, and it puts it back.
-    #[test]
+    #[quench_test::test]
     fn init_loads_the_nearest_env_file_and_installs_logging() {
         let dir = quench_core::tmp::TempDir::new().unwrap();
         let nested = dir.path().join("a/b");

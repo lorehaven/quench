@@ -93,7 +93,7 @@ mod tests {
         ("foobar", "MZXW6YTBOI"),
     ];
 
-    #[test]
+    #[quench_test::test]
     fn rfc_4648_vectors_round_trip() {
         for (plain, encoded) in VECTORS {
             assert_eq!(encode(plain), encoded);
@@ -101,13 +101,13 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn decoding_is_forgiving_about_case_padding_and_grouping() {
         assert_eq!(decode("mzxw 6ytb-oi======").unwrap(), b"foobar");
         assert_eq!(decode("MZXW6YQ=").unwrap(), b"foob");
     }
 
-    #[test]
+    #[quench_test::test]
     fn bad_input_is_an_error() {
         assert_eq!(decode("MZ1W"), Err(DecodeError::InvalidByte(2)));
         assert_eq!(decode("M"), Err(DecodeError::InvalidLength));
@@ -116,7 +116,7 @@ mod tests {
         assert!(DecodeError::InvalidLength.to_string().contains("length"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn every_length_of_random_looking_bytes_round_trips() {
         for len in 0..40u8 {
             let data: Vec<u8> = (0..len)

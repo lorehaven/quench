@@ -1,5 +1,8 @@
 //! The blocking client against a real server running on a runtime of its own.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_client::blocking::Client;
 use quench_core::async_trait;
 use quench_http::di::ContainerBuilder;
@@ -62,7 +65,7 @@ fn server(runtime: &tokio::runtime::Runtime) -> String {
     })
 }
 
-#[test]
+#[quench_test::test]
 fn blocking_calls_return_when_the_response_is_in() {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(1)
@@ -137,7 +140,7 @@ fn blocking_calls_return_when_the_response_is_in() {
     drop(runtime);
 }
 
-#[test]
+#[quench_test::test]
 fn blocking_redirects_cookies_and_multipart() {
     use quench_client::blocking::Client;
     use quench_client::multipart::Form;
@@ -173,3 +176,5 @@ fn blocking_redirects_cookies_and_multipart() {
             .contains("name=\"a\"\r\n\r\nb")
     );
 }
+
+quench_test::main!();

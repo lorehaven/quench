@@ -2,12 +2,12 @@
 
 use quench_cli::require::require_binary;
 
-#[test]
+#[quench_test::test]
 fn a_binary_that_is_on_path_resolves_ok() {
     assert!(require_binary("sh", "needed for shelling out").is_ok());
 }
 
-#[test]
+#[quench_test::test]
 fn a_missing_binary_reports_its_name_and_hint_in_both_display_and_debug() {
     let err = require_binary(
         "definitely-not-a-real-binary-xyz",

@@ -4,7 +4,7 @@ use quench_web::framework::theme::ThemeSpec;
 use quench_web::framework::theme::bootstrap_dark::BootstrapDarkTheme;
 use quench_web::styling::css::CssRule;
 
-#[test]
+#[quench_test::test]
 fn bootstrap_dark_declares_its_own_palette_and_three_color_utilities() {
     let rules = BootstrapDarkTheme::colors();
     assert_eq!(rules.len(), 4);

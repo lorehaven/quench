@@ -478,7 +478,7 @@ mod tests {
         req(r).matches(&v(version))
     }
 
-    #[test]
+    #[quench_test::test]
     fn parses_and_displays_versions() {
         assert_eq!(v("1.2.3"), Version::new(1, 2, 3));
         let full = v("1.2.3-alpha.1+build.5");
@@ -492,7 +492,7 @@ mod tests {
         assert_eq!("1.0.0".parse::<Version>().unwrap(), Version::new(1, 0, 0));
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_bad_versions() {
         for bad in [
             "",
@@ -522,7 +522,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn ordering_follows_semver() {
         // The ordering example from the semver 2.0 spec.
         let order = [
@@ -547,7 +547,7 @@ mod tests {
         assert!(v("10.0.0") > v("9.9.9"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn caret_requirements() {
         assert!(ok("^1.2.3", "1.2.3") && ok("^1.2.3", "1.9.0") && !ok("^1.2.3", "2.0.0"));
         assert!(!ok("^1.2.3", "1.2.2"));
@@ -562,7 +562,7 @@ mod tests {
         assert!(ok("0.1", "0.1.5") && !ok("0.1", "0.2.0"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn tilde_requirements() {
         assert!(ok("~1.2.3", "1.2.3") && ok("~1.2.3", "1.2.9") && !ok("~1.2.3", "1.3.0"));
         assert!(!ok("~1.2.3", "1.2.2"));
@@ -570,7 +570,7 @@ mod tests {
         assert!(ok("~1", "1.9.0") && !ok("~1", "2.0.0"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn comparison_requirements() {
         assert!(ok(">=1.2.3", "1.2.3") && ok(">=1.2.3", "2.0.0") && !ok(">=1.2.3", "1.2.2"));
         assert!(
@@ -597,7 +597,7 @@ mod tests {
         assert!(ok("=1", "1.7.0") && !ok("=1", "2.0.0"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn wildcards_and_star() {
         assert!(ok("*", "0.0.1") && ok("*", "99.0.0"));
         assert!(ok("1.*", "1.7.0") && !ok("1.*", "2.0.0"));
@@ -609,7 +609,7 @@ mod tests {
         assert!(!VersionReq::STAR.matches(&v("3.2.1-rc.1")));
     }
 
-    #[test]
+    #[quench_test::test]
     fn comma_separated_comparators_all_must_hold() {
         assert!(
             ok(">=1.2, <1.5", "1.4.0")
@@ -619,7 +619,7 @@ mod tests {
         assert!(ok(" >=1.2.0 , <2.0.0 ", "1.9.9"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn pre_release_rule() {
         assert!(!ok("^1.2.3", "1.3.0-rc.1"));
         assert!(!ok(">=1.0.0", "2.0.0-rc.1"));
@@ -633,7 +633,7 @@ mod tests {
         assert!(ok("^0.3.0-a", "0.3.0-b") && ok("^0.0.3-a", "0.0.3-b") && ok("^0.3.0-a", "0.3.0"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn rejects_bad_requirements() {
         for bad in [
             "",
@@ -660,7 +660,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn requirements_display_as_cargo_does() {
         for (input, shown) in [
             ("^0.2", "^0.2"),

@@ -622,3 +622,6 @@ impl ClientCredentialsClientBuilder {
 pub mod prelude {
     pub use crate::{BasicAuthClient, BearerAuthClient, ClientCredentialsClient, HttpClient};
 }
+
+#[cfg(test)]
+quench_test::main!();

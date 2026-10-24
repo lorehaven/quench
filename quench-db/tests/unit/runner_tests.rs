@@ -5,7 +5,7 @@ use quench_db::plan::{MigrationPlan, ResolvedModule};
 use quench_db::runner::*;
 use std::collections::BTreeMap;
 
-#[test]
+#[quench_test::test]
 fn rejects_injection_in_table_names() {
     assert!(validate_identifier("ledger table", "forge_migrations").is_ok());
     assert!(validate_identifier("ledger table", "forge migrations").is_err());
@@ -14,7 +14,7 @@ fn rejects_injection_in_table_names() {
     assert!(validate_identifier("ledger table", "").is_err());
 }
 
-#[test]
+#[quench_test::test]
 fn advisory_lock_key_is_stable() {
     assert_eq!(
         advisory_lock_key("public.forge_migrations"),
@@ -47,7 +47,7 @@ fn result(id: &str, outcome: MigrationOutcome) -> MigrationResult {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn apply_report_counts_by_outcome() {
     let report = ApplyReport {
         results: vec![
@@ -62,7 +62,7 @@ fn apply_report_counts_by_outcome() {
     assert_eq!(report.count(MigrationOutcome::Pending), 0);
 }
 
-#[test]
+#[quench_test::test]
 fn apply_report_with_outcome_filters_to_matching_results() {
     let report = ApplyReport {
         results: vec![
@@ -78,7 +78,7 @@ fn apply_report_with_outcome_filters_to_matching_results() {
     assert_eq!(pending, vec!["b"]);
 }
 
-#[test]
+#[quench_test::test]
 fn resettable_schemas_excludes_public_the_ledger_schema_and_database_scoped_modules() {
     let plan = MigrationPlan {
         modules: vec![
@@ -95,7 +95,7 @@ fn resettable_schemas_excludes_public_the_ledger_schema_and_database_scoped_modu
     assert_eq!(schemas, vec!["sage".to_string()]);
 }
 
-#[test]
+#[quench_test::test]
 fn resettable_schemas_is_sorted_and_deduplicated() {
     let plan = MigrationPlan {
         modules: vec![
@@ -109,7 +109,7 @@ fn resettable_schemas_is_sorted_and_deduplicated() {
     assert_eq!(schemas, vec!["alpha".to_string(), "zeta".to_string()]);
 }
 
-#[test]
+#[quench_test::test]
 fn builder_methods_chain_and_set_every_field() {
     let runner = MigrationRunner::new()
         .ledger_schema("custom_schema")
@@ -126,7 +126,7 @@ fn builder_methods_chain_and_set_every_field() {
     assert!(debug.contains("dry_run: true"));
 }
 
-#[test]
+#[quench_test::test]
 fn default_runner_uses_the_documented_defaults() {
     let debug = format!("{:?}", MigrationRunner::new());
     assert!(debug.contains(DEFAULT_LEDGER_SCHEMA));
@@ -136,14 +136,15 @@ fn default_runner_uses_the_documented_defaults() {
     assert!(debug.contains("dry_run: false"));
 }
 
-#[test]
+#[quench_test::test]
+#[allow(clippy::eq_op)]
 fn migration_outcome_equality_distinguishes_every_variant() {
     assert_eq!(MigrationOutcome::Applied, MigrationOutcome::Applied);
     assert_ne!(MigrationOutcome::Applied, MigrationOutcome::Skipped);
     assert_ne!(MigrationOutcome::Skipped, MigrationOutcome::Pending);
 }
 
-#[test]
+#[quench_test::test]
 fn reset_report_default_is_empty() {
     let report = ResetReport::default();
     assert!(report.schemas.is_empty());

@@ -161,7 +161,7 @@ macro_rules! json_expect_expr_comma {
 mod tests {
     use crate::{Map, Value};
 
-    #[test]
+    #[quench_test::test]
     fn literals() {
         assert_eq!(json!(null), Value::Null);
         assert_eq!(json!(true), Value::Bool(true));
@@ -174,7 +174,7 @@ mod tests {
         assert_eq!(json!({}), Value::Object(Map::new()));
     }
 
-    #[test]
+    #[quench_test::test]
     fn arrays() {
         assert_eq!(
             json!([1, "two", null, true, false, [3], {"k": 4}]).to_string(),
@@ -184,7 +184,7 @@ mod tests {
         assert_eq!(json!([[], {}]).to_string(), "[[],{}]");
     }
 
-    #[test]
+    #[quench_test::test]
     fn objects_keep_the_written_order() {
         let v = json!({
             "z": 1,
@@ -202,7 +202,7 @@ mod tests {
         assert_eq!(v["a"]["nested"][0], Value::Bool(true));
     }
 
-    #[test]
+    #[quench_test::test]
     fn interpolates_expressions_of_any_serialize_type() {
         let name = String::from("ada");
         let tags = vec!["a", "b"];
@@ -224,14 +224,14 @@ mod tests {
         assert_eq!(json!(name).to_string(), r#""ada""#);
     }
 
-    #[test]
+    #[quench_test::test]
     fn computed_keys_go_in_parentheses() {
         let key = format!("k{}", 1);
         let v = json!({ (key.clone()): 1, (format!("{key}b")): 2, "plain": 3 });
         assert_eq!(v.to_string(), r#"{"k1":1,"k1b":2,"plain":3}"#);
     }
 
-    #[test]
+    #[quench_test::test]
     fn unfinished_trailing_values_work() {
         assert_eq!(json!({"a": 1}).to_string(), r#"{"a":1}"#);
         assert_eq!(

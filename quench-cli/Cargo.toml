@@ -10,10 +10,12 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = "README.md"
+autotests = false
 
 [lib]
 name = "quench_cli"
 path = "src/lib.rs"
+harness = false
 
 [features]
 default = ["repl"]
@@ -25,11 +27,9 @@ repl = ["tui"]
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true, optional = true }
 
-[[test]]
-name = "pty"
-required-features = ["repl"]
 
 [dev-dependencies]
+quench-test = { workspace = true }
 quench-core = { workspace = true }
 
 [target.'cfg(unix)'.dev-dependencies]
@@ -37,3 +37,14 @@ libc = { workspace = true }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "pty"
+path = "tests/pty.rs"
+required-features = ["repl"]
+harness = false
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false

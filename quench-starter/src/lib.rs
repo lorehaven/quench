@@ -10,3 +10,6 @@ pub use http::*;
 pub use logging::*;
 pub use metrics::*;
 pub use resilience::*;
+
+#[cfg(test)]
+quench_test::main!();

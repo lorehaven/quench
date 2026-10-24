@@ -90,7 +90,7 @@ fn float(text: &str) -> Option<Value> {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn nulls_and_booleans() {
         for text in ["", "~", "null", "Null", "NULL"] {
             assert_eq!(plain(text), Value::Null, "{text:?}");
@@ -111,7 +111,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn integers() {
         assert_eq!(plain("0"), Value::UInt(0));
         assert_eq!(plain("-0"), Value::UInt(0));
@@ -135,7 +135,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn floats() {
         assert_eq!(plain("1.5"), Value::Float(1.5));
         assert_eq!(plain("-1.5"), Value::Float(-1.5));
@@ -171,7 +171,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn everything_else_is_text() {
         for text in [
             "hello", "http://x", "a:b", "=", "<<", "@x", "a b c", "-x", "x-", "1 2",

@@ -369,7 +369,7 @@ mod tests {
         parse(source).expect_err(source).to_string()
     }
 
-    #[test]
+    #[quench_test::test]
     fn simple_messages() {
         assert_eq!(
             values("hello = Hello, world!\nbye = Bye\n"),
@@ -388,7 +388,7 @@ mod tests {
         assert_eq!(parse("\n\n   \n").unwrap(), []);
     }
 
-    #[test]
+    #[quench_test::test]
     fn comments_and_terms_are_skipped() {
         let source = "# a\n## group\n### resource\n#\nkey = v\n-brand = Quench\n-multi =\n    Line\n    two\nlast = l\n";
         assert_eq!(
@@ -399,14 +399,14 @@ mod tests {
         assert!(rejects("#### four\nk = v").contains("comment"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn variables_are_kept_as_tokens() {
         assert_eq!(value("g = Hello, { $name }!"), "Hello, {$name}!");
         assert_eq!(value("g = {$a} and { $b } x{$c}"), "{$a} and {$b} x{$c}");
         assert_eq!(value("g = { $with-dash_1 }"), "{$with-dash_1}");
     }
 
-    #[test]
+    #[quench_test::test]
     fn other_placeables_contribute_nothing() {
         assert_eq!(value("a = { -brand } is here"), " is here");
         assert_eq!(value("a = { other-msg } tail"), " tail");
@@ -421,7 +421,7 @@ mod tests {
         assert_eq!(value("a = { $x } { { \"nested\" } }"), "{$x} ");
     }
 
-    #[test]
+    #[quench_test::test]
     fn multiline_values_are_dedented() {
         assert_eq!(
             value("m =\n    Line one\n    Line two\n"),
@@ -441,7 +441,7 @@ mod tests {
         assert_eq!(value("m =\n    { $x }\n    tail\n"), "{$x}\ntail");
     }
 
-    #[test]
+    #[quench_test::test]
     fn selectors_span_lines() {
         let source = "s = { $n ->\n    [one] One item\n   *[other] { $n } items\n}\nafter = x\n";
         assert_eq!(
@@ -456,13 +456,13 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn a_placeable_may_start_in_the_first_column() {
         assert_eq!(value("m = a\n{ $b }\n"), "a\n{$b}");
         assert_eq!(value("m =\n{ $b ->\n *[x] y\n}\n"), "");
     }
 
-    #[test]
+    #[quench_test::test]
     fn attributes() {
         assert_eq!(
             values("a = Value\n    .title = T\n    .alt = Alt { $x }\nb = B\n"),
@@ -481,7 +481,7 @@ mod tests {
         assert!(rejects("a = V\n    .t = { $x\n").contains("unclosed"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn line_endings() {
         assert_eq!(
             values("a = one\r\nb =\r\n    two\r\n"),
@@ -489,7 +489,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn errors_name_the_line() {
         assert_eq!(
             rejects("ok = 1\nbad\n"),
@@ -511,7 +511,7 @@ mod tests {
         assert!(rejects("-1x = y").contains("identifier"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn error_type_displays() {
         let e = parse("bad\n").unwrap_err();
         assert_eq!(

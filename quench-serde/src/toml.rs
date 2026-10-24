@@ -1013,7 +1013,7 @@ mod tests {
         parse(text).expect_err(text).to_string()
     }
 
-    #[test]
+    #[quench_test::test]
     fn scalars() {
         let v = ok("s = \"x\"\ni = 42\nn = -7\nf = 1.5\nb = true\nc = false\nz = 0");
         assert_eq!(
@@ -1022,7 +1022,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn integers() {
         assert_eq!(
             ok(
@@ -1051,7 +1051,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn floats() {
         assert_eq!(
             ok(
@@ -1079,7 +1079,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn non_finite_floats() {
         let v = ok("a = inf\nb = +inf\nc = -inf\nd = nan\ne = -nan");
         assert_eq!(v["a"], Value::Float(f64::INFINITY));
@@ -1092,7 +1092,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn strings() {
         let v = ok(
             "a = \"hi\\n\\t\\\"\\\\\\u00e9\\U0001F600\\e\\x41\\b\\f\\r\"\nb = 'lit\\n\"q\"'\nc = \"\"",
@@ -1102,7 +1102,7 @@ mod tests {
         assert_eq!(v["c"], Value::from(""));
     }
 
-    #[test]
+    #[quench_test::test]
     fn multiline_strings() {
         assert_eq!(
             ok("a = \"\"\"\nline1\nline2\"\"\"")["a"],
@@ -1128,7 +1128,7 @@ mod tests {
         assert_eq!(ok("a = '''cr\r\nlf'''")["a"], Value::from("cr\r\nlf"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn bad_strings() {
         for bad in [
             "a = \"abc",
@@ -1155,7 +1155,7 @@ mod tests {
         assert!(rejects("a = \"\\x4\"").contains("escape"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn datetimes_are_kept_as_text() {
         let v = ok(
             "a = 1979-05-27T07:32:00Z\nb = 1979-05-27T07:32:00-07:00\nc = 1979-05-27 07:32:00Z\nd = 1979-05-27T07:32:00\ne = 1979-05-27T00:32:00.999999\nf = 1979-05-27\ng = 07:32:00\nh = 00:32:00.5\ni = 1979-05-27t07:32:00z\nj = 07:32\nk = 1979-05-27 07:32",
@@ -1176,7 +1176,7 @@ mod tests {
         assert_eq!(t.to_rfc3339(), "1979-05-27T14:32:00Z");
     }
 
-    #[test]
+    #[quench_test::test]
     fn bad_datetimes() {
         for bad in [
             "a = 1979-13-27",
@@ -1200,7 +1200,7 @@ mod tests {
         assert!(rejects("a = 1979-13-27").contains("date or time"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn arrays() {
         assert_eq!(ok("a = [1, 2, 3]")["a"], j("[1,2,3]"));
         assert_eq!(ok("a = [1, 2,]")["a"], j("[1,2]"));
@@ -1226,7 +1226,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn inline_tables() {
         assert_eq!(ok("a = {b = 1, c = \"x\"}")["a"], j(r#"{"b":1,"c":"x"}"#));
         assert_eq!(ok("a = {}")["a"], j("{}"));
@@ -1255,7 +1255,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn inline_tables_and_arrays_are_closed() {
         assert!(
             rejects("a = {b = 1}\na.c = 2").contains("cannot be extended")
@@ -1266,7 +1266,7 @@ mod tests {
         assert!(parse("a = [{b = 1}]\n[[a]]\nb = 2").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn keys() {
         assert_eq!(
             ok("\"quoted key\" = 1\n'lit key' = 2\n\"\" = 3\n1234 = 4\nbare-key_1 = 5"),
@@ -1290,7 +1290,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn duplicate_keys_are_errors() {
         assert!(rejects("a = 1\na = 2").contains("more than once"));
         assert!(rejects("a.b = 1\na = 2").contains("more than once"));
@@ -1298,7 +1298,7 @@ mod tests {
         assert!(parse("\"a\" = 1\na = 2").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn tables() {
         let v = ok("x = 1\n[a]\nb = 1\n[a.c]\nd = 2\n[e]\n");
         assert_eq!(v, j(r#"{"x":1,"a":{"b":1,"c":{"d":2}},"e":{}}"#));
@@ -1310,7 +1310,7 @@ mod tests {
         assert_eq!(ok("[\"a b\"]\nc = 1"), j(r#"{"a b":{"c":1}}"#));
     }
 
-    #[test]
+    #[quench_test::test]
     fn table_redefinition_is_an_error() {
         assert!(rejects("[a]\nb = 1\n[a]\nc = 2").contains("more than once"));
         assert!(parse("[a]\nb = 1\n[a.b]\n").is_err());
@@ -1325,7 +1325,7 @@ mod tests {
         assert!(parse("[a]\nb = 1\n[a.b.c]\n").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn dotted_keys_can_gain_subtables_by_header() {
         let v = ok(
             "fruit.apple.color = \"red\"\nfruit.apple.taste.sweet = true\n[fruit.apple.texture]\nsmooth = true\n",
@@ -1335,7 +1335,7 @@ mod tests {
         assert!(parse("fruit.apple.color = \"red\"\n[fruit.apple.taste]\n").is_ok());
     }
 
-    #[test]
+    #[quench_test::test]
     fn arrays_of_tables() {
         let v = ok("[[p]]\nname = \"a\"\n[[p]]\n[[p]]\nname = \"c\"\ncolor = \"gray\"\n");
         assert_eq!(
@@ -1360,7 +1360,7 @@ mod tests {
         assert!(parse("a.b = 1\n[[a]]\n").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn comments_and_line_endings() {
         assert_eq!(ok("# only a comment"), j("{}"));
         assert_eq!(ok("# c\n[a] # c\nb = 1 # c\n"), j(r#"{"a":{"b":1}}"#));
@@ -1373,7 +1373,7 @@ mod tests {
         assert!(parse("a = 1 # \u{7f}").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn bad_structure() {
         for bad in [
             "[a",
@@ -1395,7 +1395,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn errors_have_positions() {
         let e = parse("a = 1\nb = oops\n").unwrap_err();
         assert_eq!(e.location(), Some((2, 5)));
@@ -1403,7 +1403,7 @@ mod tests {
         assert_eq!(e.location(), Some((3, 1)));
     }
 
-    #[test]
+    #[quench_test::test]
     fn spec_example() {
         let doc = "# This is a TOML document.\n\ntitle = \"TOML Example\"\n\n[owner]\nname = \"Tom Preston-Werner\"\ndob = 1979-05-27T07:32:00-08:00\n\n[database]\nenabled = true\nports = [ 8000, 8001, 8002 ]\ndata = [ [\"delta\", \"phi\"], [3.14] ]\ntemp_targets = { cpu = 79.5, case = 72.0 }\n\n[servers]\n\n[servers.alpha]\nip = \"10.0.0.1\"\nrole = \"frontend\"\n\n[servers.beta]\nip = \"10.0.0.2\"\nrole = \"backend\"\n";
         let v = ok(doc);
@@ -1436,7 +1436,7 @@ mod tests {
         steps: Vec<String>,
     }
 
-    #[test]
+    #[quench_test::test]
     fn typed_round_trip() {
         let config = Config {
             name: "svc".into(),
@@ -1471,14 +1471,14 @@ mod tests {
         assert_eq!(from_str::<Config>(&pretty).unwrap(), config);
     }
 
-    #[test]
+    #[quench_test::test]
     fn typed_errors_name_the_path() {
         let e = from_str::<Config>("name = \"x\"\nport = 1\n[db]\nurl = 5\n").unwrap_err();
         assert_eq!(e.path(), "db.url");
         assert!(from_str::<Config>("name = \"x\"").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn writer_layouts() {
         let v = j(
             r#"{"top":1,"sub":{"a":1,"deep":{"b":2}},"only_children":{"x":{"y":1}},"empty":{},"list":[{"n":1},{"n":2}],"mixed":[1,{"k":2}],"nested":[{"inner":{"z":1}}]}"#,
@@ -1507,7 +1507,7 @@ mod tests {
         assert_eq!(parse(&text).unwrap(), v);
     }
 
-    #[test]
+    #[quench_test::test]
     fn writer_quotes_keys_and_escapes_strings() {
         let v = j(r#"{"plain":"x","with space":"a\"b\\c\n\t\u0001\u007f","":1,"é":2}"#);
         let text = to_string(&v).unwrap();
@@ -1519,7 +1519,7 @@ mod tests {
         assert_eq!(parse(&text).unwrap(), v);
     }
 
-    #[test]
+    #[quench_test::test]
     fn pretty_uses_multiline_strings_only_when_safe() {
         let v = j(
             r#"{"a":"one\ntwo","b":"has \"\"\" quotes\nx","c":"back\\slash\nx","d":"ctl\u0001\nx"}"#,
@@ -1538,13 +1538,13 @@ mod tests {
         assert_eq!(parse(&text).unwrap(), v);
     }
 
-    #[test]
+    #[quench_test::test]
     fn writer_floats() {
         let text = to_string(&j(r#"{"a":1.0,"b":-0.5,"c":1e20,"d":5e-324}"#)).unwrap();
         assert_eq!(text, "a = 1.0\nb = -0.5\nc = 1e+20\nd = 5e-324\n");
     }
 
-    #[test]
+    #[quench_test::test]
     fn writer_nulls() {
         // a null table entry is omitted, as an unset Option is
         assert_eq!(
@@ -1562,7 +1562,7 @@ mod tests {
         assert_eq!(to_string(&j(r#"{"a":[{}]}"#)).unwrap(), "[[a]]\n");
     }
 
-    #[test]
+    #[quench_test::test]
     fn writer_limits() {
         assert!(
             to_string(&j("[1]"))
@@ -1591,7 +1591,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn writer_round_trips_awkward_values() {
         let v = j(
             r#"{"a":{"b.c":{"d e":[1,2,[3,[4]]]}},"s":["x","y"],"t":[{"u":[{"v":1}]}],"i":-9223372036854775808}"#,

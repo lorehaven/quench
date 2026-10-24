@@ -1,6 +1,6 @@
 use quench_mail::{Address, BuildError, Mailbox};
 
-#[test]
+#[quench_test::test]
 fn a_plain_address_splits_into_local_and_domain() {
     let address: Address = "alice@example.com".parse().unwrap();
     assert_eq!(address.local(), "alice");
@@ -9,7 +9,7 @@ fn a_plain_address_splits_into_local_and_domain() {
     assert_eq!(address.to_string(), "alice@example.com");
 }
 
-#[test]
+#[quench_test::test]
 fn common_local_part_characters_are_accepted() {
     for ok in [
         "first.last@example.com",
@@ -23,7 +23,7 @@ fn common_local_part_characters_are_accepted() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn malformed_addresses_are_rejected() {
     let long_local = format!("{}@example.com", "a".repeat(65));
     let long_domain = format!("a@{}.com", "b".repeat(64));
@@ -56,7 +56,7 @@ fn malformed_addresses_are_rejected() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn line_breaks_and_smtp_command_syntax_cannot_smuggle_in() {
     for bad in [
         "a@b.c\r\nBcc: x@y.z",
@@ -71,7 +71,7 @@ fn line_breaks_and_smtp_command_syntax_cannot_smuggle_in() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn address_new_validates_like_parsing() {
     assert!(Address::new("alice", "example.com").is_ok());
     assert_eq!(
@@ -80,7 +80,7 @@ fn address_new_validates_like_parsing() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn mailbox_forms_parse() {
     let bare: Mailbox = "alice@example.com".parse().unwrap();
     assert_eq!(bare.name, None);
@@ -97,7 +97,7 @@ fn mailbox_forms_parse() {
     assert_eq!(padded.address.as_str(), "alice@example.com");
 }
 
-#[test]
+#[quench_test::test]
 fn quoted_display_names_are_unquoted() {
     let m: Mailbox = "\"Liddell, Alice\" <alice@example.com>".parse().unwrap();
     assert_eq!(m.name.as_deref(), Some("Liddell, Alice"));
@@ -106,13 +106,13 @@ fn quoted_display_names_are_unquoted() {
     assert_eq!(escaped.name.as_deref(), Some(r#"Al "the" Great"#));
 }
 
-#[test]
+#[quench_test::test]
 fn non_ascii_display_names_are_kept_for_later_encoding() {
     let m: Mailbox = "Zoë Łukasz <zoe@example.com>".parse().unwrap();
     assert_eq!(m.name.as_deref(), Some("Zoë Łukasz"));
 }
 
-#[test]
+#[quench_test::test]
 fn malformed_mailboxes_are_rejected() {
     for bad in [
         "Alice <alice@example.com",
@@ -127,7 +127,7 @@ fn malformed_mailboxes_are_rejected() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn mailbox_display_is_readable() {
     let named: Mailbox = "Alice <alice@example.com>".parse().unwrap();
     assert_eq!(named.to_string(), "Alice <alice@example.com>");

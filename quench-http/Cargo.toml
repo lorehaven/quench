@@ -10,10 +10,12 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+autotests = false
 
 [lib]
 name = "quench_http"
 path = "src/lib.rs"
+harness = false
 
 [dependencies]
 quench-log = { workspace = true }
@@ -30,8 +32,94 @@ default = ["tls"]
 tls = ["dep:rustls", "quench-proto/tls"]
 
 [dev-dependencies]
+quench-test = { workspace = true }
 quench-proto = { workspace = true, features = ["client"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "body_limits"
+path = "tests/body_limits.rs"
+harness = false
+
+[[test]]
+name = "dependency_graph"
+path = "tests/dependency_graph.rs"
+harness = false
+
+[[test]]
+name = "di_cycle"
+path = "tests/di_cycle.rs"
+harness = false
+
+[[test]]
+name = "di_missing_dependency"
+path = "tests/di_missing_dependency.rs"
+harness = false
+
+[[test]]
+name = "di_provide_arc"
+path = "tests/di_provide_arc.rs"
+harness = false
+
+[[test]]
+name = "di_provided_value"
+path = "tests/di_provided_value.rs"
+harness = false
+
+[[test]]
+name = "e2e"
+path = "tests/e2e.rs"
+harness = false
+
+[[test]]
+name = "extensions_and_headers"
+path = "tests/extensions_and_headers.rs"
+harness = false
+
+[[test]]
+name = "form"
+path = "tests/form.rs"
+harness = false
+
+[[test]]
+name = "framework"
+path = "tests/framework.rs"
+harness = false
+
+[[test]]
+name = "graceful_shutdown"
+path = "tests/graceful_shutdown.rs"
+harness = false
+
+[[test]]
+name = "mount_prefix"
+path = "tests/mount_prefix.rs"
+harness = false
+
+[[test]]
+name = "multipart"
+path = "tests/multipart.rs"
+harness = false
+
+[[test]]
+name = "on_path_prefix"
+path = "tests/on_path_prefix.rs"
+harness = false
+
+[[test]]
+name = "route_macro"
+path = "tests/route_macro.rs"
+harness = false
+
+[[test]]
+name = "router_wildcard"
+path = "tests/router_wildcard.rs"
+harness = false
+
+[[test]]
+name = "streaming"
+path = "tests/streaming.rs"
+harness = false

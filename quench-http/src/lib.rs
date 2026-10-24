@@ -55,3 +55,6 @@ pub mod prelude {
     pub use crate::server::{load_tls, serve_https, serve_https_on};
     pub use quench_http_macros::{delete, get, injectable, patch, post, put};
 }
+
+#[cfg(test)]
+quench_test::main!();

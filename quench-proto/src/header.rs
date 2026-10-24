@@ -646,7 +646,7 @@ mod tests {
         HeaderValue::from_str(text).unwrap()
     }
 
-    #[test]
+    #[quench_test::test]
     fn names_are_lowercased_tokens() {
         assert_eq!(
             HeaderName::from_bytes(b"Content-Type").unwrap(),
@@ -672,13 +672,13 @@ mod tests {
         assert!(InvalidHeaderName.to_string().contains("invalid"));
     }
 
-    #[test]
+    #[quench_test::test]
     #[should_panic(expected = "invalid header name")]
     fn from_static_rejects_uppercase() {
         let _ = HeaderName::from_static("Upper");
     }
 
-    #[test]
+    #[quench_test::test]
     fn values_reject_control_bytes() {
         assert_eq!(
             value("text/html; charset=utf-8").to_str().unwrap(),
@@ -699,7 +699,7 @@ mod tests {
         assert!(HeaderValue::try_from("fine").is_ok());
     }
 
-    #[test]
+    #[quench_test::test]
     fn values_expose_bytes_and_text() {
         let v = value("abc");
         assert_eq!(v.as_bytes(), b"abc");
@@ -716,13 +716,13 @@ mod tests {
         assert_eq!(HeaderValue::from(-4i32).as_bytes(), b"-4");
     }
 
-    #[test]
+    #[quench_test::test]
     #[should_panic(expected = "invalid header value")]
     fn from_static_value_rejects_newlines() {
         let _ = HeaderValue::from_static("a\nb");
     }
 
-    #[test]
+    #[quench_test::test]
     fn map_lookup_is_case_insensitive_and_ordered() {
         let mut map = HeaderMap::new();
         assert!(map.is_empty());
@@ -747,7 +747,7 @@ mod tests {
         assert!(format!("{map:?}").contains("content-type"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn insert_replaces_every_earlier_value() {
         let mut map = HeaderMap::new();
         map.append("x", value("1"));
@@ -766,7 +766,7 @@ mod tests {
         assert!(map.insert(&CONTENT_TYPE, value("b")).is_some());
     }
 
-    #[test]
+    #[quench_test::test]
     fn remove_clears_all_values() {
         let mut map = HeaderMap::new();
         map.append("x", value("1"));
@@ -779,7 +779,7 @@ mod tests {
         assert!(map.is_empty());
     }
 
-    #[test]
+    #[quench_test::test]
     fn joined_values_of_list_headers() {
         let mut map = HeaderMap::with_capacity(4);
         assert!(map.get_joined("accept").is_none());
@@ -793,7 +793,7 @@ mod tests {
         assert!(obs.get_joined("x").is_none());
     }
 
-    #[test]
+    #[quench_test::test]
     fn collects_extends_and_iterates() {
         let mut map: HeaderMap = [(CONTENT_TYPE, value("a")), (HOST, value("h"))]
             .into_iter()
@@ -805,7 +805,7 @@ mod tests {
         assert_eq!(map.get_all(&HOST).count(), 1);
     }
 
-    #[test]
+    #[quench_test::test]
     fn well_known_constants_are_valid_lowercase_names() {
         for name in [
             &ACCEPT,

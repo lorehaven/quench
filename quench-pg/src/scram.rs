@@ -164,7 +164,7 @@ mod tests {
     const SERVER_FIRST: &str =
         "r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096";
 
-    #[test]
+    #[quench_test::test]
     fn rfc_7677_exchange() {
         let mut scram = Scram::with_nonce("pencil", NONCE);
         assert_eq!(scram.client_first(), b"n,,n=,r=rOprNGfwEbeRWgbNEkqO");
@@ -180,7 +180,7 @@ mod tests {
         assert!(scram.verify_server(b"v=AAAA").is_err());
     }
 
-    #[test]
+    #[quench_test::test]
     fn rfc_7677_proof_and_server_signature_with_the_rfc_username() {
         // Reproduce the RFC's exact exchange by using its client-first-bare (`n=user,r=...`).
         let mut scram = Scram::with_nonce("pencil", NONCE);
@@ -200,7 +200,7 @@ mod tests {
         assert!(wrong.to_string().contains("does not know the password"));
     }
 
-    #[test]
+    #[quench_test::test]
     fn random_nonces_differ() {
         let a = Scram::new("pw").client_first();
         let b = Scram::new("pw").client_first();
@@ -208,7 +208,7 @@ mod tests {
         assert!(a.starts_with(b"n,,n=,r="));
     }
 
-    #[test]
+    #[quench_test::test]
     fn malformed_server_messages_are_rejected() {
         let new = || Scram::with_nonce("pw", "abc");
         for bad in [
@@ -237,7 +237,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn server_final_errors() {
         let mut scram = Scram::with_nonce("pw", "abc");
         assert!(

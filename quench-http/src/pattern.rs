@@ -124,7 +124,7 @@ mod tests {
         )
     }
 
-    #[test]
+    #[quench_test::test]
     fn literal_is_anchored_and_trailing_slash_sensitive() {
         assert!(m("/ui", "/ui").is_some());
         assert!(m("/ui", "/ui/").is_none());
@@ -133,7 +133,7 @@ mod tests {
         assert!(m("/", "").is_none());
     }
 
-    #[test]
+    #[quench_test::test]
     fn segment_captures_one_non_empty_segment() {
         assert_eq!(m("/u/{id}", "/u/42"), pairs(&[("id", "42")]));
         assert!(m("/u/{id}", "/u/").is_none());
@@ -144,12 +144,12 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn segment_can_share_a_segment_with_literal_text() {
         assert_eq!(m("/f/{name}.json", "/f/a.json"), pairs(&[("name", "a")]));
     }
 
-    #[test]
+    #[quench_test::test]
     fn rest_swallows_slashes_and_backtracks_for_a_suffix() {
         assert_eq!(
             m(
@@ -161,14 +161,14 @@ mod tests {
         assert!(m("/{name:.+}/blobs/{digest}", "/blobs/x").is_none());
     }
 
-    #[test]
+    #[quench_test::test]
     fn rest_min_distinguishes_plus_and_star() {
         assert_eq!(m("/a/{p:.*}", "/a/"), pairs(&[("p", "")]));
         assert!(m("/a/{p:.+}", "/a/").is_none());
         assert_eq!(m("/a/{p:.*}", "/a/b/c"), pairs(&[("p", "b/c")]));
     }
 
-    #[test]
+    #[quench_test::test]
     #[should_panic(expected = "unsupported constraint")]
     fn unsupported_constraint_is_rejected() {
         Pattern::parse("/{id:[0-9]+}");

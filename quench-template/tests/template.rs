@@ -1,6 +1,8 @@
 //! The template engine: syntax, expressions, filters, tests, loops, macros and errors.
 
 #![allow(clippy::too_many_lines)]
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
 
 use quench_serde::{Value, json};
 use quench_template::{Args, Environment, ErrorKind};
@@ -19,7 +21,7 @@ fn fails(source: &str, context: &Value) -> quench_template::Error {
     Environment::new().render_str(source, context).unwrap_err()
 }
 
-#[test]
+#[quench_test::test]
 fn text_variables_and_comments() {
     let ctx = json!({"name": "ada", "n": 3, "f": 1.5, "t": true, "none": null, "list": [1, "a"], "map": {"k": "v"}});
     assert_eq!(render("hi {{ name }}{# gone #}!", &ctx), "hi ada!");
@@ -39,7 +41,7 @@ fn text_variables_and_comments() {
     assert_eq!(r("a\n\n"), "a\n");
 }
 
-#[test]
+#[quench_test::test]
 fn whitespace_control_and_raw() {
     assert_eq!(r("a  {{- 1 -}}  b"), "a1b");
     assert_eq!(r("a\n{%- if true -%}\n  x\n{%- endif %}\nb"), "ax\nb");
@@ -52,7 +54,7 @@ fn whitespace_control_and_raw() {
     assert_eq!(r("{{ '}}' }}"), "}}");
 }
 
-#[test]
+#[quench_test::test]
 fn expressions() {
     assert_eq!(
         r("{{ 1 + 2 * 3 }} {{ (1 + 2) * 3 }} {{ 7 // 2 }} {{ 7 % 3 }} {{ 2 ** 10 }} {{ 7 / 2 }}"),
@@ -108,7 +110,7 @@ fn expressions() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn control_flow() {
     let ctx = json!({"items": ["a", "b", "c"], "map": {"x": 1, "y": 2}, "pairs": [[1, 2], [3, 4]], "empty": []});
     assert_eq!(
@@ -170,7 +172,7 @@ fn control_flow() {
     assert_eq!(r("{% if missing %}a{% else %}b{% endif %}"), "b");
 }
 
-#[test]
+#[quench_test::test]
 fn set_with_and_blocks() {
     assert_eq!(r("{% set a = 1 %}{% set b = a + 1 %}{{ a }}{{ b }}"), "12");
     assert_eq!(r("{% set a, b = [1, 2] %}{{ b }}{{ a }}"), "21");
@@ -186,7 +188,7 @@ fn set_with_and_blocks() {
     assert_eq!(r("{% set a = missing %}{{ a }}|"), "|");
 }
 
-#[test]
+#[quench_test::test]
 fn filters() {
     let ctx = json!({"s": "Hello World", "l": [3, 1, 2], "m": {"b": 2, "a": 1}, "words": ["x", "y"],
         "objs": [{"n": "a", "v": 2}, {"n": "b", "v": 1}], "pad": "  p  ", "ws": "a b  c"});
@@ -279,7 +281,7 @@ fn filters() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn tests() {
     let ctx = json!({"s": "x", "n": 4, "f": 1.5, "l": [1], "m": {"a": 1}, "z": null, "t": true});
     let cases = [
@@ -326,7 +328,7 @@ fn tests() {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn methods() {
     assert_eq!(
         r("{{ 'a-b'.split('-') }} {{ ' x '.strip() }}{{ 'ab'.upper() }}{{ 'AB'.lower() }}"),
@@ -354,7 +356,7 @@ fn methods() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn macros_imports_and_includes() {
     let mut env = Environment::new();
     env.add_template(
@@ -402,7 +404,7 @@ fn macros_imports_and_includes() {
     assert!(env.render("imp.j2", &json!({})).is_err());
 }
 
-#[test]
+#[quench_test::test]
 fn macro_argument_errors() {
     let mut env = Environment::new();
     env.add_template("m", "{% macro f(a, b=2) %}{{ a }}{{ b }}{% endmacro %}")
@@ -419,7 +421,7 @@ fn macro_argument_errors() {
     assert!(env.render("t", &json!({})).is_err());
 }
 
-#[test]
+#[quench_test::test]
 fn environment_hooks() {
     let mut env = Environment::new();
     env.add_global("env", "prod");
@@ -458,7 +460,7 @@ fn environment_hooks() {
     assert!(env.render("dyn.j2", &json!({})).is_err());
 }
 
-#[test]
+#[quench_test::test]
 fn errors_say_what_and_where() {
     let e = fails("a\n{{ 1 + }}", &json!({}));
     assert_eq!(e.kind(), ErrorKind::Syntax);
@@ -579,3 +581,5 @@ fn errors_say_what_and_where() {
     assert_eq!(env.render("t", &json!({})).unwrap(), "x");
     assert!(env.add_template("bad", "{% if %}").is_err());
 }
+
+quench_test::main!();

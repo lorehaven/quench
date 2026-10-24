@@ -111,7 +111,7 @@ mod tests {
         unsafe { libc::close(fd) };
     }
 
-    #[test]
+    #[quench_test::test]
     fn raw_mode_is_entered_and_restored() {
         let (master, slave) = pty();
         let before = local_flags(slave);
@@ -133,7 +133,7 @@ mod tests {
         close(slave);
     }
 
-    #[test]
+    #[quench_test::test]
     fn keeping_input_uses_the_non_flushing_mode() {
         let (master, slave) = pty();
         let before = local_flags(slave);
@@ -150,7 +150,7 @@ mod tests {
         close(slave);
     }
 
-    #[test]
+    #[quench_test::test]
     fn non_terminals_are_not_touched() {
         let mut fds = [0 as RawFd; 2];
         // SAFETY: `pipe` fills the two-element array.

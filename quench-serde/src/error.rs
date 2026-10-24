@@ -94,7 +94,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn plain_errors_display_their_message() {
         let e = Error::new("boom");
         assert_eq!(e.to_string(), "boom");
@@ -102,7 +102,7 @@ mod tests {
         assert_eq!(e.location(), None);
     }
 
-    #[test]
+    #[quench_test::test]
     fn locations_count_lines_and_columns() {
         let text = "ab\ncd\nef";
         assert_eq!(Error::at("x", text, 0).location(), Some((1, 1)));
@@ -117,7 +117,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn paths_build_from_the_inside_out() {
         let e = Error::new("expected a string")
             .in_index(2)
@@ -136,7 +136,7 @@ mod tests {
         assert_eq!(Error::new("x").path(), "");
     }
 
-    #[test]
+    #[quench_test::test]
     fn path_and_location_display_together() {
         let e = Error::at("oops", "a\nb", 2).in_field("f");
         assert_eq!(e.to_string(), "f: oops at line 2 column 1");

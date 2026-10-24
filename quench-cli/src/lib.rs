@@ -12,3 +12,6 @@ pub mod term;
 pub mod terminal;
 #[cfg(all(unix, feature = "tui"))]
 pub mod tty;
+
+#[cfg(test)]
+quench_test::main!();

@@ -5,6 +5,9 @@
 //! survive a shutdown signal, does a new connection get refused once
 //! draining is done) only exists at the socket layer.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::async_trait;
 use quench_http::di::ContainerBuilder;
 use quench_http::endpoint::Endpoint;
@@ -57,7 +60,7 @@ fn read_http_response(stream: &mut StdTcpStream) -> String {
     String::from_utf8_lossy(&buf).into_owned()
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn in_flight_request_survives_shutdown_and_new_connections_are_then_refused() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -129,3 +132,5 @@ async fn in_flight_request_survives_shutdown_and_new_connections_are_then_refuse
         "listener should be closed after shutdown completes"
     );
 }
+
+quench_test::main!();

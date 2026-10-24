@@ -5,7 +5,7 @@ use quench_web_components::buttons::{
     success_button, warning_button,
 };
 
-#[test]
+#[quench_test::test]
 fn every_variant_has_its_own_class_name() {
     assert_eq!(ButtonVariant::Primary.class_name(), "btn btn-primary");
     assert_eq!(ButtonVariant::Secondary.class_name(), "btn btn-secondary");
@@ -15,7 +15,7 @@ fn every_variant_has_its_own_class_name() {
     assert_eq!(ButtonVariant::Outline.class_name(), "btn btn-outline");
 }
 
-#[test]
+#[quench_test::test]
 fn a_plain_button_defaults_to_type_button_and_the_bare_btn_class() {
     let html = ButtonBuilder::new("Save").build().render();
     assert!(html.contains("type=\"button\""));
@@ -24,7 +24,7 @@ fn a_plain_button_defaults_to_type_button_and_the_bare_btn_class() {
     assert!(!html.contains("disabled"));
 }
 
-#[test]
+#[quench_test::test]
 fn variant_overrides_the_bare_btn_class() {
     let html = ButtonBuilder::new("Delete")
         .variant(ButtonVariant::Danger)
@@ -33,13 +33,13 @@ fn variant_overrides_the_bare_btn_class() {
     assert!(html.contains("class=\"btn btn-danger\""));
 }
 
-#[test]
+#[quench_test::test]
 fn disabled_adds_the_disabled_attribute() {
     let html = ButtonBuilder::new("Save").disabled(true).build().render();
     assert!(html.contains("disabled=\"disabled\""));
 }
 
-#[test]
+#[quench_test::test]
 fn button_type_and_id_are_both_configurable() {
     let html = ButtonBuilder::new("Send")
         .button_type("submit")
@@ -50,7 +50,7 @@ fn button_type_and_id_are_both_configurable() {
     assert!(html.contains("id=\"send-btn\""));
 }
 
-#[test]
+#[quench_test::test]
 fn every_convenience_constructor_applies_its_own_variant() {
     assert!(primary_button("x").render().contains("btn-primary"));
     assert!(secondary_button("x").render().contains("btn-secondary"));

@@ -44,6 +44,7 @@ The binary understands `cargo test`'s arguments: filters, `--exact`, `--skip`, `
 At the end of every run `<package>-<binary>.json` and `.html` are written to `target/<profile>/quench-test/`, and `index.html` and `summary.json` there are rebuilt from every report in the directory, so one `cargo test` leaves a single page covering all test binaries. The page is one file with no external resources, in light and dark, with a filter for the status of each case and the steps of BDD scenarios.
 
 - `QUENCH_TEST_REPORT_DIR=path` or `--report-dir path` writes elsewhere; `QUENCH_TEST_REPORT=off` writes nothing.
+- Under `cargo nextest` (which sets `NEXTEST`) nothing is written unless a directory is named: nextest runs every test in a process of its own, so no process sees the whole run and each would overwrite the last one's report with its single test. Use `cargo test` where you want the report.
 - The JSON has `title`, `started`, `duration_ms`, a `summary` (`total`, `passed`, `failed`, `skipped`) and `suites`, each with its `cases` (`name`, `status`, `duration_ms`, `message`, `tags`, `location`, `steps`). `report::Report::from_json` reads it back.
 
 ## Commands

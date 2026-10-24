@@ -23,7 +23,7 @@ fn read_the_one_log_file(dir: &Path) -> String {
     fs::read_to_string(entry.path()).expect("read log file")
 }
 
-#[test]
+#[quench_test::test]
 fn file_sink_writes_json_by_default() {
     let dir = TempDir::new().unwrap();
     let config = Config {
@@ -51,7 +51,7 @@ fn file_sink_writes_json_by_default() {
     assert!(content.contains("\"count\":42"));
 }
 
-#[test]
+#[quench_test::test]
 fn file_sink_writes_plain_text_when_configured() {
     let dir = TempDir::new().unwrap();
     let config = Config {
@@ -78,7 +78,7 @@ fn file_sink_writes_plain_text_when_configured() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn rotation_never_names_the_file_after_prefix_and_suffix_only() {
     let dir = TempDir::new().unwrap();
     let config = Config {
@@ -99,7 +99,7 @@ fn rotation_never_names_the_file_after_prefix_and_suffix_only() {
     assert!(dir.path().join("widget.log").is_file());
 }
 
-#[test]
+#[quench_test::test]
 fn creates_the_log_directory_if_it_does_not_exist_yet() {
     let dir = TempDir::new().unwrap();
     let nested = dir.path().join("nested").join("logs");
@@ -114,7 +114,7 @@ fn creates_the_log_directory_if_it_does_not_exist_yet() {
     assert!(nested.is_dir());
 }
 
-#[test]
+#[quench_test::test]
 fn file_disabled_builds_a_subscriber_with_no_guard() {
     let config = Config {
         console_enabled: true,
@@ -133,7 +133,7 @@ fn file_disabled_builds_a_subscriber_with_no_guard() {
     });
 }
 
-#[test]
+#[quench_test::test]
 fn both_sinks_disabled_still_builds_a_usable_subscriber() {
     let config = Config {
         console_enabled: false,
@@ -152,7 +152,7 @@ fn both_sinks_disabled_still_builds_a_usable_subscriber() {
 /// subscriber - every other test above deliberately avoids it via
 /// `with_default` so they can run independently of each other and of this
 /// one, in any order, in the same test binary.
-#[test]
+#[quench_test::test]
 fn try_init_with_installs_a_real_global_default_and_a_second_call_fails() {
     let dir = TempDir::new().unwrap();
     let config = Config {
@@ -177,7 +177,7 @@ fn try_init_with_installs_a_real_global_default_and_a_second_call_fails() {
     assert!(matches!(second, Err(quench_log::Error::AlreadyInitialized)));
 }
 
-#[test]
+#[quench_test::test]
 fn the_directory_error_names_the_path() {
     let dir = TempDir::new().unwrap();
     let blocker = dir.path().join("file");
@@ -191,7 +191,7 @@ fn the_directory_error_names_the_path() {
     assert!(error.to_string().contains("under-a-file"), "{error}");
 }
 
-#[test]
+#[quench_test::test]
 fn an_unparseable_level_falls_back_to_info() {
     let dir = TempDir::new().unwrap();
     let config = Config {
@@ -215,7 +215,7 @@ fn an_unparseable_level_falls_back_to_info() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn the_filter_decides_what_reaches_the_file() {
     let dir = TempDir::new().unwrap();
     let config = Config {
@@ -244,7 +244,7 @@ fn the_filter_decides_what_reaches_the_file() {
     assert_eq!(content.lines().count(), 2);
 }
 
-#[test]
+#[quench_test::test]
 fn init_with_panics_on_a_second_install_and_names_the_crate() {
     let dir = TempDir::new().unwrap();
     let config = Config {
@@ -267,7 +267,7 @@ fn init_with_panics_on_a_second_install_and_names_the_crate() {
     let _ = quench_log::global_is_set();
 }
 
-#[test]
+#[quench_test::test]
 fn error_variants_describe_themselves() {
     use std::error::Error as _;
     let create = quench_log::Error::CreateLogDir {

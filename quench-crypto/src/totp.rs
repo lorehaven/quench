@@ -249,7 +249,7 @@ mod tests {
     use super::*;
 
     // RFC 4226 appendix D: key "12345678901234567890".
-    #[test]
+    #[quench_test::test]
     fn hotp_matches_the_rfc_4226_vectors() {
         let expected = [
             "755224", "287082", "359152", "969429", "338314", "254676", "287922", "162583",
@@ -264,7 +264,7 @@ mod tests {
     }
 
     // RFC 6238 appendix B, 8 digits, per-algorithm keys.
-    #[test]
+    #[quench_test::test]
     fn totp_matches_the_rfc_6238_vectors() {
         let sha1 = Totp::new(b"12345678901234567890".to_vec())
             .unwrap()
@@ -295,7 +295,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn checking_allows_the_skew_and_nothing_more() {
         let totp = Totp::new(generate_secret()).unwrap();
         let t = 1_700_000_000;
@@ -314,7 +314,7 @@ mod tests {
         assert!(totp.check_now(&totp.code_now()));
     }
 
-    #[test]
+    #[quench_test::test]
     fn construction_validates_and_the_secret_stays_out_of_debug() {
         assert_eq!(Totp::new(vec![1; 15]), Err(Error::SecretTooShort(15)));
         assert!(Totp::from_base32("not base32!").is_err());
@@ -346,7 +346,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn the_url_is_what_apps_import() {
         let totp = Totp::new(b"12345678901234567890".to_vec()).unwrap();
         assert_eq!(

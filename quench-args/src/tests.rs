@@ -114,19 +114,19 @@ fn expect_err(args: &[&str]) -> Error {
     parse(args).expect_err("should not parse")
 }
 
-#[test]
+#[quench_test::test]
 fn the_definition_is_consistent() {
     Cli::command().debug_assert();
 }
 
-#[test]
+#[quench_test::test]
 fn no_subcommand_is_fine_when_optional() {
     let cli = parse(&[]).unwrap();
     assert!(cli.cmd.is_none());
     assert_eq!(cli.env, None);
 }
 
-#[test]
+#[quench_test::test]
 fn global_options_work_before_and_after_the_subcommand() {
     let before = parse(&["--env", "prod", "env", "list"]).unwrap();
     assert_eq!(before.env.as_deref(), Some("prod"));
@@ -139,7 +139,7 @@ fn global_options_work_before_and_after_the_subcommand() {
     assert!(parse(&["env", "list", "--verbose"]).unwrap().verbose);
 }
 
-#[test]
+#[quench_test::test]
 fn nested_subcommands_and_aliases() {
     let cli = parse(&["env", "set", "prod"]).unwrap();
     assert!(matches!(
@@ -166,7 +166,7 @@ fn nested_subcommands_and_aliases() {
     ));
 }
 
-#[test]
+#[quench_test::test]
 fn value_enums_have_defaults_and_validate() {
     let Some(Cmd::List { scope, targets }) = parse(&["list"]).unwrap().cmd else {
         panic!("list");
@@ -196,7 +196,7 @@ fn value_enums_have_defaults_and_validate() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn flags_options_defaults_and_clusters() {
     let Some(Cmd::Apply {
         dry_run,
@@ -249,7 +249,7 @@ fn flags_options_defaults_and_clusters() {
     assert_eq!(count, Some(9));
 }
 
-#[test]
+#[quench_test::test]
 fn typed_values_report_what_was_wrong() {
     let error = expect_err(&["apply", "--timeout", "soon"]);
     assert_eq!(error.kind(), ErrorKind::InvalidValue);
@@ -260,7 +260,7 @@ fn typed_values_report_what_was_wrong() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn trailing_var_args_swallow_flags() {
     let Some(Cmd::Test { args }) = parse(&["test", "--release", "-p", "x", "--", "y"])
         .unwrap()
@@ -275,7 +275,7 @@ fn trailing_var_args_swallow_flags() {
     assert!(args.is_empty());
 }
 
-#[test]
+#[quench_test::test]
 fn double_dash_ends_options() {
     let Some(Cmd::List { targets, .. }) = parse(&["list", "--", "--weird", "-x"]).unwrap().cmd
     else {
@@ -284,7 +284,7 @@ fn double_dash_ends_options() {
     assert_eq!(targets, ["--weird", "-x"]);
 }
 
-#[test]
+#[quench_test::test]
 fn required_arguments_and_unknown_things_are_errors() {
     let error = expect_err(&["get"]);
     assert_eq!(error.kind(), ErrorKind::MissingRequired);
@@ -323,7 +323,7 @@ fn required_arguments_and_unknown_things_are_errors() {
     assert_eq!(expect_err(&["env"]).kind(), ErrorKind::MissingSubcommand);
 }
 
-#[test]
+#[quench_test::test]
 fn conflicting_arguments_are_rejected() {
     let error = expect_err(&["--verbose", "--quiet"]);
     assert_eq!(error.kind(), ErrorKind::ArgumentConflict);
@@ -335,7 +335,7 @@ fn conflicting_arguments_are_rejected() {
     assert!(parse(&["--quiet"]).is_ok());
 }
 
-#[test]
+#[quench_test::test]
 fn tuple_variants_flatten_their_args() {
     let cli = parse(&["set-branch", "owner/name", "main"]).unwrap();
     let Some(Cmd::SetBranch(args)) = cli.cmd else {
@@ -348,7 +348,7 @@ fn tuple_variants_flatten_their_args() {
     assert!(parse(&["set-branch"]).is_err());
 }
 
-#[test]
+#[quench_test::test]
 fn help_and_version_are_not_failures() {
     let help = expect_err(&["-h"]);
     assert_eq!(help.kind(), ErrorKind::DisplayHelp);
@@ -389,7 +389,7 @@ fn help_and_version_are_not_failures() {
     assert_eq!(version.to_string(), "riv 1.2.3");
 }
 
-#[test]
+#[quench_test::test]
 fn subcommand_help_shows_its_usage_arguments_and_inherited_globals() {
     let text = expect_err(&["list", "--help"]).render();
     assert!(
@@ -418,7 +418,7 @@ fn subcommand_help_shows_its_usage_arguments_and_inherited_globals() {
     assert!(apply.contains("[default: 300]"));
 }
 
-#[test]
+#[quench_test::test]
 fn the_help_subcommand_prints_help_for_what_it_names() {
     let general = expect_err(&["help"]).render();
     assert!(general.contains("Usage: riv [OPTIONS] [COMMAND]"));
@@ -435,7 +435,7 @@ fn the_help_subcommand_prints_help_for_what_it_names() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn the_command_tree_can_be_inspected() {
     let command = Cli::command();
     assert_eq!(command.get_name(), "riv");
@@ -480,7 +480,7 @@ enum ForemanCmd {
     },
 }
 
-#[test]
+#[quench_test::test]
 fn positionals_and_subcommands_share_a_command() {
     let bare = Foreman::try_parse_from(["foreman", "conveyor", "--flag"]).unwrap();
     assert!(bare.command.is_none());
@@ -516,7 +516,7 @@ struct Plain {
     input: String,
 }
 
-#[test]
+#[quench_test::test]
 fn a_command_without_subcommands_and_default_names() {
     let plain = Plain::try_parse_from(["prog", "-vo", "out.txt", "in.txt"]).unwrap();
     assert!(plain.verbose);
@@ -554,7 +554,7 @@ struct Templ {
     x: bool,
 }
 
-#[test]
+#[quench_test::test]
 fn help_templates_fill_in_their_placeholders() {
     let text = Templ::try_parse_from(["templ", "-h"]).unwrap_err().render();
     assert!(
@@ -565,7 +565,7 @@ fn help_templates_fill_in_their_placeholders() {
     assert!(text.trim_end().ends_with("End."));
 }
 
-#[test]
+#[quench_test::test]
 fn errors_render_for_people() {
     let error = expect_err(&["--nope"]);
     let text = error.render();
@@ -585,7 +585,7 @@ fn errors_render_for_people() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn non_utf8_arguments_are_an_error() {
     use std::os::unix::ffi::OsStringExt;
     let bad = std::ffi::OsString::from_vec(vec![0xff, 0xfe]);
@@ -595,7 +595,7 @@ fn non_utf8_arguments_are_an_error() {
     assert_eq!(error.kind(), ErrorKind::InvalidUtf8);
 }
 
-#[test]
+#[quench_test::test]
 fn matches_can_be_read_directly() {
     let command = Command::new("m")
         .arg(Arg::new("name").long("name").short('n').kind(Kind::Many))
@@ -612,7 +612,7 @@ fn matches_can_be_read_directly() {
     assert!(m.get_required("nothing").is_err());
 }
 
-#[test]
+#[quench_test::test]
 #[should_panic(expected = "duplicate long flag")]
 fn debug_assert_catches_duplicate_flags() {
     Command::new("c")
@@ -621,7 +621,7 @@ fn debug_assert_catches_duplicate_flags() {
         .debug_assert();
 }
 
-#[test]
+#[quench_test::test]
 #[should_panic(expected = "already built in")]
 fn debug_assert_catches_a_clash_with_help() {
     Command::new("c")
@@ -629,7 +629,7 @@ fn debug_assert_catches_a_clash_with_help() {
         .debug_assert();
 }
 
-#[test]
+#[quench_test::test]
 #[should_panic(expected = "unknown argument")]
 fn debug_assert_catches_a_conflict_with_nothing() {
     Command::new("c")
@@ -642,7 +642,7 @@ fn debug_assert_catches_a_conflict_with_nothing() {
         .debug_assert();
 }
 
-#[test]
+#[quench_test::test]
 #[should_panic(expected = "duplicate subcommand")]
 fn debug_assert_catches_duplicate_subcommands() {
     Command::new("c")
@@ -651,7 +651,7 @@ fn debug_assert_catches_duplicate_subcommands() {
         .debug_assert();
 }
 
-#[test]
+#[quench_test::test]
 #[should_panic(expected = "no `--long` or `-s`")]
 fn debug_assert_catches_a_positional_flag() {
     Command::new("c")
@@ -659,7 +659,7 @@ fn debug_assert_catches_a_positional_flag() {
         .debug_assert();
 }
 
-#[test]
+#[quench_test::test]
 #[should_panic(expected = "duplicate argument id")]
 fn debug_assert_catches_duplicate_ids() {
     Command::new("c")
@@ -668,7 +668,7 @@ fn debug_assert_catches_duplicate_ids() {
         .debug_assert();
 }
 
-#[test]
+#[quench_test::test]
 #[should_panic(expected = "duplicate subcommand")]
 fn debug_assert_catches_a_reused_alias() {
     Command::new("c")
@@ -677,7 +677,7 @@ fn debug_assert_catches_a_reused_alias() {
         .debug_assert();
 }
 
-#[test]
+#[quench_test::test]
 #[should_panic(expected = "duplicate short flag")]
 fn debug_assert_catches_duplicate_shorts() {
     Command::new("c")
@@ -686,7 +686,7 @@ fn debug_assert_catches_duplicate_shorts() {
         .debug_assert();
 }
 
-#[test]
+#[quench_test::test]
 fn possible_values_and_hidden_flags_in_help() {
     let command = Command::new("c")
         .arg(Arg::new("mode").long("mode").possible_values([
@@ -716,7 +716,7 @@ fn possible_values_and_hidden_flags_in_help() {
     assert!(command.try_get_matches_from(["--mode", "slow"]).is_err());
 }
 
-#[test]
+#[quench_test::test]
 fn value_enums_parse_case_insensitively_on_request() {
     assert_eq!(
         <Scope as ValueEnum>::from_str("MUTABLE", true),
@@ -754,7 +754,7 @@ enum AnvilCmd {
     Build,
 }
 
-#[test]
+#[quench_test::test]
 fn optional_values_and_switches_that_default_on() {
     let anvil =
         |args: &[&str]| Anvil::try_parse_from(std::iter::once("anvil").chain(args.iter().copied()));
@@ -801,7 +801,7 @@ fn optional_values_and_switches_that_default_on() {
     Anvil::command().debug_assert();
 }
 
-#[test]
+#[quench_test::test]
 fn help_for_a_path_shows_the_whole_usage_path() {
     let command = Cli::command();
     let text = command

@@ -91,7 +91,7 @@ fn member(data: &[u8], limit: usize) -> Result<(Vec<u8>, usize)> {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn round_trips_and_concatenates() {
         let a = compress(b"hello ");
         let b = compress(b"world");
@@ -101,7 +101,7 @@ mod tests {
         assert!(matches!(decompress(&both, 8), Err(Error::Limit(_))));
     }
 
-    #[test]
+    #[quench_test::test]
     fn optional_header_fields_are_skipped() {
         let plain = compress(b"data");
         let body = &plain[10..];
@@ -120,7 +120,7 @@ mod tests {
         assert_eq!(decompress(&file, 100).unwrap(), b"data");
     }
 
-    #[test]
+    #[quench_test::test]
     fn damage_is_reported() {
         let good = compress(b"some text some text some text");
         assert!(matches!(decompress(&good[..5], 100), Err(Error::Truncated)));

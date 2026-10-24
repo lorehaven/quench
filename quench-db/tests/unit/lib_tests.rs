@@ -19,30 +19,30 @@ impl Model for TestModel {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn test_model_trait() {
     assert_eq!(TestModel::table_name(), "test_table");
 }
 
-#[test]
+#[quench_test::test]
 fn model_primary_key_name_defaults_to_id() {
     assert_eq!(TestModel::primary_key_name(), "id");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn connect_with_an_empty_url_gives_an_in_memory_db() {
     let db = Db::connect("").await.expect("connect");
     assert!(matches!(db, Db::InMemory(_)));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn db_execute_and_migrate_dispatch_to_the_in_memory_backend() {
     let db = Db::connect("").await.expect("connect");
     assert!(db.execute("anything").await.is_ok());
     assert!(db.migrate(vec![]).await.is_ok());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn repository_dispatches_crud_to_the_in_memory_backend() {
     let db = Db::connect("").await.expect("connect");
     let repo = db.repository::<TestModel>();
@@ -74,7 +74,7 @@ async fn repository_dispatches_crud_to_the_in_memory_backend() {
 }
 
 #[cfg(not(feature = "postgres"))]
-#[tokio::test]
+#[quench_test::test]
 async fn a_url_needs_the_postgres_feature() {
     let err = quench_db::Db::connect("postgres://localhost/app")
         .await

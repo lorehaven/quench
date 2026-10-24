@@ -1,5 +1,8 @@
 //! The HTTP/1.1 client driver, against scripted servers and against the server driver.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::bytes::Bytes;
 use quench_core::stream::StreamExt;
 use quench_proto::h1::client::{ClientConfig, ClientConn, send_request};
@@ -32,7 +35,7 @@ fn scripted(reply: &'static [u8]) -> (tokio::io::DuplexStream, tokio::task::Join
     (client, task)
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn sends_a_request_head_with_host_and_reads_a_sized_body() {
     let (io, peer) = scripted(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\nX-A: b\r\n\r\nhello");
     let exchange = send_request(
@@ -56,7 +59,7 @@ async fn sends_a_request_head_with_host_and_reads_a_sized_body() {
     assert!(!seen.contains("content-length"), "{seen}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn userinfo_is_not_sent_in_the_host_header() {
     let (io, peer) = scripted(b"HTTP/1.1 204 No Content\r\n\r\n");
     let _ = send_request(
@@ -73,7 +76,7 @@ async fn userinfo_is_not_sent_in_the_host_header() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn posts_a_sized_body_with_content_length() {
     let (io, peer) = scripted(b"HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n");
     let request = Request::new(Method::POST, Uri::parse("http://h/x").unwrap()).body("payload");
@@ -88,7 +91,7 @@ async fn posts_a_sized_body_with_content_length() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn an_empty_post_still_declares_a_zero_length() {
     let (io, peer) = scripted(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
     let _ = send_request(
@@ -102,7 +105,7 @@ async fn an_empty_post_still_declares_a_zero_length() {
     assert!(seen.contains("content-length: 0\r\n"), "{seen}");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn streams_unsized_request_bodies_chunked() {
     let (io, peer) = scripted(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
     let items: Vec<Result<Bytes, std::io::Error>> = vec![
@@ -122,7 +125,7 @@ async fn streams_unsized_request_bodies_chunked() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn declared_request_length_must_match_the_body() {
     let (io, _peer) = scripted(b"HTTP/1.1 200 OK\r\n\r\n");
     let request = Request::new(Method::POST, Uri::parse("http://h/x").unwrap())
@@ -142,7 +145,7 @@ async fn declared_request_length_must_match_the_body() {
     ));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_failing_request_body_stream_aborts_the_send() {
     let (io, _peer) = scripted(b"HTTP/1.1 200 OK\r\n\r\n");
     let items: Vec<Result<Bytes, std::io::Error>> = vec![Err(std::io::Error::other("nope"))];
@@ -154,7 +157,7 @@ async fn a_failing_request_body_stream_aborts_the_send() {
     ));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn skips_interim_responses() {
     let (io, _peer) =
         scripted(b"HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
@@ -168,7 +171,7 @@ async fn skips_interim_responses() {
     assert_eq!(exchange.response.status, StatusCode::OK);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn reads_chunked_and_close_delimited_bodies() {
     let (io, _peer) = scripted(
         b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n3\r\nabc\r\n2\r\nde\r\n0\r\n\r\n",
@@ -204,7 +207,7 @@ async fn reads_chunked_and_close_delimited_bodies() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn head_responses_have_no_body_even_with_a_length() {
     let (io, _peer) = scripted(b"HTTP/1.1 200 OK\r\nContent-Length: 1000\r\n\r\n");
     let request = Request::new(Method::HEAD, Uri::parse("http://h/").unwrap());
@@ -215,7 +218,7 @@ async fn head_responses_have_no_body_even_with_a_length() {
     assert!(exchange.reuse.await.is_ok());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn bad_responses_are_errors() {
     for reply in [
         &b"garbage\r\n\r\n"[..],
@@ -262,7 +265,7 @@ async fn bad_responses_are_errors() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_truncated_body_is_reported_by_the_stream() {
     let (io, _peer) = scripted(b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nabc");
     let exchange = send_request(
@@ -276,7 +279,7 @@ async fn a_truncated_body_is_reported_by_the_stream() {
     assert!(exchange.reuse.await.is_err());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_silent_server_trips_the_head_timeout() {
     let (io, _server) = tokio::io::duplex(1024);
     let config = ClientConfig {
@@ -289,7 +292,7 @@ async fn a_silent_server_trips_the_head_timeout() {
     ));
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn connections_are_reused_through_the_server_driver() {
     let (client_io, server_io) = tokio::io::duplex(1 << 16);
     let service = |req: Request| async move {
@@ -326,7 +329,7 @@ async fn connections_are_reused_through_the_server_driver() {
     server.await.unwrap().unwrap();
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn bodies_can_be_streamed_item_by_item() {
     let (io, _peer) = scripted(
         b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\na\r\n1\r\nb\r\n0\r\n\r\n",
@@ -346,7 +349,7 @@ async fn bodies_can_be_streamed_item_by_item() {
     assert_eq!(seen, b"ab");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn idle_connections_notice_when_the_peer_closed() {
     let (io, mut server) = tokio::io::duplex(1024);
     let mut conn = ClientConn::new(io);
@@ -359,3 +362,5 @@ async fn idle_connections_notice_when_the_peer_closed() {
     drop(server);
     assert!(!conn.is_reusable(), "a closed peer makes it unusable");
 }
+
+quench_test::main!();

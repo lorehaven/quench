@@ -175,7 +175,7 @@ mod tests {
         out
     }
 
-    #[test]
+    #[quench_test::test]
     fn server_errors_parse_every_field() {
         let wire = fields(&[
             (b'S', "ERROR"),
@@ -221,7 +221,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn malformed_field_lists_do_not_panic() {
         assert_eq!(ServerError::parse(b""), ServerError::default());
         let truncated = ServerError::parse(b"Mno terminator");
@@ -235,7 +235,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn error_helpers_and_display() {
         let server = Error::Server(Box::new(ServerError {
             code: "23505".into(),

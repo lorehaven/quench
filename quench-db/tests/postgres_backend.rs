@@ -3,6 +3,9 @@
 //! Skipped unless `DB_TEST_POSTGRES_URL` is set, so the suite stays runnable
 //! without infrastructure - mirrors `quench-cache/tests/redis_store.rs`.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_db::prelude::*;
 use quench_db::{Crud, Database};
 use quench_serde::{Deserialize, Serialize};
@@ -38,14 +41,14 @@ async fn widgets_table(db: &PostgresDb) {
         .expect("create table");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn connect_and_execute_a_statement() {
     let Some(url) = url() else { return };
     let db = PostgresDb::new(&url).await.expect("connect");
     db.execute("SELECT 1").await.expect("execute");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn repository_crud_round_trips_through_postgres() {
     let Some(url) = url() else { return };
     let db = PostgresDb::new(&url).await.expect("connect");
@@ -81,7 +84,7 @@ async fn repository_crud_round_trips_through_postgres() {
     assert!(repo.read("1").await.expect("read").is_none());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn db_connect_with_a_url_gives_the_postgres_backend() {
     let Some(url) = url() else { return };
     let db = Db::connect(&url).await.expect("connect");
@@ -108,7 +111,7 @@ impl Model for Numbered {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn models_with_numbers_json_times_and_arrays_round_trip() {
     let Some(url) = url() else { return };
     let db = Db::connect(&url).await.expect("connect");
@@ -167,7 +170,7 @@ impl Model for Gadget {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn errors_surface_as_db_errors() {
     let Some(url) = url() else { return };
     let db = Db::connect(&url).await.expect("connect");
@@ -209,7 +212,7 @@ async fn errors_surface_as_db_errors() {
         .expect("drop");
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn migrate_applies_each_migration_once() {
     let Some(url) = url() else { return };
     let table = format!(
@@ -289,3 +292,5 @@ async fn migrate_applies_each_migration_once() {
     quench_core::env::remove("DB_MIGRATION_TABLE");
     quench_core::env::remove("DB_POOL_MAX_SIZE");
 }
+
+quench_test::main!();

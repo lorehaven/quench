@@ -8,7 +8,7 @@ fn sessions() -> Arc<SessionDb> {
     SessionDb::init(CacheStore::in_memory())
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn refresh_tokens_rotate_and_the_new_one_works() {
     let sessions = sessions();
     let (session, first) = sessions.create("user", 3600).await.unwrap();
@@ -24,7 +24,7 @@ async fn refresh_tokens_rotate_and_the_new_one_works() {
 /// now-consumed token has to succeed once, with the exact token the first
 /// rotation already produced, or a crash between gatehouse minting that token
 /// and the client persisting it would lock the client out for good.
-#[tokio::test]
+#[quench_test::test]
 async fn a_just_rotated_token_still_works_once_more_for_a_lost_response() {
     let sessions = sessions();
     let (_, first) = sessions.create("user", 3600).await.unwrap();
@@ -41,7 +41,7 @@ async fn a_just_rotated_token_still_works_once_more_for_a_lost_response() {
 /// The recovery in the test above is itself single-use: it exists to answer
 /// the caller's very next retry, not to keep a captured old token replayable
 /// for the whole grace window.
-#[tokio::test]
+#[quench_test::test]
 async fn a_recovered_token_does_not_work_a_second_time() {
     let sessions = sessions();
     let (_, first) = sessions.create("user", 3600).await.unwrap();
@@ -55,7 +55,7 @@ async fn a_recovered_token_does_not_work_a_second_time() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn revoking_ends_the_session_for_its_owner_only() {
     let sessions = sessions();
     let (session, token) = sessions.create("alice", 3600).await.unwrap();
@@ -71,14 +71,14 @@ async fn revoking_ends_the_session_for_its_owner_only() {
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_session_belongs_to_one_user() {
     let sessions = sessions();
     let (session, _) = sessions.create("alice", 3600).await.unwrap();
     assert!(!sessions.is_active(&session.id, "bob").await.unwrap());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn logout_revokes_by_refresh_token() {
     let sessions = sessions();
     let (session, token) = sessions.create("alice", 3600).await.unwrap();
@@ -90,7 +90,7 @@ async fn logout_revokes_by_refresh_token() {
 
 /// What makes removing someone's permissions take effect now rather than
 /// whenever their access token happens to expire.
-#[tokio::test]
+#[quench_test::test]
 async fn revoking_everything_ends_every_session_one_user_holds() {
     let sessions = sessions();
     let (first, first_token) = sessions.create("alice", 3600).await.unwrap();
@@ -116,7 +116,7 @@ async fn revoking_everything_ends_every_session_one_user_holds() {
 
 /// The index is what `revoke_all` walks. A session missing from it would survive
 /// a revocation, so every path that creates or extends one has to maintain it.
-#[tokio::test]
+#[quench_test::test]
 async fn the_index_tracks_sessions_through_creation_rotation_and_logout() {
     let sessions = sessions();
     let (session, token) = sessions.create("alice", 3600).await.unwrap();
@@ -138,7 +138,7 @@ async fn the_index_tracks_sessions_through_creation_rotation_and_logout() {
     assert!(sessions.sessions_for("alice").await.unwrap().is_empty());
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn a_logout_clears_its_index_entry_too() {
     let sessions = sessions();
     let (_, token) = sessions.create("alice", 3600).await.unwrap();

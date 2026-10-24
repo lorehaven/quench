@@ -215,7 +215,7 @@ mod tests {
         Err(io::Error::new(io::ErrorKind::NotFound, "no such file"))
     }
 
-    #[test]
+    #[quench_test::test]
     fn message_errors() {
         let e = Error::msg("boom");
         assert_eq!(e.to_string(), "boom");
@@ -223,7 +223,7 @@ mod tests {
         assert_eq!(e.chain(), ["boom"]);
     }
 
-    #[test]
+    #[quench_test::test]
     fn wraps_std_errors_and_downcasts() {
         let e: Error = failing_io().unwrap_err().into();
         assert_eq!(e.to_string(), "no such file");
@@ -233,7 +233,7 @@ mod tests {
         assert_eq!(e.root_cause().to_string(), "no such file");
     }
 
-    #[test]
+    #[quench_test::test]
     fn context_stacks_outermost_first() {
         let e = failing_io()
             .context("reading config")
@@ -251,7 +251,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn context_on_our_own_error_and_lazily() {
         let calls = std::cell::Cell::new(0);
         let ok: Result<u8> = Ok::<u8, Error>(1).with_context(|| {
@@ -267,7 +267,7 @@ mod tests {
         assert_eq!(format!("{e:#}"), "n=7: inner");
     }
 
-    #[test]
+    #[quench_test::test]
     fn option_context() {
         assert_eq!(Some(3).context("missing").unwrap(), 3);
         assert_eq!(
@@ -281,7 +281,7 @@ mod tests {
         assert_eq!(Some(1).with_context(|| "lazy").unwrap(), 1);
     }
 
-    #[test]
+    #[quench_test::test]
     fn includes_the_sources_of_wrapped_errors() {
         #[derive(Debug)]
         struct Outer(io::Error);
@@ -299,7 +299,7 @@ mod tests {
         assert_eq!(e.chain(), ["top", "outer failed", "no such file"]);
     }
 
-    #[test]
+    #[quench_test::test]
     fn macros() {
         fn plain() -> Result<()> {
             bail!("plain");
@@ -333,7 +333,7 @@ mod tests {
         assert_eq!(err!(String::from("owned")).to_string(), "owned");
     }
 
-    #[test]
+    #[quench_test::test]
     fn question_mark_converts() {
         fn run() -> Result<()> {
             failing_io()?;
@@ -342,7 +342,7 @@ mod tests {
         assert_eq!(run().unwrap_err().to_string(), "no such file");
     }
 
-    #[test]
+    #[quench_test::test]
     fn error_is_send_and_sync() {
         fn assert_send_sync<T: Send + Sync + 'static>() {}
         assert_send_sync::<Error>();

@@ -1,6 +1,9 @@
 //! Catalog loading and dependency resolution - the part of the migration
 //! pipeline that runs before any database is touched.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_core::tmp::TempDir;
 use quench_db::prelude::{Catalog, InstallRequest, MigrationPlan, PlanError};
 use std::path::Path;
@@ -106,7 +109,7 @@ fn plan_for(catalog: &Catalog, specs: &[&str]) -> Result<MigrationPlan, PlanErro
     MigrationPlan::resolve(catalog, &requests)
 }
 
-#[test]
+#[quench_test::test]
 fn resolves_dependencies_before_dependents() {
     let temp = base_catalog();
     let catalog = Catalog::load(temp.path()).expect("load catalog");
@@ -122,7 +125,7 @@ fn resolves_dependencies_before_dependents() {
     assert!(core < app, "core must be installed before app: {order:?}");
 }
 
-#[test]
+#[quench_test::test]
 fn dependencies_inherit_the_dependent_schema() {
     let temp = base_catalog();
     let catalog = Catalog::load(temp.path()).expect("load catalog");
@@ -142,7 +145,7 @@ fn dependencies_inherit_the_dependent_schema() {
     assert_eq!(ext_instances, 1);
 }
 
-#[test]
+#[quench_test::test]
 fn version_gates_which_migrations_are_planned() {
     let temp = base_catalog();
     let catalog = Catalog::load(temp.path()).expect("load catalog");
@@ -166,7 +169,7 @@ fn version_gates_which_migrations_are_planned() {
     assert_eq!(app_ids, vec!["0001-early", "0002-late"]);
 }
 
-#[test]
+#[quench_test::test]
 fn renders_schema_and_module_variables() {
     let temp = base_catalog();
     let catalog = Catalog::load(temp.path()).expect("load catalog");
@@ -181,7 +184,7 @@ fn renders_schema_and_module_variables() {
     assert!(early.statements[0].contains("DEFAULT 30"));
 }
 
-#[test]
+#[quench_test::test]
 fn plans_are_reproducible() {
     let temp = base_catalog();
     let catalog = Catalog::load(temp.path()).expect("load catalog");
@@ -199,7 +202,7 @@ fn plans_are_reproducible() {
     assert_eq!(sums(&first), sums(&second));
 }
 
-#[test]
+#[quench_test::test]
 fn rejects_a_version_the_catalog_does_not_define() {
     let temp = base_catalog();
     let catalog = Catalog::load(temp.path()).expect("load catalog");
@@ -211,7 +214,7 @@ fn rejects_a_version_the_catalog_does_not_define() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn rejects_an_unknown_module() {
     let temp = base_catalog();
     let catalog = Catalog::load(temp.path()).expect("load catalog");
@@ -220,7 +223,7 @@ fn rejects_an_unknown_module() {
     assert!(error.to_string().contains("unknown module"), "{error}");
 }
 
-#[test]
+#[quench_test::test]
 fn rejects_a_pinned_version_that_breaks_a_requirement() {
     let temp = TempDir::new().expect("temp dir");
     let root = temp.path();
@@ -241,7 +244,7 @@ fn rejects_a_pinned_version_that_breaks_a_requirement() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn detects_dependency_cycles() {
     let temp = TempDir::new().expect("temp dir");
     let root = temp.path();
@@ -266,7 +269,7 @@ fn detects_dependency_cycles() {
     );
 }
 
-#[test]
+#[quench_test::test]
 fn rejects_unknown_variables_in_migrations() {
     let temp = TempDir::new().expect("temp dir");
     let root = temp.path();
@@ -292,7 +295,7 @@ sql = "CREATE TABLE ${nope}.t (id TEXT);"
     assert!(error.to_string().contains("nope"), "unexpected: {error}");
 }
 
-#[test]
+#[quench_test::test]
 fn rejects_a_migration_tagged_ahead_of_its_module() {
     let temp = TempDir::new().expect("temp dir");
     let root = temp.path();
@@ -321,7 +324,7 @@ sql = "SELECT 1;"
     );
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn find_by_rejects_columns_the_model_does_not_declare() {
     use quench_db::prelude::{Crud, Db, Model};
     use quench_serde::{Deserialize, Serialize};
@@ -359,7 +362,7 @@ async fn find_by_rejects_columns_the_model_does_not_declare() {
     assert!(error.to_string().contains("unknown column"), "{error}");
 }
 
-#[test]
+#[quench_test::test]
 fn parses_install_specs() {
     let spec = InstallRequest::parse("sage@0.1.9:sage_test").expect("parse");
     assert_eq!(spec.module, "sage");
@@ -375,3 +378,5 @@ fn parses_install_specs() {
 
     assert!(InstallRequest::parse("sage@not-a-version").is_err());
 }
+
+quench_test::main!();

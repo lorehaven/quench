@@ -14,9 +14,13 @@ readme = { workspace = true }
 [lib]
 name = "quench_args"
 path = "src/lib.rs"
+harness = false
 
 [dependencies]
 quench-args-macros = { workspace = true }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+quench-test = { workspace = true }

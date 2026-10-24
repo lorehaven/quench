@@ -64,7 +64,7 @@ pub fn bytes<const N: usize>() -> [u8; N] {
 mod tests {
     use super::*;
 
-    #[test]
+    #[quench_test::test]
     fn fills_with_entropy() {
         let a: [u8; 32] = bytes();
         let b: [u8; 32] = bytes();
@@ -72,12 +72,12 @@ mod tests {
         assert_ne!(a, [0u8; 32]);
     }
 
-    #[test]
+    #[quench_test::test]
     fn empty_buffer_is_fine() {
         assert!(try_fill(&mut []).is_ok());
     }
 
-    #[test]
+    #[quench_test::test]
     fn error_displays() {
         assert!(RandomError.to_string().contains("random"));
     }

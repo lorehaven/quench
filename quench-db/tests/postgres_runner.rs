@@ -3,6 +3,9 @@
 //! Skipped unless `DB_TEST_POSTGRES_URL` is set - mirrors
 //! `tests/postgres_backend.rs` and `quench-cache/tests/redis_store.rs`.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use quench_db::catalog::ModuleScope;
 use quench_db::plan::{MigrationPlan, PlannedMigration, ResolvedModule};
 use quench_db::prelude::*;
@@ -40,7 +43,7 @@ fn plan_for(schema: &str, table: &str) -> MigrationPlan {
     }
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn dry_run_reports_pending_without_writing_anything() {
     let Some(url) = url() else { return };
     let db = PostgresDb::new(&url).await.expect("connect");
@@ -54,7 +57,7 @@ async fn dry_run_reports_pending_without_writing_anything() {
     assert_eq!(report.count(MigrationOutcome::Pending), 1);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn apply_is_idempotent_and_reset_forgets_it() {
     let Some(url) = url() else { return };
     let db = PostgresDb::new(&url).await.expect("connect");
@@ -82,7 +85,7 @@ async fn apply_is_idempotent_and_reset_forgets_it() {
     assert_eq!(report.forgotten_migrations, 1);
 }
 
-#[tokio::test]
+#[quench_test::test]
 async fn drift_is_rejected_unless_explicitly_allowed() {
     let Some(url) = url() else { return };
     let db = PostgresDb::new(&url).await.expect("connect");
@@ -107,3 +110,5 @@ async fn drift_is_rejected_unless_explicitly_allowed() {
 
     lenient.reset(&db, &plan).await.expect("cleanup");
 }
+
+quench_test::main!();

@@ -1,5 +1,8 @@
 //! The derives, exercised on the shapes quench and forge actually use.
 
+// The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
+#![allow(clippy::wildcard_imports)]
+
 use std::collections::{BTreeMap, HashMap};
 
 use quench_serde::{Deserialize, Serialize, Value, json};
@@ -27,7 +30,7 @@ struct Plain {
     note: Option<String>,
 }
 
-#[test]
+#[quench_test::test]
 fn plain_struct_round_trips_in_field_order() {
     let value = Plain {
         name: "a".into(),
@@ -75,7 +78,7 @@ struct Camel {
     nickname: Option<String>,
 }
 
-#[test]
+#[quench_test::test]
 fn rename_alias_and_deny_unknown_fields() {
     let value = Camel {
         first_name: "Ada".into(),
@@ -126,7 +129,7 @@ struct Defaults {
     read_only: u8,
 }
 
-#[test]
+#[quench_test::test]
 fn defaults_and_skips() {
     let parsed = read::<Defaults>("{}");
     assert_eq!(
@@ -183,7 +186,7 @@ impl Default for ContainerDefault {
     }
 }
 
-#[test]
+#[quench_test::test]
 fn container_default_fills_missing_fields_from_the_type_default() {
     assert_eq!(read::<ContainerDefault>("{}"), ContainerDefault::default());
     assert_eq!(
@@ -207,7 +210,7 @@ struct Custom {
     b: u8,
 }
 
-#[test]
+#[quench_test::test]
 fn container_default_can_be_a_path() {
     assert_eq!(read::<Custom>(r#"{"a":1}"#), Custom { a: 1, b: 20 });
 }
@@ -226,7 +229,7 @@ struct Flattened {
     extra: HashMap<String, Value>,
 }
 
-#[test]
+#[quench_test::test]
 fn flatten_merges_and_collects_the_rest() {
     let parsed = read::<Flattened>(r#"{"id":1,"x":5,"color":"red","n":2}"#);
     assert_eq!(parsed.id, 1);
@@ -256,7 +259,7 @@ struct Target {
     name: String,
 }
 
-#[test]
+#[quench_test::test]
 fn a_flattened_option_is_none_when_its_fields_are_not_there() {
     // serde's behaviour: the leftovers do not make a `Target`, so there is none - not an error.
     let none = read::<MaybeFlattened>(r#"{"package":"ml"}"#);
@@ -293,7 +296,7 @@ struct Pair(String, u8);
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct Marker;
 
-#[test]
+#[quench_test::test]
 fn tuple_like_structs() {
     assert_eq!(text(&Newtype(5)), "5");
     assert_eq!(read::<Newtype>("5"), Newtype(5));
@@ -318,7 +321,7 @@ enum External {
     Original,
 }
 
-#[test]
+#[quench_test::test]
 fn externally_tagged_enums() {
     for (value, wire) in [
         (External::Unit, r#""Unit""#),
@@ -363,7 +366,7 @@ enum Renamed {
     },
 }
 
-#[test]
+#[quench_test::test]
 fn rename_all_on_enums_reaches_variants_and_variant_fields() {
     assert_eq!(text(&Renamed::FirstThing), r#""first_thing""#);
     assert_eq!(
@@ -384,7 +387,7 @@ enum Internal {
     Wrapped(Inner),
 }
 
-#[test]
+#[quench_test::test]
 fn internally_tagged_enums() {
     assert_eq!(text(&Internal::Ping), r#"{"type":"ping"}"#);
     assert_eq!(
@@ -429,7 +432,7 @@ enum Untagged {
     Nothing,
 }
 
-#[test]
+#[quench_test::test]
 fn untagged_enums_try_each_variant_in_order() {
     assert_eq!(read::<Untagged>("5"), Untagged::Number(5));
     assert_eq!(read::<Untagged>(r#""s""#), Untagged::Text("s".into()));
@@ -458,7 +461,7 @@ struct Borrowed<'a> {
     parts: &'a [u8],
 }
 
-#[test]
+#[quench_test::test]
 fn generics_and_lifetimes() {
     let g = Generic {
         value: 1_u8,
@@ -488,7 +491,7 @@ struct Raw {
     r#match: u8,
 }
 
-#[test]
+#[quench_test::test]
 fn raw_identifiers_lose_their_prefix() {
     let value = Raw {
         r#type: "t".into(),
@@ -504,7 +507,7 @@ struct Nested {
     by_name: BTreeMap<String, Inner>,
 }
 
-#[test]
+#[quench_test::test]
 fn nested_types_report_the_full_path() {
     let e = fails::<Nested>(
         r#"{"items":[{"name":"a","count":1,"tags":[]},{"name":"b","count":"x","tags":[]}],"by_name":{}}"#,
@@ -526,13 +529,13 @@ enum Strict {
     A { v: u8 },
 }
 
-#[test]
+#[quench_test::test]
 fn deny_unknown_fields_reaches_internally_tagged_variants() {
     assert_eq!(read::<Strict>(r#"{"kind":"A","v":1}"#), Strict::A { v: 1 });
     assert!(fails::<Strict>(r#"{"kind":"A","v":1,"w":2}"#).contains("unknown field `w`"));
 }
 
-#[test]
+#[quench_test::test]
 fn the_json_macro_accepts_derived_types() {
     let value = json!({ "plain": Plain { name: "a".into(), count: 1, tags: vec![], note: None }, "n": Newtype(3) });
     assert_eq!(
@@ -540,3 +543,5 @@ fn the_json_macro_accepts_derived_types() {
         r#"{"plain":{"name":"a","count":1,"tags":[],"note":null},"n":3}"#
     );
 }
+
+quench_test::main!();

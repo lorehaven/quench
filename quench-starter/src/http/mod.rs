@@ -247,7 +247,7 @@ mod root_or_mounted_tests {
         )
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn bare_root_redirects_to_ui_when_base_path_is_not_root() {
         // Not asserting the exact `Location` value: `routers::ui::ui_path`
         // reads `BASE_PATH` from a process-global `LazyLock` (see
@@ -269,7 +269,7 @@ mod root_or_mounted_tests {
         assert!(inner.headers.contains_key("location"));
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn anything_other_than_bare_root_falls_through_to_mounted() {
         let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
         let app = RootOrMounted {
@@ -281,7 +281,7 @@ mod root_or_mounted_tests {
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
-    #[tokio::test]
+    #[quench_test::test]
     async fn root_base_path_never_intercepts_leaves_it_to_mounted() {
         let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
         let app = RootOrMounted {

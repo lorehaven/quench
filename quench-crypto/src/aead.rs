@@ -249,7 +249,7 @@ mod tests {
         quench_core::hex::decode(text.split_whitespace().collect::<String>()).unwrap()
     }
 
-    #[test]
+    #[quench_test::test]
     fn hchacha20_matches_the_draft_vector() {
         let key: [u8; 32] =
             unhex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
@@ -262,7 +262,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn chacha20_poly1305_matches_rfc_8439() {
         // RFC 8439 section 2.8.2.
         let key: [u8; 32] =
@@ -286,7 +286,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn xchacha20_poly1305_matches_the_draft() {
         // draft-irtf-cfrg-xchacha appendix A.3.1.
         let key: [u8; 32] =
@@ -312,7 +312,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[quench_test::test]
     fn seal_and_open_round_trip_and_bind_everything() {
         for (seal, open) in [
             (
@@ -345,7 +345,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[quench_test::test]
     fn debug_hides_the_key_and_errors_display() {
         assert!(!format!("{:?}", ChaCha20Poly1305::new([9; 32])).contains('9'));
         assert!(!format!("{:?}", XChaCha20Poly1305::new([9; 32])).contains('9'));
