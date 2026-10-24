@@ -1,6 +1,6 @@
 [package]
 name = "quench-k8s"
-version = "0.1.0"
+version = "0.1.1"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - a generic Kubernetes API client: kubeconfig and in-cluster auth, dynamic resources, discovery, logs and watches"
