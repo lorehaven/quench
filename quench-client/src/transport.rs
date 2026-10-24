@@ -14,7 +14,9 @@ use quench_proto::Body;
 use quench_proto::h1::client::{ClientConfig, ClientConn, send_request};
 use quench_proto::io::Io;
 #[cfg(feature = "tls")]
-use quench_proto::tls::{ClientOptions, TlsConnector, client_config, server_name};
+use quench_proto::tls::{
+    ClientOptions, TlsConnector, client_config, client_config_with_identity, server_name,
+};
 
 // The protocol types a request or response speaks, so callers need not depend on `quench-proto` for them.
 pub use quench_proto::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri, header};
@@ -100,6 +102,7 @@ pub struct ClientBuilder {
     timeout: Option<Duration>,
     accept_invalid_certs: bool,
     extra_roots_pem: Vec<Vec<u8>>,
+    client_identity: Option<(Vec<u8>, Vec<u8>)>,
     max_response_bytes: Option<usize>,
     user_agent: Option<String>,
     redirect: Redirect,
@@ -119,6 +122,7 @@ impl Client {
             timeout: None,
             accept_invalid_certs: false,
             extra_roots_pem: Vec::new(),
+            client_identity: None,
             max_response_bytes: None,
             user_agent: None,
             redirect: Redirect::Limited(MAX_REDIRECTS),
@@ -283,6 +287,18 @@ impl ClientBuilder {
         self
     }
 
+    /// Presents this certificate chain and private key (both PEM) to servers that ask for a client certificate
+    /// (mutual TLS). An unusable pair makes [`build`](Self::build) fail.
+    #[must_use]
+    pub fn client_identity_pem(
+        mut self,
+        certificate: impl Into<Vec<u8>>,
+        private_key: impl Into<Vec<u8>>,
+    ) -> Self {
+        self.client_identity = Some((certificate.into(), private_key.into()));
+        self
+    }
+
     /// Sends `value` as the `User-Agent` of every request (some APIs, GitHub's among them, refuse a request
     /// without one). A request can still set its own. A value that is not a valid header makes
     /// [`build`](Self::build) fail.
@@ -316,7 +332,11 @@ impl ClientBuilder {
                 use_system_roots: true,
                 alpn_protocols: vec![b"http/1.1".to_vec()],
             };
-            TlsConnector::new(client_config(&options).map_err(Error::Build)?)
+            let config = match &self.client_identity {
+                Some((certificate, key)) => client_config_with_identity(&options, certificate, key),
+                None => client_config(&options),
+            };
+            TlsConnector::new(config.map_err(Error::Build)?)
         };
         let user_agent = self
             .user_agent

@@ -1,0 +1,19 @@
+[package]
+name = "quench-archive"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - archives and compression with no dependencies: tar, zip, deflate, gzip and zstd (decoder and encoder)"
+keywords = ["tar", "zip", "zstd", "gzip", "deflate"]
+categories = ["compression", "encoding"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_archive"
+path = "src/lib.rs"
+
+[lints]
+workspace = true

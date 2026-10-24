@@ -63,19 +63,54 @@ pub struct ClientOptions {
 ///
 /// A description of what was wrong with the options or the crypto setup.
 pub fn client_config(options: &ClientOptions) -> Result<Arc<ClientConfig>, String> {
+    build_client_config(options, None)
+}
+
+/// Like [`client_config`], and the client proves who it is with a certificate chain and private key (PEM), for
+/// servers that ask for one (mutual TLS: a Kubernetes API server, say).
+///
+/// # Errors
+///
+/// A description of what was wrong with the options, the certificate or the key.
+pub fn client_config_with_identity(
+    options: &ClientOptions,
+    certificate_pem: &[u8],
+    private_key_pem: &[u8],
+) -> Result<Arc<ClientConfig>, String> {
+    let chain = pem_certificates(certificate_pem)?;
+    if chain.is_empty() {
+        return Err("the client certificate PEM holds no certificate".to_string());
+    }
+    let key = pem_private_key(private_key_pem)?;
+    build_client_config(options, Some((chain, key)))
+}
+
+fn build_client_config(
+    options: &ClientOptions,
+    identity: Option<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>)>,
+) -> Result<Arc<ClientConfig>, String> {
     let provider = provider();
     let builder = ClientConfig::builder_with_provider(provider.clone())
         .with_safe_default_protocol_versions()
         .map_err(|e| e.to_string())?;
     let mut config = if options.accept_invalid_certs {
-        builder
+        let verified = builder
             .dangerous()
-            .with_custom_certificate_verifier(Arc::new(AcceptAnyCert(provider)))
-            .with_no_client_auth()
+            .with_custom_certificate_verifier(Arc::new(AcceptAnyCert(provider)));
+        match identity {
+            Some((chain, key)) => verified
+                .with_client_auth_cert(chain, key)
+                .map_err(|e| format!("bad client certificate or key: {e}"))?,
+            None => verified.with_no_client_auth(),
+        }
     } else {
-        builder
-            .with_root_certificates(root_store(options)?)
-            .with_no_client_auth()
+        let verified = builder.with_root_certificates(root_store(options)?);
+        match identity {
+            Some((chain, key)) => verified
+                .with_client_auth_cert(chain, key)
+                .map_err(|e| format!("bad client certificate or key: {e}"))?,
+            None => verified.with_no_client_auth(),
+        }
     };
     config.alpn_protocols.clone_from(&options.alpn_protocols);
     Ok(Arc::new(config))

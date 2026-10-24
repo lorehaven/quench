@@ -7,6 +7,7 @@ Quench is a modular Rust workspace of shared library crates split out of [Forge]
 ```text
 docs/
 ├── README.md                 # this file
+├── quench-archive.md
 ├── quench-args.md
 ├── quench-auth.md
 ├── quench-cache.md
@@ -39,7 +40,9 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench DB](./quench-db.md) — ORM/CRUD abstraction plus a migration catalog engine
 - [Quench Log](./quench-log.md) — leveled events, spans, console and rolling-file output
 - [Quench QR](./quench-qr.md) — QR code encoder (ISO 18004, versions 1-40) with SVG output, no dependencies
+- [Quench Archive](./quench-archive.md) — tar, zip, deflate, gzip and zstd (decoder and encoder), no dependencies
 - [Quench Args](./quench-args.md) — command-line parsing with clap-compatible derives, no clap
+- [Quench K8s](./quench-k8s.md) — generic Kubernetes API client (kubeconfig, dynamic resources, discovery, logs, watch)
 - [Quench Schema](./quench-schema.md) — JSON Schema validation over quench-serde values
 - [Quench Regex](./quench-regex.md) — regular expressions with Unicode classes, no dependencies
 - [Quench TZ](./quench-tz.md) — IANA time zones with the database built in
@@ -99,6 +102,7 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 
 ```text
 .
+├── quench-archive/         # tar, zip, deflate, gzip, zstd
 ├── quench-args/            # command-line argument parsing
 ├── quench-args-macros/     # its derive macros
 ├── quench-auth/            # relying-party token/session verification
@@ -119,6 +123,7 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ├── quench-proto/           # HTTP types, HTTP/1.1, multipart, cookies, WebSocket, SSE
 ├── quench-redis/
 ├── quench-regex/           # regular expressions
+├── quench-k8s/             # Kubernetes API client
 ├── quench-schema/          # JSON Schema validation
            # Redis client
 ├── quench-serde/           # JSON, urlencoded, Value, Serialize/Deserialize; features toml, yaml

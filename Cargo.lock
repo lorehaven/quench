@@ -107,6 +107,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-archive"
+version = "0.1.0"
+
+[[package]]
 name = "quench-args"
 version = "0.1.0"
 dependencies = [
@@ -281,6 +285,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "quench-k8s"
+version = "0.1.0"
+dependencies = [
+ "quench-client",
+ "quench-core",
+ "quench-http",
+ "quench-serde",
+ "tokio",
 ]
 
 [[package]]

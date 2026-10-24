@@ -914,3 +914,31 @@ async fn query_pairs_are_appended_and_encoded() {
     let bad = Client::new().get("not a url").query(&[("a", "b")]);
     assert!(bad.send().await.is_err());
 }
+
+#[cfg(feature = "tls")]
+#[test]
+#[allow(clippy::redundant_clone)] // the blocking half below needs its own copy only with that feature
+fn a_client_identity_is_accepted_or_refused_at_build_time() {
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
+    let cert = std::fs::read(format!("{dir}/client.pem")).unwrap();
+    let key = std::fs::read(format!("{dir}/client.key")).unwrap();
+    assert!(
+        Client::builder()
+            .client_identity_pem(cert.clone(), key.clone())
+            .build()
+            .is_ok()
+    );
+    let error = Client::builder()
+        .client_identity_pem(cert, b"not a key".to_vec())
+        .build()
+        .err()
+        .unwrap();
+    assert!(matches!(error, Error::Build(m) if m.contains("private key")));
+    #[cfg(feature = "blocking")]
+    assert!(
+        quench_client::blocking::Client::builder()
+            .client_identity_pem(std::fs::read(format!("{dir}/client.pem")).unwrap(), key)
+            .build()
+            .is_ok()
+    );
+}

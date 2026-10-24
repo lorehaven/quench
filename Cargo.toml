@@ -13,6 +13,7 @@ members = [
   "quench-db",
   "quench-http",
   "quench-http-macros",
+  "quench-k8s",
   "quench-log",
   "quench-log-macros",
   "quench-schema",
@@ -26,6 +27,7 @@ members = [
   "quench-tls",
   "quench-tz",
   "quench-qr",
+  "quench-archive",
   "quench-pg",
   "quench-redis",
   "quench-regex",
@@ -58,6 +60,7 @@ quench-core-macros = { path = "quench-core-macros", registry = "ennor", version 
 quench-db = { path = "quench-db", registry = "ennor", version = "0.2.1", default-features = false }
 quench-http = { path = "quench-http", registry = "ennor", version = "0.1.0", default-features = false }
 quench-http-macros = { path = "quench-http-macros", registry = "ennor", version = "0.1.0" }
+quench-k8s = { path = "quench-k8s", registry = "ennor", version = "0.1.0" }
 quench-log = { path = "quench-log", registry = "ennor", version = "0.1.0" }
 quench-log-macros = { path = "quench-log-macros", registry = "ennor", version = "0.1.0" }
 quench-schema = { path = "quench-schema", registry = "ennor", version = "0.1.0" }
@@ -70,6 +73,7 @@ quench-proto = { path = "quench-proto", registry = "ennor", version = "0.1.0", d
 quench-tz = { path = "quench-tz", registry = "ennor", version = "0.1.0" }
 quench-tls = { path = "quench-tls", registry = "ennor", version = "0.1.0" }
 quench-qr = { path = "quench-qr", registry = "ennor", version = "0.1.0" }
+quench-archive = { path = "quench-archive", registry = "ennor", version = "0.1.0" }
 quench-pg = { path = "quench-pg", registry = "ennor", version = "0.1.0", default-features = false }
 quench-regex = { path = "quench-regex", registry = "ennor", version = "0.1.0" }
 quench-redis = { path = "quench-redis", registry = "ennor", version = "0.1.0", default-features = false }

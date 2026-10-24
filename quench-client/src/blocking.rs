@@ -118,6 +118,17 @@ impl ClientBuilder {
         self
     }
 
+    /// Presents a client certificate and key (PEM) to servers that ask for one.
+    #[must_use]
+    pub fn client_identity_pem(
+        mut self,
+        certificate: impl Into<Vec<u8>>,
+        private_key: impl Into<Vec<u8>>,
+    ) -> Self {
+        self.inner = self.inner.client_identity_pem(certificate, private_key);
+        self
+    }
+
     /// Sent as the `User-Agent` of every request.
     #[must_use]
     pub fn user_agent(mut self, value: impl Into<String>) -> Self {

@@ -1,8 +1,8 @@
 //! The rustls glue against a real handshake, using the fixture CA and `localhost` leaf.
 
 use quench_tls::{
-    ClientOptions, TlsAcceptor, TlsConnector, client_config, load_server_config, root_store,
-    server_name,
+    ClientOptions, TlsAcceptor, TlsConnector, client_config, client_config_with_identity,
+    load_server_config, root_store, server_name,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -541,4 +541,119 @@ mod flaky {
         let chain = pem_certificates(&std::fs::read(fixture("ca.pem")).unwrap()).unwrap();
         assert!(server_config(chain, pem_private_key(&key).unwrap()).is_err());
     }
+}
+
+/// A server that requires a client certificate signed by the fixture client CA.
+fn mutual_acceptor() -> TlsAcceptor {
+    use rustls::RootCertStore;
+    use rustls::server::WebPkiClientVerifier;
+
+    let mut roots = RootCertStore::empty();
+    for cert in
+        quench_tls::pem_certificates(&std::fs::read(fixture("client-ca.pem")).unwrap()).unwrap()
+    {
+        roots.add(cert).unwrap();
+    }
+    let verifier = WebPkiClientVerifier::builder_with_provider(
+        Arc::new(roots),
+        Arc::new(rustls::crypto::ring::default_provider()),
+    )
+    .build()
+    .unwrap();
+    let chain =
+        quench_tls::pem_certificates(&std::fs::read(fixture("server.pem")).unwrap()).unwrap();
+    let key = quench_tls::pem_private_key(&std::fs::read(fixture("server.key")).unwrap()).unwrap();
+    let config = rustls::ServerConfig::builder_with_provider(Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .unwrap()
+    .with_client_cert_verifier(verifier)
+    .with_single_cert(chain, key)
+    .unwrap();
+    TlsAcceptor::from(Arc::new(config))
+}
+
+fn server_options() -> ClientOptions {
+    ClientOptions {
+        extra_roots_pem: vec![std::fs::read(fixture("ca.pem")).unwrap()],
+        ..ClientOptions::default()
+    }
+}
+
+#[tokio::test]
+async fn a_client_certificate_is_presented_when_one_is_configured() {
+    let (client_io, server_io) = tokio::io::duplex(1 << 16);
+    let acceptor = mutual_acceptor();
+    let server = tokio::spawn(async move {
+        let mut tls = acceptor
+            .accept(server_io)
+            .await
+            .expect("the client certificate is accepted");
+        let mut buf = [0u8; 2];
+        tls.read_exact(&mut buf).await.unwrap();
+        tls.write_all(b"ok").await.unwrap();
+        tls.shutdown().await.unwrap();
+    });
+    let config = client_config_with_identity(
+        &server_options(),
+        &std::fs::read(fixture("client.pem")).unwrap(),
+        &std::fs::read(fixture("client.key")).unwrap(),
+    )
+    .unwrap();
+    let mut tls = TlsConnector::new(config)
+        .connect(server_name("localhost").unwrap(), client_io)
+        .await
+        .unwrap();
+    tls.write_all(b"hi").await.unwrap();
+    let mut reply = Vec::new();
+    tls.read_to_end(&mut reply).await.unwrap();
+    assert_eq!(reply, b"ok");
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn without_a_client_certificate_a_mutual_server_refuses() {
+    let (client_io, server_io) = tokio::io::duplex(1 << 16);
+    let acceptor = mutual_acceptor();
+    let server = tokio::spawn(async move { acceptor.accept(server_io).await.is_err() });
+    let anonymous = TlsConnector::new(client_config(&server_options()).unwrap());
+    let outcome = async {
+        let mut tls = anonymous
+            .connect(server_name("localhost").unwrap(), client_io)
+            .await?;
+        tls.write_all(b"hi").await?;
+        let mut buf = Vec::new();
+        tls.read_to_end(&mut buf).await?;
+        Ok::<_, std::io::Error>(buf)
+    }
+    .await;
+    assert!(server.await.unwrap(), "the server rejected the handshake");
+    assert!(outcome.is_err() || outcome.unwrap().is_empty());
+}
+
+#[test]
+fn a_bad_client_identity_is_described() {
+    let options = server_options();
+    let cert = std::fs::read(fixture("client.pem")).unwrap();
+    let key = std::fs::read(fixture("client.key")).unwrap();
+    assert!(
+        client_config_with_identity(&options, b"", &key)
+            .unwrap_err()
+            .contains("no certificate")
+    );
+    assert!(
+        client_config_with_identity(&options, &cert, b"not a key")
+            .unwrap_err()
+            .contains("private key")
+    );
+    // A key that does not belong to the certificate is refused too.
+    let other_key = std::fs::read(fixture("server.key")).unwrap();
+    assert!(client_config_with_identity(&options, &cert, &other_key).is_err());
+    // With verification off the identity is still sent.
+    let lax = ClientOptions {
+        accept_invalid_certs: true,
+        ..ClientOptions::default()
+    };
+    assert!(client_config_with_identity(&lax, &cert, &key).is_ok());
 }
