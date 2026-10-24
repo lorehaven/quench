@@ -1,6 +1,6 @@
 [package]
 name = "quench-cache"
-version = "0.1.16"
+version = "0.1.17"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - caching: in-process by default, Redis behind the `redis` feature"
