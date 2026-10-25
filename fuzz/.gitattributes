@@ -1,0 +1,2 @@
+# Seeds are raw wire bytes: HTTP needs CRLF, WebSocket frames are binary. Never let git normalise them.
+seeds/** -text

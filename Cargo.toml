@@ -17,6 +17,7 @@ members = [
   "quench-log",
   "quench-log-macros",
   "quench-schema",
+  "quench-security",
   "quench-serde",
   "quench-serde-macros",
   "quench-mail",

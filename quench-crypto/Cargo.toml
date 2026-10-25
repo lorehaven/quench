@@ -45,3 +45,9 @@ workspace = true
 
 [dev-dependencies]
 quench-test = { workspace = true }
+
+[[test]]
+name = "security_jwt"
+path = "tests/security_jwt.rs"
+required-features = ["jwt"]
+harness = false

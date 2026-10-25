@@ -1,0 +1,77 @@
+[package]
+name = "quench-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Its own workspace: libfuzzer-sys must stay out of the main dependency graph (deny.toml, audit).
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+quench-proto = { path = "../quench-proto", features = ["server", "client", "ws", "multipart"] }
+quench-crypto = { path = "../quench-crypto" }
+quench-serde = { path = "../quench-serde" }
+
+[profile.release]
+debug = 1
+
+
+[[bin]]
+name = "request_head"
+path = "fuzz_targets/request_head.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "response_head"
+path = "fuzz_targets/response_head.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "chunked_decoder"
+path = "fuzz_targets/chunked_decoder.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ws_frame"
+path = "fuzz_targets/ws_frame.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "uri"
+path = "fuzz_targets/uri.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "cookie"
+path = "fuzz_targets/cookie.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "multipart_boundary"
+path = "fuzz_targets/multipart_boundary.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jwt"
+path = "fuzz_targets/jwt.rs"
+test = false
+doc = false
+bench = false

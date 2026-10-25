@@ -433,14 +433,23 @@ fn validate_claims(claims: &Value, validation: &Validation, now: i64) -> Result<
             .and_then(|v| v.as_i64().or_else(|| v.as_f64().map(|f| f.floor() as i64)))
     };
 
+    // A time claim that is present but not a number (`"exp":"9999999999"`) must fail, not be skipped:
+    // skipping it would turn a malformed expiry into "never expires" for any consumer that reads
+    // the claims leniently.
+    let numeric = |name: &str| match claims.get(name) {
+        None | Some(Value::Null) => Ok(None),
+        Some(_) => number(name)
+            .map(Some)
+            .ok_or_else(|| Error::from(ErrorKind::Json(format!("`{name}` is not a number")))),
+    };
     if validation.validate_exp
-        && let Some(exp) = number("exp")
+        && let Some(exp) = numeric("exp")?
         && exp < now.saturating_sub(leeway)
     {
         return Err(ErrorKind::ExpiredSignature.into());
     }
     if validation.validate_nbf
-        && let Some(nbf) = number("nbf")
+        && let Some(nbf) = numeric("nbf")?
         && nbf > now.saturating_add(leeway)
     {
         return Err(ErrorKind::ImmatureSignature.into());

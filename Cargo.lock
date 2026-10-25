@@ -422,6 +422,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-security"
+version = "0.1.0"
+dependencies = [
+ "quench-core",
+ "quench-test",
+]
+
+[[package]]
 name = "quench-serde"
 version = "0.1.6"
 dependencies = [

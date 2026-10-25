@@ -1,0 +1,47 @@
+[package]
+name = "quench-security"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - the security gate: supply-chain, static and attack suites run as one quench-test report"
+keywords = ["security", "test"]
+categories = ["development-tools::testing"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+publish = false
+autotests = false
+
+[lib]
+name = "quench_security"
+path = "src/lib.rs"
+
+[features]
+# The gate shells out to cargo-deny, cargo-audit and nested `cargo test`, reads the network (advisory
+# database) and, for `fuzz`, runs for minutes. Off by default so `cargo test --workspace` never starts it.
+gate = []
+
+[dev-dependencies]
+quench-test = { workspace = true }
+quench-core = { workspace = true }
+
+[lints]
+workspace = true
+
+[[test]]
+name = "gate"
+path = "tests/gate.rs"
+harness = false
+required-features = ["gate"]
+
+[[test]]
+name = "fuzz"
+path = "tests/fuzz.rs"
+harness = false
+required-features = ["gate"]
+
+[[test]]
+name = "scanners"
+path = "tests/scanners.rs"
+harness = false

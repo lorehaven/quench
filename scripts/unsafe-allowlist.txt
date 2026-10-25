@@ -1,0 +1,16 @@
+# Files reviewed and allowed to contain `unsafe` (or an unsafe_code override).
+# scripts/security.fish fails on unsafe in any file NOT listed here: new unsafe needs a conscious review.
+# Keep each entry justified.
+
+# termios / ioctl / poll through libc: the terminal layer has no safe alternative.
+./quench-cli/src/keys.rs
+./quench-cli/src/term.rs
+./quench-cli/src/tty.rs
+./quench-cli/tests/pty.rs
+# std::env::set_var is unsafe in edition 2024; wrapped once, called at startup.
+./quench-core/src/env.rs
+./quench-starter/src/logging.rs
+# Tests that mutate the process environment.
+./quench-config/tests/unit/lib_tests.rs
+./quench-starter/tests/unit/common_db_tests.rs
+./quench-starter/tests/unit/common_wait_tests.rs

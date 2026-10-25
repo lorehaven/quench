@@ -123,3 +123,8 @@ harness = false
 name = "streaming"
 path = "tests/streaming.rs"
 harness = false
+
+[[test]]
+name = "security_http"
+path = "tests/security_http.rs"
+harness = false

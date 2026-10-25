@@ -62,3 +62,15 @@ name = "throughput"
 path = "tests/throughput.rs"
 required-features = ["client", "server"]
 harness = false
+
+[[test]]
+name = "security_h1"
+path = "tests/security_h1.rs"
+required-features = ["server"]
+harness = false
+
+[[test]]
+name = "fuzz_parsers"
+path = "tests/fuzz_parsers.rs"
+required-features = ["server"]
+harness = false

@@ -1,9 +1,12 @@
-# Every push to master, and every pull request.
-on = { push = ["master"], pull_request = ["*"] }
+# Every push to master, every pull request, and - at midnight Warsaw time, through summer and winter time
+# alike - the nightly security run. The scheduled run is the `security` stage alone: every other stage opts
+# out with `event != 'schedule'`, so pushes and pull requests are exactly what they were.
+on = { push = ["master"], pull_request = ["*"], schedule = ["0 0 * * *"], timezone = "Europe/Warsaw" }
 
 # ---------------------------------------------------------------- check
 [[stage]]
 name = "check"
+when  = "event != 'schedule'"
 
 [[stage.job]]
 name  = "format"
@@ -53,6 +56,7 @@ steps = [
 # ---------------------------------------------------------------- build
 [[stage]]
 name  = "build"
+when  = "event != 'schedule'"
 needs = ["check"]
 
 [[stage.job]]
@@ -63,6 +67,7 @@ steps = [{ anvil = "build --all" }]
 # ---------------------------------------------------------------- test
 [[stage]]
 name  = "test"
+when  = "event != 'schedule'"
 needs = ["build"]
 
 [[stage.job]]
@@ -90,3 +95,25 @@ steps = [
   { run = "cargo llvm-cov report" },
 ]
 artifacts = ["lcov.info"]
+
+# ---------------------------------------------------------------- security (nightly)
+# Started by the clock (`on.schedule`), never by a push. One job, one report: the gate's stages and the
+# fuzz targets are quench-test cases written to target/security, which conveyor keeps whatever the outcome
+# and shows as the Security card on the repo's scan page. The steps are chained with `|| rc=1` so a failed
+# stage never stops the fuzzing after it, and the job still ends red.
+#
+# Advisories appear without any code changing, which is the point of running this every night rather than
+# only on push. QUENCH_FUZZ_SECONDS is per target (3x for the three with real parser state): about 30
+# minutes of fuzzing on top of the build.
+[[stage]]
+name = "security"
+when = "event == 'schedule'"
+
+[[stage.job]]
+name    = "nightly"
+image   = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
+timeout = 5400
+env     = { RUST_BACKTRACE = "1", QUENCH_FUZZ_SECONDS = "120", QUENCH_FUZZ_ITERS = "1000000" }
+steps = [
+  { run = "export QUENCH_TEST_REPORT_DIR=$PWD/target/security; rc=0; cargo test -p quench-security --test scanners || rc=1; cargo test -p quench-security --features gate --test gate -- --test-threads=1 || rc=1; cargo test -p quench-security --features gate --test fuzz -- --test-threads=1 || rc=1; exit $rc" },
+]

@@ -1,0 +1,4 @@
+HTTP/1.1 301 Moved
+Location: /x
+Set-Cookie: a=b; Path=/
+
