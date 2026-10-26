@@ -11,21 +11,25 @@ when  = "event != 'schedule'"
 [[stage.job]]
 name  = "format"
 image = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
+secrets = ["ANVIL_APP_TOKEN", "ANVIL_GATEHOUSE_URL"]
 steps = [{ anvil = "format --check" }]
 
 [[stage.job]]
 name  = "lint"
 image = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
+secrets = ["ANVIL_APP_TOKEN", "ANVIL_GATEHOUSE_URL"]
 steps = [{ anvil = "lint --all-targets --deny-warnings" }]
 
 [[stage.job]]
 name  = "deps"
 image = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
+secrets = ["ANVIL_APP_TOKEN", "ANVIL_GATEHOUSE_URL"]
 steps = [{ anvil = "machete" }, { anvil = "audit" }, { anvil = "deny" }]
 
 [[stage.job]]
 name  = "semver-check"
 image = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
+secrets = ["ANVIL_APP_TOKEN", "ANVIL_GATEHOUSE_URL"]
 # Every package here is published to `ennor` and consumed elsewhere (forge's
 # workspace.dependencies pulls them directly), so a breaking change in
 # any of them is worth catching before it reaches a dependent's next build.
@@ -62,6 +66,7 @@ needs = ["check"]
 [[stage.job]]
 name  = "workspace"
 image = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
+secrets = ["ANVIL_APP_TOKEN", "ANVIL_GATEHOUSE_URL"]
 steps = [{ anvil = "build --all" }]
 
 # ---------------------------------------------------------------- test
@@ -73,6 +78,7 @@ needs = ["build"]
 [[stage.job]]
 name  = "unit"
 image = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
+secrets = ["ANVIL_APP_TOKEN", "ANVIL_GATEHOUSE_URL"]
 env   = { RUST_BACKTRACE = "1" }
 # The tests run on quench-test's own harness, which leaves a JSON/HTML report of the whole run in
 # target/debug/quench-test; conveyor keeps `summary.json` and `index.html` from there and shows them on the
@@ -83,6 +89,7 @@ steps = [{ anvil = "test --all" }]
 [[stage.job]]
 name      = "coverage"
 image     = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
+secrets = ["ANVIL_APP_TOKEN", "ANVIL_GATEHOUSE_URL"]
 env       = { RUST_BACKTRACE = "1" }
 # `--lcov`/`--text` are separate report formats - one invocation can only
 # produce one, so the run that actually exercises the tests is kept
@@ -112,6 +119,7 @@ when = "event == 'schedule'"
 [[stage.job]]
 name    = "nightly"
 image   = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
+secrets = ["ANVIL_APP_TOKEN", "ANVIL_GATEHOUSE_URL"]
 timeout = 5400
 env     = { RUST_BACKTRACE = "1", QUENCH_FUZZ_SECONDS = "120", QUENCH_FUZZ_ITERS = "1000000" }
 steps = [

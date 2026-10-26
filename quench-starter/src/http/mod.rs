@@ -145,6 +145,7 @@ pub fn discover_and_mount(base_path: impl Into<String>) -> Arc<dyn Endpoint> {
     let router: Arc<dyn Endpoint> = Arc::new(discover_routes());
     let mounted = mount(base_path.clone(), router);
     let app: Arc<dyn Endpoint> = Arc::new(RootOrMounted { base_path, mounted });
+    let app = wrap(app, middleware::security_headers::SecurityHeaders);
     let app = wrap(app, middleware::correlation::CorrelationId);
     wrap(app, middleware::logger::FilteredLogger::default())
 }

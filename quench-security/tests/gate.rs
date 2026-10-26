@@ -90,6 +90,16 @@ fn static_no_secrets_in_sources() {
     );
 }
 
+#[quench_test::test]
+fn static_no_symlink_points_outside_the_checkout() {
+    // A symlink to an absolute path works on one machine and breaks every clone made anywhere else.
+    let found = symlinks_leaving_the_project(&root());
+    assert!(
+        found.is_empty(),
+        "symlinks that leave the project (path, target): {found:?}"
+    );
+}
+
 // --- attack suites (nested runs; their individual cases land in the same report) ---
 
 fn nested(args: &[&str], what: &str) {

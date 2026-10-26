@@ -9,6 +9,7 @@ use quench_starter::http::domain::api_error::{ApiError, json_error};
 use quench_starter::http::domain::error;
 use quench_starter::http::middleware::correlation::{CorrelationId, inject_correlation_id_header};
 use quench_starter::http::middleware::logger::FilteredLogger;
+use quench_starter::http::middleware::security_headers::SecurityHeaders;
 use quench_starter::http::routers::ui;
 use std::sync::Arc;
 
@@ -235,4 +236,40 @@ async fn static_assets_are_served_safely() {
             "{bad:?}"
         );
     }
+}
+
+struct OwnNosniff;
+
+#[quench_core::async_trait]
+impl Endpoint for OwnNosniff {
+    async fn call(&self, _req: Request) -> Response {
+        Response::new(StatusCode::OK).header("x-content-type-options", "custom")
+    }
+}
+
+#[quench_test::test]
+async fn responses_are_marked_nosniff_unless_the_handler_chose() {
+    let marked = SecurityHeaders
+        .handle(request("/", &[]).await, &Status(StatusCode::OK))
+        .await;
+    assert_eq!(
+        marked.headers().get("x-content-type-options").unwrap(),
+        "nosniff"
+    );
+
+    let errors = SecurityHeaders
+        .handle(request("/", &[]).await, &Status(StatusCode::NOT_FOUND))
+        .await;
+    assert_eq!(
+        errors.headers().get("x-content-type-options").unwrap(),
+        "nosniff"
+    );
+
+    let kept = SecurityHeaders
+        .handle(request("/", &[]).await, &OwnNosniff)
+        .await;
+    assert_eq!(
+        kept.headers().get("x-content-type-options").unwrap(),
+        "custom"
+    );
 }
