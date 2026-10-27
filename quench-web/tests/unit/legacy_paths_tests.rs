@@ -123,4 +123,4 @@ use quench_web::validate_locales_exist as _;
 use quench_web::validate_locales_exist_in as _;
 
 #[quench_test::test]
-fn the_pre_split_public_paths_still_resolve() {}
+const fn the_pre_split_public_paths_still_resolve() {}

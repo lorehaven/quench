@@ -59,4 +59,4 @@ use quench_web_components::toggle_modal as _;
 use quench_web_components::update_from_select as _;
 
 #[quench_test::test]
-fn the_pre_split_public_paths_still_resolve() {}
+const fn the_pre_split_public_paths_still_resolve() {}
