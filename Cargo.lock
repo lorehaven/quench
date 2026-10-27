@@ -449,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "quench-starter"
-version = "0.4.15"
+version = "0.4.16"
 dependencies = [
  "quench-auth",
  "quench-cli",
@@ -543,7 +543,7 @@ dependencies = [
 
 [[package]]
 name = "quench-web"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "quench-core",
  "quench-style",
@@ -552,7 +552,7 @@ dependencies = [
 
 [[package]]
 name = "quench-web-components"
-version = "0.1.17"
+version = "0.1.18"
 dependencies = [
  "quench-test",
  "quench-web",
