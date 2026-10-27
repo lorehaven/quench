@@ -17,5 +17,7 @@ mod dom_tests;
 mod forms_tests;
 #[path = "unit/status_tests.rs"]
 mod status_tests;
+#[path = "unit/legacy_paths_tests.rs"]
+mod legacy_paths_tests;
 
 quench_test::main!();

@@ -23,5 +23,7 @@ mod html_builder_element_tests;
 mod html_builder_elements_tests;
 #[path = "unit/html_builder_page_tests.rs"]
 mod html_builder_page_tests;
+#[path = "unit/legacy_paths_tests.rs"]
+mod legacy_paths_tests;
 
 quench_test::main!();

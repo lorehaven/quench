@@ -19,7 +19,6 @@ harness = false
 
 [dependencies]
 quench-core = { workspace = true }
-quench-serde = { workspace = true }
 quench-style = { workspace = true }
 
 [lints]

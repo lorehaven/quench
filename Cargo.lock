@@ -546,7 +546,6 @@ name = "quench-web"
 version = "0.1.22"
 dependencies = [
  "quench-core",
- "quench-serde",
  "quench-style",
  "quench-test",
 ]
