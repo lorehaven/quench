@@ -141,6 +141,11 @@ fn with<T>(f: impl FnOnce(&mut State) -> T) -> T {
     STATE.with(|s| f(&mut s.borrow_mut()))
 }
 
+/// For calls made by `Drop`, which can run while the thread is being torn down.
+fn try_with(f: impl FnOnce(&mut State)) {
+    let _ = STATE.try_with(|s| f(&mut s.borrow_mut()));
+}
+
 /// Forgets everything and starts again with just the root. Call at the start of a test.
 pub fn reset() {
     with(|s| *s = State::new());
@@ -478,7 +483,7 @@ pub(crate) mod imports {
     }
 
     pub fn release(h: u32) {
-        with(|s| {
+        super::try_with(|s| {
             s.calls.push(Call::Release(h));
             if h >= 2 && s.node(h).is_some() {
                 s.table[h as usize] = None;
@@ -500,7 +505,7 @@ pub(crate) mod imports {
     }
 
     pub fn clear_timeout(id: u32) {
-        with(|s| {
+        super::try_with(|s| {
             s.calls.push(Call::ClearTimeout(id));
             s.timers.remove(&id);
         });
@@ -525,7 +530,7 @@ pub(crate) mod imports {
     /// Aborting a fetch makes the browser complete it with status 0, a little later: see
     /// [`super::run_ticks`].
     pub fn fetch_abort(id: u32) {
-        with(|s| {
+        super::try_with(|s| {
             s.calls.push(Call::FetchAbort(id));
             if s.fetches.remove(&id).is_some() {
                 s.aborts.push(id);

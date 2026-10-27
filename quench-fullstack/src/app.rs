@@ -3,10 +3,11 @@
 use std::sync::Arc;
 
 use quench_core::async_trait;
-use quench_http::prelude::{Endpoint, Request, Response};
+use quench_http::prelude::{Endpoint, FromRequest, Request, Response};
 
 use crate::assets::{Assets, PREFIX};
 use crate::document::{Page, document_response, new_nonce, render_document};
+use crate::user::User;
 
 /// The assets of one app and how pages that start it are written.
 #[derive(Clone, Debug)]
@@ -77,11 +78,18 @@ impl Ui {
 }
 
 type PageFn = Box<dyn Fn(&Request) -> Page + Send + Sync>;
+type UserPageFn = Box<dyn Fn(&Request, Option<User>) -> Page + Send + Sync>;
 
-/// Pages at exact paths, plus the assets, as one endpoint.
+enum PageKind {
+    Plain(PageFn),
+    ForUser(UserPageFn),
+}
+
+/// Pages at exact paths, the assets, and every `#[server]` function, as one endpoint.
 pub struct UiApp {
     ui: Arc<Ui>,
-    pages: Vec<(String, PageFn)>,
+    pages: Vec<(String, PageKind)>,
+    functions: Vec<(&'static str, Arc<dyn Endpoint>)>,
 }
 
 impl std::fmt::Debug for UiApp {
@@ -91,16 +99,25 @@ impl std::fmt::Debug for UiApp {
                 "pages",
                 &self.pages.iter().map(|(p, _)| p).collect::<Vec<_>>(),
             )
+            .field(
+                "functions",
+                &self.functions.iter().map(|(p, _)| p).collect::<Vec<_>>(),
+            )
             .finish_non_exhaustive()
     }
 }
 
 impl UiApp {
+    /// Collects the `#[server]` functions linked into the binary.
+    ///
+    /// # Panics
+    /// If two of them have the same path.
     #[must_use]
     pub fn new(ui: Ui) -> Self {
         Self {
             ui: Arc::new(ui),
             pages: Vec::new(),
+            functions: crate::server::functions(),
         }
     }
 
@@ -112,7 +129,23 @@ impl UiApp {
         path: &str,
         render: impl Fn(&Request) -> Page + Send + Sync + 'static,
     ) -> Self {
-        self.pages.push((path.to_string(), Box::new(render)));
+        self.pages
+            .push((path.to_string(), PageKind::Plain(Box::new(render))));
+        self
+    }
+
+    /// As [`UiApp::page`], for a page that depends on who is asking: `render` is given the
+    /// signed-in [`User`], or `None` when there is no valid session. The session is checked the
+    /// way a `#[context] user: User` parameter is, from the request's cookie or bearer token, so
+    /// the server can render the signed-in view (or the sign-in form) in the first response.
+    #[must_use]
+    pub fn page_for_user(
+        mut self,
+        path: &str,
+        render: impl Fn(&Request, Option<User>) -> Page + Send + Sync + 'static,
+    ) -> Self {
+        self.pages
+            .push((path.to_string(), PageKind::ForUser(Box::new(render))));
         self
     }
 
@@ -124,7 +157,7 @@ impl UiApp {
 
 #[async_trait]
 impl Endpoint for UiApp {
-    async fn call(&self, req: Request) -> Response {
+    async fn call(&self, mut req: Request) -> Response {
         let path = req.uri().path();
         if path.starts_with(PREFIX) {
             return self
@@ -137,12 +170,22 @@ impl Endpoint for UiApp {
                 )
                 .unwrap_or_else(Response::not_found);
         }
-        // A page holds `Rc`s, so it must be built and rendered without an `.await` in between.
-        self.pages
-            .iter()
-            .find(|(p, _)| p == path)
-            .map_or_else(Response::not_found, |(_, render)| {
-                self.ui.render(render(&req))
-            })
+        if let Some((_, endpoint)) = self.functions.iter().find(|(p, _)| *p == path) {
+            return endpoint.call(req).await;
+        }
+        let Some((_, kind)) = self.pages.iter().find(|(p, _)| p == path) else {
+            return Response::not_found();
+        };
+        // Who is asking is settled first: a page holds `Rc`s, so it is built and rendered with no
+        // `.await` after it exists.
+        let user = match kind {
+            PageKind::ForUser(_) => User::from_request(&mut req).await.ok(),
+            PageKind::Plain(_) => None,
+        };
+        let page = match kind {
+            PageKind::Plain(render) => render(&req),
+            PageKind::ForUser(render) => render(&req, user),
+        };
+        self.ui.render(page)
     }
 }

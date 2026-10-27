@@ -289,19 +289,23 @@ dependencies = [
 name = "quench-example-ui-web-app"
 version = "0.1.0"
 dependencies = [
+ "quench-fullstack",
  "quench-serde",
  "quench-ui",
  "quench-ui-web",
+ "tokio",
 ]
 
 [[package]]
 name = "quench-example-ui-web-server"
 version = "0.1.0"
 dependencies = [
+ "quench-auth",
  "quench-core",
  "quench-example-ui-web-app",
  "quench-fullstack",
  "quench-http",
+ "quench-proto",
  "quench-serde",
  "tokio",
 ]
@@ -311,14 +315,27 @@ name = "quench-fullstack"
 version = "0.1.0"
 dependencies = [
  "quench-archive",
+ "quench-auth",
  "quench-core",
  "quench-crypto",
+ "quench-fullstack-macros",
  "quench-http",
+ "quench-log",
  "quench-proto",
+ "quench-serde",
  "quench-test",
  "quench-ui",
  "quench-ui-web",
  "tokio",
+]
+
+[[package]]
+name = "quench-fullstack-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

@@ -85,7 +85,7 @@ try {
   const source = await page.text();
   check("view-source already has the content", source.includes("<h1>quench-ui</h1>") && source.includes('<span id="count">0</span>')
     && source.includes("3 from the server") && source.includes("<li>build the wasm</li>"));
-  check("the state is embedded as JSON", /<script type="application\/json" id="__q_state" nonce="[0-9a-f]{32}">\{"server_todos":\[/.test(source));
+  check("the state is embedded as JSON", /<script type="application\/json" id="__q_state" nonce="[0-9a-f]{32}">\{"Demo":\{"server_todos":\[/.test(source));
   const nonce = /nonce="([0-9a-f]{32})"/.exec(source)[1];
   const csp = page.headers.get("content-security-policy");
   check("the policy names the page's nonce and allows no inline code", csp.includes(`'nonce-${nonce}'`)
@@ -173,6 +173,82 @@ try {
   check("reload fetched again", await until(() => ev(`${$("#server-status")}.textContent`).then((t) => t !== "stale" && t.includes("from the server")), "the reload"));
   check("and that was a request to the server", requests.some((u) => u.endsWith("/api/todos")));
   check("no console errors or exceptions so far", errors.length === 0, JSON.stringify(errors));
+
+
+  // ---- server functions, sessions and the notes app (Stage 6) ---------------------------------
+  const rpc = { "content-type": "application/json", "x-quench-rpc": "1" };
+  const call = (path, body, headers = {}) => fetch(`${base}${path}`, { method: "POST", headers: { ...rpc, ...headers }, body: JSON.stringify(body) });
+  check("a call without the custom header is refused", (await fetch(`${base}/_fn/list_notes`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status === 403);
+  check("a call without a session is 401 with a typed error", await call("/_fn/list_notes", {}).then(async (r) => r.status === 401 && (await r.json()).kind === "unauthorized"));
+  check("a cross-site call is refused", (await call("/_fn/list_notes", {}, { "sec-fetch-site": "cross-site", origin: "https://evil.example" })).status === 403);
+  check("a GET is 405", (await fetch(`${base}/_fn/list_notes`)).status === 405);
+  const login = await (await call("/api/v1/auth/login", { username: "ola", password: "pw" })).json();
+  const bearer = { authorization: `Bearer ${login.access_token}` };
+  check("a bearer token is a session without any cookie", await call("/_fn/list_notes", {}, bearer).then((r) => r.status === 200));
+  const refreshed = await call("/api/v1/auth/refresh", { refresh_token: login.refresh_token });
+  check("the refresh token rotates", refreshed.status === 200 && (await refreshed.json()).refresh_token !== login.refresh_token);
+  check("a spent refresh token is refused", (await call("/api/v1/auth/refresh", { refresh_token: login.refresh_token })).status === 401);
+  check("a wrong password is refused", (await call("/api/v1/auth/login", { username: "ola", password: "x" })).status === 401);
+
+  const notesSource = await (await fetch(`${base}/notes`)).text();
+  check("signed out, the server renders the sign-in form", notesSource.includes('id="login-form"') && !notesSource.includes('id="note-form"')
+    && notesSource.includes('{"Notes":{"user":null,"notes":[]}}'));
+
+  const typeInto = (sel, text) => ev(`(() => { const i = ${$(sel)}; i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event("input", {bubbles: true})); })()`);
+  const submit = (sel) => ev(`${$(sel)}.requestSubmit()`);
+  const message = () => ev(`${$("#message")}.textContent`);
+  await load("/notes");
+  check("the page starts with the sign-in form", await ev(`!!${$("#login-form")}`) && !(await ev(`!!${$("#note-form")}`)));
+  await typeInto("#username", "ola"); await typeInto("#password", "wrong"); await submit("#login-form");
+  check("a wrong password shows the server's reason", await until(async () => (await message()) === "invalid credentials", "the message"));
+  await typeInto("#password", "pw"); await submit("#login-form");
+  check("signing in shows the user's notes", await until(() => ev(`${$("#who")}?.textContent === "Signed in as ola"`), "the signed-in view"));
+  check("the session is a cookie the page cannot read", !(await ev(`document.cookie`)).includes("session") && !(await ev(`document.cookie`)).includes("refresh"));
+  await submit("#note-form");
+  check("an empty note is refused, naming the problem", await until(async () => (await message()) === "text: write something", "the validation message"));
+  await typeInto("#note-text", "buy milk"); await submit("#note-form");
+  await until(() => ev(`document.querySelectorAll("#notes li").length === 1`), "the first note");
+  await typeInto("#note-text", "walk the dog"); await submit("#note-form");
+  check("notes are added and the field is cleared", await until(() => ev(`document.querySelectorAll("#notes li").length === 2`), "two notes")
+    && await ev(`${$("#note-text")}.value`) === "" && await message() === "");
+  await ev(`document.querySelector("#notes li button.toggle").click()`);
+  check("a note can be marked done", await until(() => ev(`document.querySelector("#notes li").classList.contains("done")
+    && document.querySelector("#notes li button.toggle").textContent === "reopen"`), "the toggle"));
+
+  // The server now renders the signed-in view itself, from the cookie.
+  await setDelay(700);
+  await send("Network.setCacheDisabled", { cacheDisabled: true }); // the module is immutable-cached by now, which would skip the delay
+  await go("/notes");
+  await until(() => ev(`!!${$("#who")}`), "the server-rendered page");
+  const served = { hydrated: await hydrated(), who: await ev(`${$("#who")}?.textContent`), items: await ev(`document.querySelectorAll("#notes li").length`),
+    done: await ev(`document.querySelector("#notes li")?.classList.contains("done")`) };
+  check("after a reload the server's page already has the notes", !served.hydrated && served.who === "Signed in as ola" && served.items === 2 && served.done === true, JSON.stringify(served));
+  await ev(`window.__ssr = { ul: ${$("#notes")}, first: document.querySelector("#notes li"), who: ${$("#who")}.firstChild }`);
+  await until(hydrated, "hydration of /notes", 12000);
+  await setDelay(0);
+  await send("Network.setCacheDisabled", { cacheDisabled: false });
+  check("hydration kept the server's nodes", await ev(`window.__ssr.ul === ${$("#notes")} && window.__ssr.first === document.querySelector("#notes li")
+    && window.__ssr.who === ${$("#who")}.firstChild`));
+  check("and nothing was reported", errors.length === 0, JSON.stringify(errors));
+
+  // Server-sent events: a change made on the page arrives on the stream.
+  await ev(`window.__events = []; window.__es = new EventSource("/api/notes/stream"); window.__es.addEventListener("note", (e) => window.__events.push(e.data));`);
+  await until(() => ev(`window.__es.readyState === 1`), "the stream to open");
+  await typeInto("#note-text", "streamed"); await submit("#note-form");
+  check("the server pushes a change as it happens", await until(() => ev(`window.__events.some((e) => e.startsWith("ola added note"))`), "the event"));
+  await ev(`window.__es.close()`);
+  check("the stream is only for signed-in users", (await fetch(`${base}/api/notes/stream`)).status === 401);
+
+  // Another user sees none of it.
+  await ev(`${$("#signout")}.click()`);
+  check("signing out shows the form again", await until(() => ev(`!!${$("#login-form")}`), "the sign-in form"));
+  check("and ends the session on the server", (await ev(`fetch("/_fn/list_notes", {method: "POST", headers: ${JSON.stringify(rpc)}, body: "{}"}).then((r) => r.status)`)) === 401);
+  await typeInto("#username", "ewa"); await typeInto("#password", "pw2"); await submit("#login-form");
+  await until(() => ev(`${$("#who")}?.textContent === "Signed in as ewa"`), "ewa's view");
+  check("another user does not see them", await ev(`document.querySelectorAll("#notes li").length`) === 0);
+  const theirs = await call("/_fn/set_done", { id: 1, done: true }, { authorization: `Bearer ${(await (await call("/api/v1/auth/login", { username: "ewa", password: "pw2" })).json()).access_token}` });
+  check("or change them: someone else's note is not found", theirs.status === 404 && (await theirs.json()).kind === "not_found");
+  check("no console errors in the notes flow", errors.filter((e) => !e.includes("401") && !e.includes("Failed to load resource")).length === 0, JSON.stringify(errors));
 
   // ---- a server page that does not match: the result is the client's page ---------------------
   for (const kind of ["tag", "text", "drop", "extra", "attr"]) {

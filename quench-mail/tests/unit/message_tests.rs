@@ -187,7 +187,13 @@ fn bcc_recipients_are_delivered_to_but_never_named() {
             .any(|a| a.as_str() == "secret@example.net")
     );
     assert!(!wire(&message).contains("secret@example.net"));
-    assert!(!wire(&message).to_ascii_lowercase().contains("bcc"));
+    // No `Bcc:` header. (Not a search for "bcc" anywhere: the random message id is hex and can
+    // contain it by chance.)
+    assert!(
+        !wire(&message)
+            .lines()
+            .any(|line| line.to_ascii_lowercase().starts_with("bcc:"))
+    );
 }
 
 #[quench_test::test]

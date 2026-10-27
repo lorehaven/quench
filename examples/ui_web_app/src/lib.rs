@@ -7,6 +7,8 @@
 //! and serve it with `examples/ui_web_server`. `--features counter` or `--features todo` builds a
 //! smaller app, which is how the sizes in the roadmap were measured.
 
+pub mod notes;
+
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -229,12 +231,32 @@ pub fn demo(state: Option<AppState>) -> View {
         .into_view()
 }
 
-/// What the browser starts: the demo over the state the server embedded.
+/// The state a page embeds: which page it is, and what it was rendered from.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub enum PageState {
+    Demo(AppState),
+    Notes(notes::NotesState),
+}
+
+impl PageState {
+    /// The JSON the page embeds.
+    #[must_use]
+    pub fn to_json(&self) -> String {
+        quench_serde::json::to_string(self)
+    }
+}
+
+/// What the browser starts: the page the server rendered, from the state it embedded. With no
+/// state (a page that was not rendered on the server) it is the demo, fetching what it needs.
 #[must_use]
 pub fn app() -> View {
     let state = quench_ui_web::initial_state()
-        .and_then(|json| quench_serde::json::from_str::<AppState>(&json).ok());
-    demo(state)
+        .and_then(|json| quench_serde::json::from_str::<PageState>(&json).ok());
+    match state {
+        Some(PageState::Notes(notes)) => notes::notes_view(notes),
+        Some(PageState::Demo(demo_state)) => demo(Some(demo_state)),
+        None => demo(None),
+    }
 }
 
 #[cfg(feature = "counter")]

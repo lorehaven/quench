@@ -33,7 +33,8 @@ struct Handle {
 impl Drop for Handle {
     fn drop(&mut self) {
         if self.owned {
-            LISTENERS.with(|l| {
+            // Dropped during thread shutdown the tables may already be gone: nothing to tidy then.
+            let _ = LISTENERS.try_with(|l| {
                 l.borrow_mut().remove(&self.id);
             });
             host::release(self.id);

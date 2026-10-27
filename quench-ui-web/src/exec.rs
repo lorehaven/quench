@@ -221,7 +221,10 @@ impl Future for Sleep {
 impl Drop for Sleep {
     fn drop(&mut self) {
         if let (Some(id), false) = (self.id, self.done) {
-            let removed = TIMERS.with(|t| t.borrow_mut().pending.remove(&id));
+            let removed = TIMERS
+                .try_with(|t| t.borrow_mut().pending.remove(&id))
+                .ok()
+                .flatten();
             if removed.is_some_and(|state| !state.fired) {
                 host::clear_timeout(id);
             }

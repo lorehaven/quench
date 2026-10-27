@@ -214,7 +214,9 @@ impl Future for Fetch {
 impl Drop for Fetch {
     fn drop(&mut self) {
         if !self.done {
-            let live = FETCHES.with(|f| f.borrow_mut().pending.remove(&self.id).is_some());
+            let live = FETCHES
+                .try_with(|f| f.borrow_mut().pending.remove(&self.id).is_some())
+                .unwrap_or(false);
             if live {
                 host::fetch_abort(self.id);
             }

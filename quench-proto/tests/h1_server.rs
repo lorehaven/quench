@@ -611,3 +611,72 @@ async fn streams_with_a_declared_length_use_content_length() {
 }
 
 quench_test::main!();
+
+#[quench_test::test]
+async fn a_streaming_response_sends_its_head_before_its_first_chunk_is_ready() {
+    // A server-sent event stream may have nothing to say for a long time; the client still has
+    // to learn that the response began (a browser's EventSource opens on the head).
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Bytes, std::io::Error>>(4);
+    let rx = std::sync::Mutex::new(Some(rx));
+    let service = move |_req: Request| {
+        let rx = rx.lock().unwrap().take().expect("one request");
+        async move {
+            let stream = quench_core::stream::unfold(rx, |mut rx| async move {
+                rx.recv().await.map(|item| (item, rx))
+            });
+            Response::new(StatusCode::OK)
+                .header("content-type", "text/event-stream")
+                .body(Body::from_stream(stream))
+        }
+    };
+    let (mut client, server) = tokio::io::duplex(4096);
+    let task = tokio::spawn(async move {
+        serve_connection(server, &service, &quick(), Shutdown::never()).await
+    });
+    client
+        .write_all(b"GET /events HTTP/1.1\r\nHost: a\r\nConnection: close\r\n\r\n")
+        .await
+        .unwrap();
+
+    // Nothing has been produced, yet the head arrives.
+    let mut head = vec![0u8; 512];
+    let n = tokio::time::timeout(Duration::from_millis(250), client.read(&mut head))
+        .await
+        .expect("the head must not wait for the first chunk")
+        .unwrap();
+    let head = String::from_utf8_lossy(&head[..n]).into_owned();
+    assert!(
+        head.starts_with("HTTP/1.1 200 OK\r\n") && head.contains("transfer-encoding: chunked\r\n"),
+        "{head}"
+    );
+    assert!(head.ends_with("\r\n\r\n"), "only the head so far: {head:?}");
+
+    // Then the events follow as they happen, and the stream ends cleanly.
+    tx.send(Ok(Bytes::from_static(b"data: hi\n\n")))
+        .await
+        .unwrap();
+    drop(tx);
+    let mut rest = Vec::new();
+    client.read_to_end(&mut rest).await.unwrap();
+    let rest = String::from_utf8_lossy(&rest);
+    assert!(
+        rest.contains("data: hi") && rest.ends_with("0\r\n\r\n"),
+        "{rest:?}"
+    );
+    assert!(task.await.unwrap().is_ok());
+}
+
+#[quench_test::test]
+async fn a_streaming_response_with_its_first_chunk_ready_is_still_one_write() {
+    let service = |_req: Request| async {
+        let items: Vec<Result<Bytes, std::io::Error>> = vec![Ok(Bytes::from_static(b"ready"))];
+        Response::new(StatusCode::OK).body(Body::from_stream(quench_core::stream::iter(items)))
+    };
+    let out = run(
+        service,
+        quick(),
+        b"GET / HTTP/1.1\r\nHost: a\r\nConnection: close\r\n\r\n",
+    )
+    .await;
+    assert!(out.ends_with("5\r\nready\r\n0\r\n\r\n"), "{out}");
+}

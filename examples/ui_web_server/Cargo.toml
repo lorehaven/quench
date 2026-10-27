@@ -16,10 +16,12 @@ name = "quench-example-ui-web-server"
 path = "src/main.rs"
 
 [dependencies]
+quench-auth = { workspace = true }
 quench-core = { workspace = true }
 quench-example-ui-web-app = { path = "../ui_web_app" }
 quench-fullstack = { workspace = true }
 quench-http = { workspace = true }
+quench-proto = { workspace = true }
 quench-serde = { workspace = true }
 tokio = { workspace = true }
 

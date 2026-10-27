@@ -15,6 +15,7 @@ packages = [
     "quench-crypto",
     "quench-db",
     "quench-fullstack",
+    "quench-fullstack-macros",
     "quench-html",
     "quench-http",
     "quench-http-macros",

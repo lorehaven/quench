@@ -501,9 +501,46 @@ where
         });
     }
 
-    let mut body = response.body;
+    write_body(wr, out, response.body, framing, config).await?;
+    Ok(Written {
+        keep_alive,
+        upgrade,
+    })
+}
+
+/// Writes the body after the head (which is still in `out`), framed as `framing` says.
+async fn write_body<W>(
+    wr: &mut W,
+    mut out: Vec<u8>,
+    mut body: Body,
+    framing: Framing,
+    config: &ServerConfig,
+) -> Result<(), Error>
+where
+    W: AsyncWrite + Unpin,
+{
     let mut sent = 0u64;
-    while let Some(chunk) = body.next().await {
+    // A streaming body can take a long while to produce its first chunk (a server-sent event
+    // stream, say). Unless that chunk is ready now, send the head first: the client then knows the
+    // response has begun, and a browser's `EventSource` opens on it.
+    let mut first = None;
+    if matches!(framing, Framing::Chunked | Framing::UntilClose) {
+        let mut next = std::pin::pin!(body.next());
+        match poll_now(next.as_mut()) {
+            Poll::Ready(item) => first = Some(item),
+            Poll::Pending => {
+                send(wr, &out, config.write_timeout).await?;
+                out.clear();
+                first = Some(next.await);
+            }
+        }
+    }
+    loop {
+        let item = match first.take() {
+            Some(item) => item,
+            None => body.next().await,
+        };
+        let Some(chunk) = item else { break };
         let chunk = chunk.map_err(Error::Body)?;
         match framing {
             Framing::Length(n) => {
@@ -537,10 +574,14 @@ where
     if !out.is_empty() {
         send(wr, &out, config.write_timeout).await?;
     }
-    Ok(Written {
-        keep_alive,
-        upgrade,
-    })
+    Ok(())
+}
+
+/// Polls `future` once, with a waker that does nothing, to see whether it is ready right now. A
+/// future polled this way and left pending must be polled again with a real waker, which every
+/// future supports. Its own function so the context never lives across an `.await`.
+fn poll_now<F: Future>(future: Pin<&mut F>) -> Poll<F::Output> {
+    future.poll(&mut Context::from_waker(std::task::Waker::noop()))
 }
 
 /// A minimal bodiless answer for a request that could not be served; best effort.

@@ -22,9 +22,14 @@ counter = []
 todo = []
 
 [dependencies]
+quench-fullstack = { workspace = true }
 quench-serde = { workspace = true }
 quench-ui = { workspace = true }
 quench-ui-web = { workspace = true }
+
+# The in-memory store lives on the server only.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true }
 
 [lints]
 workspace = true

@@ -31,6 +31,7 @@ members = [
   "quench-ui",
   "quench-ui-web",
   "quench-fullstack",
+  "quench-fullstack-macros",
   "quench-qr",
   "quench-archive",
   "quench-template",
@@ -88,6 +89,7 @@ quench-tz = { path = "quench-tz", registry = "ennor", version = "0.1.0" }
 quench-ui = { path = "quench-ui", registry = "ennor", version = "0.1.0" }
 quench-ui-web = { path = "quench-ui-web", registry = "ennor", version = "0.1.0" }
 quench-fullstack = { path = "quench-fullstack", registry = "ennor", version = "0.1.0" }
+quench-fullstack-macros = { path = "quench-fullstack-macros", registry = "ennor", version = "0.1.0" }
 quench-tls = { path = "quench-tls", registry = "ennor", version = "0.1.0" }
 quench-qr = { path = "quench-qr", registry = "ennor", version = "0.1.0" }
 quench-test = { path = "quench-test", registry = "ennor", version = "0.1.0" }

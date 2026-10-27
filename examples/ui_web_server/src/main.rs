@@ -1,13 +1,18 @@
-//! Serves the `ui_web_app` example, rendering the page on the server. Build the app first:
+//! Serves the `ui_web_app` example, rendering pages on the server. Build the app first:
 //!
 //! ```text
 //! cargo build --target wasm32-unknown-unknown --profile wasm -p quench-example-ui-web-app
 //! cargo run -p quench-example-ui-web-server            # then open http://127.0.0.1:3000
 //! ```
 //!
-//! `PORT` and `WASM` (the path of the module) override the defaults. The page, `quench.js` and the
+//! `PORT` and `WASM` (the path of the module) override the defaults. Pages, `quench.js` and the
 //! module are served by `quench-fullstack` with content-hashed names and a strict
-//! Content-Security-Policy; `view-source:` shows the page already rendered.
+//! Content-Security-Policy; `view-source:` shows a page already rendered.
+//!
+//! - `/` is the demo (counter, todos, a list the server embedded).
+//! - `/notes` is the notes app: sign in as `ola` / `pw` or `ewa` / `pw2`. Its calls are `#[server]`
+//!   functions, and `/api/v1/auth/*` is a gatehouse-compatible stub that issues real signed
+//!   tokens. `/api/notes/stream` pushes a server-sent event when your notes change.
 //!
 //! Hooks for the browser test (this is an example: do not copy them into a service):
 //! `/?corrupt=<kind>` damages the server's HTML (`tag`, `text`, `drop`, `extra`, `attr`, `empty`),
@@ -17,15 +22,21 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use quench_auth::domain::jwt::JwtConfig;
 use quench_core::async_trait;
-use quench_example_ui_web_app::{AppState, ServerTodo, demo};
-use quench_fullstack::{Page, Ui, UiApp};
+use quench_core::stream;
+use quench_example_ui_web_app::notes::{self, NotesState, store};
+use quench_example_ui_web_app::{AppState, PageState, ServerTodo, demo};
+use quench_fullstack::testing::StubGatehouse;
+use quench_fullstack::{Page, Ui, UiApp, User};
 use quench_http::prelude::http::StatusCode;
 use quench_http::prelude::*;
+use quench_proto::sse::Event;
 
 const STYLE: &str = "body{font-family:sans-serif;margin:2rem auto;max-width:36rem;padding:0 1rem}\
 .card{border:1px solid #ccc;border-radius:.5rem;padding:1rem;margin:1rem 0}\
-li.done span{text-decoration:line-through;color:#888}li{margin:.25rem 0}button{margin-left:.5rem}";
+li.done span{text-decoration:line-through;color:#888}li{margin:.25rem 0}button{margin-left:.5rem}\
+.error{color:#b00020;min-height:1.2em}";
 
 fn todos() -> Vec<ServerTodo> {
     [
@@ -64,8 +75,34 @@ fn corrupt(kind: &str, html: String) -> String {
 
 struct Site {
     app: UiApp,
+    auth: StubGatehouse,
     wasm_path: String,
     delay_ms: AtomicU64,
+}
+
+impl Site {
+    /// Server-sent events: one `note` event each time one of the signed-in user's notes changes.
+    async fn stream(&self, mut req: Request) -> Response {
+        let Ok(user) = User::from_request(&mut req).await else {
+            return Response::new(StatusCode::UNAUTHORIZED);
+        };
+        let prefix = format!("{} ", user.sub);
+        let events = stream::unfold(store::subscribe(), move |mut changes| {
+            let prefix = prefix.clone();
+            async move {
+                loop {
+                    match changes.recv().await {
+                        Ok(message) if message.starts_with(&prefix) => {
+                            return Some((Event::new().event("note").data(message), changes));
+                        }
+                        Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
+                    }
+                }
+            }
+        });
+        Response::sse(events).header("cache-control", "no-store")
+    }
 }
 
 #[async_trait]
@@ -81,6 +118,7 @@ impl Endpoint for Site {
                     .header("content-type", "application/json")
                     .header("cache-control", "no-store");
             }
+            "/api/notes/stream" => return self.stream(req).await,
             "/__delay" => {
                 let ms = query
                     .strip_prefix("ms=")
@@ -89,6 +127,7 @@ impl Endpoint for Site {
                 self.delay_ms.store(ms, Ordering::Relaxed);
                 return Response::text(StatusCode::OK, format!("delay {ms}ms"));
             }
+            _ if path.starts_with("/api/v1/auth/") => return self.auth.call(req).await,
             _ => {}
         }
         if path == self.wasm_path {
@@ -130,19 +169,41 @@ async fn main() {
     let mut ui = Ui::new(bytes);
     let style = ui.add_asset("site.css", STYLE, "text/css");
     let wasm_path = ui.paths().1.to_string();
-    let app = UiApp::new(ui).page("/", move |_req| {
-        let state = AppState {
-            server_todos: todos(),
-        };
-        Page::new("quench-ui", demo(Some(state.clone())))
-            .stylesheet(&style)
-            .state(state.to_json())
-    });
-    let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
+    let (demo_style, notes_style) = (style.clone(), style);
+
+    let app = UiApp::new(ui)
+        .page("/", move |_req| {
+            let state = AppState {
+                server_todos: todos(),
+            };
+            Page::new("quench-ui", demo(Some(state.clone())))
+                .stylesheet(&demo_style)
+                .state(PageState::Demo(state).to_json())
+        })
+        .page_for_user("/notes", move |_req, user| {
+            let state = NotesState {
+                notes: user
+                    .as_ref()
+                    .map(|u| store::notes_of(&u.sub))
+                    .unwrap_or_default(),
+                user: user.map(|u| u.sub),
+            };
+            Page::new("Notes", notes::notes_view(state.clone()))
+                .stylesheet(&notes_style)
+                .state(PageState::Notes(state).to_json())
+        });
+
+    // The stub issues the tokens; the service verifies them with the same configuration, as a
+    // relying party would verify gatehouse's.
+    let auth = StubGatehouse::new(&[("ola", "pw"), ("ewa", "pw2")]);
+    let mut jwt: JwtConfig = auth.jwt();
+    jwt.auth_enabled = true;
+    let container = Arc::new(ContainerBuilder::new().provide(jwt).build().await.unwrap());
     let addr = format!("127.0.0.1:{port}").parse().unwrap();
     println!("http://{addr}  (wasm: {wasm_path})");
     let site = Site {
         app,
+        auth,
         wasm_path,
         delay_ms: AtomicU64::new(0),
     };

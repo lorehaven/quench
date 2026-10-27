@@ -3,7 +3,7 @@ name = "quench-fullstack"
 version = "0.1.0"
 edition = { workspace = true }
 authors = { workspace = true }
-description = "Quench - serves quench-ui apps from quench-http: server-side rendering, hydration markup, content-hashed assets and a strict Content-Security-Policy"
+description = "Quench - serves quench-ui apps from quench-http and lets them call server functions: server-side rendering, hashed assets, typed calls, sessions"
 keywords = ["ui", "ssr", "wasm", "http"]
 categories = ["web-programming", "wasm"]
 homepage = { workspace = true }
@@ -17,13 +17,22 @@ name = "quench_fullstack"
 path = "src/lib.rs"
 harness = false
 
+# What the browser build needs too: the shared types, the typed call, the macro.
 [dependencies]
-quench-archive = { workspace = true }
 quench-core = { workspace = true }
-quench-crypto = { workspace = true }
-quench-http = { workspace = true }
+quench-fullstack-macros = { workspace = true }
+quench-serde = { workspace = true }
 quench-ui = { workspace = true }
 quench-ui-web = { workspace = true }
+
+# The server only. `ring` (through quench-crypto) does not build for wasm32.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+quench-archive = { workspace = true }
+quench-auth = { workspace = true, features = ["http"] }
+quench-crypto = { workspace = true }
+quench-http = { workspace = true }
+quench-log = { workspace = true }
+tokio = { workspace = true }
 
 [lints]
 workspace = true
@@ -36,4 +45,3 @@ harness = false
 [dev-dependencies]
 quench-proto = { workspace = true }
 quench-test = { workspace = true }
-tokio = { workspace = true }
