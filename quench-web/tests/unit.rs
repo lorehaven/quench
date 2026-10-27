@@ -35,10 +35,10 @@ mod framework_theme_default_dark_tests;
 mod framework_theme_default_light_tests;
 #[path = "unit/framework_theme_mod_tests.rs"]
 mod framework_theme_mod_tests;
-#[path = "unit/html_builder_element_tests.rs"]
-mod html_builder_element_tests;
 #[path = "unit/golden_baseline_tests.rs"]
 mod golden_baseline_tests;
+#[path = "unit/html_builder_element_tests.rs"]
+mod html_builder_element_tests;
 #[path = "unit/html_builder_elements_tests.rs"]
 mod html_builder_elements_tests;
 #[path = "unit/html_builder_page_tests.rs"]

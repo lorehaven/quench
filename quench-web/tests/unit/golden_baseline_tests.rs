@@ -149,4 +149,3 @@ fn rendering_is_deterministic() {
         assert_eq!(first, shell_page(div().text("same")));
     }
 }
-
