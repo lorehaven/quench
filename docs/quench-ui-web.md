@@ -26,7 +26,9 @@ fn app() -> View {
 quench_ui_web::app!(app);
 ```
 
-`app!` defines the `q_main` export. It installs the panic hook, builds the view into the root, and leaks the mount (the page owns it until it closes).
+`app!` defines the `q_main` export. It installs the panic hook, then builds the view into the root and leaks the mount (the page owns it until it closes). If the root already holds content, the page was rendered on the server and the view is *hydrated* instead of built (see below).
+
+Before `q_main`, `quench.js` reads the text of `<script type="application/json" id="__q_state">`, if the page has one, and hands it to the module with `q_set_state`; the app reads it with `quench_ui_web::initial_state()`.
 
 ## Handles
 
@@ -63,6 +65,9 @@ All text is UTF-8 in linear memory.
 | `q_fetch(id, method_ptr, method_len, url_ptr, url_len, headers_ptr, headers_len, body_ptr, body_len)` | `fetch`; headers are `Name: value` lines joined by `\n`; a `body_len` of `0` sends no body. Completion calls `q_fetch_done` |
 | `q_fetch_abort(id)` | aborts that fetch (an `AbortController`); `q_fetch_done` is then called with status `0` |
 | `q_schedule_tick()` | `queueMicrotask(q_tick)`; called when a task became ready to poll |
+| `q_root_has_content() -> u32` | `1` if the root has any child node, i.e. the server rendered into it |
+| `q_hydrate_begin()` | from now on, creating a node claims the next server-rendered node (see Hydration) |
+| `q_hydrate_end() -> u32` | stops claiming; removes server nodes nothing claimed; returns how many mismatches there were |
 
 ## Exports (JS calls Rust)
 
@@ -70,6 +75,7 @@ All text is UTF-8 in linear memory.
 |---|---|
 | `memory` | the instance's linear memory |
 | `q_alloc(len) -> ptr`, `q_dealloc(ptr, len)` | buffers for text going in (see above) |
+| `q_set_state(ptr, len)` | the page's embedded JSON, called before `q_main` when there is any |
 | `q_main()` | called once after instantiation |
 | `q_dispatch_event(h, kind, ptr, len, a, b, c, flags)` | a listener fired on the node `h` |
 | `q_tick()` | poll every task that is ready |
@@ -99,6 +105,22 @@ All text is UTF-8 in linear memory.
 
 **Delivery.** A DOM operation can raise events synchronously (removing the focused input fires `blur`). JS never delivers an event while one of its imports is running: it queues it and delivers it right after the import returns, so listeners cannot re-enter a half-finished update.
 
+## Hydration
+
+A page rendered on the server already has the DOM. Hydration builds the same view over it and keeps its nodes, so nothing flashes, no node is duplicated, and a node the browser has already painted keeps its identity. The mount engine creates nodes **in document order** (an element before its children, a dynamic or keyed region's content before the anchor that ends it), so `quench.js` only needs a cursor.
+
+Between `q_hydrate_begin` and `q_hydrate_end`, `quench.js` keeps a stack of frames, one per element being built, each with the parent and the next unclaimed child (the cursor):
+
+- `q_create_el(tag)`: if the cursor is an element with that tag, claim it and push a frame for its children. Otherwise create a fresh element (a mismatch).
+- `q_create_text(s)`: claim a text node whose data is `s`. If the node holds `s` followed by more, split it: the HTML parser merges adjacent text, so no separator is needed in the markup. Empty text has no markup, so an empty text node is created and placed at the cursor.
+- `q_create_anchor()`: claim an empty comment (`<!---->`).
+- `q_insert(parent, child, before)`: a claimed node is already in place (an element's frame is popped, and server nodes left unclaimed inside it are removed). A fresh node goes at the cursor and **replaces** the node that did not match.
+- `q_set_attr`: an attribute that already has the value is left alone; one that differs on a claimed node is a mismatch and is set.
+
+The result is always what a client-only render would have produced, because every mismatch is repaired by building the client's node. In development (`dev`) each mismatch logs `quench: hydration mismatch in #app > div:nth-child(2): expected <h2>, found <h3>; rebuilt it` with the path of the parent; in production nothing is logged. The Rust side learns the count from `q_hydrate_end` (`hydrate_root` returns it).
+
+What the server must write so this works (`quench-ui`'s serialiser does all of it): elements with their attributes in the order the view sets them, text exactly as the view has it, an empty comment for each dynamic or keyed region, a doubled newline after `<pre>` and `<textarea>` when the text begins with one (the parser drops the first), and no content inside void elements. Markup the browser re-parents (a `<div>` inside a `<p>`, a `<tr>` without a `<tbody>`) will mismatch and be repaired.
+
 ## Async
 
 The wasm module has no threads and no runtime of its own. `quench_ui_web::spawn(future)` adds a task to a single-threaded executor. A task that is woken marks itself ready and, once per batch, calls `q_schedule_tick`; `q_tick` then polls every ready task. `sleep(ms)` and `fetch` are futures completed by `q_timer_fire` and `q_fetch_done`. Dropping a pending `sleep` clears its timer; dropping a pending fetch aborts it.
@@ -121,7 +143,8 @@ The workspace `wasm` profile is release with `opt-level = "z"`, `lto`, one codeg
 |---|---|
 | `app!(my_app)` | defines the `q_main` export for a `fn() -> impl IntoView`; installs the panic hook, mounts into the root and leaks the mount |
 | `DomRenderer`, `Node` | the `quench_ui::Renderer` for the DOM; `Node` is a reference-counted handle that is released when the last clone drops |
-| `mount_root(view)`, `run(f)`, `install_panic_hook()` | the pieces `app!` is made of |
+| `mount_root(view)`, `hydrate_root(view)`, `run(f)`, `install_panic_hook()` | the pieces `app!` is made of; `hydrate_root` returns the mount and the number of mismatches |
+| `initial_state()` | the JSON the server embedded in the page, if any |
 | `spawn(future)`, `sleep(ms)` | the single-threaded executor and its timer |
 | `Request::get/post/new(..).header(..).body(..).send()` | starts a request now; the `Fetch` future yields `Response { status, headers, body }` (`ok()`, `text()`, `header(name)`) or a `FetchError` (`Network`, `Aborted`). `Fetch::abort_handle()` and dropping the future both abort |
 | `QUENCH_JS` | the source of `quench.js`, for a server to serve |
@@ -137,6 +160,8 @@ On any target other than `wasm32` the crate swaps the JS side for an in-memory h
 `scripts/ui-web-test.fish` builds `examples/ui_web_app` for wasm, starts `examples/ui_web_server` (a `quench-http` server that sends a strict Content-Security-Policy), and runs `tests/browser.mjs`, which drives headless Chromium over the DevTools protocol (Node 22 and `chromium` needed). It checks that the app renders and fetches, that the counter patches the same text node, that submitting a form does not reload the page and clears the input, that keyed items keep their DOM nodes, that 100 items added and removed return the JS handle table to its starting size, that nothing was logged as an error, and that a panic shows the overlay and stops the app.
 
 Unit tests (`tests/unit`) cover the renderer, handle release and reuse, 10,000 nodes coming and going, event decoding and flags, invalid UTF-8 and unknown handles or kinds, buffer allocation, the executor, timers and `fetch` including abort. Line coverage 96% on the host build; `host/wasm.rs` only compiles for `wasm32`.
+
+Hydration is checked in the same run (see `docs/quench-fullstack.md`): the nodes the server sent are the nodes the page keeps, six kinds of damaged server HTML each end as the correct page with the mismatch reported in development and silent in production, and a page with nothing rendered is built from scratch.
 
 Not covered: touch gestures and a real mobile `WebView` (no device was connected), and CSP rules for inline `style` attributes: `Element::style(..)` writes a `style` attribute, which a policy without `'unsafe-inline'` in `style-src-attr` blocks, so use classes or the stylesheet under a strict policy (Stage 5).
 

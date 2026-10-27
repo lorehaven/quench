@@ -37,6 +37,8 @@ pub enum Call {
     ClearTimeout(u32),
     Fetch(u32),
     FetchAbort(u32),
+    HydrateBegin,
+    HydrateEnd,
 }
 
 /// A fetch the Rust side started.
@@ -75,6 +77,8 @@ struct State {
     aborts: Vec<u32>,
     ticks: usize,
     logs: Vec<(u32, String)>,
+    server_content: bool,
+    mismatches: u32,
 }
 
 impl State {
@@ -97,6 +101,8 @@ impl State {
             aborts: Vec::new(),
             ticks: 0,
             logs: Vec::new(),
+            server_content: false,
+            mismatches: 0,
         }
     }
 
@@ -339,6 +345,17 @@ pub fn run_ticks() -> bool {
     }
 }
 
+/// Pretends the page arrived with server-rendered content in the root (or not).
+///
+/// `mismatches` is what hydration will report. The claiming itself is done by `quench.js`; the real
+/// thing is exercised by the browser test.
+pub fn set_server_content(present: bool, mismatches: u32) {
+    with(|s| {
+        s.server_content = present;
+        s.mismatches = mismatches;
+    });
+}
+
 /// What `q_log` received: `(level, message)`.
 #[must_use]
 pub fn logs() -> Vec<(u32, String)> {
@@ -518,5 +535,20 @@ pub(crate) mod imports {
 
     pub fn schedule_tick() {
         with(|s| s.ticks += 1);
+    }
+
+    pub fn root_has_content() -> bool {
+        with(|s| s.server_content)
+    }
+
+    pub fn hydrate_begin() {
+        with(|s| s.calls.push(Call::HydrateBegin));
+    }
+
+    pub fn hydrate_end() -> u32 {
+        with(|s| {
+            s.calls.push(Call::HydrateEnd);
+            s.mismatches
+        })
     }
 }

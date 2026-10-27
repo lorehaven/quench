@@ -2,7 +2,7 @@
 // docs/quench-ui-web.md; read that before changing anything here.
 //
 //   <div id="app"></div>
-//   <script type="module" src="/quench.js?wasm=/app.wasm"></script>
+//   <script type="module" src="/quench.js?wasm=/app.wasm"></script>      (add &dev=0 or &dev=1 to force)
 
 const EVENTS = ["click", "dblclick", "input", "change", "keydown", "keyup", "submit", "focus", "blur",
   "pointerdown", "pointerup", "pointermove"];
@@ -13,13 +13,14 @@ const FORM_PROPS = new Set(["value", "checked", "selected"]);
 export async function start(url, options = {}) {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
-  const dev = options.dev ?? (window.QUENCH_DEV === true
-    || ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname));
+  const dev = options.dev ?? (typeof window.QUENCH_DEV === "boolean" ? window.QUENCH_DEV
+    : ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname));
   let ex = null;       // the instance's exports
   let dead = false;    // the instance trapped
   let busy = 0;        // imports running right now
   const queued = [];   // events raised during an import, delivered after it
-  const nodes = [null, document.getElementById("app") ?? document.body]; // handle -> node
+  const root = document.getElementById("app") ?? document.body;
+  const nodes = [null, root]; // handle -> node
   const free = [];     // released handles, reused
   const listeners = new Map(); // handle -> [[type, fn]]
   const timers = new Map();
@@ -108,10 +109,77 @@ export async function start(url, options = {}) {
     listeners.set(h, entry);
   }
 
+  // --- hydration ------------------------------------------------------------------------------
+  // While hydrating, creating a node claims the next node of the server-rendered DOM instead of
+  // making one (nodes are created in document order). A node that does not match is replaced by a
+  // fresh one, so the result is always what a client-only render would have built.
+  let hydrating = null; // { frames: [{ parent, cursor, fresh }], mismatches }
+  const origin = new Map(); // handle -> "claimed" | "replace" | "insert", until it is inserted
+  const frame = () => hydrating.frames[hydrating.frames.length - 1];
+  const where = (n) => {
+    const path = [];
+    for (; n?.nodeType === 1; n = n.parentElement) {
+      path.unshift(n.id ? `#${n.id}` : `${n.localName}:nth-child(${[...(n.parentElement?.children ?? [])].indexOf(n) + 1})`);
+      if (n.id) break;
+    }
+    return path.join(" > ");
+  };
+  const what = (n) => (!n ? "nothing" : n.nodeType === 1 ? `<${n.localName}>` : n.nodeType === 3 ? `text "${n.data.slice(0, 20)}"` : "a comment");
+  const bad = (expected, found, at) => {
+    hydrating.mismatches++;
+    if (dev) console.error(`quench: hydration mismatch in ${where(at)}: expected ${expected}, found ${what(found)}; rebuilt it`);
+  };
+  const trim = (f) => { // server nodes the app has no use for
+    for (let c = f.cursor; c && !f.fresh; c = f.cursor) { bad("the end of its content", c, f.parent); f.cursor = c.nextSibling; c.remove(); }
+  };
+  /** The next server node if it is the one wanted, else a fresh one that will replace it. */
+  function take(wanted, fresh, expected) {
+    const f = frame();
+    if (f.fresh) return add(fresh()); // inside a rebuilt subtree there is nothing to claim
+    const c = f.cursor;
+    const claimed = c && wanted(c);
+    if (claimed) f.cursor = c.nextSibling; else bad(expected, c, f.parent);
+    const h = add(claimed ? c : fresh());
+    origin.set(h, claimed ? "claimed" : "replace");
+    return h;
+  }
+  function createElement(tag) {
+    if (!hydrating) return add(document.createElement(tag));
+    const h = take((c) => c.nodeType === 1 && c.localName === tag, () => document.createElement(tag), `<${tag}>`);
+    const claimed = origin.get(h) === "claimed";
+    hydrating.frames.push({ parent: nodes[h], cursor: claimed ? nodes[h].firstChild : null, fresh: !claimed });
+    return h;
+  }
+  function createText(s) {
+    if (!hydrating) return add(document.createTextNode(s));
+    const f = frame(), c = f.cursor;
+    if (!f.fresh && s === "") { // an empty text node has no markup to claim
+      const h = add(document.createTextNode(""));
+      origin.set(h, "insert");
+      return h;
+    }
+    if (!f.fresh && c?.nodeType === 3 && c.data.length > s.length && c.data.startsWith(s)) c.splitText(s.length); // the parser merged neighbours
+    return take((n) => n.nodeType === 3 && n.data === s, () => document.createTextNode(s), `text "${s.slice(0, 20)}"`);
+  }
+  function insert(parent, child, before) {
+    const node = get(child);
+    if (!hydrating) return get(parent)?.insertBefore(node, get(before));
+    if (node.nodeType === 1 && frame().parent === node) trim(hydrating.frames.pop());
+    const mode = origin.get(child);
+    origin.delete(child);
+    if (mode === "claimed") return;
+    const f = frame();
+    if (f.fresh || !mode) return get(parent)?.insertBefore(node, get(before));
+    f.parent.insertBefore(node, f.cursor);
+    if (mode === "replace" && f.cursor) { const old = f.cursor; f.cursor = old.nextSibling; old.remove(); }
+  }
+
   // --- DOM ------------------------------------------------------------------------------------
   const setAttr = (h, name, value) => {
     const node = get(h);
     if (node?.nodeType !== 1) return;
+    if (hydrating && node.getAttribute(name) === value) return; // the server got it right
+    if (hydrating && origin.get(h) === "claimed") bad(`${name}="${value}"`, node, node);
     node.setAttribute(name, value);
     if (FORM_PROPS.has(name) && name in node) node[name] = name === "value" ? value : true;
   };
@@ -131,13 +199,24 @@ export async function start(url, options = {}) {
   };
 
   const env = {
-    q_create_el: guarded((p, n) => add(document.createElement(text(p, n)))),
-    q_create_text: guarded((p, n) => add(document.createTextNode(text(p, n)))),
-    q_create_anchor: guarded(() => add(document.createComment(""))),
+    q_create_el: guarded((p, n) => createElement(text(p, n))),
+    q_create_text: guarded((p, n) => createText(text(p, n))),
+    q_create_anchor: guarded(() => (hydrating
+      ? take((c) => c.nodeType === 8 && c.data === "", () => document.createComment(""), "an anchor comment")
+      : add(document.createComment("")))),
     q_set_text: guarded((h, p, n) => { const node = get(h); if (node) node.data = text(p, n); }),
     q_set_attr: guarded((h, np, nl, vp, vl) => setAttr(h, text(np, nl), text(vp, vl))),
     q_remove_attr: guarded((h, p, n) => removeAttr(h, text(p, n))),
-    q_insert: guarded((parent, child, before) => get(parent)?.insertBefore(get(child), get(before))),
+    q_insert: guarded(insert),
+    q_root_has_content: guarded(() => (root.firstChild ? 1 : 0)),
+    q_hydrate_begin: guarded(() => { hydrating = { frames: [{ parent: root, cursor: root.firstChild, fresh: false }], mismatches: 0 }; }),
+    q_hydrate_end: guarded(() => {
+      trim(hydrating.frames[0]);
+      const { mismatches } = hydrating;
+      hydrating = null;
+      origin.clear();
+      return mismatches;
+    }),
     q_remove: guarded((parent, child) => {
       const node = get(child);
       if (node && node.parentNode === get(parent)) node.remove();
@@ -185,6 +264,8 @@ export async function start(url, options = {}) {
   }
   ex = result.instance.exports;
   performance.mark("quench:instantiated");
+  const state = document.getElementById("__q_state"); // JSON the server embedded for the app
+  if (state) call(() => ex.q_set_state(...put(encoder.encode(state.textContent))));
   call(() => ex.q_main?.());
   performance.mark("quench:ready");
   const api = { exports: ex, handles: () => nodes.filter(Boolean).length - 1 };
@@ -192,5 +273,6 @@ export async function start(url, options = {}) {
   return api;
 }
 
-const auto = new URL(import.meta.url).searchParams.get("wasm");
-if (auto) start(auto).catch((error) => console.error("quench: could not start:", error));
+const params = new URL(import.meta.url).searchParams;
+const auto = params.get("wasm");
+if (auto) start(auto, { dev: params.has("dev") ? params.get("dev") === "1" : undefined }).catch((error) => console.error("quench: could not start:", error));

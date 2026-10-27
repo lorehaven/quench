@@ -11,7 +11,7 @@ cargo build -p quench-example-ui-web-server; or exit 1
 PORT=$port target/debug/quench-example-ui-web-server >/dev/null 2>&1 &
 set -l server $last_pid
 sleep 1
-node quench-ui-web/tests/browser.mjs http://127.0.0.1:$port/
+node quench-ui-web/tests/browser.mjs http://127.0.0.1:$port
 set -l result $status
 kill $server 2>/dev/null
 exit $result

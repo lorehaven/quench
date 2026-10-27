@@ -299,7 +299,24 @@ name = "quench-example-ui-web-server"
 version = "0.1.0"
 dependencies = [
  "quench-core",
+ "quench-example-ui-web-app",
+ "quench-fullstack",
  "quench-http",
+ "quench-serde",
+ "tokio",
+]
+
+[[package]]
+name = "quench-fullstack"
+version = "0.1.0"
+dependencies = [
+ "quench-archive",
+ "quench-core",
+ "quench-crypto",
+ "quench-http",
+ "quench-proto",
+ "quench-test",
+ "quench-ui",
  "quench-ui-web",
  "tokio",
 ]

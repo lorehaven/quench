@@ -26,6 +26,7 @@ docs/
 ├── quench-mail.md
 ├── quench-starter.md
 ├── quench-style.md
+├── quench-fullstack.md
 ├── quench-ui.md
 ├── quench-ui-web.md
 ├── quench-web.md
@@ -63,6 +64,7 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench Style](./quench-style.md) — shared design tokens, themes, base CSS and i18n for web, mobile and desktop
 - [Quench TZ](./quench-tz.md) — IANA time zones with the database built in
 - [Quench UI](./quench-ui.md) — UI core: signals, views, events and the renderer interface
+- [Quench Fullstack](./quench-fullstack.md) — serves Quench UI apps from Quench HTTP: server rendering, hashed assets, strict CSP
 - [Quench UI Web](./quench-ui-web.md) — runs a Quench UI app in the browser from WebAssembly, with a small JS bridge
 - [Quench PG](./quench-pg.md) — PostgreSQL wire-protocol client with SCRAM, TLS, pool
 - [Quench Redis](./quench-redis.md) — Redis client: RESP2/3, pool, cluster routing
@@ -160,6 +162,7 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ├── quench-qr/              # QR code encoder
 ├── quench-tls/             # rustls glue and trust stores
 ├── quench-style/           # shared tokens, themes, base CSS, i18n
+├── quench-fullstack/       # serves quench-ui apps from quench-http: SSR, hashed assets, CSP
 ├── quench-ui/              # UI core: signals, views, events, renderer interface
 ├── quench-ui-web/          # runs quench-ui in the browser: wasm glue, quench.js, DOM renderer
 ├── quench-web/             # server-rendered HTML/CSS/JS page builder

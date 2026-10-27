@@ -172,3 +172,33 @@ fn the_tick_and_timer_exports_tolerate_nothing_to_do() {
     quench_ui_web::q_timer_fire(12345);
     assert_eq!(quench_ui_web::pending_tasks(), 0);
 }
+
+#[quench_test::test]
+fn the_embedded_state_is_stored_for_the_app() {
+    mock::reset();
+    assert_eq!(quench_ui_web::initial_state(), None);
+    let json = "{\"todos\":[1,2],\"title\":\"café\"}".as_bytes();
+    let (ptr, len) = {
+        let ptr = q_alloc(json.len());
+        unsafe { std::ptr::copy_nonoverlapping(json.as_ptr(), ptr, json.len()) };
+        (ptr, json.len())
+    };
+    unsafe { quench_ui_web::q_set_state(ptr, len) };
+    assert_eq!(
+        quench_ui_web::initial_state().as_deref(),
+        Some(std::str::from_utf8(json).unwrap())
+    );
+    // Invalid UTF-8 is replaced, and an empty buffer gives an empty string, never a panic.
+    let bad = [b'{', 0xff, b'}'];
+    let ptr = q_alloc(bad.len());
+    unsafe { std::ptr::copy_nonoverlapping(bad.as_ptr(), ptr, bad.len()) };
+    unsafe { quench_ui_web::q_set_state(ptr, bad.len()) };
+    assert_eq!(
+        quench_ui_web::initial_state().as_deref(),
+        Some("{\u{fffd}}")
+    );
+    unsafe { quench_ui_web::q_set_state(std::ptr::null_mut(), 0) };
+    assert_eq!(quench_ui_web::initial_state().as_deref(), Some(""));
+    mock::reset();
+    assert_eq!(quench_ui_web::initial_state(), None);
+}

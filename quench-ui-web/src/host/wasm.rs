@@ -29,6 +29,9 @@ unsafe extern "C" {
     );
     fn q_fetch_abort(id: u32);
     fn q_schedule_tick();
+    fn q_root_has_content() -> u32;
+    fn q_hydrate_begin();
+    fn q_hydrate_end() -> u32;
 }
 
 // SAFETY (all wrappers): the pointers come from live `&str`/`&[u8]` borrows that outlast the call,
@@ -108,4 +111,17 @@ pub fn fetch_abort(id: u32) {
 
 pub fn schedule_tick() {
     unsafe { q_schedule_tick() }
+}
+
+pub fn root_has_content() -> bool {
+    unsafe { q_root_has_content() != 0 }
+}
+
+pub fn hydrate_begin() {
+    unsafe { q_hydrate_begin() }
+}
+
+/// Ends hydration and returns how many server nodes did not match what the app built.
+pub fn hydrate_end() -> u32 {
+    unsafe { q_hydrate_end() }
 }

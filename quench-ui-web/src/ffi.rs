@@ -1,7 +1,7 @@
 //! The functions `quench.js` calls, and the buffer rules behind them.
 #![allow(unsafe_code)] // raw buffers cross the wasm boundary as (pointer, length) pairs
 
-use crate::{dom, events, exec, fetch};
+use crate::{dom, events, exec, fetch, state};
 
 /// Room for `len` bytes that JS fills in and hands to one export. The export takes ownership.
 #[must_use]
@@ -59,6 +59,15 @@ pub unsafe extern "C" fn q_dispatch_event(
     if let Some(event) = events::decode(kind, payload, a, b, c, flags) {
         dom::dispatch(handle, &event);
     }
+}
+
+/// The JSON the server embedded in the page for the app, read before `q_main`.
+///
+/// # Safety
+/// `ptr` and `len` must be a buffer from `q_alloc`, or `len` must be 0.
+#[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
+pub unsafe extern "C" fn q_set_state(ptr: *mut u8, len: usize) {
+    state::set(lossy(&unsafe { take(ptr, len) }));
 }
 
 /// Polls every task that is ready.

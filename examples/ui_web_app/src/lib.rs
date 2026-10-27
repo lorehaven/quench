@@ -10,7 +10,7 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use quench_serde::Deserialize;
+use quench_serde::{Deserialize, Serialize};
 use quench_ui::prelude::*;
 use quench_ui_web::{Request, sleep, spawn};
 
@@ -126,16 +126,33 @@ pub fn todo() -> View {
         .into_view()
 }
 
-#[derive(Clone, Deserialize)]
-struct ServerTodo {
-    id: u32,
-    title: String,
-    done: bool,
+/// A todo the server knows about.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ServerTodo {
+    pub id: u32,
+    pub title: String,
+    pub done: bool,
 }
 
-/// Todos fetched from the server's `/api/todos`.
+/// What the server renders the page from and embeds in it, so the browser starts from the same
+/// data without asking for it again.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct AppState {
+    pub server_todos: Vec<ServerTodo>,
+}
+
+impl AppState {
+    /// The JSON the page embeds.
+    #[must_use]
+    pub fn to_json(&self) -> String {
+        quench_serde::json::to_string(self)
+    }
+}
+
+/// Todos from the server: given in `initial` when the server rendered them, fetched from
+/// `/api/todos` otherwise.
 #[must_use]
-pub fn server_todos() -> View {
+pub fn server_todos(initial: Option<Vec<ServerTodo>>) -> View {
     let status = create_signal("loading...".to_string());
     let items = create_signal(Vec::<ServerTodo>::new());
     let load = {
@@ -165,7 +182,12 @@ pub fn server_todos() -> View {
             });
         }
     };
-    load();
+    if let Some(list) = initial {
+        status.set(format!("{} from the server", list.len()));
+        items.set(list);
+    } else {
+        load();
+    }
     let (shown, list) = (status, items);
     div()
         .class("card")
@@ -194,16 +216,25 @@ pub fn panic_button() -> View {
         .into_view()
 }
 
-/// All of them.
+/// All of them. The server renders this with its state; the browser builds the same view from
+/// the state embedded in the page (`app`), or fetches it when the page has none.
 #[must_use]
-pub fn demo() -> View {
+pub fn demo(state: Option<AppState>) -> View {
     div()
         .child(h1().text("quench-ui"))
         .child(counter())
         .child(todo())
-        .child(server_todos())
+        .child(server_todos(state.map(|s| s.server_todos)))
         .child(panic_button())
         .into_view()
+}
+
+/// What the browser starts: the demo over the state the server embedded.
+#[must_use]
+pub fn app() -> View {
+    let state = quench_ui_web::initial_state()
+        .and_then(|json| quench_serde::json::from_str::<AppState>(&json).ok());
+    demo(state)
 }
 
 #[cfg(feature = "counter")]
@@ -211,4 +242,4 @@ quench_ui_web::app!(counter);
 #[cfg(all(feature = "todo", not(feature = "counter")))]
 quench_ui_web::app!(todo);
 #[cfg(not(any(feature = "counter", feature = "todo")))]
-quench_ui_web::app!(demo);
+quench_ui_web::app!(app);

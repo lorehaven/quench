@@ -27,9 +27,30 @@ enum Part<N> {
     Region(Rc<Region<N>>),
 }
 
+/// A region is built in document order: its content first, then the anchor that ends it. That
+/// makes the order nodes are created in the order they appear in the document, which hydration
+/// relies on, so the anchor does not exist until the first content has been built.
 struct Region<N> {
-    anchor: N,
+    anchor: RefCell<Option<N>>,
     content: RefCell<Part<N>>,
+}
+
+impl<N: Clone> Region<N> {
+    fn new() -> Rc<Self> {
+        Rc::new(Self {
+            anchor: RefCell::new(None),
+            content: RefCell::new(Part::None),
+        })
+    }
+
+    /// Ends the region with an anchor, once its first content is in place.
+    fn finish_first_build<R: Renderer<Node = N>>(&self, r: &R, parent: &N, before: Option<&N>) {
+        if self.anchor.borrow().is_none() {
+            let anchor = r.create_anchor();
+            r.insert(parent, &anchor, before);
+            *self.anchor.borrow_mut() = Some(anchor);
+        }
+    }
 }
 
 impl<N: Clone> Clone for Part<N> {
@@ -53,7 +74,7 @@ impl<N: Clone> Part<N> {
             Self::Many(parts) => parts.iter().for_each(|p| p.nodes(out)),
             Self::Region(region) => {
                 region.content.borrow().nodes(out);
-                out.push(region.anchor.clone());
+                out.extend(region.anchor.borrow().clone());
             }
         }
     }
@@ -272,20 +293,22 @@ fn build_dynamic<R: Renderer>(
     parent: &R::Node,
     before: Option<&R::Node>,
 ) -> Part<R::Node> {
-    let anchor = r.create_anchor();
-    r.insert(parent, &anchor, before);
-    let region = Rc::new(Region {
-        anchor,
-        content: RefCell::new(Part::None),
-    });
-    let (r2, parent2, region2) = (Rc::clone(r), parent.clone(), Rc::clone(&region));
+    let region = Region::new();
+    let (r2, parent2, region2, before2) = (
+        Rc::clone(r),
+        parent.clone(),
+        Rc::clone(&region),
+        before.cloned(),
+    );
     create_effect(move || {
         let view = f();
         untrack(|| {
             let old = region2.content.replace(Part::None);
             remove_part(&*r2, &parent2, &old);
-            let part = build(&r2, view, &parent2, Some(&region2.anchor));
+            let anchor = region2.anchor.borrow().clone();
+            let part = build(&r2, view, &parent2, anchor.as_ref().or(before2.as_ref()));
             *region2.content.borrow_mut() = part;
+            region2.finish_first_build(&*r2, &parent2, before2.as_ref());
         });
     });
     Part::Region(region)
@@ -303,25 +326,28 @@ fn build_keyed<R: Renderer>(
     parent: &R::Node,
     before: Option<&R::Node>,
 ) -> Part<R::Node> {
-    let anchor = r.create_anchor();
-    r.insert(parent, &anchor, before);
-    let region = Rc::new(Region {
-        anchor,
-        content: RefCell::new(Part::None),
-    });
+    let region = Region::new();
     // Entries must outlive each re-run of the effect below, which resets its own scope, so they
     // hang off the scope the list was built in.
     let outer = Scope::current();
     let entries: Rc<RefCell<Vec<Entry<R::Node>>>> = Rc::new(RefCell::new(Vec::new()));
-    let (r2, parent2, region2) = (Rc::clone(r), parent.clone(), Rc::clone(&region));
+    let (r2, parent2, region2, before2) = (
+        Rc::clone(r),
+        parent.clone(),
+        Rc::clone(&region),
+        before.cloned(),
+    );
     create_effect(move || {
         let items = source();
         untrack(|| {
             let old = std::mem::take(&mut *entries.borrow_mut());
-            let new = reconcile(&r2, &parent2, &region2.anchor, old, items, outer.as_ref());
+            let anchor = region2.anchor.borrow().clone();
+            let end = anchor.as_ref().or(before2.as_ref());
+            let new = reconcile(&r2, &parent2, end, old, items, outer.as_ref());
             *region2.content.borrow_mut() =
                 Part::Many(new.iter().map(|e| e.part.clone()).collect());
             *entries.borrow_mut() = new;
+            region2.finish_first_build(&*r2, &parent2, before2.as_ref());
         });
     });
     Part::Region(region)
@@ -332,7 +358,7 @@ fn build_keyed<R: Renderer>(
 fn reconcile<R: Renderer>(
     r: &Rc<R>,
     parent: &R::Node,
-    anchor: &R::Node,
+    end: Option<&R::Node>,
     old: Vec<Entry<R::Node>>,
     items: Vec<KeyedItem>,
     outer: Option<&Scope>,
@@ -354,6 +380,17 @@ fn reconcile<R: Renderer>(
             remove_part(&**r, parent, &entry.part);
         }
     }
+    // With nothing to keep, build front to back, so nodes are created in document order.
+    if by_key.is_empty() {
+        return items
+            .into_iter()
+            .map(|(key, make)| {
+                let scope = outer.map_or_else(Scope::new, Scope::new_in);
+                let part = scope.run(|| build(r, make(), parent, end));
+                Entry { key, part, scope }
+            })
+            .collect();
+    }
     // The survivors that already appear in the right order stay where they are; the rest move.
     let order: Vec<(usize, usize)> = items
         .iter()
@@ -368,26 +405,26 @@ fn reconcile<R: Renderer>(
 
     // Walk the new order backwards, so each entry is placed relative to the one after it.
     let mut placed: Vec<Entry<R::Node>> = Vec::with_capacity(items.len());
-    let mut next_node = anchor.clone();
+    let mut next_node = end.cloned();
     for (at, (key, make)) in items.into_iter().enumerate().rev() {
         let entry = if let Some(entry) = by_key.remove(&key) {
             if !stays.contains(&at) {
                 let mut nodes = Vec::new();
                 entry.part.nodes(&mut nodes);
                 for node in &nodes {
-                    r.insert(parent, node, Some(&next_node));
+                    r.insert(parent, node, next_node.as_ref());
                 }
             }
             entry
         } else {
             let scope = outer.map_or_else(Scope::new, Scope::new_in);
-            let part = scope.run(|| build(r, make(), parent, Some(&next_node)));
+            let part = scope.run(|| build(r, make(), parent, next_node.as_ref()));
             Entry { key, part, scope }
         };
         let mut nodes = Vec::new();
         entry.part.nodes(&mut nodes);
         if let Some(first) = nodes.first() {
-            next_node = first.clone();
+            next_node = Some(first.clone());
         }
         placed.push(entry);
     }

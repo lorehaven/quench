@@ -584,3 +584,63 @@ fn the_todo_list_adds_toggles_and_removes_items() {
     m.unmount();
     assert_eq!(r.live_nodes(), 1);
 }
+
+#[quench_test::test]
+fn nodes_are_created_in_document_order() {
+    // Dynamic and keyed regions nested in each other and in static markup: whatever the shape, the
+    // order nodes are created in is the order they appear in the document.
+    let (r, root) = setup();
+    let items = create_signal(vec![1_u32, 2, 3]);
+    let flag = create_signal(true);
+    let (list, shown) = (items.clone(), flag.clone());
+    let m = mount(
+        &r,
+        &root,
+        div()
+            .child("start")
+            .child(View::dynamic(move || {
+                let list = list.clone();
+                if shown.get() {
+                    fragment([
+                        span().text("a").into_view(),
+                        View::keyed(
+                            move || list.get(),
+                            |i| *i,
+                            |i| {
+                                li().text(i.to_string())
+                                    .child(View::dynamic(move || format!("-{i}").into_view()))
+                                    .into_view()
+                            },
+                        ),
+                        View::text_fn(|| "tail".to_string()),
+                    ])
+                } else {
+                    View::Empty
+                }
+            }))
+            .child(p().text("end")),
+    );
+    let order = r.document_order();
+    assert!(order.windows(2).all(|w| w[0] < w[1]), "{order:?}");
+    // Still true after the lists change and are rebuilt.
+    items.set(vec![3, 1, 4, 5]);
+    flag.set(false);
+    flag.set(true);
+    assert_eq!(r.text(), "starta3-31-14-45-5tailend");
+    m.unmount();
+}
+
+#[quench_test::test]
+fn a_newline_straight_after_pre_or_textarea_survives_html_parsing() {
+    let html = quench_ui::render_to_string(
+        div()
+            .child(pre().text("\nfirst"))
+            .child(textarea().text("\nsecond"))
+            .child(pre().text("no newline")),
+    );
+    // The parser drops one newline after <pre> and <textarea>, so the serialiser writes two.
+    assert_eq!(
+        html,
+        "<div><pre>\n\nfirst</pre><textarea>\n\nsecond</textarea><pre>no newline</pre></div>"
+    );
+}

@@ -8,7 +8,7 @@ use crate::html::{escape_attr, escape_raw_text, escape_text, is_void};
 use crate::renderer::Renderer;
 
 /// A node in a [`TestRenderer`].
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeId(usize);
 
 /// One change applied to the tree, in order.
@@ -246,6 +246,22 @@ impl TestRenderer {
         }
     }
 
+    /// Every node under the root in document order. Nodes are numbered as they are created, so
+    /// when the numbers increase along this list the view created them in document order, which
+    /// is what hydration relies on.
+    #[must_use]
+    pub fn document_order(&self) -> Vec<NodeId> {
+        fn walk(tree: &Tree, id: NodeId, out: &mut Vec<NodeId>) {
+            for child in &tree.nodes[id.0].children {
+                out.push(*child);
+                walk(tree, *child, out);
+            }
+        }
+        let mut out = Vec::new();
+        walk(&self.tree.borrow(), self.root(), &mut out);
+        out
+    }
+
     /// Nodes reachable from the root, the root included. After unmounting a view this returns
     /// to 1, so a count that keeps growing is a leak.
     #[must_use]
@@ -302,6 +318,15 @@ fn write_html(tree: &Tree, id: NodeId, in_raw: bool, out: &mut String) {
             out.push('>');
             if is_void(tag) {
                 return;
+            }
+            // The HTML parser drops a newline that directly follows these start tags, so one
+            // that is really there needs another in front of it.
+            if matches!(tag.as_str(), "pre" | "textarea" | "listing")
+                && node.children.first().is_some_and(
+                    |c| matches!(&tree.nodes[c.0].kind, Kind::Text(t) if t.starts_with('\n')),
+                )
+            {
+                out.push('\n');
             }
             let raw = tag == "script" || tag == "style";
             for child in &node.children {

@@ -236,3 +236,49 @@ fn the_todo_flow_keeps_order_and_nodes_in_the_mock_dom() {
     m.unmount();
     assert_eq!(mock::live_handles(), 0);
 }
+
+#[quench_test::test]
+fn run_hydrates_when_the_page_arrived_with_content_and_builds_when_it_did_not() {
+    mock::reset();
+    mock::set_server_content(true, 0);
+    quench_ui_web::run(|| p().text("hello"));
+    let _ = std::panic::take_hook();
+    let calls = mock::calls();
+    let begin = calls
+        .iter()
+        .position(|c| *c == Call::HydrateBegin)
+        .expect("hydration started");
+    let end = calls
+        .iter()
+        .position(|c| *c == Call::HydrateEnd)
+        .expect("and ended");
+    let create = calls
+        .iter()
+        .position(|c| matches!(c, Call::CreateElement(..)))
+        .unwrap();
+    assert!(
+        begin < create && create < end,
+        "the view is built between begin and end: {calls:?}"
+    );
+
+    mock::reset();
+    quench_ui_web::run(|| p().text("hello"));
+    let _ = std::panic::take_hook();
+    assert!(
+        !mock::calls().contains(&Call::HydrateBegin),
+        "no server content, so a plain mount"
+    );
+}
+
+#[quench_test::test]
+fn hydrate_root_reports_how_many_nodes_did_not_match() {
+    mock::reset();
+    mock::set_server_content(true, 3);
+    let (mounted, mismatches) = quench_ui_web::hydrate_root(div().child(p().text("x")));
+    assert_eq!(mismatches, 3);
+    mock::set_server_content(true, 0);
+    let (other, clean) = quench_ui_web::hydrate_root(span());
+    assert_eq!(clean, 0);
+    mounted.unmount();
+    other.unmount();
+}

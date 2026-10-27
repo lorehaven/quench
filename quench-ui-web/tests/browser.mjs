@@ -1,12 +1,12 @@
-// End-to-end check in a real browser: drives headless Chromium over the DevTools protocol.
+// End-to-end checks in a real browser: drives headless Chromium over the DevTools protocol.
 // Run through scripts/ui-web-test.fish, which builds the wasm and starts the example server.
-//   node quench-ui-web/tests/browser.mjs http://127.0.0.1:3101/
+//   node quench-ui-web/tests/browser.mjs http://127.0.0.1:3101
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const url = process.argv[2] ?? "http://127.0.0.1:3101/";
+const base = (process.argv[2] ?? "http://127.0.0.1:3101").replace(/\/$/, "");
 const port = 9400 + Math.floor(Math.random() * 400);
 const profile = mkdtempSync(join(tmpdir(), "quench-chrome-"));
 const chrome = spawn(process.env.CHROMIUM ?? "chromium", [
@@ -42,15 +42,16 @@ const ws = await connect();
 await new Promise((r) => (ws.onopen = r));
 let id = 0;
 const waiting = new Map();
-const consoleErrors = [];
-const exceptions = [];
+const errors = [];      // console errors, exceptions and failed log entries since the last reset
+const requests = [];    // URLs the page asked for since the last reset
 ws.onmessage = ({ data }) => {
   const m = JSON.parse(data);
   if (m.id && waiting.has(m.id)) { waiting.get(m.id)(m); waiting.delete(m.id); }
   else if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error") {
-    consoleErrors.push(m.params.args.map((a) => a.value ?? a.description).join(" "));
-  } else if (m.method === "Runtime.exceptionThrown") exceptions.push(m.params.exceptionDetails.text);
-  else if (m.method === "Log.entryAdded" && m.params.entry.level === "error") consoleErrors.push(m.params.entry.text);
+    errors.push(m.params.args.map((a) => a.value ?? a.description).join(" "));
+  } else if (m.method === "Runtime.exceptionThrown") errors.push(m.params.exceptionDetails.text);
+  else if (m.method === "Log.entryAdded" && m.params.entry.level === "error") errors.push(m.params.entry.text);
+  else if (m.method === "Network.requestWillBeSent") requests.push(m.params.request.url);
 };
 const send = (method, params = {}) => new Promise((resolve) => {
   const mid = ++id;
@@ -63,29 +64,84 @@ const ev = async (expression) => {
   return r.result.result.value;
 };
 const $ = (sel) => `document.querySelector(${JSON.stringify(sel)})`;
+const hydrated = () => ev(`performance.getEntriesByName("quench:ready").length > 0`); // set in dev and production alike
+const go = async (path) => {
+  errors.length = 0;
+  requests.length = 0;
+  await send("Page.navigate", { url: `${base}${path}` });
+};
+const load = async (path) => {
+  await go(path);
+  return until(hydrated, `${path} to start`);
+};
+const setDelay = (ms) => fetch(`${base}/__delay?ms=${ms}`).then((r) => r.text());
+const appHtml = () => ev(`document.getElementById("app").innerHTML`);
 
 try {
-  await send("Runtime.enable"); await send("Log.enable"); await send("Page.enable");
-  await send("Page.navigate", { url });
-  await until(() => ev(`${$("#server-status")}?.textContent.includes("from the server")`), "the page to load and fetch");
+  await send("Runtime.enable"); await send("Log.enable"); await send("Page.enable"); await send("Network.enable");
 
-  check("the app rendered", await ev(`${$("h1")}?.textContent`) === "quench-ui");
-  check("the fetch from quench-http rendered the list", await ev(`document.querySelectorAll("#server-list li").length`) === 3
-    && await ev(`${$("#server-list li.done")}?.textContent`) === "read the contract");
+  // ---- the server's side: what view-source shows, and how the assets are served ----------------
+  const page = await fetch(`${base}/`);
+  const source = await page.text();
+  check("view-source already has the content", source.includes("<h1>quench-ui</h1>") && source.includes('<span id="count">0</span>')
+    && source.includes("3 from the server") && source.includes("<li>build the wasm</li>"));
+  check("the state is embedded as JSON", /<script type="application\/json" id="__q_state" nonce="[0-9a-f]{32}">\{"server_todos":\[/.test(source));
+  const nonce = /nonce="([0-9a-f]{32})"/.exec(source)[1];
+  const csp = page.headers.get("content-security-policy");
+  check("the policy names the page's nonce and allows no inline code", csp.includes(`'nonce-${nonce}'`)
+    && csp.includes("default-src 'self'") && !csp.includes("'unsafe-inline'"));
+  check("no inline handlers or styles in the markup", !/\son[a-z]+=/.test(source) && !/<style|\sstyle=/.test(source));
+  const wasmPath = /wasm=([^"]+)"/.exec(source)[1];
+  const scriptPath = /src="([^?"]+)\?wasm=/.exec(source)[1];
+  check("the assets have content-hashed names", /^\/_quench\/app\.[0-9a-f]{16}\.wasm$/.test(wasmPath) && /^\/_quench\/quench\.[0-9a-f]{16}\.js$/.test(scriptPath));
+  const asset = await fetch(`${base}${wasmPath}`, { headers: { "accept-encoding": "gzip" } });
+  check("an asset is cacheable for a year and immutable", asset.headers.get("cache-control") === "public, max-age=31536000, immutable"
+    && /^"[0-9a-f]{16}"$/.test(asset.headers.get("etag")) && asset.headers.get("content-type") === "application/wasm");
+  const again = await fetch(`${base}${wasmPath}`, { headers: { "if-none-match": asset.headers.get("etag") } });
+  check("a repeat request is a 304", again.status === 304);
+  const gz = await fetch(`${base}${scriptPath}`, { headers: { "accept-encoding": "gzip" } });
+  const plain = await fetch(`${base}${scriptPath}`, { headers: { "accept-encoding": "identity" } });
+  check("gzip is sent when accepted and not otherwise", gz.headers.get("content-encoding") === "gzip" && plain.headers.get("content-encoding") === null);
+  check("an old hash is a 404", (await fetch(`${base}/_quench/app.0000000000000000.wasm`)).status === 404);
 
-  // counter: one patch per click, and the DOM node for the number stays the same node
+  // ---- hydration keeps the nodes the server sent -----------------------------------------------
+  await setDelay(700); // the module arrives late, so the page can be inspected before it starts
+  await go("/");
+  await until(() => ev(`!!${$("#count")}`), "the server-rendered page");
+  check("the page is visible before the app starts", !(await hydrated()) && await ev(`${$("h1")}?.textContent`) === "quench-ui");
+  await ev(`window.__ssr = {
+    h1: ${$("h1")}, countText: ${$("#count")}.firstChild, form: ${$("#add-form")}, input: ${$("#draft")},
+    items: [...document.querySelectorAll("#server-list li")], anchor: ${$("#server-list")}.lastChild,
+    total: document.getElementById("app").querySelectorAll("*").length }`);
+  const before = await appHtml();
+  await until(hydrated, "hydration", 12000);
+  await setDelay(0);
+  check("hydration kept every server node", await ev(`window.__ssr.h1 === ${$("h1")}
+    && window.__ssr.countText === ${$("#count")}.firstChild && window.__ssr.form === ${$("#add-form")}
+    && window.__ssr.input === ${$("#draft")} && window.__ssr.anchor === ${$("#server-list")}.lastChild
+    && window.__ssr.items.every((li, i) => li === document.querySelectorAll("#server-list li")[i])`));
+  check("it added no nodes", await ev(`document.getElementById("app").querySelectorAll("*").length === window.__ssr.total`));
+  check("the markup is unchanged by hydration", await appHtml() === before);
+  check("no errors, no mismatches", errors.length === 0, JSON.stringify(errors));
+  check("the embedded state meant no request for it", !requests.some((u) => u.endsWith("/api/todos")), JSON.stringify(requests));
+  await ev(`${$("#up")}.click()`);
+  check("the hydrated counter works on the server's text node", await ev(`window.__ssr.countText.data`) === "1"
+    && await ev(`window.__ssr.countText === ${$("#count")}.firstChild`));
+  const cleanDom = (await appHtml()).replace(/id="count">1</, 'id="count">0<'); // the page as the server sent it, before the click
+
+  // ---- interactions after hydration ------------------------------------------------------------
+  await load("/");
   await ev(`window.__countNode = ${$("#count")}.firstChild`);
   for (let i = 0; i < 3; i++) await ev(`${$("#up")}.click()`);
   await ev(`${$("#down")}.click()`);
   check("counter counts", await ev(`${$("#count")}.textContent`) === "2");
   check("counter patched the same text node", await ev(`window.__countNode === ${$("#count")}.firstChild`));
 
-  // todo: typing, submit (no page reload), controlled input value, keyed identity
   const type = (text) => ev(`(() => { const i = ${$("#draft")}; i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event("input", {bubbles: true})); })()`);
   await ev(`window.__marker = 42`);
   await type("milk");
   await ev(`${$("#add-form")}.requestSubmit()`);
-  check("submit added an item", await ev(`document.querySelectorAll("ul li").length`) >= 1 && (await ev(`${$("#left")}.textContent`)) === "1 left");
+  check("submit added an item", await ev(`${$("#left")}.textContent`) === "1 left");
   check("submit did not reload the page", await ev(`window.__marker`) === 42);
   check("the input was cleared (value property)", await ev(`${$("#draft")}.value`) === "");
   await ev(`window.__first = document.querySelector("ul li")`);
@@ -103,41 +159,64 @@ try {
   check("remove drops the item and keeps the others' nodes", await titles() === "eggs,bread"
     && await ev(`window.__first.isConnected`) === false);
 
-  // handles: adding and removing many items returns the handle table to where it was
   const handles = () => ev(`window.__quench.handles()`);
-  const before = await handles();
+  const baseline = await handles();
   for (let i = 0; i < 100; i++) { await type(`item ${i}`); await ev(`${$("#add-form")}.requestSubmit()`); }
   const during = await handles();
   while (await ev(`document.querySelectorAll("button.remove").length`) > 2) await ev(`document.querySelector("button.remove").click()`);
   const after = await handles();
-  check("100 items added and removed: the handle table returns to its size", during > before + 300 && after === before, `${before} -> ${during} -> ${after}`);
+  check("100 items added and removed: the handle table returns to its size", during > baseline + 300 && after === baseline, `${baseline} -> ${during} -> ${after}`);
 
-  // fetch again
+  requests.length = 0;
   await ev(`${$("#server-status")}.firstChild.data = "stale"`); // not textContent: that would replace the node Rust patches
   await ev(`${$("#reload")}.click()`);
   check("reload fetched again", await until(() => ev(`${$("#server-status")}.textContent`).then((t) => t !== "stale" && t.includes("from the server")), "the reload"));
+  check("and that was a request to the server", requests.some((u) => u.endsWith("/api/todos")));
+  check("no console errors or exceptions so far", errors.length === 0, JSON.stringify(errors));
 
-  // Not a check: how long this machine took (headless Chromium, loopback, unthrottled).
-  const timing = await ev(`(() => {
-    const at = (name) => performance.getEntriesByName(name)[0].startTime;
-    const wasm = performance.getEntriesByType("resource").find((r) => new URL(r.name).pathname === "/app.wasm");
-    return JSON.stringify({
-      wasmKB: Math.round(wasm.decodedBodySize / 1024),
-      wasmFetchMs: Math.round(wasm.duration),
-      instantiateAndFirstRenderMs: Math.round(at("quench:ready") - at("quench:instantiated")),
-      fetchToReadyMs: Math.round(at("quench:ready") - wasm.startTime),
-    });
-  })()`);
-  console.log(`INFO  load timing: ${timing}`);
+  // ---- a server page that does not match: the result is the client's page ---------------------
+  for (const kind of ["tag", "text", "drop", "extra", "attr"]) {
+    await load(`/?corrupt=${kind}`);
+    const mismatches = errors.filter((e) => e.includes("hydration mismatch"));
+    check(`corrupt:${kind} is reported with a path and what was expected`, mismatches.length > 0 && mismatches.every((m) => m.includes("hydration mismatch in") && m.includes("expected")), JSON.stringify(errors));
+    check(`corrupt:${kind} ends as the correct page`, await appHtml() === cleanDom, `\n got: ${await appHtml()}\n want: ${cleanDom}`);
+    await ev(`${$("#up")}.click()`);
+    check(`corrupt:${kind}: the repaired page works`, await ev(`${$("#count")}.textContent`) === "1");
+  }
+  await load("/?corrupt=empty");
+  check("corrupt:empty (nothing rendered) is a plain client render", errors.length === 0 && await appHtml() === cleanDom, JSON.stringify(errors));
 
-  check("no console errors or exceptions so far", consoleErrors.length === 0 && exceptions.length === 0, JSON.stringify([...consoleErrors, ...exceptions]));
+  // in production mode a mismatch is repaired without noise
+  const injected = (await send("Page.addScriptToEvaluateOnNewDocument", { source: "window.QUENCH_DEV = false" })).result.identifier;
+  await load("/?corrupt=tag");
+  check("production mode: repaired quietly", errors.length === 0 && await appHtml() === cleanDom, JSON.stringify(errors));
+  await send("Page.removeScriptToEvaluateOnNewDocument", { identifier: injected });
 
-  // a panic reaches the console and shows the overlay; the app stops without hanging the page
+  // ---- the policy really blocks inline code ----------------------------------------------------
+  await load("/");
+  await ev(`window.__violations = 0; document.addEventListener("securitypolicyviolation", () => window.__violations++);
+    const s = document.createElement("script"); s.textContent = "window.__injected = 1"; document.body.append(s);`);
+  await sleep(200);
+  check("an injected inline script without the nonce is blocked", await ev(`window.__injected`) === undefined && await ev(`window.__violations`) >= 1);
+
+  // ---- a panic reaches the console and shows the overlay; the app stops without hanging --------
+  await load("/");
+  errors.length = 0;
   await ev(`${$("#boom")}.click()`);
   await until(() => ev(`!!document.body.querySelector("pre")`), "the overlay");
   check("panic overlay shown with the message", (await ev(`document.body.querySelector("pre")?.textContent`) ?? "").includes("boom"));
   await ev(`${$("#up")}.click()`);
-  check("the stopped app ignores later events", await ev(`${$("#count")}.textContent`) === "2");
+  check("the stopped app ignores later events", await ev(`${$("#count")}.textContent`) === "0");
+
+  // Not a check: how long this machine took (headless Chromium, loopback, unthrottled).
+  await load("/");
+  const timing = await ev(`(() => {
+    const at = (name) => performance.getEntriesByName(name)[0].startTime;
+    const wasm = performance.getEntriesByType("resource").find((r) => new URL(r.name).pathname.endsWith(".wasm"));
+    return JSON.stringify({ wasmKB: Math.round(wasm.decodedBodySize / 1024), wasmFetchMs: Math.round(wasm.duration),
+      hydrateMs: Math.round(at("quench:ready") - at("quench:instantiated")), fetchToReadyMs: Math.round(at("quench:ready") - wasm.startTime) });
+  })()`);
+  console.log(`INFO  load timing: ${timing}`);
 } catch (error) {
   check("test run", false, String(error));
 } finally {
