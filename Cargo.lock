@@ -465,6 +465,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-style"
+version = "0.1.0"
+dependencies = [
+ "quench-core",
+ "quench-serde",
+ "quench-test",
+]
+
+[[package]]
 name = "quench-template"
 version = "0.1.2"
 dependencies = [
@@ -538,6 +547,7 @@ version = "0.1.22"
 dependencies = [
  "quench-core",
  "quench-serde",
+ "quench-style",
  "quench-test",
 ]
 

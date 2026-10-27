@@ -2,6 +2,8 @@
 
 `quench-web` (crate `quench_web`) is a library-only, dependency-light HTML/CSS/JS builder used to assemble server-rendered UI pages without a templating engine. It provides chainable `Element`/`PageBuilder` builders, a small set of framework-level page/shell/theme/i18n helpers, and a shared `q-shell-*` class vocabulary so every service's UI looks and behaves consistently. It is depended on directly by `quench-starter` (for its own UI plumbing), `quench-web-components`, and the `switchboard-service`, `conveyor-service`, `sage-service`, `warehouse-service`, `gatehouse-service` Docker services, plus `examples/basic`.
 
+The theme, base-CSS, `CssRule`, i18n and asset-writing code lives in [`quench-style`](./quench-style.md) and is re-exported here at its old paths, so existing code is unaffected.
+
 ## Public API / Key Types
 
 Reachable via `quench_web::prelude::*`:
@@ -24,7 +26,7 @@ Not environment-variable driven; behavior is controlled through builder calls:
 
 ## Testing
 
-No test files exist under `libs/quench-web` (`tests/` is absent); coverage for this crate's behavior currently comes from the services that consume it.
+Unit tests under `tests/unit` cover the HTML builders, page and shell assembly, components and scripts. `tests/unit/golden_baseline_tests.rs` compares the generated stylesheets, `translations.js`, favicon and two full pages against `tests/fixtures/baseline/`, byte for byte; regenerate with `QUENCH_UPDATE_GOLDEN=1 cargo test -p quench-web golden` after an intended change. `Element` renders attributes in sorted order, so output is stable from run to run.
 
 ## Usage example
 

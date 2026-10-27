@@ -34,6 +34,7 @@ See [docs/](./docs/) for per-crate reference.
 - [Quench K8s](./docs/quench-k8s.md) — generic Kubernetes API client (kubeconfig, dynamic resources, discovery, logs, watch)
 - [Quench Schema](./docs/quench-schema.md) — JSON Schema validation over quench-serde values
 - [Quench Regex](./docs/quench-regex.md) — regular expressions with Unicode classes, no dependencies
+- [Quench Style](./docs/quench-style.md) — shared design tokens, themes, base CSS and i18n for web, mobile and desktop
 - [Quench TZ](./docs/quench-tz.md) — IANA time zones with the database built in
 - [Quench TLS](./docs/quench-tls.md) — async glue between tokio streams and rustls, with shared trust-store helpers
 - [Quench Log](./docs/quench-log.md) — leveled events, spans, console and rolling-file output

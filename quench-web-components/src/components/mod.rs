@@ -1,7 +1,2 @@
-pub mod footer;
-pub mod header;
-pub mod nav;
-
-pub use footer::*;
-pub use header::*;
-pub use nav::*;
+pub use quench_web::framework::components::*;
+pub use quench_web::framework::components::{footer, header, nav};

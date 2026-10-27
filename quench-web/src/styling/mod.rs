@@ -1,1 +1,1 @@
-pub mod css;
+pub use quench_style::css;

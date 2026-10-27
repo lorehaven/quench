@@ -1,9 +1,9 @@
-use super::assets::create_asset_files_with_options;
-use super::i18n::{available_locales, validate_locales_exist};
 use crate::{
     AppBuilder, Element, FooterBuilder, HeaderBuilder, Link, NavPanelBuilder, Script, Theme,
 };
 use quench_core::Result;
+use quench_style::assets::create_asset_files_with_options;
+use quench_style::i18n::{available_locales, validate_locales_exist};
 
 #[derive(Clone, Debug)]
 pub struct AppShellBuilder {

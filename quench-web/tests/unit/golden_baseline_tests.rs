@@ -86,8 +86,7 @@ fn translations_script_is_unchanged() {
 
 #[quench_test::test]
 fn favicon_is_unchanged() {
-    let favicon = std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("favicon.png")).unwrap();
-    assert_golden("assets/favicon.png", &favicon);
+    assert_golden("assets/favicon.png", quench_web::framework::app::FAVICON);
 }
 
 /// Mirrors `examples/basic`: a single heading inside the default shell.

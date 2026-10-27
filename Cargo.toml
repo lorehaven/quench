@@ -22,6 +22,7 @@ members = [
   "quench-serde-macros",
   "quench-mail",
   "quench-starter",
+  "quench-style",
   "quench-web",
   "quench-web-components",
   "quench-proto",
@@ -77,6 +78,7 @@ quench-serde = { path = "quench-serde", registry = "ennor", version = "0.1.0" }
 quench-serde-macros = { path = "quench-serde-macros", registry = "ennor", version = "0.1.0" }
 quench-mail = { path = "quench-mail", registry = "ennor", version = "0.1.0" }
 quench-starter = { path = "quench-starter", registry = "ennor", version = "0.4.0" }
+quench-style = { path = "quench-style", registry = "ennor", version = "0.1.0" }
 quench-web = { path = "quench-web", registry = "ennor", version = "0.1.11" }
 quench-proto = { path = "quench-proto", registry = "ennor", version = "0.1.0", default-features = false }
 quench-tz = { path = "quench-tz", registry = "ennor", version = "0.1.0" }

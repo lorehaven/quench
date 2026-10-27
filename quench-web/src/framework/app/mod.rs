@@ -1,12 +1,9 @@
-mod assets;
 mod builder;
-mod ftl;
-mod i18n;
 mod scripts;
 mod shell;
 
-pub use assets::*;
 pub use builder::*;
-pub use i18n::*;
+pub use quench_style::assets::*;
+pub use quench_style::i18n::*;
 pub use scripts::*;
 pub use shell::*;

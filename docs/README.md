@@ -25,6 +25,7 @@ docs/
 ├── quench-log.md
 ├── quench-mail.md
 ├── quench-starter.md
+├── quench-style.md
 ├── quench-web.md
 ├── quench-web-components.md
 └── examples/                 # examples/* runnable references
@@ -57,6 +58,7 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench K8s](./quench-k8s.md) — generic Kubernetes API client (kubeconfig, dynamic resources, discovery, logs, watch)
 - [Quench Schema](./quench-schema.md) — JSON Schema validation over quench-serde values
 - [Quench Regex](./quench-regex.md) — regular expressions with Unicode classes, no dependencies
+- [Quench Style](./quench-style.md) — shared design tokens, themes, base CSS and i18n for web, mobile and desktop
 - [Quench TZ](./quench-tz.md) — IANA time zones with the database built in
 - [Quench PG](./quench-pg.md) — PostgreSQL wire-protocol client with SCRAM, TLS, pool
 - [Quench Redis](./quench-redis.md) — Redis client: RESP2/3, pool, cluster routing
@@ -153,6 +155,7 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ├── quench-starter/         # service bootstrap
 ├── quench-qr/              # QR code encoder
 ├── quench-tls/             # rustls glue and trust stores
+├── quench-style/           # shared tokens, themes, base CSS, i18n
 ├── quench-web/             # server-rendered HTML/CSS/JS page builder
 ├── quench-web-components/  # UI components built on quench-web
 ├── examples/               # runnable references: basic, db_example, http_demo, forge_service_demo

@@ -1,6 +1,6 @@
 # Quench Web Components
 
-`quench-web-components` (crate `quench_web_components`) is a small library of reusable, higher-level UI builders (buttons, cards/panels/containers, form fields, status badges/alerts) layered on top of `quench-web`'s `Element` builder. Its own README is a short pointer to this page. As of this writing it is a workspace member (`libs/quench-web-components`) with a real dependency on `quench-web`, but **no other crate in the workspace depends on it** — it isn't wired into the root `Cargo.toml`'s `[workspace.dependencies]` and nothing under `docker/`, `cli/`, or `examples/` references it. Its `components::nav`, `HeaderBuilder`, and `FooterBuilder` are near-duplicates of the ones that already live in `quench-web::framework::components` — that overlap is worth resolving before adopting this crate anywhere.
+`quench-web-components` (crate `quench_web_components`) is a small library of reusable, higher-level UI builders (buttons, cards/panels/containers, form fields, status badges/alerts) layered on top of `quench-web`'s `Element` builder. Its own README is a short pointer to this page. It is used by the forge services `conveyor`, `gatehouse`, `switchboard` and `warehouse`, which call `containers::empty_state`. Its `components` and `dom` modules are re-exports of the ones in `quench-web`, kept so existing `quench_web_components::components::...` paths still work.
 
 ## Public API / Key Types
 
@@ -10,12 +10,12 @@ Reachable via `quench_web_components::prelude::*` (a subset) or the crate root:
 - `containers` — `Card` (title/content/footer/`.compact()`), `Panel` (title/content/`.bordered()`/`.highlighted()`), `Container` (`.fluid()`/`.centered()`), plus helpers `card`, `compact_card`, `panel`, `highlighted_panel`.
 - `forms` — `FormInput`, `FormSelect`, `FormTextarea` builders, each producing a labeled `.form-group` wrapper `Element` when `.label()` is set, or a bare field otherwise.
 - `status` — `StatusLevel` (`Info`, `Success`, `Warning`, `Error`), `StatusBadge` (`.with_icon()`), `AlertBox` (`.closeable()`), plus helpers `success_badge`, `warning_badge`, `error_badge`, `info_alert`, `success_alert`, `warning_alert`, `error_alert`.
-- `components` — `HeaderBuilder`, `FooterBuilder`, `NavPanelBuilder`, `nav_button()` — functionally identical to `quench-web`'s own versions, built directly against `quench_web::{Element, div, ...}` rather than re-exporting them.
+- `components` — `HeaderBuilder`, `FooterBuilder`, `NavPanelBuilder`, `nav_button()`, `locale_switch()`: re-exports of `quench-web`'s (the crate used to carry its own near-identical copies).
 - `dom` — re-exports of `quench_web::dom`'s `on_dom_ready`, `toggle_modal`, `update_from_select`, `set_select_value` (used internally by `NavPanelBuilder`; no additional behavior on top of `quench-web`'s copies).
 
 ## Testing
 
-No test files exist under `libs/quench-web-components`.
+Unit tests under `tests/unit` cover every builder (about 99% line coverage).
 
 ## Usage example
 

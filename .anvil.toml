@@ -41,6 +41,7 @@ packages = [
     "quench-test-macros",
     "quench-tls",
     "quench-tz",
+    "quench-style",
     "quench-web",
     "quench-web-components",
 ]
