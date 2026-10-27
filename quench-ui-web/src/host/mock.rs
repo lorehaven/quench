@@ -39,6 +39,8 @@ pub enum Call {
     FetchAbort(u32),
     HydrateBegin,
     HydrateEnd,
+    SseOpen(u32),
+    SseClose(u32),
 }
 
 /// A fetch the Rust side started.
@@ -75,6 +77,7 @@ struct State {
     timers: BTreeMap<u32, u32>,
     fetches: BTreeMap<u32, FetchCall>,
     aborts: Vec<u32>,
+    sse: BTreeMap<u32, (String, Vec<String>)>,
     ticks: usize,
     logs: Vec<(u32, String)>,
     server_content: bool,
@@ -99,6 +102,7 @@ impl State {
             timers: BTreeMap::new(),
             fetches: BTreeMap::new(),
             aborts: Vec::new(),
+            sse: BTreeMap::new(),
             ticks: 0,
             logs: Vec::new(),
             server_content: false,
@@ -361,6 +365,42 @@ pub fn set_server_content(present: bool, mismatches: u32) {
     });
 }
 
+/// The event sources the Rust side has open: `(id, url, event names)`.
+#[must_use]
+pub fn sse_sources() -> Vec<(u32, String, Vec<String>)> {
+    with(|s| {
+        s.sse
+            .iter()
+            .map(|(i, (u, n))| (*i, u.clone(), n.clone()))
+            .collect()
+    })
+}
+
+/// What the browser reports about an event source (see the contract).
+///
+/// `kind` is 0 opened, 1 an event, 2 reconnecting, 3 failed for good. An event is delivered only if
+/// the source is open and listens for that name (`message` always). Returns whether anything was
+/// delivered.
+pub fn sse_emit(id: u32, kind: u32, name: &str, data: &str) -> bool {
+    let listening = with(|s| {
+        s.sse.get(&id).is_some_and(|(_, names)| {
+            kind != 1 || name == "message" || names.iter().any(|n| n == name)
+        })
+    });
+    if !listening {
+        return false;
+    }
+    let (np, nl) = ffi::alloc_copy(name.as_bytes());
+    let (dp, dl) = ffi::alloc_copy(data.as_bytes());
+    // SAFETY: both buffers were just produced by `alloc_copy`, each passed to one export.
+    #[allow(unsafe_code)]
+    unsafe {
+        ffi::q_sse_event(id, kind, np, nl, dp, dl);
+    }
+    run_ticks();
+    true
+}
+
 /// What `q_log` received: `(level, message)`.
 #[must_use]
 pub fn logs() -> Vec<(u32, String)> {
@@ -540,6 +580,25 @@ pub(crate) mod imports {
 
     pub fn schedule_tick() {
         with(|s| s.ticks += 1);
+    }
+
+    pub fn sse_open(id: u32, url: &str, names: &str) {
+        super::try_with(|s| {
+            s.calls.push(Call::SseOpen(id));
+            let names = names
+                .split('\n')
+                .filter(|n| !n.is_empty())
+                .map(str::to_string)
+                .collect();
+            s.sse.insert(id, (url.to_string(), names));
+        });
+    }
+
+    pub fn sse_close(id: u32) {
+        super::try_with(|s| {
+            s.calls.push(Call::SseClose(id));
+            s.sse.remove(&id);
+        });
     }
 
     pub fn root_has_content() -> bool {

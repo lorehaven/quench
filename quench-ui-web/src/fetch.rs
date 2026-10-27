@@ -148,7 +148,9 @@ thread_local! {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn reset() {
-    FETCHES.with(|f| *f.borrow_mut() = Fetches::default());
+    // Dropped after the borrow ends (see `exec::reset`).
+    let old = FETCHES.with(|f| std::mem::take(&mut *f.borrow_mut()));
+    drop(old);
 }
 
 /// The response of a request in flight.

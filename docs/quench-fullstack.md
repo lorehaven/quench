@@ -75,7 +75,20 @@ The body is `{"kind":"not_found","message":"...","fields":[{"field","message"}]}
 
 ## Server-sent events
 
-`quench-http` streams server-sent events (`Response::sse`). The example serves `/api/notes/stream`, which pushes an event when the signed-in user's notes change; a page reads it with the browser's `EventSource`, as the browser test does. The Rust side of the browser has no `EventSource` binding yet, so a `quench-ui` app cannot subscribe to a stream without one more host import. While writing this, a streaming response was found to hold back its status line and headers until the first event, so an `EventSource` never opened; `quench-proto` now sends the head as soon as it is clear the first chunk is not ready.
+`quench-http` streams server-sent events (`Response::sse`), and `quench_ui_web::EventSource` reads them in the browser:
+
+```rust
+let source = Rc::new(EventSource::open("/api/notes/stream", &["note"]));   // same origin, with the cookie
+let reader = source.clone();
+spawn(async move {
+    while let Some(event) = reader.next().await {
+        if let SseEvent::Message { data, .. } = event { activity.update(|log| log.push(data)); }
+    }
+});
+on_cleanup(move || source.close());   // the view that opened it closes it
+```
+
+The browser reconnects by itself (and says so with `SseEvent::Reconnecting`), and dropping or closing the source ends it. The example serves `/api/notes/stream`, which pushes an event when the signed-in user's notes change (and is 401 without a session); the signed-in notes view subscribes from Rust and shows the activity, including a note added from another device, which the browser test does. While building this, a streaming response was found to hold back its status line and headers until the first event, so an `EventSource` never opened; `quench-proto` now sends the head as soon as it is clear the first chunk is not ready.
 
 ## A page
 

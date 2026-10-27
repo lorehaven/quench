@@ -44,8 +44,12 @@ thread_local! {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn reset() {
-    EXEC.with(|e| *e.borrow_mut() = Executor::default());
-    TIMERS.with(|t| *t.borrow_mut() = Timers::default());
+    // Dropped after the borrow ends: dropping a task can wake another (closing a stream that a
+    // task waits on does), and waking needs the executor.
+    let tasks = EXEC.with(|e| std::mem::take(&mut *e.borrow_mut()));
+    let timers = TIMERS.with(|t| std::mem::take(&mut *t.borrow_mut()));
+    drop(tasks);
+    drop(timers);
 }
 
 /// Wakes a task by id. It is only an id, so the waker is `Send + Sync` without any `unsafe`.
@@ -120,19 +124,19 @@ pub fn tick() {
         let waker = Waker::from(Arc::new(TaskWaker(id)));
         let mut cx = Context::from_waker(&waker);
         let poll = fut.as_mut().poll(&mut cx);
-        EXEC.with(|e| {
+        let finished = EXEC.with(|e| {
             let mut e = e.borrow_mut();
             match poll {
-                Poll::Ready(()) => {
-                    e.tasks.remove(&id);
-                }
+                Poll::Ready(()) => e.tasks.remove(&id),
                 Poll::Pending => {
                     if let Some(task) = e.tasks.get_mut(&id) {
                         task.fut = Some(fut);
                     }
+                    None
                 }
             }
         });
+        drop(finished); // outside the borrow, for the same reason as in `reset`
     }
 }
 

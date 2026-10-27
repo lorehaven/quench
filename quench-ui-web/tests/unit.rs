@@ -7,5 +7,7 @@ mod async_tests;
 mod dom_tests;
 #[path = "unit/ffi_tests.rs"]
 mod ffi_tests;
+#[path = "unit/sse_tests.rs"]
+mod sse_tests;
 
 quench_test::main!();

@@ -231,12 +231,14 @@ try {
     && window.__ssr.who === ${$("#who")}.firstChild`));
   check("and nothing was reported", errors.length === 0, JSON.stringify(errors));
 
-  // Server-sent events: a change made on the page arrives on the stream.
-  await ev(`window.__events = []; window.__es = new EventSource("/api/notes/stream"); window.__es.addEventListener("note", (e) => window.__events.push(e.data));`);
-  await until(() => ev(`window.__es.readyState === 1`), "the stream to open");
+  // Server-sent events: the page subscribes from Rust, and a change made anywhere shows up in it.
   await typeInto("#note-text", "streamed"); await submit("#note-form");
-  check("the server pushes a change as it happens", await until(() => ev(`window.__events.some((e) => e.startsWith("ola added note"))`), "the event"));
-  await ev(`window.__es.close()`);
+  check("the page's own change arrives over its stream", await until(() => ev(`[...document.querySelectorAll("#activity li")].some((li) => li.textContent.startsWith("ola added note"))`), "the activity line"));
+  const cookieLogin = await call("/api/v1/auth/login", { username: "ola", password: "pw" });
+  const elsewhere = { authorization: `Bearer ${(await cookieLogin.json()).access_token}` };
+  const lines = await ev(`document.querySelectorAll("#activity li").length`);
+  await call("/_fn/create_note", { text: "from another device" }, elsewhere);
+  check("and so does a change made from another session", await until(() => ev(`document.querySelectorAll("#activity li").length > ${lines}`), "the other device's line"));
   check("the stream is only for signed-in users", (await fetch(`${base}/api/notes/stream`)).status === 401);
 
   // Another user sees none of it.

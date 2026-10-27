@@ -25,6 +25,7 @@ export async function start(url, options = {}) {
   const listeners = new Map(); // handle -> [[type, fn]]
   const timers = new Map();
   const fetches = new Map();
+  const sources = new Map(); // id -> EventSource
 
   // --- memory ---------------------------------------------------------------------------------
   // The memory may grow during any call into Rust, so a view is never kept.
@@ -193,9 +194,13 @@ export async function start(url, options = {}) {
   // --- timers and fetch -----------------------------------------------------------------------
   const finish = (id, status, body, headers) => {
     fetches.delete(id);
-    const [bp, bl] = put(body);
-    const [hp, hl] = put(encoder.encode(headers));
-    call(() => ex.q_fetch_done(id, status, bp, bl, hp, hl));
+    call(() => ex.q_fetch_done(id, status, ...put(body), ...put(encoder.encode(headers))));
+  };
+
+  /** Tells Rust what an event source did: 0 opened, 1 an event, 2 reconnecting, 3 failed for good. */
+  const sse = (id, kind, name = "", data = "") => {
+    if (!sources.has(id)) return;
+    call(() => ex.q_sse_event(id, kind, ...put(encoder.encode(name)), ...put(encoder.encode(data))));
   };
 
   const env = {
@@ -252,6 +257,19 @@ export async function start(url, options = {}) {
         .catch((error) => finish(id, 0, encoder.encode(error?.name === "AbortError" ? "aborted" : String(error)), ""));
     }),
     q_fetch_abort: guarded((id) => fetches.get(id)?.abort()),
+    q_sse_open: guarded((id, up, ul, np, nl) => {
+      const source = new EventSource(text(up, ul));
+      sources.set(id, source);
+      for (const name of new Set(["message", ...text(np, nl).split("\n").filter(Boolean)])) {
+        source.addEventListener(name, (event) => sse(id, 1, name, event.data));
+      }
+      source.onopen = () => sse(id, 0);
+      source.onerror = () => {
+        sse(id, source.readyState === EventSource.CLOSED ? 3 : 2);
+        if (source.readyState === EventSource.CLOSED) sources.delete(id);
+      };
+    }),
+    q_sse_close: guarded((id) => { sources.get(id)?.close(); sources.delete(id); }),
     q_schedule_tick: guarded(() => queueMicrotask(() => call(() => ex.q_tick()))),
   };
 

@@ -29,6 +29,14 @@ unsafe extern "C" {
     );
     fn q_fetch_abort(id: u32);
     fn q_schedule_tick();
+    fn q_sse_open(
+        id: u32,
+        url_ptr: *const u8,
+        url_len: usize,
+        names_ptr: *const u8,
+        names_len: usize,
+    );
+    fn q_sse_close(id: u32);
     fn q_root_has_content() -> u32;
     fn q_hydrate_begin();
     fn q_hydrate_end() -> u32;
@@ -124,4 +132,12 @@ pub fn hydrate_begin() {
 /// Ends hydration and returns how many server nodes did not match what the app built.
 pub fn hydrate_end() -> u32 {
     unsafe { q_hydrate_end() }
+}
+
+pub fn sse_open(id: u32, url: &str, names: &str) {
+    unsafe { q_sse_open(id, url.as_ptr(), url.len(), names.as_ptr(), names.len()) }
+}
+
+pub fn sse_close(id: u32) {
+    unsafe { q_sse_close(id) }
 }

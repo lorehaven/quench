@@ -65,6 +65,8 @@ All text is UTF-8 in linear memory.
 | `q_fetch(id, method_ptr, method_len, url_ptr, url_len, headers_ptr, headers_len, body_ptr, body_len)` | `fetch`; headers are `Name: value` lines joined by `\n`; a `body_len` of `0` sends no body. Completion calls `q_fetch_done` |
 | `q_fetch_abort(id)` | aborts that fetch (an `AbortController`); `q_fetch_done` is then called with status `0` |
 | `q_schedule_tick()` | `queueMicrotask(q_tick)`; called when a task became ready to poll |
+| `q_sse_open(id, url_ptr, url_len, names_ptr, names_len)` | `new EventSource(url)`, listening for the unnamed event (`message`) and for each event name in `names` (separated by `\n`); reports through `q_sse_event` |
+| `q_sse_close(id)` | closes that `EventSource`; nothing is reported afterwards |
 | `q_root_has_content() -> u32` | `1` if the root has any child node, i.e. the server rendered into it |
 | `q_hydrate_begin()` | from now on, creating a node claims the next server-rendered node (see Hydration) |
 | `q_hydrate_end() -> u32` | stops claiming; removes server nodes nothing claimed; returns how many mismatches there were |
@@ -80,6 +82,7 @@ All text is UTF-8 in linear memory.
 | `q_dispatch_event(h, kind, ptr, len, a, b, c, flags)` | a listener fired on the node `h` |
 | `q_tick()` | poll every task that is ready |
 | `q_timer_fire(id)` | a timer fired |
+| `q_sse_event(id, kind, name_ptr, name_len, data_ptr, data_len)` | something happened to an `EventSource`: `kind` `0` it opened, `1` an event arrived (`name`: its event name, `message` if unnamed; `data`), `2` the connection was lost and the browser is reconnecting, `3` it failed for good (`readyState` closed). Both buffers are consumed; they are empty except for `1` |
 | `q_fetch_done(id, status, body_ptr, body_len, headers_ptr, headers_len)` | a fetch finished. `status` is the HTTP status, or `0` for a network error or abort, in which case the body is a message. Body and headers are consumed buffers; headers are `name: value` lines |
 
 ### Events
@@ -125,6 +128,10 @@ What the server must write so this works (`quench-ui`'s serialiser does all of i
 
 The wasm module has no threads and no runtime of its own. `quench_ui_web::spawn(future)` adds a task to a single-threaded executor. A task that is woken marks itself ready and, once per batch, calls `q_schedule_tick`; `q_tick` then polls every ready task. `sleep(ms)` and `fetch` are futures completed by `q_timer_fire` and `q_fetch_done`. Dropping a pending `sleep` clears its timer; dropping a pending fetch aborts it.
 
+## Server-sent events
+
+`EventSource` is the browser's own client for `text/event-stream`: it reconnects by itself and sends `Last-Event-ID`. Its events are named, and a browser can only listen for names it is told, so `q_sse_open` takes the names the app wants. Events reach Rust through `q_sse_event`; the Rust side keeps them in a queue per source, so none is lost while the app is busy. Closing is idempotent, and dropping a Rust `EventSource` closes it.
+
 ## Panics
 
 `panic = "abort"` in the release profile. A panic first runs the hook, which sends the message to `q_log(3, ..)` (console, and the overlay in development); the instance then traps and every later export call throws, which `quench.js` catches and logs once.
@@ -146,6 +153,7 @@ The workspace `wasm` profile is release with `opt-level = "z"`, `lto`, one codeg
 | `mount_root(view)`, `hydrate_root(view)`, `run(f)`, `install_panic_hook()` | the pieces `app!` is made of; `hydrate_root` returns the mount and the number of mismatches |
 | `initial_state()` | the JSON the server embedded in the page, if any |
 | `spawn(future)`, `sleep(ms)` | the single-threaded executor and its timer |
+| `EventSource::open(url, &["event-name"])` | a server-sent events stream: `while let Some(event) = source.next().await` yields `SseEvent::{Open, Message { name, data }, Reconnecting, Closed}`; `close()` or dropping it ends it |
 | `Request::get/post/new(..).header(..).body(..).send()` | starts a request now; the `Fetch` future yields `Response { status, headers, body }` (`ok()`, `text()`, `header(name)`) or a `FetchError` (`Network`, `Aborted`). `Fetch::abort_handle()` and dropping the future both abort |
 | `QUENCH_JS` | the source of `quench.js`, for a server to serve |
 

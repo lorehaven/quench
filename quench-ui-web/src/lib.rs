@@ -26,6 +26,7 @@ mod exec;
 mod fetch;
 mod ffi;
 mod host;
+mod sse;
 mod state;
 
 use quench_ui::{IntoView, Mount, mount};
@@ -36,10 +37,12 @@ pub use events::{decode as decode_event, kind_code};
 pub use exec::{Sleep, pending_tasks, sleep, spawn};
 pub use fetch::{AbortHandle, Fetch, FetchError, Request, Response, pending_fetches};
 pub use ffi::{
-    q_alloc, q_dealloc, q_dispatch_event, q_fetch_done, q_set_state, q_tick, q_timer_fire,
+    q_alloc, q_dealloc, q_dispatch_event, q_fetch_done, q_set_state, q_sse_event, q_tick,
+    q_timer_fire,
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use host::mock;
+pub use sse::{EventSource, SseEvent};
 pub use state::initial_state;
 
 /// The source of `quench.js`, for a server to serve at the URL the page loads it from.
@@ -87,6 +90,7 @@ pub(crate) fn reset_runtime() {
     state::reset();
     exec::reset();
     fetch::reset();
+    sse::reset();
 }
 
 /// Defines the `q_main` export that starts an app: `quench_ui_web::app!(my_app);` where

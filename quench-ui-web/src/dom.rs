@@ -17,7 +17,9 @@ thread_local! {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn reset() {
-    LISTENERS.with(|l| l.borrow_mut().clear());
+    // Dropping a listener can drop a node handle, which edits this table: do it after the borrow.
+    let old = LISTENERS.with(|l| std::mem::take(&mut *l.borrow_mut()));
+    drop(old);
 }
 
 /// A DOM node. Cloning is cheap; when the last clone is dropped the handle is released, which

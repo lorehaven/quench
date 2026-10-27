@@ -205,6 +205,24 @@ fn notes_list(
     let (out_user, out_notes, out_message) = (user.clone(), notes.clone(), message.clone());
     let (list, row_notes, row_message) = (notes.clone(), notes.clone(), message.clone());
     let who = user.get_untracked().unwrap_or_default();
+    let log = create_signal(Vec::<String>::new());
+    // Changes made anywhere (another tab, another device) arrive over a server-sent events stream.
+    // It is the browser's alone: a server render has no use for it, and the view that opened it
+    // closes it when it goes away (signing out rebuilds this region).
+    #[cfg(target_arch = "wasm32")]
+    {
+        use quench_ui_web::{EventSource, SseEvent};
+        let source = std::rc::Rc::new(EventSource::open("/api/notes/stream", &["note"]));
+        let (reader, feed) = (source.clone(), log.clone());
+        spawn(async move {
+            while let Some(event) = reader.next().await {
+                if let SseEvent::Message { data, .. } = event {
+                    feed.update(|log| log.push(data));
+                }
+            }
+        });
+        on_cleanup(move || source.close());
+    }
     div()
         .child(p().attr("id", "who").text(format!("Signed in as {who}")))
         .child(
@@ -249,6 +267,12 @@ fn notes_list(
                 )
                 .child(button().attr("type", "submit").text("Add")),
         )
+        .child(p().text("Activity"))
+        .child(ul().attr("id", "activity").child(View::keyed(
+            move || log.get().into_iter().enumerate().collect::<Vec<_>>(),
+            |(i, _)| *i,
+            |(_, line)| li().text(line).into_view(),
+        )))
         .child(ul().attr("id", "notes").child(View::keyed(
             move || list.get(),
             |n| format!("{}:{}", n.id, n.done),
