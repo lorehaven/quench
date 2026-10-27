@@ -1,0 +1,33 @@
+[package]
+name = "quench-ui-web"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - runs a quench-ui app in the browser from WebAssembly, with a small hand-written JS bridge"
+keywords = ["ui", "wasm", "dom", "browser"]
+categories = ["gui", "wasm"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+autotests = false
+include = ["src/**", "js/**", "Cargo.toml"]
+
+[lib]
+name = "quench_ui_web"
+path = "src/lib.rs"
+harness = false
+
+[dependencies]
+quench-ui = { workspace = true }
+
+[lints]
+workspace = true
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false
+
+[dev-dependencies]
+quench-test = { workspace = true }

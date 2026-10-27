@@ -1,0 +1,30 @@
+[package]
+name = "quench-example-ui-web-app"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - a quench-ui app for the browser: a counter, a keyed todo list and a fetch from quench-http"
+keywords = ["development", "tools"]
+categories = ["development-tools"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_example_ui_web_app"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# Which app the wasm module starts. With neither, it starts the full demo.
+counter = []
+todo = []
+
+[dependencies]
+quench-serde = { workspace = true }
+quench-ui = { workspace = true }
+quench-ui-web = { workspace = true }
+
+[lints]
+workspace = true

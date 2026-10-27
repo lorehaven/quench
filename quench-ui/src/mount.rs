@@ -19,6 +19,9 @@ use crate::view::{Attr, Class, Element, IntoView, Key, KeyedItem, View};
 enum Part<N> {
     None,
     Node(N),
+    /// An element and what was built inside it. A renderer whose node handles own resources (a
+    /// DOM backend's listeners, say) needs them to live exactly as long as the element is attached.
+    Element(N, Vec<Self>),
     Many(Vec<Self>),
     /// A dynamic or keyed region: its current content and the anchor after it.
     Region(Rc<Region<N>>),
@@ -34,6 +37,7 @@ impl<N: Clone> Clone for Part<N> {
         match self {
             Self::None => Self::None,
             Self::Node(n) => Self::Node(n.clone()),
+            Self::Element(n, children) => Self::Element(n.clone(), children.clone()),
             Self::Many(v) => Self::Many(v.clone()),
             Self::Region(r) => Self::Region(Rc::clone(r)),
         }
@@ -45,7 +49,7 @@ impl<N: Clone> Part<N> {
     fn nodes(&self, out: &mut Vec<N>) {
         match self {
             Self::None => {}
-            Self::Node(n) => out.push(n.clone()),
+            Self::Node(n) | Self::Element(n, _) => out.push(n.clone()),
             Self::Many(parts) => parts.iter().for_each(|p| p.nodes(out)),
             Self::Region(region) => {
                 region.content.borrow().nodes(out);
@@ -63,8 +67,11 @@ fn remove_part<R: Renderer>(r: &R, parent: &R::Node, part: &Part<R::Node>) {
     }
 }
 
-/// A mounted view. Dropping it leaves the view in place and live; call [`Mount::unmount`] to
-/// remove it and dispose its effects.
+/// A mounted view.
+///
+/// Call [`Mount::unmount`] to remove it and dispose its effects, or [`Mount::leak`] to keep it for
+/// good. Dropping it without either leaves the DOM as it is but releases the renderer's handles
+/// for static nodes.
 pub struct Mount<R: Renderer> {
     renderer: Rc<R>,
     parent: R::Node,
@@ -85,6 +92,12 @@ impl<R: Renderer> Mount<R> {
     pub fn unmount(self) {
         self.scope.dispose();
         remove_part(&*self.renderer, &self.parent, &self.part);
+    }
+
+    /// Keeps the view in place and live for the rest of the program: the nodes and what they own
+    /// are never released. For an app that runs until the page closes.
+    pub const fn leak(self) {
+        std::mem::forget(self);
     }
 
     /// The scope that owns the view's effects.
@@ -205,13 +218,16 @@ fn build_element<R: Renderer>(
         r.listen(&node, kind, wrap_handler(kind, handler));
     }
 
-    if !is_void(&el.tag) {
-        for child in el.children {
-            build(r, child, &node, None);
-        }
-    }
+    let children: Vec<Part<R::Node>> = if is_void(&el.tag) {
+        Vec::new()
+    } else {
+        el.children
+            .into_iter()
+            .map(|child| build(r, child, &node, None))
+            .collect()
+    };
     r.insert(parent, &node, before);
-    Part::Node(node)
+    Part::Element(node, children)
 }
 
 /// Runs the listener in a batch, so several writes cause one update.

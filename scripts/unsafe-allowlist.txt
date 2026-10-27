@@ -14,3 +14,12 @@
 ./quench-config/tests/unit/lib_tests.rs
 ./quench-starter/tests/unit/common_db_tests.rs
 ./quench-starter/tests/unit/common_wait_tests.rs
+# quench-ui forbids unsafe code outright; the scan lists the file because it treats the lint switch as a use.
+./quench-ui/src/lib.rs
+# The wasm boundary: text and events cross as (pointer, length) pairs in linear memory, and the imports are
+# `extern "C"` calls into quench.js. Each unsafe block has a SAFETY note; the contract is docs/quench-ui-web.md.
+./quench-ui-web/src/ffi.rs
+./quench-ui-web/src/host/wasm.rs
+# The in-memory stand-in for quench.js hands buffers to those exports the way JS would, and tests call them.
+./quench-ui-web/src/host/mock.rs
+./quench-ui-web/tests/unit/ffi_tests.rs

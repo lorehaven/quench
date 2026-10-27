@@ -29,6 +29,7 @@ members = [
   "quench-tls",
   "quench-tz",
   "quench-ui",
+  "quench-ui-web",
   "quench-qr",
   "quench-archive",
   "quench-template",
@@ -84,6 +85,7 @@ quench-web = { path = "quench-web", registry = "ennor", version = "0.1.11" }
 quench-proto = { path = "quench-proto", registry = "ennor", version = "0.1.0", default-features = false }
 quench-tz = { path = "quench-tz", registry = "ennor", version = "0.1.0" }
 quench-ui = { path = "quench-ui", registry = "ennor", version = "0.1.0" }
+quench-ui-web = { path = "quench-ui-web", registry = "ennor", version = "0.1.0" }
 quench-tls = { path = "quench-tls", registry = "ennor", version = "0.1.0" }
 quench-qr = { path = "quench-qr", registry = "ennor", version = "0.1.0" }
 quench-test = { path = "quench-test", registry = "ennor", version = "0.1.0" }
@@ -112,6 +114,15 @@ opt-level = 3
 
 [profile.release]
 strip = "debuginfo"
+
+# The browser build: `cargo build --target wasm32-unknown-unknown --profile wasm -p <app>`.
+[profile.wasm]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
 
 [workspace.lints.rust]
 unsafe_code = "deny"
