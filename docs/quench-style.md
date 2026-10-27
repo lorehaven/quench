@@ -15,6 +15,7 @@ Mobile and desktop hosts run the same WASM bundle in a `WebView`, so there is on
 | `mobile` | `q-m-*` classes: safe-area insets, 44px touch targets, tap highlight, overscroll and momentum scrolling, dynamic viewport height, motion with reduced-motion support |
 | `desktop` | `q-d-*` classes in one `@media (hover: hover) and (pointer: fine)` block: hover, `:focus-visible`, dense controls, thin scrollbars, selectable text |
 | `i18n`, `ftl` | Fluent `.ftl` reader and `window.qTranslations` generation (`available_locales`, `generate_translations_js`, `parse_ftl_in`) |
+| `components` | `q-*` styles for the `quench-ui` kit (virtual list, app bar, bottom nav, sheet, dialog, snackbar, tiles, switch, checkbox, text field, FAB, chip, tabs, pull to refresh, swipe action, presence) written in the theme's own custom properties, plus `touch-action` classes and `prefers-reduced-motion` handling. `TEXT_PAIRS` and `EDGE_PAIRS` list the colour pairs used, and tests check every one against WCAG contrast (4.5:1 for text, 3:1 for edges and focus rings) in all four themes. `Color::contrast` and `Color::luminance` are public |
 | `assets` | `write_assets(root, themes, locales)` and the `dist/assets` writers, plus the `FAVICON` bytes |
 
 ## Tokens

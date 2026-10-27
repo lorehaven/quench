@@ -76,7 +76,7 @@ fn decoding_fills_in_payloads_and_modifier_flags() {
         Some(Event::Submit)
     );
     assert_eq!(
-        decode_event(12, String::new(), 0.0, 0.0, 0, 0),
+        decode_event(18, String::new(), 0.0, 0.0, 0, 0),
         None,
         "past the table"
     );

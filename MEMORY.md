@@ -1,0 +1,1 @@
+- [Fullstack direction](fullstack_direction.md) — order: finish roadmap, rewrite forge services to the template, mobile apps, then move mathom/pedlar/daybook into a monorepo (repo not decided)

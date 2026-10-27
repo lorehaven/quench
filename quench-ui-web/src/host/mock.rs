@@ -41,6 +41,11 @@ pub enum Call {
     HydrateEnd,
     SseOpen(u32),
     SseClose(u32),
+    Prevent(u32, u32, u32),
+    SetStyle(u32, String, String),
+    Focus(u32),
+    TrapFocus(u32),
+    History(u32, String),
 }
 
 /// A fetch the Rust side started.
@@ -82,6 +87,12 @@ struct State {
     logs: Vec<(u32, String)>,
     server_content: bool,
     mismatches: u32,
+    /// The browser's session history for `history()`: URLs and the current index.
+    entries: Vec<String>,
+    entry: usize,
+    styles: BTreeMap<(usize, String), String>,
+    now: f64,
+    reduced_motion: bool,
 }
 
 impl State {
@@ -107,6 +118,11 @@ impl State {
             logs: Vec::new(),
             server_content: false,
             mismatches: 0,
+            entries: vec!["/".to_string()],
+            entry: 0,
+            styles: BTreeMap::new(),
+            now: 0.0,
+            reduced_motion: false,
         }
     }
 
@@ -401,6 +417,51 @@ pub fn sse_emit(id: u32, kind: u32, name: &str, data: &str) -> bool {
     true
 }
 
+/// The CSS property set on the handle's node through the style object.
+#[must_use]
+pub fn style(handle: u32, property: &str) -> Option<String> {
+    with(|s| {
+        let i = s.node(handle)?;
+        s.styles.get(&(i, property.to_string())).cloned()
+    })
+}
+
+/// Sets the clock `q_now` reads, in milliseconds.
+pub fn set_now(ms: f64) {
+    with(|s| s.now = ms);
+}
+
+/// Sets what `prefers-reduced-motion` reports.
+pub fn set_reduced_motion(on: bool) {
+    with(|s| s.reduced_motion = on);
+}
+
+/// The URL the page was loaded at, as `quench.js` reports it before `q_main`.
+pub fn set_location(url: &str) {
+    let (ptr, len) = ffi::alloc_copy(url.as_bytes());
+    // SAFETY: `(ptr, len)` was just produced by `alloc_copy`, and is passed to one export.
+    #[allow(unsafe_code)]
+    unsafe {
+        ffi::q_set_location(ptr, len);
+    }
+}
+
+/// The browser went to `url` through its history (the back or forward button).
+pub fn popstate(url: &str) {
+    let (ptr, len) = ffi::alloc_copy(url.as_bytes());
+    // SAFETY: as for `set_location`.
+    #[allow(unsafe_code)]
+    unsafe {
+        ffi::q_popstate(ptr, len);
+    }
+}
+
+/// The browser's session history: `(entries, index of the current one)`.
+#[must_use]
+pub fn history_entries() -> (Vec<String>, usize) {
+    with(|s| (s.entries.clone(), s.entry))
+}
+
 /// What `q_log` received: `(level, message)`.
 #[must_use]
 pub fn logs() -> Vec<(u32, String)> {
@@ -614,5 +675,72 @@ pub(crate) mod imports {
             s.calls.push(Call::HydrateEnd);
             s.mismatches
         })
+    }
+
+    pub fn prevent(h: u32, kind: u32, mode: u32) {
+        with(|s| s.calls.push(Call::Prevent(h, kind, mode)));
+    }
+
+    pub fn set_style(h: u32, property: &str, value: &str) {
+        with(|s| {
+            s.calls
+                .push(Call::SetStyle(h, property.to_string(), value.to_string()));
+            if let Some(i) = s.node(h) {
+                s.styles.retain(|(n, p), _| !(*n == i && p == property));
+                if !value.is_empty() {
+                    s.styles
+                        .insert((i, property.to_string()), value.to_string());
+                }
+            }
+        });
+    }
+
+    pub fn now() -> f64 {
+        with(|s| s.now)
+    }
+
+    pub fn prefers_reduced_motion() -> bool {
+        with(|s| s.reduced_motion)
+    }
+
+    pub fn focus(h: u32) {
+        with(|s| s.calls.push(Call::Focus(h)));
+    }
+
+    pub fn trap_focus(h: u32) {
+        with(|s| s.calls.push(Call::TrapFocus(h)));
+    }
+
+    /// The browser's session history: push and replace edit it; back and forward move in it and
+    /// report the entry they land on, as a `popstate` would.
+    pub fn history(op: u32, url: &str) {
+        let landed = with(|s| {
+            s.calls.push(Call::History(op, url.to_string()));
+            match op {
+                0 => {
+                    s.entries.truncate(s.entry + 1);
+                    s.entries.push(url.to_string());
+                    s.entry += 1;
+                    None
+                }
+                1 => {
+                    let at = s.entry;
+                    s.entries[at] = url.to_string();
+                    None
+                }
+                2 if s.entry > 0 => {
+                    s.entry -= 1;
+                    Some(s.entries[s.entry].clone())
+                }
+                3 if s.entry + 1 < s.entries.len() => {
+                    s.entry += 1;
+                    Some(s.entries[s.entry].clone())
+                }
+                _ => None,
+            }
+        });
+        if let Some(url) = landed {
+            super::popstate(&url);
+        }
     }
 }

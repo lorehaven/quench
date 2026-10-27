@@ -180,3 +180,33 @@ impl fmt::Display for ServerError {
 }
 
 impl std::error::Error for ServerError {}
+
+/// Ties a [`quench_ui::form::Form`] to server functions: the result of the call decides what the
+/// form shows.
+pub trait FormExt {
+    /// Ends a submission with the result of a server function. On success the form's errors are
+    /// cleared and the value returned; on failure they show: a [`ServerError::Validation`] puts each
+    /// message on the field it names, any other error is the form's own.
+    fn finish<T>(&self, result: Result<T, ServerError>) -> Option<T>;
+}
+
+impl FormExt for quench_ui::form::Form {
+    fn finish<T>(&self, result: Result<T, ServerError>) -> Option<T> {
+        self.set_submitting(false);
+        match result {
+            Ok(value) => {
+                self.clear_errors();
+                Some(value)
+            }
+            Err(ServerError::Validation { message, fields }) => {
+                let fields: Vec<_> = fields.into_iter().map(|f| (f.field, f.message)).collect();
+                self.apply_errors(&message, &fields);
+                None
+            }
+            Err(other) => {
+                self.apply_errors(other.message(), &[]);
+                None
+            }
+        }
+    }
+}

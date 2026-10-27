@@ -16,6 +16,8 @@
 
 #[path = "unit/assets_tests.rs"]
 mod assets_tests;
+#[path = "unit/dev_tests.rs"]
+mod dev_tests;
 #[path = "unit/document_tests.rs"]
 mod document_tests;
 #[path = "unit/support.rs"]
@@ -29,6 +31,8 @@ mod function_tests;
 mod functions;
 #[path = "unit/guard_tests.rs"]
 mod guard_tests;
+#[path = "unit/routing_tests.rs"]
+mod routing_tests;
 #[path = "unit/session_tests.rs"]
 mod session_tests;
 #[path = "unit/stub_tests.rs"]

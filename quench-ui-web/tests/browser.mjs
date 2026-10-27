@@ -205,12 +205,19 @@ try {
   check("signing in shows the user's notes", await until(() => ev(`${$("#who")}?.textContent === "Signed in as ola"`), "the signed-in view"));
   check("the session is a cookie the page cannot read", !(await ev(`document.cookie`)).includes("session") && !(await ev(`document.cookie`)).includes("refresh"));
   await submit("#note-form");
-  check("an empty note is refused, naming the problem", await until(async () => (await message()) === "text: write something", "the validation message"));
-  await typeInto("#note-text", "buy milk"); await submit("#note-form");
+  const requestsBefore = requests.length;
+  check("an empty note is refused on the field, without a request", await until(() => ev(`${$("#text-error")}.textContent === "write something"`), "the field error")
+    && await ev(`${$("#text")}.getAttribute("aria-invalid")`) === "true" && await ev(`${$("#text")}.getAttribute("aria-describedby")`) === "text-error"
+    && !requests.slice(requestsBefore).some((u) => u.includes("/_fn/create_note")));
+  await typeInto("#text", "x".repeat(201)); await submit("#note-form");
+  check("the server's verdict shows on the same field", await until(() => ev(`${$("#text-error")}.textContent === "too long"`), "the server's message"));
+  await typeInto("#text", "buy milk");
+  check("typing clears the error", await ev(`${$("#text-error")}.textContent`) === "");
+  await submit("#note-form");
   await until(() => ev(`document.querySelectorAll("#notes li").length === 1`), "the first note");
-  await typeInto("#note-text", "walk the dog"); await submit("#note-form");
+  await typeInto("#text", "walk the dog"); await submit("#note-form");
   check("notes are added and the field is cleared", await until(() => ev(`document.querySelectorAll("#notes li").length === 2`), "two notes")
-    && await ev(`${$("#note-text")}.value`) === "" && await message() === "");
+    && await ev(`${$("#text")}.value`) === "" && await message() === "");
   await ev(`document.querySelector("#notes li button.toggle").click()`);
   check("a note can be marked done", await until(() => ev(`document.querySelector("#notes li").classList.contains("done")
     && document.querySelector("#notes li button.toggle").textContent === "reopen"`), "the toggle"));
@@ -232,7 +239,7 @@ try {
   check("and nothing was reported", errors.length === 0, JSON.stringify(errors));
 
   // Server-sent events: the page subscribes from Rust, and a change made anywhere shows up in it.
-  await typeInto("#note-text", "streamed"); await submit("#note-form");
+  await typeInto("#text", "streamed"); await submit("#note-form");
   check("the page's own change arrives over its stream", await until(() => ev(`[...document.querySelectorAll("#activity li")].some((li) => li.textContent.startsWith("ola added note"))`), "the activity line"));
   const cookieLogin = await call("/api/v1/auth/login", { username: "ola", password: "pw" });
   const elsewhere = { authorization: `Bearer ${(await cookieLogin.json()).access_token}` };
@@ -251,6 +258,185 @@ try {
   const theirs = await call("/_fn/set_done", { id: 1, done: true }, { authorization: `Bearer ${(await (await call("/api/v1/auth/login", { username: "ewa", password: "pw2" })).json()).access_token}` });
   check("or change them: someone else's note is not found", theirs.status === 404 && (await theirs.json()).kind === "not_found");
   check("no console errors in the notes flow", errors.filter((e) => !e.includes("401") && !e.includes("Failed to load resource")).length === 0, JSON.stringify(errors));
+
+  // ---- routing: deep links, nested layouts, history, guards, scroll (Stage 7) -----------------
+  const here = () => ev(`location.pathname + location.search`);
+  const pathIs = (want) => until(async () => (await here()) === want, `the URL to be ${want}`);
+  const deep = await fetch(`${base}/app/users/7`);
+  check("a deep link is rendered by the server", deep.status === 200 && (await deep.text()).includes("User 7"));
+  check("a URL no route matches is a 404 from the server", (await fetch(`${base}/app/zzz`)).status === 404);
+  const guarded = await fetch(`${base}/app/admin`, { redirect: "manual" });
+  check("a guarded page redirects on the server", guarded.status === 302 && guarded.headers.get("location") === "/app/login?next=/app/admin");
+
+  await load("/app/users/7");
+  check("the deep link hydrated without a mismatch", errors.filter((e) => e.includes("mismatch")).length === 0, JSON.stringify(errors));
+  check("it shows the user from the URL", await ev(`${$("#user-name")}.textContent`) === "User 7");
+  await ev(`window.__shell = ${$("#shell")}; ${$("#bump")}.click(); ${$("#bump")}.click()`);
+  check("the page works after hydration", await ev(`${$("#visits")}.textContent`) === "Clicks here: 2");
+  await ev(`${$("#all-users")}.click()`);
+  check("a link changes the URL without a page load", await here() === "/app/users" && await ev(`window.__shell === ${$("#shell")}`));
+  check("the layout around it was kept", await ev(`${$("#where")}.textContent`) === "/app/users");
+
+  await ev(`window.scrollTo(0, 700)`);
+  await until(() => ev(`scrollY > 600`), "the page to scroll");
+  await sleep(250); // the browser reports the end of the scroll after a moment
+  await ev(`document.querySelectorAll("#user-list a")[49].click()`);
+  check("a link to another page is followed", await here() === "/app/users/50" && await ev(`${$("#user-name")}.textContent`) === "User 50");
+  check("a new page starts at the top", await ev(`scrollY`) === 0);
+  await ev(`history.back()`);
+  await pathIs("/app/users");
+  check("back shows the list again", await ev(`document.querySelectorAll("#user-list li").length`) === 60);
+  check("back restores the scroll position", await until(() => ev(`Math.abs(scrollY - 700) < 5`), "the scroll to be restored"));
+  await ev(`history.forward()`);
+  await pathIs("/app/users/50");
+  check("forward goes on to the page it left", await ev(`${$("#user-name")}.textContent`) === "User 50");
+
+  const modified = await ev(`(() => {
+    const a = document.querySelector("nav a[href='/app']");
+    let prevented = null;
+    const stop = (e) => { prevented = e.defaultPrevented; e.preventDefault(); };
+    document.addEventListener("click", stop, { once: true });
+    a.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true }));
+    return prevented;
+  })()`);
+  check("a ctrl-click is left to the browser", modified === false && await here() === "/app/users/50");
+
+  await ev(`document.querySelector("nav a[href='/app/admin']").click()`);
+  await pathIs("/app/login?next=/app/admin");
+  check("a guarded page sends a signed-out visitor to sign in", await ev(`${$("#sign-in")} !== null`));
+  await ev(`${$("#sign-in")}.click()`);
+  await pathIs("/app/admin");
+  check("after signing in the guarded page is shown", (await ev(`${$("#view")}.textContent`)).includes("Only for the signed in"));
+  await ev(`history.back()`);
+  await pathIs("/app/users/50");
+  check("the redirect and sign-in left no history entry of their own", await here() === "/app/users/50");
+
+  await ev(`document.querySelector("nav a[href='/app/settings/profile']").click()`);
+  await pathIs("/app/settings/profile");
+  await ev(`document.querySelector("#view a[href='/app/settings/about']").click()`);
+  await pathIs("/app/settings/about");
+  check("a nested layout shows its child", (await ev(`${$("#view")}.textContent`)).includes("About this app."));
+  check("the current link is marked", await ev(`document.querySelectorAll("a[aria-current='page']").length`) >= 1);
+  check("the outer layout survived all of it", await ev(`window.__shell === ${$("#shell")}`));
+
+  // ---- a virtualised list of 10,000 rows ---------------------------------------------------------
+  await load("/app/big");
+  const rowsNow = () => ev(`document.querySelectorAll("#big-list .q-vlist-row").length`);
+  const firstRow = () => ev(`document.querySelector("#big-list .q-vlist-row")?.textContent`);
+  check("the list hydrated", errors.filter((e) => e.includes("mismatch")).length === 0, JSON.stringify(errors));
+  check("only the rows in view are in the page", await until(async () => (await rowsNow()) > 5 && (await rowsNow()) < 40, "the rows") && await firstRow() === "Row 1");
+  check("the spacer is as tall as all 10,000 rows (set through the style object)", await ev(`getComputedStyle(document.querySelector("#big-list .q-vlist-space")).height`) === "320000px");
+  await ev(`document.getElementById("big-list").scrollTop = 160000`);
+  check("scrolling far shows the rows there", await until(async () => /^Row 4\d{3}$|^Row 5\d{3}$/.test(await firstRow()), "rows near 5000"));
+  const flick = await ev(`(async () => {
+    const list = document.getElementById("big-list");
+    const t0 = performance.now();
+    for (let i = 0; i < 120; i++) { list.scrollTop = 1000 + i * 2500; await new Promise((r) => requestAnimationFrame(r)); }
+    return { ms: performance.now() - t0, nodes: list.querySelectorAll("*").length };
+  })()`);
+  check("120 scroll steps stay smooth (under 40 ms each on average)", flick.ms / 120 < 40, JSON.stringify(flick));
+  check("and the page stays small", flick.nodes < 150, JSON.stringify(flick));
+  await ev(`document.getElementById("big-list").scrollTop = 1e9`);
+  check("the end of the list is reachable", await until(async () => (await ev(`document.querySelector("#big-list .q-vlist-row:last-child")?.textContent`)) === "Row 10000", "the last row"));
+  check("no errors in the list", errors.length === 0, JSON.stringify(errors));
+
+  // ---- the component gallery: keyboard, ARIA, forms, gestures, motion, language (Stage 7) ------
+  const press = async (key, code, vk) => {
+    for (const type of ["keyDown", "keyUp"]) await send("Input.dispatchKeyEvent", { type, key, code, windowsVirtualKeyCode: vk });
+  };
+  const shot = async (name) => {
+    const { result } = await send("Page.captureScreenshot", { format: "png" });
+    if (process.env.SHOTS) (await import("node:fs")).writeFileSync(`${process.env.SHOTS}/${name}.png`, Buffer.from(result.data, "base64"));
+  };
+  const view = (width, height, scheme, mobile) => Promise.all([
+    send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile }),
+    send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: scheme }] }),
+  ]);
+  await load("/gallery");
+  check("the gallery hydrated without a mismatch", errors.filter((e) => e.includes("mismatch")).length === 0, JSON.stringify(errors));
+  check("it is the English page", await ev(`${$("#gallery-title")}.textContent`) === "Gallery");
+  const tab = (i) => ev(`document.querySelectorAll("[role=tab]")[${i}].click()`);
+  check("the tab bar has the right roles", await ev(`document.querySelectorAll("[role=tablist] [role=tab]").length`) === 5
+    && await ev(`document.querySelector("[role=tabpanel]").getAttribute("aria-labelledby")`) === "g-tab-0");
+
+  await ev(`${$("#notifications")}.click()`);
+  check("a switch toggles and says so", await ev(`${$("#notifications")}.getAttribute("aria-checked")`) === "false");
+  await ev(`${$("#unread")}.click()`);
+  check("a chip is pressed", await ev(`${$("#unread")}.getAttribute("aria-pressed")`) === "true");
+
+  await ev(`${$("#open-sheet")}.click()`);
+  check("a sheet is a modal dialog", await until(() => ev(`!!document.querySelector("[role=dialog][aria-modal=true]")`), "the sheet"));
+  await sleep(100);
+  check("it takes focus", await ev(`document.querySelector("[role=dialog]").contains(document.activeElement)`));
+  let escaped = false;
+  for (let i = 0; i < 12; i++) { await press("Tab", "Tab", 9); if (!(await ev(`document.querySelector("[role=dialog]").contains(document.activeElement)`))) escaped = true; }
+  check("Tab never leaves it", !escaped);
+  await press("Escape", "Escape", 27);
+  check("Escape closes it", await until(() => ev(`!document.querySelector("[role=dialog]")`), "the sheet to leave"));
+
+  await ev(`${$("#gallery-form")}.requestSubmit()`);
+  check("an invalid form shows every error", await ev(`document.querySelectorAll("#gallery-form [role=alert]").length`) >= 3
+    && (await ev(`${$("#email-error")}.textContent`)) === "Enter your email" && await ev(`${$("#email")}.getAttribute("aria-invalid")`) === "true");
+  await ev(`(() => { for (const [id, v] of [["email", "ola@example.com"], ["day", "2025-03-04"], ["at", "09:30"]]) { const i = document.getElementById(id); i.value = v; i.dispatchEvent(new Event("input", {bubbles: true})); } })()`);
+  await ev(`${$("#gallery-form")}.requestSubmit()`);
+  check("a valid form is sent and announced", await until(() => ev(`document.querySelector("[role=status]")?.textContent.includes("Form sent")`), "the snackbar"));
+
+  await ev(`document.querySelector("[role=tab]").focus()`);
+  await press("ArrowRight", "ArrowRight", 39);
+  check("the arrow key moves to the next tab and focuses it", await ev(`document.activeElement.getAttribute("aria-selected") === "true" && document.activeElement.id === "g-tab-1"`));
+  check("and shows its panel", (await ev(`${$("#rows")}.getBoundingClientRect().height`)) > 100);
+  await press("End", "End", 35);
+  check("End goes to the last tab", await ev(`document.activeElement.id`) === "g-tab-4");
+  check("and the page did not scroll", await ev(`scrollY`) === 0);
+
+  await press("Home", "Home", 36);
+  await tab(2);
+  const pad = (type, x, y, t = 0) => ev(`${$("#pad")}.dispatchEvent(new PointerEvent(${JSON.stringify(type)}, {clientX: ${x}, clientY: ${y}, pointerId: 1, bubbles: true}))`);
+  await pad("pointerdown", 100, 100); await pad("pointerup", 100, 100);
+  check("a tap is a tap", await ev(`${$("#pad")}.textContent`) === "Tap");
+  await pad("pointerdown", 100, 100); await sleep(650);
+  check("a long press is recognised by the clock", await ev(`${$("#pad")}.textContent`) === "LongPress");
+  await pad("pointerup", 100, 100);
+  await pad("pointerdown", 100, 100); await pad("pointermove", 160, 102); await pad("pointermove", 260, 104); await pad("pointerup", 260, 104);
+  check("a quick drag is a swipe", await ev(`${$("#pad")}.textContent`) === "Swipe(Right)", await ev(`${$("#pad")}.textContent`));
+
+  await tab(3);
+  await ev(`${$("#toggle-card")}.click()`);
+  check("animated content appears", await until(() => ev(`!!document.querySelector(".gallery-card")`), "the card"));
+  await sleep(100);
+  check("and enters", await ev(`document.querySelector(".q-anim").classList.contains("q-anim-in")`));
+  await ev(`${$("#toggle-card")}.click()`);
+  check("and leaves after its exit", await until(() => ev(`!document.querySelector(".gallery-card")`), "the card to go", 3000));
+
+  await tab(4);
+  const files = () => ev(`${$("#files")}.textContent`);
+  check("English: one file", await files() === "You have selected 1 file.", await files());
+  await ev(`${$("#lang-pl")}.click()`);
+  check("the language switches without a reload", await files() === "Wybrano: 1 plik." && await ev(`${$("#gallery-title")}.textContent`) === "Galeria", await files());
+  const more = async (n) => { for (let i = 0; i < n; i++) await ev(`${$("#more")}.click()`); };
+  const seen = [await files()];
+  for (const _ of [2, 3, 4, 5]) { await more(1); seen.push(await files()); }
+  check("Polish plural forms: 1, 2-4, 5+", seen.join("|") === "Wybrano: 1 plik.|Wybrano: 2 pliki.|Wybrano: 3 pliki.|Wybrano: 4 pliki.|Wybrano: 5 plików.", seen.join("|"));
+  await more(7);
+  check("12 is not 'few'", await files() === "Wybrano: 12 plików.", await files());
+  await more(10);
+  check("22 is 'few' again", await files() === "Wybrano: 22 pliki.", await files());
+  await ev(`${$("#lang-en")}.click()`);
+  check("and back to English: 22 files", await files() === "You have selected 22 files.", await files());
+  check("no errors in the gallery", errors.filter((e) => !e.includes("Failed to load resource")).length === 0, JSON.stringify(errors));
+
+  for (const [name, w, h, scheme, mobile] of [["desktop-dark", 1280, 800, "dark", false], ["desktop-light", 1280, 800, "light", false], ["mobile-dark", 390, 844, "dark", true], ["mobile-light", 390, 844, "light", true]]) {
+    await view(w, h, scheme, mobile);
+    for (const [label, index] of [["controls", 0], ["lists", 1], ["language", 4]]) { await tab(index); await sleep(150); await shot(`${name}-${label}`); }
+  }
+  await send("Emulation.clearDeviceMetricsOverride");
+
+  await load("/app/zzz");
+  check("an unknown URL shows the not-found page", (await ev(`document.body.textContent`)).includes("There is nothing here."));
+  await load("/app/login?next=/app/users");
+  await ev(`${$("#sign-in")}.click()`);
+  await pathIs("/app/users");
+  check("no errors while routing", errors.filter((e) => !e.includes("Failed to load resource")).length === 0, JSON.stringify(errors));
 
   // ---- a server page that does not match: the result is the client's page ---------------------
   for (const kind of ["tag", "text", "drop", "extra", "attr"]) {

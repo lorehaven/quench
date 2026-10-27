@@ -35,6 +35,48 @@ impl Color {
         Self(out)
     }
 
+    /// `first` weighted by `share` (0 to 1) with `second`, channel by channel in sRGB.
+    #[must_use]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::suboptimal_flops
+    )] // 0..=255 by construction
+    pub fn mix(first: Self, second: Self, share: f64) -> Self {
+        let channel =
+            |a: u8, b: u8| (f64::from(a) * share + f64::from(b) * (1.0 - share)).round() as u32;
+        Self::rgb(
+            (channel(first.red(), second.red()) << 16)
+                | (channel(first.green(), second.green()) << 8)
+                | channel(first.blue(), second.blue()),
+        )
+    }
+
+    /// The relative luminance (WCAG 2.x), from 0 (black) to 1 (white).
+    #[must_use]
+    #[allow(clippy::suboptimal_flops)] // the formula as the standard writes it
+    pub fn luminance(self) -> f64 {
+        let channel = |c: u8| {
+            let c = f64::from(c) / 255.0;
+            if c <= 0.039_28 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * channel(self.red())
+            + 0.7152 * channel(self.green())
+            + 0.0722 * channel(self.blue())
+    }
+
+    /// The contrast ratio between two colours (WCAG 2.x), from 1 to 21. Body text needs 4.5,
+    /// large text and the edges of controls 3.
+    #[must_use]
+    pub fn contrast(self, other: Self) -> f64 {
+        let (a, b) = (self.luminance(), other.luminance());
+        (a.max(b) + 0.05) / (a.min(b) + 0.05)
+    }
+
     #[must_use]
     pub const fn red(self) -> u8 {
         ((self.0 >> 16) & 0xff) as u8
@@ -95,6 +137,31 @@ impl Palette {
                 .map(|(step, color)| (format!("--bs-gray-{step}"), color)),
         );
         out
+    }
+
+    /// The colour of the token `name` (`--bs-gray-100`), of the literal `white`, or of a mix
+    /// written `mix:<token>:<token>:<percent of the first>` (what CSS `color-mix(in srgb, ...)`
+    /// makes of the same two tokens).
+    #[must_use]
+    pub fn color(&self, name: &str) -> Option<Color> {
+        if name == "white" {
+            return Some(Color::rgb(0x00ff_ffff));
+        }
+        if let Some(spec) = name.strip_prefix("mix:") {
+            let parts: Vec<&str> = spec.split(':').collect();
+            let [a, b, percent] = parts[..] else {
+                return None;
+            };
+            return Some(Color::mix(
+                self.color(a)?,
+                self.color(b)?,
+                percent.parse::<f64>().ok()? / 100.0,
+            ));
+        }
+        self.tokens()
+            .into_iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, c)| c)
     }
 
     /// The theme stylesheet: the `:root` tokens and the status colour helpers.

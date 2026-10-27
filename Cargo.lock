@@ -307,6 +307,7 @@ dependencies = [
  "quench-http",
  "quench-proto",
  "quench-serde",
+ "quench-style",
  "tokio",
 ]
 
@@ -584,6 +585,16 @@ dependencies = [
  "rustls",
  "tokio",
  "webpki-roots",
+]
+
+[[package]]
+name = "quench-tool"
+version = "0.1.0"
+dependencies = [
+ "quench-args",
+ "quench-serde",
+ "quench-template",
+ "quench-test",
 ]
 
 [[package]]

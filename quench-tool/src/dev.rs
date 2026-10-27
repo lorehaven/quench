@@ -1,0 +1,102 @@
+//! `quench dev`: build, run the server, and start over when a source file changes. The server was
+//! started with `QUENCH_DEV`, so the pages reload themselves once it is back.
+
+use std::io::Write;
+
+use crate::error::Result;
+use crate::project::Project;
+use crate::release::{build_server, build_wasm};
+use crate::system::{Cmd, Process, System};
+use crate::watch::{Event, Watch};
+
+fn start(
+    sys: &dyn System,
+    out: &mut dyn Write,
+    project: &Project,
+    port: u16,
+) -> Result<Box<dyn Process>> {
+    build_wasm(sys, out, project, false)?;
+    build_server(sys, out, project, false, false)?;
+    let binary = project.server_path("debug");
+    let cmd = Cmd::new(&binary.to_string_lossy(), &[], &project.root)
+        .env("PORT", &port.to_string())
+        .env("QUENCH_DEV", "1")
+        .env("WASM", &project.wasm_path("wasm-dev").to_string_lossy());
+    sys.spawn(&cmd)
+        .map_err(|e| crate::error::Error(format!("cannot start {}: {e}", binary.display())))
+}
+
+/// Runs until `watch` says to stop (the real one never does: the person interrupts the process).
+///
+/// # Errors
+/// Only output that cannot be written; a failed build is reported and waited out.
+pub fn dev(
+    sys: &dyn System,
+    out: &mut dyn Write,
+    project: &Project,
+    port: u16,
+    open: bool,
+    watch: &mut dyn Watch,
+) -> Result<()> {
+    // The browser is opened once: later restarts reload the page it already shows.
+    let mut opened = false;
+    loop {
+        let mut server = match start(sys, out, project, port) {
+            Ok(child) => {
+                writeln!(
+                    out,
+                    "serving http://127.0.0.1:{port} - edit a file, the page reloads"
+                )?;
+                if open && !opened {
+                    opened = true;
+                    open_browser(sys, out, &format!("http://127.0.0.1:{port}"))?;
+                }
+                Some(child)
+            }
+            Err(e) => {
+                writeln!(out, "error: {e}\nwaiting for a change")?;
+                None
+            }
+        };
+        let mut reported = false;
+        let stopped = loop {
+            match watch.poll() {
+                Event::Changed => break false,
+                Event::Stop => break true,
+                Event::Quiet => {}
+            }
+            if let Some(child) = server.as_mut()
+                && !reported
+                && let Some(code) = child.try_wait()
+            {
+                writeln!(
+                    out,
+                    "the server stopped (exit {code}); waiting for a change"
+                )?;
+                reported = true;
+            }
+        };
+        if let Some(mut child) = server {
+            child.kill();
+        }
+        if stopped {
+            return Ok(());
+        }
+        writeln!(out, "change detected, rebuilding")?;
+    }
+}
+
+/// Asks the desktop to open `url`: `xdg-open` on Linux, `open` on macOS. Failing to is not an error.
+fn open_browser(sys: &dyn System, out: &mut dyn Write, url: &str) -> Result<()> {
+    let Some(program) = ["xdg-open", "open"].into_iter().find(|p| sys.on_path(p)) else {
+        writeln!(out, "no xdg-open or open found: open {url} yourself")?;
+        return Ok(());
+    };
+    if sys
+        .run(&Cmd::new(program, &[url], std::path::Path::new(".")))
+        .map_or(true, |code| code != 0)
+    {
+        writeln!(out, "{program} failed: open {url} yourself")?;
+    }
+    Ok(())
+}

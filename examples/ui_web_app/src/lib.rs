@@ -7,7 +7,9 @@
 //! and serve it with `examples/ui_web_server`. `--features counter` or `--features todo` builds a
 //! smaller app, which is how the sizes in the roadmap were measured.
 
+pub mod gallery;
 pub mod notes;
+pub mod site;
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -236,6 +238,10 @@ pub fn demo(state: Option<AppState>) -> View {
 pub enum PageState {
     Demo(AppState),
     Notes(notes::NotesState),
+    /// The routed app under `/app`: the router reads where it is from the URL.
+    Site,
+    /// The component gallery.
+    Gallery,
 }
 
 impl PageState {
@@ -255,6 +261,13 @@ pub fn app() -> View {
     match state {
         Some(PageState::Notes(notes)) => notes::notes_view(notes),
         Some(PageState::Demo(demo_state)) => demo(Some(demo_state)),
+        Some(PageState::Gallery) => gallery::gallery(),
+        Some(PageState::Site) => {
+            let router = quench_ui::router::Router::new(std::rc::Rc::new(
+                quench_ui_web::BrowserHistory::new(),
+            ));
+            site::site(&router)
+        }
         None => demo(None),
     }
 }

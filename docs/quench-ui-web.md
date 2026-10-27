@@ -1,6 +1,6 @@
 # Quench UI Web
 
-`quench-ui-web` (crate `quench_ui_web`) runs a [`quench-ui`](./quench-ui.md) app in a browser. The app compiles to a `.wasm` module; one small hand-written file, `quench.js` (under 300 lines, embedded in the crate as `quench_ui_web::QUENCH_JS`), loads it and gives it the DOM. There is no `wasm-bindgen`, `web-sys` or `js-sys`: the two sides talk through the plain functions below. The same bundle runs in a desktop browser, an Android `WebView` and a desktop `WebView`.
+`quench-ui-web` (crate `quench_ui_web`) runs a [`quench-ui`](./quench-ui.md) app in a browser. The app compiles to a `.wasm` module; one small hand-written file, `quench.js` (under 400 lines, embedded in the crate as `quench_ui_web::QUENCH_JS`), loads it and gives it the DOM. There is no `wasm-bindgen`, `web-sys` or `js-sys`: the two sides talk through the plain functions below. The same bundle runs in a desktop browser, an Android `WebView` and a desktop `WebView`.
 
 This page is the contract between the two halves. Changing either side means changing it here first.
 
@@ -69,6 +69,13 @@ All text is UTF-8 in linear memory.
 | `q_sse_close(id)` | closes that `EventSource`; nothing is reported afterwards |
 | `q_root_has_content() -> u32` | `1` if the root has any child node, i.e. the server rendered into it |
 | `q_hydrate_begin()` | from now on, creating a node claims the next server-rendered node (see Hydration) |
+| `q_prevent(h, kind, mode)` | for the listeners of `kind` on the node: `mode` `1` always calls `preventDefault`; `2` is for links: a plain left click is handled and prevented, while a ctrl-, shift-, alt-, meta- or non-primary click is neither handled nor prevented, so the browser opens the link as it normally would. Called after `q_listen` |
+| `q_set_style(h, name_ptr, name_len, val_ptr, val_len)` | `node.style.setProperty` (an empty value removes the property). Through the style object, not the `style` attribute, so it works under `style-src 'self'` |
+| `q_now() -> f64` | `performance.now()`, milliseconds |
+| `q_reduced_motion() -> u32` | `1` if `prefers-reduced-motion: reduce` matches |
+| `q_focus(h)` | focuses the node once the current call ends (it is attached by then) |
+| `q_trap_focus(h)` | Tab and Shift+Tab move between the focusable things inside the node and wrap around, until the handle is released |
+| `q_history(op, ptr, len)` | `0` `pushState` of the URL (the scroll position of the entry being left is saved first, then the page scrolls to the top), `1` `replaceState`, `2` `history.back()`, `3` `history.forward()` |
 | `q_hydrate_end() -> u32` | stops claiming; removes server nodes nothing claimed; returns how many mismatches there were |
 
 ## Exports (JS calls Rust)
@@ -78,8 +85,10 @@ All text is UTF-8 in linear memory.
 | `memory` | the instance's linear memory |
 | `q_alloc(len) -> ptr`, `q_dealloc(ptr, len)` | buffers for text going in (see above) |
 | `q_set_state(ptr, len)` | the page's embedded JSON, called before `q_main` when there is any |
+| `q_set_location(ptr, len)` | the page's URL (path, query, hash), called before `q_main` |
+| `q_popstate(ptr, len)` | the browser moved through its history; the URL it is at now. JS then restores the scroll position saved in that entry (`history.scrollRestoration` is `"manual"`) |
 | `q_main()` | called once after instantiation |
-| `q_dispatch_event(h, kind, ptr, len, a, b, c, flags)` | a listener fired on the node `h` |
+| `q_dispatch_event(h, kind, ptr, len, a, b, c, flags) -> u32` | a listener fired on the node `h`. Returns `1` if a listener called `quench_ui::prevent_default()`; JS then calls `preventDefault` on the event (when delivery was not deferred) |
 | `q_tick()` | poll every task that is ready |
 | `q_timer_fire(id)` | a timer fired |
 | `q_sse_event(id, kind, name_ptr, name_len, data_ptr, data_len)` | something happened to an `EventSource`: `kind` `0` it opened, `1` an event arrived (`name`: its event name, `message` if unnamed; `data`), `2` the connection was lost and the browser is reconnecting, `3` it failed for good (`readyState` closed). Both buffers are consumed; they are empty except for `1` |
@@ -101,10 +110,16 @@ All text is UTF-8 in linear memory.
 | 9 | `pointerdown` | `a = clientX`, `b = clientY`, `c = pointerId` |
 | 10 | `pointerup` | as `pointerdown` |
 | 11 | `pointermove` | as `pointerdown` |
+| 12 | `compositionstart` | `ptr/len`: the control's value |
+| 13 | `compositionend` | `ptr/len`: the control's value, which now has the committed text |
+| 14 | `scroll` | `a = scrollTop`, `b = scrollLeft` of the element |
+| 15 | `transitionend` | none |
+| 16 | `resize` | `a`, `b`: the element's content width and height, reported when it is first laid out and on every change (a `ResizeObserver`) |
+| 17 | `pointercancel` | as `pointerdown` |
 
 `flags` bits: `1` ctrl, `2` shift, `4` alt, `8` meta. Touch input arrives as pointer events; scrolling and zooming are controlled with CSS `touch-action`, not from Rust.
 
-**Default actions.** JS calls `preventDefault` on `submit` events only, always, so a form never reloads the page. Nothing else is prevented: clicks on links navigate, keys type. A later stage (the router) adds an opt-in per listener.
+**Default actions.** JS calls `preventDefault` on `submit` events, always, so a form never reloads the page. Nothing else is prevented unless the app asks with `q_prevent`: clicks on links navigate, keys type. The router asks for links (`Element::intercept_click`), and `Element::prevent_default(kind)` asks for the rest.
 
 **Delivery.** A DOM operation can raise events synchronously (removing the focused input fires `blur`). JS never delivers an event while one of its imports is running: it queues it and delivers it right after the import returns, so listeners cannot re-enter a half-finished update.
 

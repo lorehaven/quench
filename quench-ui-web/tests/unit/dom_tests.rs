@@ -213,8 +213,8 @@ fn run_installs_the_hook_and_mounts_the_app() {
     assert_eq!(mock::html(), "<p>hello</p>");
     assert!(quench_ui_web::QUENCH_JS.contains("export async function start"));
     assert!(
-        quench_ui_web::QUENCH_JS.lines().count() < 300,
-        "quench.js stays under 300 lines"
+        quench_ui_web::QUENCH_JS.lines().count() < 400,
+        "quench.js stays under 400 lines"
     );
 }
 

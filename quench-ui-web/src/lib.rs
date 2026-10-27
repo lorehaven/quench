@@ -25,7 +25,9 @@ mod events;
 mod exec;
 mod fetch;
 mod ffi;
+mod history;
 mod host;
+mod platform;
 mod sse;
 mod state;
 
@@ -37,11 +39,13 @@ pub use events::{decode as decode_event, kind_code};
 pub use exec::{Sleep, pending_tasks, sleep, spawn};
 pub use fetch::{AbortHandle, Fetch, FetchError, Request, Response, pending_fetches};
 pub use ffi::{
-    q_alloc, q_dealloc, q_dispatch_event, q_fetch_done, q_set_state, q_sse_event, q_tick,
-    q_timer_fire,
+    q_alloc, q_dealloc, q_dispatch_event, q_fetch_done, q_popstate, q_set_location, q_set_state,
+    q_sse_event, q_tick, q_timer_fire,
 };
+pub use history::BrowserHistory;
 #[cfg(not(target_arch = "wasm32"))]
 pub use host::mock;
+pub use platform::WebPlatform;
 pub use sse::{EventSource, SseEvent};
 pub use state::initial_state;
 
@@ -76,6 +80,7 @@ pub fn install_panic_hook() {
 /// is one and builds the app from scratch if not. The mount lives as long as the page.
 pub fn run<V: IntoView>(app: impl FnOnce() -> V) {
     install_panic_hook();
+    quench_ui::platform::install(Rc::new(WebPlatform::new()));
     if host::root_has_content() {
         hydrate_root(app()).0.leak();
     } else {
@@ -87,6 +92,7 @@ pub fn run<V: IntoView>(app: impl FnOnce() -> V) {
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn reset_runtime() {
     dom::reset();
+    history::reset();
     state::reset();
     exec::reset();
     fetch::reset();

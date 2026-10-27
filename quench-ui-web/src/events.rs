@@ -1,9 +1,9 @@
 //! Turns the numbers `quench.js` sends into a typed [`Event`].
 
-use quench_ui::{Event, EventKind, KeyEvent, PointerEvent};
+use quench_ui::{Event, EventKind, KeyEvent, PointerEvent, ScrollEvent, Size};
 
 /// The listener kinds in the order of the contract's event table.
-const KINDS: [EventKind; 12] = [
+const KINDS: [EventKind; 18] = [
     EventKind::Click,
     EventKind::DoubleClick,
     EventKind::Input,
@@ -16,6 +16,12 @@ const KINDS: [EventKind; 12] = [
     EventKind::PointerDown,
     EventKind::PointerUp,
     EventKind::PointerMove,
+    EventKind::CompositionStart,
+    EventKind::CompositionEnd,
+    EventKind::Scroll,
+    EventKind::TransitionEnd,
+    EventKind::Resize,
+    EventKind::PointerCancel,
 ];
 
 /// The number `quench.js` uses for `kind`.
@@ -59,5 +65,14 @@ pub fn decode(kind: u32, payload: String, a: f64, b: f64, c: i32, flags: u32) ->
         EventKind::PointerDown => Event::PointerDown(pointer),
         EventKind::PointerUp => Event::PointerUp(pointer),
         EventKind::PointerMove => Event::PointerMove(pointer),
+        EventKind::PointerCancel => Event::PointerCancel(pointer),
+        EventKind::CompositionStart => Event::CompositionStart(payload),
+        EventKind::CompositionEnd => Event::CompositionEnd(payload),
+        EventKind::Scroll => Event::Scroll(ScrollEvent { top: a, left: b }),
+        EventKind::TransitionEnd => Event::TransitionEnd,
+        EventKind::Resize => Event::Resize(Size {
+            width: a,
+            height: b,
+        }),
     })
 }

@@ -26,17 +26,27 @@ use quench_auth::domain::jwt::JwtConfig;
 use quench_core::async_trait;
 use quench_core::stream;
 use quench_example_ui_web_app::notes::{self, NotesState, store};
-use quench_example_ui_web_app::{AppState, PageState, ServerTodo, demo};
+use quench_example_ui_web_app::{AppState, PageState, ServerTodo, demo, gallery, site};
 use quench_fullstack::testing::StubGatehouse;
 use quench_fullstack::{Page, Ui, UiApp, User};
 use quench_http::prelude::http::StatusCode;
 use quench_http::prelude::*;
 use quench_proto::sse::Event;
+use quench_style::theme::Theme;
+
+const GALLERY_STYLE: &str = "body{--q-fab-offset:72px;margin:0;font-family:system-ui,sans-serif;background:var(--bs-gray-950);color:var(--bs-gray-100);padding-bottom:72px}\
+#gallery{max-width:40rem;margin:0 auto}#gallery>*:not(.q-appbar):not(.q-bottomnav){padding-left:var(--q-space-4);padding-right:var(--q-space-4)}\
+.q-bottomnav{position:fixed;left:0;right:0;bottom:0}button:not([class]){min-height:44px;margin:.25rem;font:inherit;color:var(--bs-gray-100);background:var(--bs-gray-800);border:2px solid var(--bs-gray-400);border-radius:.5rem;padding:0 1rem}\
+button:focus-visible{outline:3px solid var(--bs-gray-100);outline-offset:2px}\
+.gallery-pad{height:10rem;display:flex;align-items:center;justify-content:center;border:2px dashed var(--bs-gray-400);border-radius:.5rem;user-select:none}\
+.gallery-card{padding:1rem;margin-top:1rem;background:var(--bs-gray-900);border-radius:.5rem}\
+.gallery-rows{height:18rem;border:1px solid var(--bs-gray-700)}#pull{max-height:14rem;border:1px solid var(--bs-gray-700)}";
 
 const STYLE: &str = "body{font-family:sans-serif;margin:2rem auto;max-width:36rem;padding:0 1rem}\
 .card{border:1px solid #ccc;border-radius:.5rem;padding:1rem;margin:1rem 0}\
 li.done span{text-decoration:line-through;color:#888}li{margin:.25rem 0}button{margin-left:.5rem}\
-.error{color:#b00020;min-height:1.2em}";
+.error{color:#b00020;min-height:1.2em}\
+.vlist-demo{height:20rem;border:1px solid #ccc}";
 
 fn todos() -> Vec<ServerTodo> {
     [
@@ -167,9 +177,27 @@ async fn main() {
     let bytes = std::fs::read(&wasm)
         .unwrap_or_else(|e| panic!("cannot read {wasm}: {e} - build the app first"));
     let mut ui = Ui::new(bytes);
-    let style = ui.add_asset("site.css", STYLE, "text/css");
+    let sheet = format!("{STYLE}\n{}", quench_style::components::stylesheet());
+    let style = ui.add_asset("site.css", sheet, "text/css");
+    let gallery_css = format!(
+        "{}\n{}\n{}\n{GALLERY_STYLE}",
+        quench_style::tokens::stylesheet(),
+        quench_style::mobile::stylesheet(),
+        quench_style::components::stylesheet(),
+    );
+    let gallery_style = ui.add_asset("gallery.css", gallery_css, "text/css");
+    let dark = ui.add_asset(
+        "theme-dark.css",
+        Theme::theme(Theme::DefaultDark),
+        "text/css",
+    );
+    let light = ui.add_asset(
+        "theme-light.css",
+        Theme::theme(Theme::DefaultLight),
+        "text/css",
+    );
     let wasm_path = ui.paths().1.to_string();
-    let (demo_style, notes_style) = (style.clone(), style);
+    let (demo_style, notes_style, site_style) = (style.clone(), style.clone(), style);
 
     let app = UiApp::new(ui)
         .page("/", move |_req| {
@@ -179,6 +207,18 @@ async fn main() {
             Page::new("quench-ui", demo(Some(state.clone())))
                 .stylesheet(&demo_style)
                 .state(PageState::Demo(state).to_json())
+        })
+        .page("/gallery", move |_req| {
+            Page::new("Gallery", gallery::gallery())
+                .stylesheet_for(&dark, "(prefers-color-scheme: dark)")
+                .stylesheet_for(&light, "(prefers-color-scheme: light)")
+                .stylesheet(&gallery_style)
+                .state(PageState::Gallery.to_json())
+        })
+        .pages_under("/app", move |req| {
+            Page::routed("Routed app", req.uri().path_and_query(), site::site)
+                .stylesheet(&site_style)
+                .state(PageState::Site.to_json())
         })
         .page_for_user("/notes", move |_req, user| {
             let state = NotesState {

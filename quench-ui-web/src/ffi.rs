@@ -1,7 +1,7 @@
 //! The functions `quench.js` calls, and the buffer rules behind them.
 #![allow(unsafe_code)] // raw buffers cross the wasm boundary as (pointer, length) pairs
 
-use crate::{dom, events, exec, fetch, sse, state};
+use crate::{dom, events, exec, fetch, history, sse, state};
 
 /// Room for `len` bytes that JS fills in and hands to one export. The export takes ownership.
 #[must_use]
@@ -38,8 +38,11 @@ fn lossy(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }
 
-/// A listener fired on the node `handle`. `ptr`/`len` carry the text payload (the value of an
-/// input, the key of a key event).
+/// A listener fired on the node `handle`.
+///
+/// `ptr`/`len` carry the text payload (the value of an input, the key of a key event). Returns 1
+/// if a listener asked for the browser's default action to be stopped
+/// (`quench_ui::prevent_default`), else 0.
 ///
 /// # Safety
 /// `ptr` and `len` must be a buffer from `q_alloc`, or `len` must be 0.
@@ -54,11 +57,13 @@ pub unsafe extern "C" fn q_dispatch_event(
     b: f64,
     c: i32,
     flags: u32,
-) {
+) -> u32 {
     let payload = lossy(&unsafe { take(ptr, len) });
+    let _ = quench_ui::take_prevent_request();
     if let Some(event) = events::decode(kind, payload, a, b, c, flags) {
         dom::dispatch(handle, &event);
     }
+    u32::from(quench_ui::take_prevent_request())
 }
 
 /// The JSON the server embedded in the page for the app, read before `q_main`.
@@ -68,6 +73,24 @@ pub unsafe extern "C" fn q_dispatch_event(
 #[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
 pub unsafe extern "C" fn q_set_state(ptr: *mut u8, len: usize) {
     state::set(lossy(&unsafe { take(ptr, len) }));
+}
+
+/// The URL (path, query and hash) the page was loaded at, read before `q_main`.
+///
+/// # Safety
+/// `ptr` and `len` must be a buffer from `q_alloc`, or `len` must be 0.
+#[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
+pub unsafe extern "C" fn q_set_location(ptr: *mut u8, len: usize) {
+    history::set_initial(&lossy(&unsafe { take(ptr, len) }));
+}
+
+/// The browser moved through its history (back, forward): the URL it is at now.
+///
+/// # Safety
+/// `ptr` and `len` must be a buffer from `q_alloc`, or `len` must be 0.
+#[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
+pub unsafe extern "C" fn q_popstate(ptr: *mut u8, len: usize) {
+    history::popstate(&lossy(&unsafe { take(ptr, len) }));
 }
 
 /// Something happened to an event source opened with `q_sse_open`. Both buffers are consumed.

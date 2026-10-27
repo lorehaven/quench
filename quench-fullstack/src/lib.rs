@@ -35,13 +35,15 @@ mod app;
 #[cfg(not(target_arch = "wasm32"))]
 mod assets;
 #[cfg(not(target_arch = "wasm32"))]
+mod dev;
+#[cfg(not(target_arch = "wasm32"))]
 mod document;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod server;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod testing;
 
-pub use error::{ErrorBody, FieldError, INTERNAL_MESSAGE, ServerError};
+pub use error::{ErrorBody, FieldError, FormExt, INTERNAL_MESSAGE, ServerError};
 pub use quench_fullstack_macros::server;
 pub use user::{User, user};
 

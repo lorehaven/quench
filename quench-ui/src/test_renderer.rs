@@ -20,6 +20,7 @@ pub enum Op {
     SetText(NodeId, String),
     SetAttr(NodeId, String, String),
     RemoveAttr(NodeId, String),
+    SetStyle(NodeId, String, String),
     Insert {
         parent: NodeId,
         child: NodeId,
@@ -39,6 +40,7 @@ enum Kind {
         tag: String,
         attrs: Vec<(String, String)>,
         handlers: Vec<(EventKind, Handler)>,
+        styles: Vec<(String, String)>,
     },
     Text(String),
     Anchor,
@@ -103,6 +105,7 @@ impl TestRenderer {
             tag: "#root".to_string(),
             attrs: Vec::new(),
             handlers: Vec::new(),
+            styles: Vec::new(),
         });
         Self {
             tree: RefCell::new(tree),
@@ -196,6 +199,18 @@ impl TestRenderer {
             Kind::Element { attrs, .. } => attrs
                 .iter()
                 .find(|(n, _)| n == name)
+                .map(|(_, v)| v.clone()),
+            _ => None,
+        }
+    }
+
+    /// The CSS property set on `node` through [`Renderer::set_style`].
+    #[must_use]
+    pub fn style_of(&self, node: NodeId, property: &str) -> Option<String> {
+        match &self.tree.borrow().nodes[node.0].kind {
+            Kind::Element { styles, .. } => styles
+                .iter()
+                .find(|(p, _)| p == property)
                 .map(|(_, v)| v.clone()),
             _ => None,
         }
@@ -349,6 +364,7 @@ impl Renderer for TestRenderer {
             tag: tag.to_string(),
             attrs: Vec::new(),
             handlers: Vec::new(),
+            styles: Vec::new(),
         })
     }
 
@@ -381,6 +397,18 @@ impl Renderer for TestRenderer {
                 slot.1 = value.to_string();
             } else {
                 attrs.push((name.to_string(), value.to_string()));
+            }
+        }
+    }
+
+    fn set_style(&self, node: &NodeId, property: &str, value: &str) {
+        let mut tree = self.tree.borrow_mut();
+        tree.ops
+            .push(Op::SetStyle(*node, property.to_string(), value.to_string()));
+        if let Kind::Element { styles, .. } = &mut tree.nodes[node.0].kind {
+            styles.retain(|(p, _)| p != property);
+            if !value.is_empty() {
+                styles.push((property.to_string(), value.to_string()));
             }
         }
     }

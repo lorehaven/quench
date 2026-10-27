@@ -3,6 +3,8 @@
 
 #[path = "unit/assets_tests.rs"]
 mod assets_tests;
+#[path = "unit/components_tests.rs"]
+mod components_tests;
 #[path = "unit/framework_app_i18n_tests.rs"]
 mod framework_app_i18n_tests;
 #[path = "unit/framework_styles_common_elements_tests.rs"]

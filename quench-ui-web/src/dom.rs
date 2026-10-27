@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use quench_ui::{Event, EventKind, Handler, Renderer};
+use quench_ui::{Event, EventKind, Handler, Prevent, Renderer};
 
 use crate::events::kind_code;
 use crate::host::{self, ROOT};
@@ -123,6 +123,26 @@ impl Renderer for DomRenderer {
         if first_of_kind {
             host::listen(node.id(), kind_code(kind));
         }
+    }
+
+    fn prevent_default(&self, node: &Node, kind: EventKind, how: Prevent) {
+        let mode = match how {
+            Prevent::Always => 1,
+            Prevent::PlainClick => 2,
+        };
+        host::prevent(node.id(), kind_code(kind), mode);
+    }
+
+    fn set_style(&self, node: &Node, property: &str, value: &str) {
+        host::set_style(node.id(), property, value);
+    }
+
+    fn focus(&self, node: &Node) {
+        host::focus(node.id());
+    }
+
+    fn trap_focus(&self, node: &Node) {
+        host::trap_focus(node.id());
     }
 }
 

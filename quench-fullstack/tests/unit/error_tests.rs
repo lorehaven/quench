@@ -173,3 +173,31 @@ fn extractor_failures_map_to_the_matching_variant() {
     assert_eq!(extraction.kind(), "validation");
     assert!(extraction.message().contains("eof"));
 }
+
+#[quench_test::test]
+fn a_form_shows_what_a_server_function_returned() {
+    use quench_fullstack::FormExt;
+    use quench_ui::form::{Field, Form};
+    let ((), _scope) = quench_ui::create_root(|| {
+        let text = Field::new("text", "");
+        let form = Form::new().field(&text);
+        form.set_submitting(true);
+        assert_eq!(form.finish(Ok::<_, ServerError>(7)), Some(7));
+        assert!(!form.submitting());
+        assert_eq!(
+            form.finish::<()>(Err(ServerError::invalid("text", "too long"))),
+            None
+        );
+        assert_eq!(
+            (text.error().as_deref(), form.error()),
+            (Some("too long"), None)
+        );
+        assert_eq!(
+            form.finish::<()>(Err(ServerError::Unauthorized("sign in".into()))),
+            None
+        );
+        assert_eq!(form.error().as_deref(), Some("sign in"));
+        assert_eq!(form.finish(Ok(())), Some(()));
+        assert_eq!((text.error(), form.error()), (None, None));
+    });
+}

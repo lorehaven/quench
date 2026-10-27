@@ -4,8 +4,10 @@
 //! every change is a call to a `#[server]` function. Written once, built for the server and for
 //! the browser.
 
+use quench_fullstack::FormExt;
 use quench_fullstack::{ServerError, client, server};
 use quench_serde::{Deserialize, Serialize};
+use quench_ui::form::{Field, Form, rules};
 use quench_ui::prelude::*;
 use quench_ui_web::spawn;
 
@@ -199,9 +201,11 @@ fn notes_list(
     notes: &Signal<Vec<Note>>,
     message: &Signal<String>,
 ) -> View {
-    let draft = create_signal(String::new());
-    let (draft_value, draft_input) = (draft.clone(), draft.clone());
-    let (add_notes, add_message) = (notes.clone(), message.clone());
+    // The client checks what it can; the server checks everything again and its verdict lands on
+    // the same field (`FormExt::finish`).
+    let text = Field::new("text", "").rule(rules::required("write something"));
+    let note_form = Form::new().field(&text);
+    let add_notes = notes.clone();
     let (out_user, out_notes, out_message) = (user.clone(), notes.clone(), message.clone());
     let (list, row_notes, row_message) = (notes.clone(), notes.clone(), message.clone());
     let who = user.get_untracked().unwrap_or_default();
@@ -241,30 +245,25 @@ fn notes_list(
                 }),
         )
         .child(
-            form()
-                .attr("id", "note-form")
-                .on_submit(move || {
-                    let text = draft.get_untracked();
-                    let (notes, message, draft) =
-                        (add_notes.clone(), add_message.clone(), draft.clone());
-                    spawn(async move {
-                        match create_note(text).await {
-                            Ok(note) => {
+            note_form
+                .element({
+                    let text = text.clone();
+                    move |form| {
+                        form.set_submitting(true);
+                        let (form, notes, text) = (form.clone(), add_notes.clone(), text.clone());
+                        let value = text.value_untracked();
+                        spawn(async move {
+                            if let Some(note) = form.finish(create_note(value).await) {
                                 notes.update(|list| list.push(note));
-                                message.set(String::new());
-                                draft.set(String::new());
+                                text.reset("");
                             }
-                            Err(e) => message.set(e.message().to_string()),
-                        }
-                    });
+                        });
+                    }
                 })
-                .child(
-                    input()
-                        .attr("id", "note-text")
-                        .attr("placeholder", "a note")
-                        .attr_fn("value", move || draft_value.get())
-                        .on_input(move |v| draft_input.set(v.to_string())),
-                )
+                .attr("id", "note-form")
+                .child(text.input().attr("placeholder", "a note"))
+                .child(text.error_view())
+                .child(note_form.error_view())
                 .child(button().attr("type", "submit").text("Add")),
         )
         .child(p().text("Activity"))

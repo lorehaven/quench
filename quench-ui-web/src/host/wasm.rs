@@ -40,6 +40,19 @@ unsafe extern "C" {
     fn q_root_has_content() -> u32;
     fn q_hydrate_begin();
     fn q_hydrate_end() -> u32;
+    fn q_prevent(h: u32, kind: u32, mode: u32);
+    fn q_set_style(
+        h: u32,
+        name_ptr: *const u8,
+        name_len: usize,
+        val_ptr: *const u8,
+        val_len: usize,
+    );
+    fn q_now() -> f64;
+    fn q_reduced_motion() -> u32;
+    fn q_focus(h: u32);
+    fn q_trap_focus(h: u32);
+    fn q_history(op: u32, ptr: *const u8, len: usize);
 }
 
 // SAFETY (all wrappers): the pointers come from live `&str`/`&[u8]` borrows that outlast the call,
@@ -140,4 +153,33 @@ pub fn sse_open(id: u32, url: &str, names: &str) {
 
 pub fn sse_close(id: u32) {
     unsafe { q_sse_close(id) }
+}
+
+pub fn prevent(h: u32, kind: u32, mode: u32) {
+    unsafe { q_prevent(h, kind, mode) }
+}
+
+pub fn focus(h: u32) {
+    unsafe { q_focus(h) }
+}
+
+pub fn trap_focus(h: u32) {
+    unsafe { q_trap_focus(h) }
+}
+
+/// `op`: 0 push, 1 replace, 2 back, 3 forward. `url` is used by push and replace.
+pub fn history(op: u32, url: &str) {
+    unsafe { q_history(op, url.as_ptr(), url.len()) }
+}
+
+pub fn set_style(h: u32, name: &str, value: &str) {
+    unsafe { q_set_style(h, name.as_ptr(), name.len(), value.as_ptr(), value.len()) }
+}
+
+pub fn now() -> f64 {
+    unsafe { q_now() }
+}
+
+pub fn prefers_reduced_motion() -> bool {
+    unsafe { q_reduced_motion() != 0 }
 }

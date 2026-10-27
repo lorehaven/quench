@@ -256,3 +256,18 @@ async fn the_app_endpoint_serves_pages_and_assets_and_404s_the_rest() {
         );
     }
 }
+
+#[quench_test::test]
+async fn a_stylesheet_can_be_limited_to_a_media_query() {
+    let page = Page::new("t", "x")
+        .stylesheet("/a.css")
+        .stylesheet_for("/dark.css", "(prefers-color-scheme: dark)\" onload=\"x");
+    let html = render_document(page, NONCE, "/s.js", "/a.wasm");
+    assert!(html.contains("<link rel=\"stylesheet\" href=\"/a.css\">"));
+    assert!(
+        html.contains(
+            "href=\"/dark.css\" media=\"(prefers-color-scheme: dark)&quot; onload=&quot;x\">"
+        ),
+        "{html}"
+    );
+}

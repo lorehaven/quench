@@ -73,6 +73,19 @@ The body is `{"kind":"not_found","message":"...","fields":[{"field","message"}]}
 
 `testing::StubGatehouse` is a gatehouse-compatible token service for development and tests (`/api/v1/auth/login`, `/refresh`, `/logout`, real signed tokens, rotating refresh tokens that work once, cookies set on login). It is what the notes example and the session tests run against; never put it in front of real users.
 
+`/favicon.ico` is answered with an empty, cacheable `204` unless a page is registered at that path, so a browser's first-visit request does not log a 404.
+
+## Development reload
+
+`Ui::dev_reload()` is for a server run by `quench dev` ([`quench-tool`](./quench-tool.md)): every page gets `<script src="/_quench/dev.js">`, and `/_quench/dev` is a server-sent events stream that never carries a message. The script reloads the page when the stream drops and the server answers again, so a rebuilt and restarted server shows up in the browser by itself. The policy already allows a script from this origin. Leave it off in production: it adds a request to every page.
+
+```rust
+let mut ui = Ui::new(wasm);
+if std::env::var_os("QUENCH_DEV").is_some() {
+    ui = ui.dev_reload();
+}
+```
+
 ## Server-sent events
 
 `quench-http` streams server-sent events (`Response::sse`), and `quench_ui_web::EventSource` reads them in the browser:
@@ -92,7 +105,7 @@ The browser reconnects by itself (and says so with `SseEvent::Reconnecting`), an
 
 ## A page
 
-`Page::new(title, view)` with `.lang(..)`, `.stylesheet(href)`, `.state(json)` and `.status(..)`. It renders to
+`Page::new(title, view)` with `.lang(..)`, `.stylesheet(href)`, `.stylesheet_for(href, media)` (for a theme per `prefers-color-scheme`), `.state(json)` and `.status(..)`. `Page::redirect(location)` is a `302` instead of a page, and `Page::routed(title, url, |router| view)` renders an app that routes: the router starts at `url`, and after rendering the response is a `302` if the routes redirected (a guard), a `404` if none matched, and the page otherwise, so the browser's router starts at the same place. It renders to
 
 ```html
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" ...>
@@ -121,13 +134,13 @@ The view is rendered with `quench_ui::render_to_string`: reactive text shows its
 
 - **Policy.** Each document gets `default-src 'self'; script-src 'self' 'nonce-N' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`, with `N` a fresh 128-bit random value per response (`new_nonce`), repeated on both `<script>` elements. `'wasm-unsafe-eval'` is what lets WebAssembly compile; it does not allow `eval`. There is no `'unsafe-inline'`, so an injected inline script is blocked (the browser test injects one and checks it does not run).
 - **Documents are never cached** (`no-store`), because they carry a nonce.
-- **No inline handlers or styles.** Views cannot produce `on*` attributes (`quench-ui` drops them) and `Page::stylesheet` links a file. `Element::style(..)` writes a `style` attribute, which this policy blocks: use classes and a stylesheet.
+- **No inline handlers or styles.** Views cannot produce `on*` attributes (`quench-ui` drops them) and `Page::stylesheet` links a file. `Element::style(..)` writes a `style` attribute, which this policy blocks: use classes and a stylesheet, or `Element::css(..)` (the style object) for values that depend on layout. Server-rendered markup does not carry `css` values; they are applied in the browser.
 - **Escaping** is done where the markup is made: text, attribute values, the title and language, and the state block each have tests with hostile input (`</script>`, `"` in attributes, U+2028).
 - Also sent: `x-content-type-options: nosniff`, `referrer-policy: same-origin`.
 
 ## `UiApp`
 
-An `Endpoint` that answers `/_quench/..` from the assets and exact paths from the pages registered with `.page(path, |request| Page)`; anything else is a 404. A page holds `Rc`s, so it is built and rendered inside one synchronous call. Pattern routes, a router and server functions come with later stages.
+An `Endpoint` that answers `/_quench/..` from the assets, `#[server]` functions, exact paths from the pages registered with `.page(path, |request| Page)` / `.page_for_user(..)`, and every path under a prefix from `.pages_under(prefix, ..)` / `.pages_under_for_user(..)` (the deep links of an app that routes in the browser: `/app`, `/app/users/7`; whole segments only, exact pages win); anything else is a 404. A page holds `Rc`s, so it is built and rendered inside one synchronous call.
 
 ## Testing
 

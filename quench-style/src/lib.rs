@@ -9,6 +9,7 @@
 //! on that target, so call them from the server or the build tool only.
 
 pub mod assets;
+pub mod components;
 pub mod css;
 pub mod desktop;
 pub mod ftl;

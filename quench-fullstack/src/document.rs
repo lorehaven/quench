@@ -6,7 +6,9 @@ use std::fmt::Write as _;
 use quench_http::prelude::Response;
 use quench_http::prelude::http::StatusCode;
 use quench_ui::html::escape_attr;
+use quench_ui::router::{MemoryHistory, Router};
 use quench_ui::{IntoView, View, render_to_string};
+use std::rc::Rc;
 
 /// The id of the element the app is mounted into, and that the server renders its view inside.
 pub const ROOT_ID: &str = "app";
@@ -18,10 +20,12 @@ pub const STATE_ID: &str = "__q_state";
 pub struct Page {
     pub(crate) title: String,
     pub(crate) lang: String,
-    pub(crate) stylesheets: Vec<String>,
+    pub(crate) stylesheets: Vec<(String, Option<String>)>,
     pub(crate) view: View,
     pub(crate) state: Option<String>,
     pub(crate) status: StatusCode,
+    pub(crate) redirect: Option<String>,
+    pub(crate) routed: Option<(Router, String)>,
 }
 
 impl std::fmt::Debug for Page {
@@ -44,7 +48,30 @@ impl Page {
             view: view.into_view(),
             state: None,
             status: StatusCode::OK,
+            redirect: None,
+            routed: None,
         }
+    }
+
+    /// A page that is not rendered: the browser is sent to `location` (a `302`).
+    #[must_use]
+    pub fn redirect(location: &str) -> Self {
+        let mut page = Self::new("", View::Empty);
+        page.redirect = Some(location.to_string());
+        page
+    }
+
+    /// A page whose view is a router's, rendered at `url` (the request's path and query).
+    ///
+    /// `build` gets the router and returns the app's view, with `Routes::view` inside. If the
+    /// routes redirect, a guard for instance, the response is a redirect; if none matches it is a
+    /// `404`. The browser's router starts at the same URL, so the page hydrates as it was rendered.
+    #[must_use]
+    pub fn routed(title: &str, url: &str, build: impl FnOnce(&Router) -> View) -> Self {
+        let router = Router::new(Rc::new(MemoryHistory::new(url)));
+        let mut page = Self::new(title, build(&router));
+        page.routed = Some((router, url.to_string()));
+        page
     }
 
     /// The document language (the `lang` attribute), `en` by default.
@@ -57,7 +84,16 @@ impl Page {
     /// Links a stylesheet from this origin. The policy allows no inline styles.
     #[must_use]
     pub fn stylesheet(mut self, href: &str) -> Self {
-        self.stylesheets.push(href.to_string());
+        self.stylesheets.push((href.to_string(), None));
+        self
+    }
+
+    /// As [`Page::stylesheet`], applied only where the media query matches (`(prefers-color-scheme:
+    /// dark)`).
+    #[must_use]
+    pub fn stylesheet_for(mut self, href: &str, media: &str) -> Self {
+        self.stylesheets
+            .push((href.to_string(), Some(media.to_string())));
         self
     }
 
@@ -133,10 +169,13 @@ pub fn render_document(page: Page, nonce: &str, script: &str, wasm: &str) -> Str
         "<title>{}</title>",
         quench_ui::html::escape_text(&title)
     );
-    for href in &stylesheets {
+    for (href, media) in &stylesheets {
+        let media = media
+            .as_ref()
+            .map_or_else(String::new, |m| format!(" media=\"{}\"", escape_attr(m)));
         let _ = write!(
             html,
-            "<link rel=\"stylesheet\" href=\"{}\">",
+            "<link rel=\"stylesheet\" href=\"{}\"{media}>",
             escape_attr(href)
         );
     }

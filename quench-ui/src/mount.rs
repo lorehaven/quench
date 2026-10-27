@@ -13,7 +13,7 @@ use crate::event::{Event, EventKind};
 use crate::html::{is_valid_attr_name, is_void, sanitize_attr_value};
 use crate::reactive::{Scope, batch, create_effect, untrack};
 use crate::renderer::Renderer;
-use crate::view::{Attr, Class, Element, IntoView, Key, KeyedItem, View};
+use crate::view::{Attr, Class, Element, Focus, IntoView, Key, KeyedItem, View};
 
 /// The nodes a view built, as far as removing them is concerned.
 enum Part<N> {
@@ -235,8 +235,42 @@ fn build_element<R: Renderer>(
         r.set_attr(&node, "style", &style.join("; "));
     }
 
+    for (property, value) in el.css {
+        if !property
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-')
+        {
+            continue;
+        }
+        let (r2, node2) = (Rc::clone(r), node.clone());
+        create_effect(move || r2.set_style(&node2, &property, &value()));
+    }
+
     for (kind, handler) in el.handlers {
         r.listen(&node, kind, wrap_handler(kind, handler));
+    }
+    for (kind, how) in el.prevent {
+        r.prevent_default(&node, kind, how);
+    }
+    for when in el.focus_if {
+        let (r2, node2) = (Rc::clone(r), node.clone());
+        let was = std::cell::Cell::new(false);
+        create_effect(move || {
+            let now = when();
+            if now && !was.replace(true) {
+                r2.focus(&node2);
+            } else if !now {
+                was.set(false);
+            }
+        });
+    }
+    match el.focus {
+        Focus::Leave => {}
+        Focus::Take => r.focus(&node),
+        Focus::Trap => {
+            r.trap_focus(&node);
+            r.focus(&node);
+        }
     }
 
     let children: Vec<Part<R::Node>> = if is_void(&el.tag) {

@@ -40,6 +40,7 @@ packages = [
     "quench-test-bdd-macros",
     "quench-test-macros",
     "quench-tls",
+    "quench-tool",
     "quench-tz",
     "quench-ui",
     "quench-ui-web",

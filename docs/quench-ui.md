@@ -53,9 +53,51 @@ The graph is push-dirty, pull-check. Writing a signal marks its observers dirty 
 
 Events are typed (`Event`, `EventKind`, `KeyEvent`, `PointerEvent`): `on_click`, `on_input(|value| ..)`, `on_change`, `on_submit`, `on_keydown`, or `on(kind, |event| ..)`.
 
+## Router
+
+`quench_ui::router` routes URLs to views, in the browser, in a test and on the server alike.
+
+```rust
+let router = Router::new(Rc::new(BrowserHistory::new()));   // or MemoryHistory::new("/users/7")
+Routes::new()
+    .layout(layout("/app", |ctx, inner| shell(ctx, inner))          // stays mounted across children
+        .route("", |_| home())                                      // "" is the index
+        .route("users/:id", |ctx| user(ctx))                        // ctx.param("id")
+        .guarded_route("admin", |v| if signed_in() { Guard::Allow } else { Guard::Redirect("/app/login".into()) }, |_| admin())
+        .layout(layout("settings", ..).route("profile", ..).route("about", ..)))
+    .not_found(|_| not_found())
+    .view(&router)
+```
+
+Patterns are literal segments, `:name` (one segment) and `*rest` (everything left); earlier routes win; a trailing slash does not matter; segments are percent-decoded. A layout receives the view of whichever child matched and is not rebuilt while navigation moves between its children; `ctx.param(..)` is reactive, so moving between `/users/1` and `/users/2` patches the page instead of rebuilding it. `link(href)` renders an `<a>` that navigates without a page load on a plain click (ctrl-click and the like still open a tab) and carries `aria-current="page"` on the current path. Guards run for the whole chain, outermost first, and read signals, so signing out redirects at once; `Guard::Redirect` replaces the history entry (a loop is cut after 8 hops and ends in not-found), `Guard::Deny` shows `.forbidden(..)`. Routes are built when mounted (`View::lazy`), so build the router inside a component or `run`.
+
+`Router::on_back(handler)` registers a handler for the back action (an Android back button, a sheet that wants to close); `handle_back()` runs them newest first, then goes back in history, and returns false when the host should leave the app. `Router::is_not_found()` lets a server answer 404.
+
+## Forms
+
+`quench_ui::form`: a `Field` holds a value, an error and whether the user has been through it; `field.input()` is an `<input>` bound to it (value, `id`/`name`, `aria-invalid`, `aria-describedby`), `field.error_view()` shows the error as `role="alert"`. Rules (`rules::required`, `min_len`, `max_len`, `check`, `date`, `time`) run on blur, then on every change. While an input method composes (`compositionstart` .. `compositionend`) typing does not change the value, and the host does not write the same value back into the input, so the caret and a half-typed syllable survive. A `Form` collects fields: `form.element(|f| ..)` is a `<form novalidate>` that checks every field when submitted and calls the handler only if all pass; `apply_errors(message, &[(field, message)])` shows a server's verdict, and `quench_fullstack::FormExt::finish(result)` does that for the `Result` of a server function.
+
+## Long lists
+
+`virtual_list(&items, row_height, key, render)` builds only the rows in view plus five each side, inside a spacer as tall as the whole list (set through the style object, see `Element::css`). Scrolling a little keeps the rows it keeps. The element needs a bounded height from your stylesheet (`.q-vlist` scrolls). Rows have one fixed height.
+
+## Platform services, gestures and animation
+
+`platform` holds what the UI needs from its host: a clock, one-shot timers and the reduced-motion preference. `quench-ui-web` installs the browser's; `ManualPlatform` is one a test advances by hand. `gesture::on_gesture(element, config, handler)` turns pointer events into `Tap`, `LongPress`, `DragStart`, `Drag{dx,dy}`, `DragEnd{.., vx, vy}`, `Swipe(direction)` and `Cancel`; `Recognizer` is the same state machine without an element. `Axis` sets `touch-action` through a class (a strict policy forbids inline styles). `anim::presence(visible, duration_ms, content)` keeps content in the page until its exit transition has played (`transitionend`, with a timer as fallback) and skips the waiting when reduced motion is preferred; style `.q-anim` and `.q-anim-in`.
+
+## Component kit
+
+`quench_ui::kit`: `app_bar`, `icon_button`, `bottom_nav`, `sheet`, `dialog`, `snackbar` and `toast`, `list` and `list_tile`/`tile`, `switch`, `checkbox`, `text_field`, `date_field`/`time_field` (the platform's pickers), `fab`, `chip`, `tabs`, `pull_to_refresh`, `swipe_action`. They are functions that return elements with `q-*` classes, styled by `quench_style::components`. Each has the ARIA roles of its pattern: modals are `role="dialog" aria-modal="true"`, trap focus and close on Escape and on the scrim; the switch is `role="switch"`; tabs have `tablist`/`tab`/`tabpanel` with a roving `tabindex` and arrow, Home and End keys; chips use `aria-pressed`; the snackbar is a polite live region. Touch targets are at least 48 px. Pull to refresh and swipe actions need a touch device to judge: the logic is tested with simulated pointer events, but how the browser shares a drag with scrolling (`touch-action`) has to be checked on the devices you ship to.
+
+## Translations
+
+`quench_ui::i18n`: `I18n::new(&[("en", include_str!("en.ftl")), ("pl", ..)], "en")`, then `i18n.tr("files", &[("n", 5.into())])` inside a view closure; `set_language` updates what read it. The Fluent subset covers messages, `{ $var }`, message references, literals, `NUMBER($n)` and selectors on plural categories or exact numbers. Plural rules are CLDR's for English and Polish (`one`, `few`, `many`, `other`: 1 plik, 2 pliki, 5 plików, 22 pliki, 1.5 pliku), French and Portuguese, the languages without plurals, and English for the rest. A missing id shows as itself and a language that lacks a message falls back to the first one given.
+
 ## Renderers
 
 `mount(&renderer, &parent, view)` builds a view into any `Renderer` (create element/text/anchor, set text and attributes, insert/remove, listen) and returns a `Mount`; `unmount()` removes the nodes and disposes every effect, and `leak()` keeps the view for good (an app that lives until the page closes). The mount keeps what it built inside each element, so a renderer whose node handles own resources (the DOM backend's listeners) holds them exactly as long as the element is attached. A dynamic or keyed region is delimited by an anchor node so it can rebuild in place. Nodes are created in **document order** (an element before its children, a region's content before the anchor that ends it), which is what lets a DOM backend hydrate server-rendered markup by walking it with a cursor; `TestRenderer::document_order()` lets a test assert it. `render_to_string` writes a second newline after `<pre>`/`<textarea>` text that starts with one, since the HTML parser drops the first.
+
+Beyond drawing, a renderer can `prevent_default(node, kind, how)` (a link's click, a key), `focus` and `trap_focus` a node, and `set_style` through the style object. `Element::css(property, || value)` is the reactive form: unlike `Element::style` it is not an inline `style` attribute, so it works under a policy without `'unsafe-inline'`. A listener can call `quench_ui::prevent_default()` to stop the browser's default action for the event it is handling.
 
 `TestRenderer` is an in-memory tree: `html()`, `text()`, `find_by_tag`, `find_by_attr`, `attr`, `fire(node, &event)`, an `ops()` log of every change (assert that a click causes one `SetText`), and `live_nodes()` / `live_listeners()` to catch leaks. `render_to_string(view)` builds a view and returns its HTML; regions appear as `<!---->` anchors.
 

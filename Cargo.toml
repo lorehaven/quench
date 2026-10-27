@@ -29,6 +29,7 @@ members = [
   "quench-tls",
   "quench-tz",
   "quench-ui",
+  "quench-tool",
   "quench-ui-web",
   "quench-fullstack",
   "quench-fullstack-macros",
@@ -86,6 +87,7 @@ quench-style = { path = "quench-style", registry = "ennor", version = "0.1.0" }
 quench-web = { path = "quench-web", registry = "ennor", version = "0.1.11" }
 quench-proto = { path = "quench-proto", registry = "ennor", version = "0.1.0", default-features = false }
 quench-tz = { path = "quench-tz", registry = "ennor", version = "0.1.0" }
+quench-tool = { path = "quench-tool", registry = "ennor", version = "0.1.0" }
 quench-ui = { path = "quench-ui", registry = "ennor", version = "0.1.0" }
 quench-ui-web = { path = "quench-ui-web", registry = "ennor", version = "0.1.0" }
 quench-fullstack = { path = "quench-fullstack", registry = "ennor", version = "0.1.0" }

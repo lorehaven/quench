@@ -10,6 +10,7 @@ use std::rc::Rc;
 
 use crate::event::{Event, EventKind, Handler, KeyEvent};
 use crate::html::is_valid_tag;
+use crate::renderer::Prevent;
 
 /// What identifies an item in a keyed list.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -102,6 +103,19 @@ impl View {
     #[must_use]
     pub fn dynamic(f: impl Fn() -> Self + 'static) -> Self {
         Self::Dynamic(Rc::new(f))
+    }
+
+    /// A view built when it is mounted rather than now, so that what it creates (signals that
+    /// need cleanup, effects, timers) belongs to the mount's scope. A component that is called
+    /// before `mount` and sets up effects should return its view through this.
+    #[must_use]
+    pub fn lazy(build: impl FnOnce() -> Self + 'static) -> Self {
+        let pending = std::cell::Cell::new(Some(build));
+        Self::dynamic(move || {
+            pending
+                .take()
+                .map_or(Self::Empty, |build| crate::reactive::untrack(build))
+        })
     }
 
     /// `view` while `when` is true, nothing otherwise.
@@ -226,8 +240,21 @@ pub struct Element {
     pub(crate) attrs: Vec<(String, Attr)>,
     pub(crate) classes: Vec<Class>,
     pub(crate) styles: Vec<(String, String)>,
+    pub(crate) css: Vec<(String, Rc<dyn Fn() -> String>)>,
     pub(crate) children: Vec<View>,
     pub(crate) handlers: Vec<(EventKind, Handler)>,
+    pub(crate) prevent: Vec<(EventKind, Prevent)>,
+    pub(crate) focus: Focus,
+    pub(crate) focus_if: Vec<Rc<dyn Fn() -> bool>>,
+}
+
+/// What an element does with keyboard focus when it is built.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) enum Focus {
+    #[default]
+    Leave,
+    Take,
+    Trap,
 }
 
 impl fmt::Debug for Element {
@@ -253,8 +280,12 @@ pub fn element(tag: &str) -> Element {
         attrs: Vec::new(),
         classes: Vec::new(),
         styles: Vec::new(),
+        css: Vec::new(),
         children: Vec::new(),
         handlers: Vec::new(),
+        prevent: Vec::new(),
+        focus: Focus::Leave,
+        focus_if: Vec::new(),
     }
 }
 
@@ -329,6 +360,16 @@ impl Element {
         self
     }
 
+    /// Sets a CSS property from a function of signals, through the style object. Unlike
+    /// [`Element::style`] it is not an inline `style` attribute, so a policy that forbids inline
+    /// styles (the one `quench-fullstack` sends) allows it. It is applied in the browser only: a
+    /// server render leaves the property out, so use it for what depends on layout.
+    #[must_use]
+    pub fn css(mut self, property: &str, value: impl Fn() -> String + 'static) -> Self {
+        self.css.push((property.to_string(), Rc::new(value)));
+        self
+    }
+
     /// Appends a child.
     #[must_use]
     pub fn child(mut self, child: impl IntoView) -> Self {
@@ -359,6 +400,46 @@ impl Element {
     #[must_use]
     pub fn on(mut self, kind: EventKind, handler: impl Fn(&Event) + 'static) -> Self {
         self.handlers.push((kind, Rc::new(handler)));
+        self
+    }
+
+    /// Stops the browser's default action for `kind` on this element (a form's own submit is always
+    /// stopped; this is for the rest, such as a `keydown` you handle yourself).
+    #[must_use]
+    pub fn prevent_default(mut self, kind: EventKind) -> Self {
+        self.prevent.push((kind, Prevent::Always));
+        self
+    }
+
+    /// Makes this element's `click` listener a navigation: it runs for a plain left click, whose
+    /// default (following the link) is stopped, and not for ctrl-, shift- or middle-clicks, which
+    /// the browser then handles itself (open in a new tab).
+    #[must_use]
+    pub fn intercept_click(mut self) -> Self {
+        self.prevent.push((EventKind::Click, Prevent::PlainClick));
+        self
+    }
+
+    /// Takes keyboard focus each time `when` becomes true (and when it is built, if it is true
+    /// then). For moving focus to a part of a widget the keyboard just selected.
+    #[must_use]
+    pub fn focus_if(mut self, when: impl Fn() -> bool + 'static) -> Self {
+        self.focus_if.push(Rc::new(when));
+        self
+    }
+
+    /// Takes keyboard focus when it is built.
+    #[must_use]
+    pub const fn focus_on_mount(mut self) -> Self {
+        self.focus = Focus::Take;
+        self
+    }
+
+    /// Takes keyboard focus when it is built and keeps it inside while it exists: Tab and Shift+Tab
+    /// cycle through its contents. For modal dialogs and sheets.
+    #[must_use]
+    pub const fn trap_focus(mut self) -> Self {
+        self.focus = Focus::Trap;
         self
     }
 

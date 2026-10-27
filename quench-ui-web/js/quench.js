@@ -5,7 +5,8 @@
 //   <script type="module" src="/quench.js?wasm=/app.wasm"></script>      (add &dev=0 or &dev=1 to force)
 
 const EVENTS = ["click", "dblclick", "input", "change", "keydown", "keyup", "submit", "focus", "blur",
-  "pointerdown", "pointerup", "pointermove"];
+  "pointerdown", "pointerup", "pointermove", "compositionstart", "compositionend", "scroll", "transitionend", "resize", "pointercancel"];
+const FOCUSABLE = "a[href],button,input,select,textarea,[tabindex]:not([tabindex='-1'])";
 const LEVELS = ["debug", "info", "warn", "error"];
 const FORM_PROPS = new Set(["value", "checked", "selected"]);
 
@@ -26,6 +27,8 @@ export async function start(url, options = {}) {
   const timers = new Map();
   const fetches = new Map();
   const sources = new Map(); // id -> EventSource
+  const prevents = new Map(); // "handle:type" -> 1 always, 2 a plain click only
+  const resizes = new Map();  // handle -> ResizeObserver
 
   // --- memory ---------------------------------------------------------------------------------
   // The memory may grow during any call into Rust, so a view is never kept.
@@ -50,8 +53,8 @@ export async function start(url, options = {}) {
       if (dev) overlay(`The app stopped: ${error}`);
     }
   };
-  const deliver = (args) => call(() => ex.q_dispatch_event(...args));
-  const dispatch = (...args) => (busy > 0 ? queued.push(args) : deliver(args));
+  const deliver = (args) => { let prevent = 0; call(() => { prevent = ex.q_dispatch_event(...args); }); return prevent; };
+  const dispatch = (...args) => (busy > 0 ? queued.push(args) && 0 : deliver(args)); // 1: stop the default action
   /** Wraps an import: events raised inside it wait until it returns. */
   const guarded = (fn) => (...args) => {
     busy++;
@@ -84,6 +87,9 @@ export async function start(url, options = {}) {
     if (h < 2 || !nodes[h]) return;
     for (const [type, fn] of listeners.get(h) ?? []) nodes[h].removeEventListener(type, fn);
     listeners.delete(h);
+    resizes.get(h)?.disconnect();
+    resizes.delete(h);
+    for (const key of [...prevents.keys()]) if (key.startsWith(`${h}:`)) prevents.delete(key);
     nodes[h] = null;
     free.push(h);
   }
@@ -93,17 +99,29 @@ export async function start(url, options = {}) {
     const type = EVENTS[kind];
     if (!node || !type) return;
     const entry = listeners.get(h) ?? [];
-    if (entry.some(([t]) => t === type)) return;
+    if (entry.some(([t, , own]) => t === type && !own)) return;
+    if (type === "resize") { // an element has no resize event: observe it
+      const watch = new ResizeObserver(([e]) => dispatch(h, kind, ...put(new Uint8Array(0)), e.contentRect.width, e.contentRect.height, 0, 0));
+      watch.observe(node);
+      resizes.set(h, watch);
+      entry.push([type, null]);
+      listeners.set(h, entry);
+      return;
+    }
     const fn = (event) => {
       let payload = "", a = 0, b = 0, c = 0, flags = 0;
-      if (type === "submit") event.preventDefault(); // a form never reloads the page
-      else if (type === "input" || type === "change") payload = String(event.currentTarget.value ?? "");
+      const mode = prevents.get(`${h}:${type}`) ?? (type === "submit" ? 1 : 0); // a form never reloads the page
+      if (mode === 2 && (event.button !== 0 || event.ctrlKey || event.shiftKey || event.altKey || event.metaKey)) return;
+      if (mode) event.preventDefault();
+      if (type === "input" || type === "change") payload = String(event.currentTarget.value ?? "");
+      else if (type.startsWith("composition")) payload = String(event.currentTarget.value ?? event.data ?? "");
+      else if (type === "scroll") [a, b] = [event.currentTarget.scrollTop, event.currentTarget.scrollLeft];
       else if (type === "keydown" || type === "keyup") {
         payload = event.key;
         flags = (event.ctrlKey ? 1 : 0) | (event.shiftKey ? 2 : 0) | (event.altKey ? 4 : 0) | (event.metaKey ? 8 : 0);
       } else if (type.startsWith("pointer")) [a, b, c] = [event.clientX, event.clientY, event.pointerId];
       const [ptr, len] = put(encoder.encode(payload));
-      dispatch(h, kind, ptr, len, a, b, c, flags);
+      if (dispatch(h, kind, ptr, len, a, b, c, flags) === 1) event.preventDefault(); // a listener asked for it
     };
     node.addEventListener(type, fn);
     entry.push([type, fn]);
@@ -182,7 +200,8 @@ export async function start(url, options = {}) {
     if (hydrating && node.getAttribute(name) === value) return; // the server got it right
     if (hydrating && origin.get(h) === "claimed") bad(`${name}="${value}"`, node, node);
     node.setAttribute(name, value);
-    if (FORM_PROPS.has(name) && name in node) node[name] = name === "value" ? value : true;
+    // an input being composed or typed in already shows this value: setting it again would move the caret
+    if (FORM_PROPS.has(name) && name in node && !(name === "value" && node.value === value)) node[name] = name === "value" ? value : true;
   };
   const removeAttr = (h, name) => {
     const node = get(h);
@@ -190,6 +209,42 @@ export async function start(url, options = {}) {
     node.removeAttribute(name);
     if (FORM_PROPS.has(name) && name in node) node[name] = name === "value" ? "" : false;
   };
+
+  // --- focus and history ----------------------------------------------------------------------
+  const focusNode = (h) => queueMicrotask(() => get(h)?.focus?.()); // after the node is attached
+  function trap(h) {
+    const node = get(h);
+    if (node?.nodeType !== 1) return;
+    const fn = (event) => {
+      if (event.key !== "Tab") return;
+      const items = [...node.querySelectorAll(FOCUSABLE)].filter((e) => !e.disabled && e.getClientRects().length > 0);
+      const [first, last] = [items[0], items[items.length - 1]];
+      const at = document.activeElement;
+      if (!first) event.preventDefault();
+      else if (event.shiftKey && (at === first || !node.contains(at))) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && (at === last || !node.contains(at))) { event.preventDefault(); first.focus(); }
+    };
+    node.addEventListener("keydown", fn);
+    const entry = listeners.get(h) ?? [];
+    entry.push(["keydown", fn, true]);
+    listeners.set(h, entry);
+  }
+  const here = () => location.pathname + location.search + location.hash;
+  history.scrollRestoration = "manual"; // the page's scroll is saved in each entry and put back on back/forward
+  const saveScroll = () => history.replaceState({ ...history.state, scroll: [scrollX, scrollY] }, "");
+  function go(op, url) {
+    if (op === 0) { saveScroll(); history.pushState({}, "", url); scrollTo(0, 0); }
+    else if (op === 1) history.replaceState({ ...history.state }, "", url);
+    else if (op === 2) history.back();
+    else history.forward();
+  }
+  addEventListener("popstate", (event) => {
+    call(() => ex.q_popstate(...put(encoder.encode(here()))));
+    const [x, y] = event.state?.scroll ?? [0, 0];
+    scrollTo(x, y);
+  });
+  addEventListener("scrollend", saveScroll);
+  addEventListener("pagehide", saveScroll);
 
   // --- timers and fetch -----------------------------------------------------------------------
   const finish = (id, status, body, headers) => {
@@ -227,6 +282,17 @@ export async function start(url, options = {}) {
       if (node && node.parentNode === get(parent)) node.remove();
     }),
     q_listen: guarded(listen),
+    q_set_style: guarded((h, np, nl, vp, vl) => {
+      const value = text(vp, vl);
+      if (value === "") get(h)?.style?.removeProperty(text(np, nl));
+      else get(h)?.style?.setProperty(text(np, nl), value); // the style object, which a strict CSP allows
+    }),
+    q_now: () => performance.now(),
+    q_reduced_motion: () => (matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0),
+    q_prevent: guarded((h, kind, mode) => prevents.set(`${h}:${EVENTS[kind]}`, mode)),
+    q_focus: guarded(focusNode),
+    q_trap_focus: guarded(trap),
+    q_history: guarded((op, p, n) => go(op, text(p, n))),
     q_release: guarded(release),
     q_log: guarded((level, p, n) => {
       const message = text(p, n);
@@ -283,6 +349,7 @@ export async function start(url, options = {}) {
   ex = result.instance.exports;
   performance.mark("quench:instantiated");
   const state = document.getElementById("__q_state"); // JSON the server embedded for the app
+  call(() => ex.q_set_location(...put(encoder.encode(here()))));
   if (state) call(() => ex.q_set_state(...put(encoder.encode(state.textContent))));
   call(() => ex.q_main?.());
   performance.mark("quench:ready");

@@ -7,6 +7,10 @@ mod async_tests;
 mod dom_tests;
 #[path = "unit/ffi_tests.rs"]
 mod ffi_tests;
+#[path = "unit/platform_tests.rs"]
+mod platform_tests;
+#[path = "unit/router_tests.rs"]
+mod router_tests;
 #[path = "unit/sse_tests.rs"]
 mod sse_tests;
 

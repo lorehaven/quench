@@ -1,0 +1,2 @@
+[registries.{{ registry }}]
+index = "{{ index }}"

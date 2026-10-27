@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use quench_core::async_trait;
+use quench_http::prelude::http::StatusCode;
 use quench_http::prelude::{Endpoint, FromRequest, Request, Response};
 
 use crate::assets::{Assets, PREFIX};
@@ -15,6 +16,7 @@ pub struct Ui {
     assets: Assets,
     script: String,
     wasm: String,
+    dev: bool,
 }
 
 impl Ui {
@@ -37,7 +39,17 @@ impl Ui {
             assets,
             script,
             wasm,
+            dev: false,
         }
+    }
+
+    /// Development mode, the way `quench dev` runs a server: every page carries a script that holds
+    /// a server-sent events stream open (`/_quench/dev`) and reloads the page when the server comes
+    /// back after a restart. Not for production: it adds a request to every page.
+    #[must_use]
+    pub const fn dev_reload(mut self) -> Self {
+        self.dev = true;
+        self
     }
 
     /// Serves another file under the hashed prefix, such as a stylesheet, and returns its path.
@@ -70,11 +82,34 @@ impl Ui {
     /// Renders `page` with a chosen nonce. For tests; use [`Ui::render`] otherwise, since a nonce
     /// that repeats protects nothing.
     #[must_use]
-    pub fn render_with_nonce(&self, page: Page, nonce: &str) -> Response {
-        let status = page.status;
-        let html = render_document(page, nonce, &self.script, &self.wasm);
+    pub fn render_with_nonce(&self, mut page: Page, nonce: &str) -> Response {
+        if let Some(to) = page.redirect.take() {
+            return redirect(&to);
+        }
+        let mut status = page.status;
+        let routed = page.routed.take();
+        let mut html = render_document(page, nonce, &self.script, &self.wasm);
+        if self.dev {
+            html = crate::dev::add_script(html);
+        }
+        // Rendering ran the routes, so only now is it known where the router ended up.
+        if let Some((router, asked)) = routed {
+            let landed = router.location().url();
+            if landed != asked {
+                return redirect(&landed);
+            }
+            if router.is_not_found() {
+                status = StatusCode::NOT_FOUND;
+            }
+        }
         document_response(status, html, nonce)
     }
+}
+
+fn redirect(to: &str) -> Response {
+    Response::new(StatusCode::FOUND)
+        .header("location", to)
+        .header("cache-control", "no-store")
 }
 
 type PageFn = Box<dyn Fn(&Request) -> Page + Send + Sync>;
@@ -89,6 +124,7 @@ enum PageKind {
 pub struct UiApp {
     ui: Arc<Ui>,
     pages: Vec<(String, PageKind)>,
+    prefixes: Vec<(String, PageKind)>,
     functions: Vec<(&'static str, Arc<dyn Endpoint>)>,
 }
 
@@ -117,6 +153,7 @@ impl UiApp {
         Self {
             ui: Arc::new(ui),
             pages: Vec::new(),
+            prefixes: Vec::new(),
             functions: crate::server::functions(),
         }
     }
@@ -149,6 +186,36 @@ impl UiApp {
         self
     }
 
+    /// As [`UiApp::page`], for `prefix` and everything under it (`/app`, `/app/users/7`): the
+    /// deep links of an app that routes in the browser. `render` reads the path from the request
+    /// and usually builds the page with [`Page::routed`].
+    #[must_use]
+    pub fn pages_under(
+        mut self,
+        prefix: &str,
+        render: impl Fn(&Request) -> Page + Send + Sync + 'static,
+    ) -> Self {
+        self.prefixes.push((
+            prefix.trim_end_matches('/').to_string(),
+            PageKind::Plain(Box::new(render)),
+        ));
+        self
+    }
+
+    /// As [`UiApp::pages_under`], for pages that depend on the signed-in user.
+    #[must_use]
+    pub fn pages_under_for_user(
+        mut self,
+        prefix: &str,
+        render: impl Fn(&Request, Option<User>) -> Page + Send + Sync + 'static,
+    ) -> Self {
+        self.prefixes.push((
+            prefix.trim_end_matches('/').to_string(),
+            PageKind::ForUser(Box::new(render)),
+        ));
+        self
+    }
+
     #[must_use]
     pub fn ui(&self) -> &Ui {
         &self.ui
@@ -159,6 +226,11 @@ impl UiApp {
 impl Endpoint for UiApp {
     async fn call(&self, mut req: Request) -> Response {
         let path = req.uri().path();
+        if self.ui.dev
+            && let Some(response) = crate::dev::serve(path)
+        {
+            return response;
+        }
         if path.starts_with(PREFIX) {
             return self
                 .ui
@@ -173,7 +245,21 @@ impl Endpoint for UiApp {
         if let Some((_, endpoint)) = self.functions.iter().find(|(p, _)| *p == path) {
             return endpoint.call(req).await;
         }
-        let Some((_, kind)) = self.pages.iter().find(|(p, _)| p == path) else {
+        let under = |prefix: &String| {
+            path.strip_prefix(prefix.as_str())
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+        };
+        let Some((_, kind)) = self
+            .pages
+            .iter()
+            .find(|(p, _)| p == path)
+            .or_else(|| self.prefixes.iter().find(|(p, _)| under(p)))
+        else {
+            // Browsers ask for this on every first visit; an app without an icon says so quietly.
+            if path == "/favicon.ico" {
+                return Response::new(StatusCode::NO_CONTENT)
+                    .header("cache-control", "public, max-age=86400");
+            }
             return Response::not_found();
         };
         // Who is asking is settled first: a page holds `Rc`s, so it is built and rendered with no

@@ -23,6 +23,7 @@ quench-fullstack = { workspace = true }
 quench-http = { workspace = true }
 quench-proto = { workspace = true }
 quench-serde = { workspace = true }
+quench-style = { workspace = true }
 tokio = { workspace = true }
 
 [lints]
