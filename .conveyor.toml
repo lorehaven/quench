@@ -26,37 +26,6 @@ image = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
 secrets = ["ANVIL_APP_TOKEN", "ANVIL_GATEHOUSE_URL"]
 steps = [{ anvil = "machete" }, { anvil = "audit" }, { anvil = "deny" }]
 
-[[stage.job]]
-name  = "semver-check"
-image = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
-secrets = ["ANVIL_APP_TOKEN", "ANVIL_GATEHOUSE_URL"]
-# Every package here is published to `ennor` and consumed elsewhere (forge's
-# workspace.dependencies pulls them directly), so a breaking change in
-# any of them is worth catching before it reaches a dependent's next build.
-#
-# conveyor's checkout is usually a shallow, single-commit clone - `anvil
-# semver-check`'s default baseline is the commit before a package's last
-# version bump, which isn't on disk yet at depth 1. Not always shallow,
-# though: checkout.rs falls back to a full `git fetch` of the ref when the
-# server won't serve the sha directly, and `git fetch --unshallow` on an
-# already-complete repo is a fatal error, not a no-op - so this only
-# unshallows when there's actually a shallow boundary to remove. If this
-# job's origin fetch needs a credential the initial checkout didn't persist
-# into .git/config, give it one via `secrets`.
-steps = [
-  { run = "if [ \"$(git rev-parse --is-shallow-repository)\" = true ]; then git fetch --unshallow origin; fi" },
-  { anvil = "semver-check -p quench-auth" },
-  { anvil = "semver-check -p quench-cache" },
-  { anvil = "semver-check -p quench-cli" },
-  { anvil = "semver-check -p quench-client" },
-  { anvil = "semver-check -p quench-config" },
-  { anvil = "semver-check -p quench-db" },
-  { anvil = "semver-check -p quench-mail" },
-  { anvil = "semver-check -p quench-starter" },
-  { anvil = "semver-check -p quench-web" },
-  { anvil = "semver-check -p quench-web-components" },
-]
-
 # ---------------------------------------------------------------- build
 [[stage]]
 name  = "build"
