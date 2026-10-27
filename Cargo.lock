@@ -312,7 +312,7 @@ dependencies = [
 
 [[package]]
 name = "quench-fullstack"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "quench-archive",
  "quench-auth",
@@ -603,7 +603,7 @@ dependencies = [
 
 [[package]]
 name = "quench-ui-web"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "quench-test",
  "quench-ui",
