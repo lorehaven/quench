@@ -1,0 +1,33 @@
+:root {
+    --bs-warning: #ffc107;
+    --bs-success-500: #198754;
+    --bs-success-600: #157347;
+    --bs-success-700: #146c43;
+    --bs-success-800: #0f5132;
+    --bs-success-900: #0a3622;
+    --bs-danger: #dc3545;
+    --bs-code-bg: #343a40;
+    --bs-gray-50: #0f1114;
+    --bs-gray-100: #161a1d;
+    --bs-gray-200: #1f252b;
+    --bs-gray-300: #2b3035;
+    --bs-gray-400: #343a40;
+    --bs-gray-500: #495057;
+    --bs-gray-600: #6c757d;
+    --bs-gray-700: #adb5bd;
+    --bs-gray-800: #ced4da;
+    --bs-gray-900: #dee2e6;
+    --bs-gray-950: #f8f9fa;
+}
+
+.color-green {
+    color: var(--bs-success-700);
+}
+
+.color-yellow {
+    color: var(--bs-warning);
+}
+
+.color-red {
+    color: var(--bs-danger);
+}

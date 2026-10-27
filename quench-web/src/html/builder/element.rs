@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 #[derive(Clone, Debug)]
 pub struct Element {
     tag: String,
-    attributes: HashMap<String, String>,
+    attributes: BTreeMap<String, String>,
     children: Vec<Self>,
     text_content: Option<String>,
     onclick: Option<String>,
@@ -20,7 +20,7 @@ impl Element {
     pub(crate) fn new(tag: impl ToString) -> Self {
         Self {
             tag: tag.to_string(),
-            attributes: HashMap::new(),
+            attributes: BTreeMap::new(),
             children: Vec::new(),
             text_content: None,
             onclick: None,
