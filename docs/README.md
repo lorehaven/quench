@@ -26,6 +26,7 @@ docs/
 ├── quench-mail.md
 ├── quench-starter.md
 ├── quench-style.md
+├── quench-ui.md
 ├── quench-web.md
 ├── quench-web-components.md
 └── examples/                 # examples/* runnable references
@@ -60,6 +61,7 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench Regex](./quench-regex.md) — regular expressions with Unicode classes, no dependencies
 - [Quench Style](./quench-style.md) — shared design tokens, themes, base CSS and i18n for web, mobile and desktop
 - [Quench TZ](./quench-tz.md) — IANA time zones with the database built in
+- [Quench UI](./quench-ui.md) — UI core: signals, views, events and the renderer interface
 - [Quench PG](./quench-pg.md) — PostgreSQL wire-protocol client with SCRAM, TLS, pool
 - [Quench Redis](./quench-redis.md) — Redis client: RESP2/3, pool, cluster routing
 - [Quench Cache](./quench-cache.md) — shared in-process/Redis caching layer
@@ -156,6 +158,7 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ├── quench-qr/              # QR code encoder
 ├── quench-tls/             # rustls glue and trust stores
 ├── quench-style/           # shared tokens, themes, base CSS, i18n
+├── quench-ui/              # UI core: signals, views, events, renderer interface
 ├── quench-web/             # server-rendered HTML/CSS/JS page builder
 ├── quench-web-components/  # UI components built on quench-web
 ├── examples/               # runnable references: basic, db_example, http_demo, forge_service_demo

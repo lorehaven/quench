@@ -36,6 +36,7 @@ See [docs/](./docs/) for per-crate reference.
 - [Quench Regex](./docs/quench-regex.md) — regular expressions with Unicode classes, no dependencies
 - [Quench Style](./docs/quench-style.md) — shared design tokens, themes, base CSS and i18n for web, mobile and desktop
 - [Quench TZ](./docs/quench-tz.md) — IANA time zones with the database built in
+- [Quench UI](./docs/quench-ui.md) — UI core: signals, views, events and the renderer interface
 - [Quench TLS](./docs/quench-tls.md) — async glue between tokio streams and rustls, with shared trust-store helpers
 - [Quench Log](./docs/quench-log.md) — leveled events, spans, console and rolling-file output
 - [Quench Log Macros](./docs/quench-log-macros.md) — `#[instrument]` for Quench Log

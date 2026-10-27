@@ -42,6 +42,7 @@ packages = [
     "quench-tls",
     "quench-tz",
     "quench-style",
+    "quench-ui",
     "quench-web",
     "quench-web-components",
 ]

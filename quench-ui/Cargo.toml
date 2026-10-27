@@ -1,0 +1,31 @@
+[package]
+name = "quench-ui"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - platform-independent UI core: fine-grained signals, a view tree, renderers and events"
+keywords = ["ui", "reactive", "signals", "wasm"]
+categories = ["gui", "wasm"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+autotests = false
+
+[lib]
+name = "quench_ui"
+path = "src/lib.rs"
+harness = false
+
+[dependencies]
+
+[lints]
+workspace = true
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false
+
+[dev-dependencies]
+quench-test = { workspace = true }
