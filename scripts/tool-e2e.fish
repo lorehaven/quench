@@ -2,6 +2,7 @@
 # Stage 8 acceptance, from the command line only: a new project goes from `quench new` to a release
 # binary that serves the app from an empty directory.
 #   scripts/tool-e2e.fish            # needs node and chromium (for `quench test --browser`)
+#   QUENCH_E2E_REGISTRY=1 scripts/tool-e2e.fish   # the project depends on the released crates, not this checkout
 set -l root (path resolve (status dirname)/..)
 set -l work (mktemp -d)
 set -l port 3131
@@ -13,7 +14,11 @@ set -l quench $root/target/debug/quench
 set -lx CARGO_TARGET_DIR $root/target/e2e
 
 cd $work
-$quench new demo --quench-path $root; or exit 1
+if set -q QUENCH_E2E_REGISTRY
+    $quench new demo; or exit 1
+else
+    $quench new demo --quench-path $root; or exit 1
+end
 cd demo
 $quench test --browser; or exit 1
 $quench build --release; or exit 1
