@@ -112,11 +112,13 @@ fn run_reports_through_the_exit_code() {
 }
 
 #[quench_test::test]
-fn a_free_port_can_be_bound_and_a_listening_one_is_waited_for() {
-    let port = Host.free_port();
-    assert!(port > 0);
-    assert!(!Host.wait_port(port, 200), "nothing listens yet");
-    let listener = std::net::TcpListener::bind(("127.0.0.1", port)).unwrap();
+fn a_free_port_is_found_and_a_listening_one_is_waited_for() {
+    assert!(Host.free_port() > 0);
+    // Port 0 is never connectable, so this is a timeout whatever else runs on the machine. (Probing
+    // a port that was merely free a moment ago can connect a socket to itself and hold the port.)
+    assert!(!Host.wait_port(0, 150));
+    let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let port = listener.local_addr().unwrap().port();
     assert!(Host.wait_port(port, 2000));
     drop(listener);
 }
