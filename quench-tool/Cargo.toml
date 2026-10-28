@@ -1,6 +1,6 @@
 [package]
 name = "quench-tool"
-version = "0.1.1"
+version = "0.1.2"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - the `quench` command: new projects, a dev loop with live reload, release builds, doctor and tests for quench-ui apps"
