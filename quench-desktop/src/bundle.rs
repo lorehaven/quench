@@ -5,7 +5,7 @@
 //! gets `index.html`; a path with an extension that is not in the bundle is a `404`; a path that climbs
 //! (`..`) or hides a separator is a `404`.
 
-use crate::ffi::Answer;
+use crate::answer::Answer;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::io;

@@ -14,7 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 {% if standalone %}{{ quench_desktop }}
-{% else %}quench-desktop = { workspace = true }
+{% else %}quench-desktop = { workspace = true, features = ["window"] }
 {% endif %}{% if standalone %}
 # Not part of any other workspace.
 [workspace]

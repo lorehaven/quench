@@ -40,7 +40,8 @@ fn init_joins_the_workspace_and_writes_the_host() {
         cargo.contains("name = \"my-app-desktop\"") && cargo.contains("version.workspace = true")
     );
     assert!(
-        cargo.contains("quench-desktop = { workspace = true }") && !cargo.contains("[workspace]")
+        cargo.contains("quench-desktop = { workspace = true, features = [\"window\"] }")
+            && !cargo.contains("[workspace]")
     );
     let main = read(&p, "desktop/src/main.rs");
     assert!(
@@ -71,7 +72,9 @@ fn init_makes_a_crate_of_its_own_when_there_is_no_workspace() {
     let cargo = read(&p, "desktop/Cargo.toml");
     assert!(
         cargo.contains("version = \"0.1.0\"")
-            && cargo.contains("quench-desktop = { path = \"/checkout/quench-desktop\" }"),
+            && cargo.contains(
+                "quench-desktop = { path = \"/checkout/quench-desktop\", features = [\"window\"] }"
+            ),
         "{cargo}"
     );
     assert!(
@@ -92,7 +95,11 @@ fn init_makes_a_crate_of_its_own_when_there_is_no_workspace() {
     // From the registry when no checkout is named.
     let q = project_named("linux-alone-registry", "gallery", "web");
     init(&mut Vec::new(), &q, None, None).unwrap();
-    assert!(read(&q, "desktop/Cargo.toml").contains("registry = \"ennor\""));
+    let registry = read(&q, "desktop/Cargo.toml");
+    assert!(
+        registry.contains("registry = \"ennor\"") && registry.contains("features = [\"window\"]"),
+        "{registry}"
+    );
 }
 
 #[quench_test::test]

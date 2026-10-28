@@ -1,4 +1,4 @@
-use quench_desktop::{App, Bundle, RunError, is_app_origin, opens_outside, origin_of};
+use quench_desktop::{is_app_origin, opens_outside, origin_of};
 
 #[quench_test::test]
 fn origins_are_scheme_host_and_port() {
@@ -49,20 +49,26 @@ fn links_for_the_system_are_web_and_mail() {
     }
 }
 
-#[quench_test::test]
-fn an_app_is_described_and_built_up() {
-    let app = App::new("Notes", Bundle::new().with("index.html", &b"x"[..]));
-    assert_eq!(
-        (app.title.as_str(), app.width, app.height),
-        ("Notes", 1000, 700)
-    );
-    assert!(!app.debug && app.dev_url.is_none() && app.plugins.is_empty());
-    let app = app.dev("http://127.0.0.1:3000");
-    assert!(app.debug);
-    assert_eq!(app.dev_url.as_deref(), Some("http://127.0.0.1:3000"));
-    assert!(format!("{app:?}").contains("Notes"));
-    assert_eq!(
-        RunError::NoDisplay.to_string(),
-        "there is no display to open a window on"
-    );
+/// What needs the window feature: describing an app does not open a window, but the type is part of it.
+#[cfg(feature = "window")]
+mod app {
+    use quench_desktop::{App, Bundle, RunError};
+
+    #[quench_test::test]
+    fn an_app_is_described_and_built_up() {
+        let app = App::new("Notes", Bundle::new().with("index.html", &b"x"[..]));
+        assert_eq!(
+            (app.title.as_str(), app.width, app.height),
+            ("Notes", 1000, 700)
+        );
+        assert!(!app.debug && app.dev_url.is_none() && app.plugins.is_empty());
+        let app = app.dev("http://127.0.0.1:3000");
+        assert!(app.debug);
+        assert_eq!(app.dev_url.as_deref(), Some("http://127.0.0.1:3000"));
+        assert!(format!("{app:?}").contains("Notes"));
+        assert_eq!(
+            RunError::NoDisplay.to_string(),
+            "there is no display to open a window on"
+        );
+    }
 }

@@ -79,6 +79,18 @@ impl Runner for Nothing {
     }
 }
 
+/// Waits until `fake` has run `n` programs (up to 10 s: a loaded machine is slow), then a little longer, so that one
+/// that should not have been run has the time to show.
+fn wait_for_runs(fake: &Fake, n: usize) {
+    for _ in 0..1000 {
+        if fake.ran.lock().unwrap().len() >= n {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    std::thread::sleep(Duration::from_millis(200));
+}
+
 struct Page {
     bridge: Bridge,
     messages: Arc<Mutex<Vec<Value>>>,
@@ -482,7 +494,7 @@ fn a_reminder_waits_fires_once_and_can_be_cancelled() {
         titles.contains(&"Later".to_string()) && !titles.contains(&"Cancelled".to_string()),
         "{titles:?}"
     );
-    std::thread::sleep(Duration::from_millis(300));
+    wait_for_runs(&fake, 1);
     let ran = fake.ran.lock().unwrap().clone();
     let said: Vec<_> = ran.iter().map(|r| r.1[4].clone()).collect();
     assert_eq!(
@@ -502,7 +514,7 @@ fn a_reminder_waits_fires_once_and_can_be_cancelled() {
         "schedule",
         &json!({ "id": 2, "at_ms": at(60), "title": "Replaced", "body": "b" }),
     );
-    std::thread::sleep(Duration::from_millis(300));
+    wait_for_runs(&fake, 2);
     let said: Vec<_> = fake
         .ran
         .lock()

@@ -10,6 +10,7 @@ mod bundle_tests;
 mod host_tests;
 #[path = "unit/plugin_tests.rs"]
 mod plugin_tests;
+#[cfg(feature = "window")]
 #[path = "unit/window_tests.rs"]
 mod window_tests;
 

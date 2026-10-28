@@ -11,6 +11,8 @@ quench build deb                 # dist/<name>_<version>_amd64.deb
 
 A machine needs `webkit2gtk-4.1` and `gtk3` (the libraries are linked by name, no headers or C compiler are involved); `quench doctor` checks for them and for the helper programs the plugins use.
 
+**The `window` feature.** Everything that needs GTK to link (the FFI, the window, the control socket) is behind the crate's `window` feature, which is **off by default**. Without it the crate is the bundle and its routing, the bridge, the plugins and the origin rules: it builds, tests and packages on a machine with no GTK (a CI image, `cargo package`), and nothing it produces links `gtk-3` or `webkit2gtk`. The generated `desktop/` crate depends on it with `features = ["window"]`, and so does anything else that wants a window. To work on the window itself: `cargo test -p quench-desktop --features window` (the window tests need a display and skip without one); `scripts/coverage.fish` uses `--all-features`, so it needs the libraries too. A project made with `quench linux init` therefore needs them for `cargo build --workspace` and `quench test`.
+
 ## How the window is built
 
 The host is `quench_desktop::run(App)`. An `App` is a title, a `Bundle` (the files of `dist/www`), plugins and, in a debug build, a dev-server URL. The generated `desktop/` crate embeds the bundle with its `build.rs` (one `include_bytes!` per file under `dist/www`, written into `OUT_DIR`), so the binary needs nothing next to it.

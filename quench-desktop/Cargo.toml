@@ -20,6 +20,10 @@ path = "src/lib.rs"
 quench-core = { workspace = true }
 quench-serde = { workspace = true }
 
+[features]
+# The window: GTK and webkit2gtk through `ffi`. Needs those libraries to link, so it is off unless asked for.
+window = []
+
 [lints]
 workspace = true
 
@@ -28,6 +32,7 @@ name = "quench-desktop-fixture"
 path = "tests/fixture/main.rs"
 test = false
 doc = false
+required-features = ["window"]
 
 [[test]]
 name = "unit"

@@ -85,7 +85,9 @@ pub fn init(
     let quench_desktop = dependency
         .lines()
         .find(|l| l.starts_with("quench-desktop = "))
-        .unwrap_or_default();
+        .unwrap_or_default()
+        // The window is off by default (it needs GTK to link); the host crate is the one that wants it.
+        .replacen(" }", ", features = [\"window\"] }", 1);
     let context = json!({
         "name": project.name, "title": title(project), "id": id,
         "standalone": standalone, "quench_desktop": quench_desktop,
