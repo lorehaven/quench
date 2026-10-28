@@ -875,8 +875,10 @@ fn an_input_method_composes_commits_and_deletes_around_the_caret() {
     let css = "body { margin: 0 } input { display: block; box-sizing: border-box; width: 200px; height: 30px; padding: 0 4px; border: 0; background: white; color: black; font-size: 16px }";
     let (r, _m) = live(css, view, 220, 40);
     assert!(r.ime_state().is_none(), "no field has focus");
+    assert!(!r.text_field_focused());
     r.pointer_down(190.0, 10.0);
     r.pointer_up(190.0, 10.0);
+    assert!(r.text_field_focused());
     let state = r.ime_state().unwrap();
     assert_eq!(
         (state.text.as_str(), state.cursor, state.anchor),

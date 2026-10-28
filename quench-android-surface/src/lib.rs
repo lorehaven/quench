@@ -445,7 +445,8 @@ impl<W: Write> Surface<W> {
         }
         if now >= self.blink_at {
             self.caret_on = !self.caret_on;
-            if self.renderer.focused().is_some() {
+            // Only a text field has a caret; redrawing for a focused button every blink would keep the CPU busy.
+            if self.renderer.text_field_focused() {
                 self.renderer.set_caret_visible(self.caret_on);
             }
             self.blink_at = now + BLINK;

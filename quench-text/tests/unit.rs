@@ -439,6 +439,8 @@ fn the_machines_fonts_are_indexed_by_coverage_and_loaded_when_needed() {
     )
     .unwrap();
     std::fs::write(dir.path().join("notes.txt"), "not a font").unwrap();
+    // Colour emoji cannot be drawn from outlines: not indexed, whatever they cover.
+    std::fs::write(dir.path().join("NotoColorEmoji.ttf"), REGULAR).unwrap();
     std::fs::write(dir.path().join("broken.ttf"), [0u8; 100]).unwrap();
     std::fs::write(dir.path().join("truncated.ttf"), &REGULAR[..200]).unwrap();
     let system =

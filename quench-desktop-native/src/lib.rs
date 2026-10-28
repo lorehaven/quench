@@ -149,7 +149,7 @@ impl Controller {
     pub fn timers(&mut self, now: Instant) {
         if now >= self.blink_at {
             self.caret_on = !self.caret_on;
-            if self.renderer.focused().is_some() {
+            if self.renderer.text_field_focused() {
                 self.renderer.set_caret_visible(self.caret_on);
             }
             self.blink_at = now + BLINK;

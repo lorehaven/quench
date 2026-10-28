@@ -16,6 +16,9 @@ fn default_directories() -> Vec<PathBuf> {
     let mut dirs = vec![
         PathBuf::from("/usr/share/fonts"),
         PathBuf::from("/usr/local/share/fonts"),
+        // Android keeps its fonts here (symbols, scripts); the app's own `HOME` is not where they are.
+        PathBuf::from("/system/fonts"),
+        PathBuf::from("/product/fonts"),
     ];
     if let Some(home) = std::env::var_os("HOME") {
         let home = PathBuf::from(home);
@@ -66,6 +69,11 @@ fn collect(dir: &Path, depth: usize, into: &mut Vec<PathBuf>) {
         } else if path
             .extension()
             .is_some_and(|e| e.eq_ignore_ascii_case("ttf"))
+            // Colour emoji are bitmaps, which cannot be drawn from outlines: they would answer for a character
+            // (a gear, say) and draw nothing, where a plain symbol font would draw it.
+            && !path
+                .file_name()
+                .is_some_and(|n| n.to_string_lossy().to_ascii_lowercase().contains("emoji"))
         {
             into.push(path);
         }

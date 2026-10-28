@@ -68,6 +68,13 @@ impl NativeRenderer {
         self.dom.borrow().ui.focused.map(crate::NodeId)
     }
 
+    /// Whether a text field has focus (a focused button has no caret to blink).
+    #[must_use]
+    pub fn text_field_focused(&self) -> bool {
+        let dom = self.dom.borrow();
+        dom.ui.focused.is_some_and(|f| is_text_field(&dom, f))
+    }
+
     /// The element under a point of the window (the deepest one a pointer would land on).
     #[must_use]
     pub fn element_at(&self, x: f32, y: f32) -> Option<crate::NodeId> {

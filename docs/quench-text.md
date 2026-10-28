@@ -37,7 +37,7 @@ fonts.draw(&mut canvas, &layout, 8.0, 8.0, Color::WHITE);
 
 ## System fonts
 
-`with_system_fonts()` (or `with_system_directories`) adds the fonts installed on the machine for characters none of the faces has: `/usr/share/fonts`, `/usr/local/share/fonts`, `~/.local/share/fonts` and `~/.fonts`, searched in that order and in name order within a directory. The directories are indexed once, lazily, by the code points each file's `cmap` covers (read from the file's table directory and `cmap` alone, never the whole font); a font is read in full only when it is the one that has a character that was asked for, and kept for the next one. A search that finds nothing is remembered too, so the directories are not walked again for the same character. Only `.ttf` files are read (a `.ttc` collection or a CFF `.otf` is skipped).
+`with_system_fonts()` (or `with_system_directories`) adds the fonts installed on the machine for characters none of the faces has: `/usr/share/fonts`, `/usr/local/share/fonts`, Android's `/system/fonts` and `/product/fonts`, `~/.local/share/fonts` and `~/.fonts`, searched in that order and in name order within a directory. The directories are indexed once, lazily, by the code points each file's `cmap` covers (read from the file's table directory and `cmap` alone, never the whole font); a font is read in full only when it is the one that has a character that was asked for, and kept for the next one. A search that finds nothing is remembered too, so the directories are not walked again for the same character. Only `.ttf` files are read, and not colour emoji fonts (their glyphs are bitmaps, so they would answer for a character and draw nothing) (a `.ttc` collection or a CFF `.otf` is skipped).
 
 ## Tested
 
