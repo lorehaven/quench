@@ -163,6 +163,7 @@ fn command(
             let project = Project::find(cwd)?;
             match cmd {
                 PluginCmd::Add { name } => plugins::add(out, &project, &name)?,
+                PluginCmd::Update { name } => plugins::update(out, &project, name.as_deref())?,
                 PluginCmd::List => plugins::list(out, &project)?,
             }
             Ok(0)

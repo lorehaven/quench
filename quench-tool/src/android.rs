@@ -148,8 +148,15 @@ pub fn build_native(
             if release {
                 args.push("--release");
             }
-            let cmd =
-                Cmd::new("cargo", &args, &project.root).env(&env_name, &linker.to_string_lossy());
+            // Crates that build C code (`ring`, for TLS) find the NDK's compiler and archiver by these names.
+            let underscored = target.replace('-', "_");
+            let cmd = Cmd::new("cargo", &args, &project.root)
+                .env(&env_name, &linker.to_string_lossy())
+                .env(&format!("CC_{underscored}"), &linker.to_string_lossy())
+                .env(
+                    &format!("AR_{underscored}"),
+                    &bin.join("llvm-ar").to_string_lossy(),
+                );
             crate::release::step(sys, out, &cmd)?;
             // The program the host starts. Android only extracts files named lib*.so from the APK, so it
             // is packaged under that name.

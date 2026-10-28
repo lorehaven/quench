@@ -1,7 +1,7 @@
 use super::support::*;
 use quench_tool::android::launcher;
 use quench_tool::cli::LauncherChoice;
-use quench_tool::plugins::{add, check, installed, list, names};
+use quench_tool::plugins::{add, check, installed, list, names, update};
 use quench_tool::project::Project;
 
 /// A project with the Android host made, so plugins can be added.
@@ -394,4 +394,32 @@ fn the_launcher_moves_between_the_web_app_and_the_native_renderer() {
     // No android/ at all.
     let none = project("plugins-launcher-none", "web");
     assert!(launcher(&mut Vec::new(), &none, LauncherChoice::Web).is_err());
+}
+
+#[quench_test::test]
+fn update_writes_the_hosts_kotlin_again_and_leaves_the_projects_own_files() {
+    let p = host("plugins-update");
+    add(&mut Vec::new(), &p, "surface").unwrap();
+    let kotlin = format!("{SRC}/QuenchSurfaceView.kt");
+    let mine = "surface/src/main.rs";
+    let original = read(&p, &kotlin);
+    // An old copy of the host code, and a program the user wrote.
+    std::fs::write(p.root.join(&kotlin), "package old // stale").unwrap();
+    std::fs::write(p.root.join(mine), "fn main() { /* mine */ }").unwrap();
+    let mut out = Vec::new();
+    update(&mut out, &p, Some("surface")).unwrap();
+    assert!(text(out).contains("updated") && read(&p, &kotlin) == original);
+    assert_eq!(read(&p, mine), "fn main() { /* mine */ }");
+    // Again: nothing to do. Without a name, every plugin the project has.
+    let mut out = Vec::new();
+    update(&mut out, &p, None).unwrap();
+    assert!(text(out).contains("up to date"));
+    // Plugins the project lacks, and plugins that do not exist, are errors.
+    assert!(
+        update(&mut Vec::new(), &p, Some("jobs"))
+            .unwrap_err()
+            .to_string()
+            .contains("plugin add jobs")
+    );
+    assert!(update(&mut Vec::new(), &p, Some("teleport")).is_err());
 }

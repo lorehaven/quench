@@ -50,7 +50,7 @@ Plugins are Kotlin classes the web app calls through typed Rust clients. The [co
 
 ## Plugins
 
-`quench plugin list` shows what there is and what the project has; `quench plugin add <name>` writes a plugin's Kotlin (and Rust) files, its manifest entries and its line in `plugins()`, and adds what it needs first. Adding is idempotent. The Rust clients are in `quench_ui_web::plugins` (typed, declared with `#[plugin]`); each method below takes and returns JSON by name, as the bridge does.
+`quench plugin list` shows what there is and what the project has; `quench plugin add <name>` writes a plugin's Kotlin (and Rust) files, its manifest entries and its line in `plugins()`, and adds what it needs first. Adding is idempotent. The Kotlin is copied into the project, so after upgrading the quench crates run **`quench plugin update [name]`**: it writes the host code of the plugins the project has (all, or one) again from this tool's templates, and leaves the project's own Rust, the manifest and the registry alone. (A Kotlin host older than the Rust program it talks to can misread it: the surface host crashed on a tree with a field it did not know.) `build-native` also gives crates that compile C (`ring`) the NDK's compiler and archiver (`CC_<target>`, `AR_<target>`). The Rust clients are in `quench_ui_web::plugins` (typed, declared with `#[plugin]`); each method below takes and returns JSON by name, as the bridge does.
 
 | Plugin | What it does | Needs |
 |---|---|---|

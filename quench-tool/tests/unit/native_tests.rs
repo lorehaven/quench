@@ -68,6 +68,18 @@ fn each_abi_is_built_with_the_ndk_linker_and_collected_for_gradle() {
         "{value}"
     );
     assert_eq!(ran[1].env[0].0, "CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER");
+    // The C compiler and archiver crates that build C code look for.
+    let names: Vec<&str> = ran[1].env.iter().map(|e| e.0.as_str()).collect();
+    assert!(
+        names.contains(&"CC_x86_64_linux_android") && names.contains(&"AR_x86_64_linux_android"),
+        "{names:?}"
+    );
+    let ar = ran[1]
+        .env
+        .iter()
+        .find(|e| e.0 == "AR_x86_64_linux_android")
+        .unwrap();
+    assert!(ar.1.ends_with("/bin/llvm-ar"), "{}", ar.1);
     for (abi, _) in ABIS {
         assert!(
             p.root

@@ -529,6 +529,72 @@ pub fn add(out: &mut dyn Write, project: &Project, name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Writes the host code of a plugin again from this tool's templates, for when the crates were upgraded and the
+/// Kotlin copied into the project at `plugin add` is older than the Rust side it talks to.
+///
+/// Only the Kotlin and resources under `android/app/src/main` are replaced; the project's own Rust (`surface/`,
+/// `native/`), the manifest and the registry of plugins are left as they are. `name` is one plugin, or all that
+/// the project has.
+///
+/// # Errors
+/// No plugin of that name, or one the project does not have, or a file that cannot be written.
+pub fn update(out: &mut dyn Write, project: &Project, name: Option<&str>) -> Result<()> {
+    let package = package_of(project)?;
+    let have = installed(project);
+    let chosen: Vec<&'static Plugin> = match name {
+        Some(n) => {
+            let p = find(n)?;
+            if !have.iter().any(|h| h == p.name) {
+                return Err(Error(format!(
+                    "this project does not have {n}: `quench plugin add {n}`"
+                )));
+            }
+            vec![p]
+        }
+        None => PLUGINS
+            .iter()
+            .filter(|p| have.iter().any(|h| h == p.name))
+            .collect(),
+    };
+    let context = json!({ "name": project.name, "snake": project.snake(), "package": package });
+    let package_path = package.replace('.', "/");
+    let mut changed = 0;
+    for p in chosen {
+        let mut env = Environment::new();
+        for (path, body) in p.files {
+            if !path.starts_with("android/app/src/main/") || path.ends_with("AndroidManifest.xml") {
+                continue;
+            }
+            let target = project
+                .root
+                .join(path.replace("@package_path@", &package_path));
+            let text = std::str::from_utf8(body).map_err(|e| Error(format!("{path}: {e}")))?;
+            env.add_template(path, text)
+                .map_err(|e| Error(format!("template {path}: {e}")))?;
+            let rendered = env
+                .render(path, &context)
+                .map_err(|e| Error(format!("template {path}: {e}")))?;
+            if std::fs::read_to_string(&target).ok().as_deref() == Some(rendered.as_str()) {
+                continue;
+            }
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&target, rendered)?;
+            writeln!(
+                out,
+                "updated {}",
+                path.replace("@package_path@", &package_path)
+            )?;
+            changed += 1;
+        }
+    }
+    if changed == 0 {
+        writeln!(out, "the plugins' host code is up to date")?;
+    }
+    Ok(())
+}
+
 /// Whether adding `name` brings in native code (the plugin is `native` or needs it).
 fn order_needs_native(name: &str) -> bool {
     find(name).is_ok_and(|p| p.name == "native" || p.needs.contains(&"native"))

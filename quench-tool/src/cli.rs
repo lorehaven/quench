@@ -218,6 +218,11 @@ pub enum PluginCmd {
         /// Its name; `quench plugin list` has them
         name: String,
     },
+    /// Write the host code of the project's plugins again from this tool's templates (after upgrading the crates)
+    Update {
+        /// One plugin (default: all the project has)
+        name: Option<String>,
+    },
     /// The plugins there are, and which this project has
     List,
 }
