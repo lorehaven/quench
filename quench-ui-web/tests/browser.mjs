@@ -356,7 +356,7 @@ try {
   check("the gallery hydrated without a mismatch", errors.filter((e) => e.includes("mismatch")).length === 0, JSON.stringify(errors));
   check("it is the English page", await ev(`${$("#gallery-title")}.textContent`) === "Gallery");
   const tab = (i) => ev(`document.querySelectorAll("[role=tab]")[${i}].click()`);
-  check("the tab bar has the right roles", await ev(`document.querySelectorAll("[role=tablist] [role=tab]").length`) === 5
+  check("the tab bar has the right roles", await ev(`document.querySelectorAll("[role=tablist] [role=tab]").length`) === 6
     && await ev(`document.querySelector("[role=tabpanel]").getAttribute("aria-labelledby")`) === "g-tab-0");
 
   await ev(`${$("#notifications")}.click()`);
@@ -386,7 +386,7 @@ try {
   check("the arrow key moves to the next tab and focuses it", await ev(`document.activeElement.getAttribute("aria-selected") === "true" && document.activeElement.id === "g-tab-1"`));
   check("and shows its panel", (await ev(`${$("#rows")}.getBoundingClientRect().height`)) > 100);
   await press("End", "End", 35);
-  check("End goes to the last tab", await ev(`document.activeElement.id`) === "g-tab-4");
+  check("End goes to the last tab", await ev(`document.activeElement.id`) === "g-tab-5");
   check("and the page did not scroll", await ev(`scrollY`) === 0);
 
   await press("Home", "Home", 36);
@@ -437,6 +437,34 @@ try {
   await ev(`${$("#sign-in")}.click()`);
   await pathIs("/app/users");
   check("no errors while routing", errors.filter((e) => !e.includes("Failed to load resource")).length === 0, JSON.stringify(errors));
+
+  // ---- the host bridge (Stage 9.2): no host in a plain browser, and no port for a forged message ----
+  const say = async () => {
+    await ev(`${$("#native-say")}.click()`);
+    return () => ev(`${$("#native-result")}.textContent`);
+  };
+  await load("/gallery");
+  await tab(5);
+  const noHost = await say();
+  check("in a plain browser a plugin call fails at once with `unavailable`", await until(async () => (await noHost()) === "say: error unavailable", "the answer", 1500), await noHost());
+  const ua = await ev(`navigator.userAgent`);
+  await send("Emulation.setUserAgentOverride", { userAgent: `${ua} QuenchHost/1` });
+  await load("/gallery");
+  await tab(5);
+  // A page script (or another window) can post a port, but not as the host does: the page ignores it.
+  await ev(`(() => {
+    window.__got = [];
+    const c = new MessageChannel();
+    c.port1.onmessage = (m) => window.__got.push(m.data);
+    window.postMessage("quench-bridge", "*", [c.port2]);
+    window.dispatchEvent(new MessageEvent("message", { data: "quench-bridge", ports: [new MessageChannel().port2] }));
+  })()`);
+  const hosted = await say();
+  await sleep(500);
+  check("a page that claims a host waits for it", await hosted() === "idle", await hosted());
+  check("then gives up with `unavailable` after a few seconds", await until(async () => (await hosted()) === "say: error unavailable", "the timeout", 5000), await hosted());
+  check("a forged port never received a call", await ev(`window.__got.length`) === 0);
+  await send("Emulation.setUserAgentOverride", { userAgent: ua });
 
   // ---- a server page that does not match: the result is the client's page ---------------------
   for (const kind of ["tag", "text", "drop", "extra", "attr"]) {

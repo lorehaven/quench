@@ -6,7 +6,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use quench_tool::system::{Cmd, Process, System};
+use quench_tool::system::{Cmd, Http, Process, System};
 
 #[derive(Default)]
 pub struct Fake {
@@ -23,6 +23,9 @@ pub struct Fake {
     pub programs: HashSet<String>,
     /// Whether something ever listens on the port `wait_port` is asked about.
     pub listening: Cell<bool>,
+    /// Every HTTP request, and the answers to give (a 201 with no body when the queue is empty).
+    pub requests: RefCell<Vec<Http>>,
+    pub replies: RefCell<Vec<(u16, String)>>,
 }
 
 pub struct FakeProcess {
@@ -96,6 +99,20 @@ impl System for Fake {
 
     fn on_path(&self, program: &str) -> bool {
         self.programs.contains(program)
+    }
+
+    fn http(&self, request: &Http) -> io::Result<(u16, Vec<u8>)> {
+        self.requests.borrow_mut().push(request.clone());
+        if request.url.contains("unreachable") {
+            return Err(io::Error::other("connection refused"));
+        }
+        let mut replies = self.replies.borrow_mut();
+        let (status, body) = if replies.is_empty() {
+            (201, String::new())
+        } else {
+            replies.remove(0)
+        };
+        Ok((status, body.into_bytes()))
     }
 
     fn free_port(&self) -> u16 {

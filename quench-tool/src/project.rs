@@ -9,10 +9,29 @@ use crate::error::{Result, fail};
 
 pub const MANIFEST: &str = "quench.toml";
 
+/// The `[android]` table of `quench.toml`: what the build and `quench publish` need to know.
+#[derive(Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+pub struct AndroidConfig {
+    /// The application id (`quench android init --package` writes it).
+    pub package: Option<String>,
+    /// What people see, `0.1.0` by default.
+    pub version_name: Option<String>,
+    /// Must go up with every release; the registry refuses a version code twice.
+    pub version_code: Option<u32>,
+    /// The release keystore (a path from the project root). The passwords are never here: they are
+    /// read from `QUENCH_KEYSTORE_PASSWORD` and `QUENCH_KEY_PASSWORD`.
+    pub keystore: Option<String>,
+    /// The key in the keystore.
+    pub key_alias: Option<String>,
+    /// Where `quench publish` sends the build (the warehouse), unless `WAREHOUSE_URL` says otherwise.
+    pub registry: Option<String>,
+}
+
 #[derive(Deserialize)]
 struct Manifest {
     name: String,
     template: String,
+    android: Option<AndroidConfig>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,6 +39,7 @@ pub struct Project {
     pub root: PathBuf,
     pub name: String,
     pub template: Template,
+    pub android: AndroidConfig,
 }
 
 /// Whether `name` can be a project name: it becomes a directory and the prefix of four crate names.
@@ -87,6 +107,7 @@ impl Project {
             root: root.to_path_buf(),
             name: manifest.name,
             template,
+            android: manifest.android.unwrap_or_default(),
         })
     }
 

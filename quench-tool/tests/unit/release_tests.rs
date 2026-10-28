@@ -1,5 +1,5 @@
 use super::support::*;
-use quench_tool::release::{build, wasm_profile};
+use quench_tool::release::{build, bundle, wasm_profile};
 
 fn put(path: &std::path::Path, bytes: &[u8]) {
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -113,4 +113,42 @@ fn a_program_that_cannot_start_is_named() {
         .unwrap_err()
         .to_string();
     assert!(e.contains("cannot run `missing-program`"), "{e}");
+}
+
+#[quench_test::test]
+fn a_bundle_is_written_by_the_projects_own_server() {
+    let p = project("bundle", "web");
+    let stale = p.dist().join("www/_quench/old.deadbeef.css");
+    put(&stale, b"x");
+    let sys = Fake::default();
+    let mut out = Vec::new();
+    bundle(&sys, &mut out, &p).unwrap();
+    let lines = sys.lines();
+    assert_eq!(
+        lines[0],
+        "cargo build --target wasm32-unknown-unknown --profile wasm -p demo-app"
+    );
+    assert_eq!(lines[1], "cargo build -p demo-server");
+    assert!(lines[2].ends_with("debug/demo-server"), "{lines:?}");
+    let ran = sys.ran.borrow();
+    let env: std::collections::HashMap<_, _> = ran[2].env.iter().cloned().collect();
+    assert!(env["QUENCH_EXPORT"].ends_with("dist/www"));
+    assert!(
+        env["WASM"].ends_with("wasm/demo_app.wasm"),
+        "the release module goes in the bundle"
+    );
+    assert!(
+        !stale.exists(),
+        "files of the last bundle are named by hash and must not pile up"
+    );
+    assert!(text(out).contains("bundle "));
+}
+
+#[quench_test::test]
+fn a_failing_export_fails_the_bundle() {
+    let p = project("bundle-fail", "web");
+    let sys = Fake::default();
+    *sys.fail_on.borrow_mut() = Some("debug/demo-server".to_string());
+    let e = bundle(&sys, &mut Vec::new(), &p).unwrap_err().to_string();
+    assert!(e.contains("demo-server"), "{e}");
 }

@@ -258,6 +258,36 @@ export async function start(url, options = {}) {
     call(() => ex.q_sse_event(id, kind, ...put(encoder.encode(name)), ...put(encoder.encode(data))));
   };
 
+  // --- the host app's bridge: calls are fetches of `quench-bridge:call` (body: the JSON envelope), events
+  // are an event source on `quench-bridge:events`; a call made before the host's port arrives waits 3 s.
+  const BRIDGE = "quench-bridge:", hosted = /QuenchHost\//.test(navigator.userAgent);
+  let bridgePort = null, bridgeEvents = null;
+  const bridgeWaiting = new Map(), bridgeQueue = []; // envelope id -> the waiting fetch
+  const bridgeFail = (fetchId, why) => finish(fetchId, 0, encoder.encode(why), "");
+  const bridgeCall = (fetchId, message) => {
+    if (!hosted) return bridgeFail(fetchId, "this page is not shown by a host app");
+    const { id } = JSON.parse(message), entry = { fetchId, message, timer: 0 };
+    bridgeWaiting.set(id, entry);
+    fetches.set(fetchId, { abort: () => { clearTimeout(entry.timer); bridgeWaiting.delete(id); bridgeFail(fetchId, "aborted"); } });
+    if (bridgePort) return bridgePort.postMessage(message);
+    entry.timer = setTimeout(() => { bridgeQueue.splice(bridgeQueue.indexOf(entry), 1); bridgeWaiting.delete(id); bridgeFail(fetchId, "the host did not connect"); }, 3000);
+    bridgeQueue.push(entry);
+  };
+  const bridgeAnswer = ({ data }) => {
+    if (typeof data !== "string") return;
+    const { id, event } = JSON.parse(data), entry = bridgeWaiting.get(id);
+    if (event !== undefined) { if (bridgeEvents !== null) sse(bridgeEvents, 1, "event", data); }
+    else if (entry) { bridgeWaiting.delete(id); finish(entry.fetchId, 200, encoder.encode(data), ""); }
+  };
+  if (hosted) addEventListener("message", (event) => {
+    // Only the host posts with no source window and an empty origin; a script cannot fake that (its events are not trusted).
+    if (!event.isTrusted || event.source !== null || event.origin !== "" || event.data !== "quench-bridge" || !event.ports[0]) return;
+    bridgePort?.close();
+    bridgePort = event.ports[0];
+    bridgePort.onmessage = bridgeAnswer;
+    for (const entry of bridgeQueue.splice(0)) { clearTimeout(entry.timer); bridgePort.postMessage(entry.message); }
+  });
+
   const env = {
     q_create_el: guarded((p, n) => createElement(text(p, n))),
     q_create_text: guarded((p, n) => createText(text(p, n))),
@@ -304,6 +334,7 @@ export async function start(url, options = {}) {
     }),
     q_clear_timeout: guarded((id) => { clearTimeout(timers.get(id)); timers.delete(id); }),
     q_fetch: guarded((id, mp, ml, up, ul, hp, hl, bp, bl) => {
+      if (text(up, ul).startsWith(BRIDGE)) { bridgeCall(id, text(bp, bl)); return; }
       const method = text(mp, ml);
       const init = { method, signal: undefined, headers: {} };
       for (const line of text(hp, hl).split("\n")) {
@@ -324,6 +355,11 @@ export async function start(url, options = {}) {
     }),
     q_fetch_abort: guarded((id) => fetches.get(id)?.abort()),
     q_sse_open: guarded((id, up, ul, np, nl) => {
+      if (text(up, ul).startsWith(BRIDGE)) {
+        bridgeEvents = id;
+        sources.set(id, { close: () => { if (bridgeEvents === id) bridgeEvents = null; } });
+        return sse(id, 0);
+      }
       const source = new EventSource(text(up, ul));
       sources.set(id, source);
       for (const name of new Set(["message", ...text(np, nl).split("\n").filter(Boolean)])) {

@@ -73,6 +73,30 @@ impl Ui {
         (&self.script, &self.wasm)
     }
 
+    /// Writes `page` and every asset to `dir` as a static bundle: `index.html`, and each asset at
+    /// its hashed public path (`_quench/app.<hash>.wasm`). It is what a native shell (the Android
+    /// host) serves from its own origin: the page is rendered on this side, as for a browser, and
+    /// the app takes it over the same way.
+    ///
+    /// The scripts carry the fixed nonce `bundle`; the host's policy does not use nonces, since
+    /// everything in the bundle is the app's own.
+    ///
+    /// # Errors
+    /// When a file or directory cannot be written.
+    pub fn export(&self, dir: &std::path::Path, page: Page) -> std::io::Result<()> {
+        let html = render_document(page, "bundle", &self.script, &self.wasm);
+        std::fs::create_dir_all(dir)?;
+        std::fs::write(dir.join("index.html"), html)?;
+        for asset in self.assets.iter() {
+            let target = dir.join(asset.path().trim_start_matches('/'));
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(target, asset.bytes())?;
+        }
+        Ok(())
+    }
+
     /// Renders `page` with a fresh nonce.
     #[must_use]
     pub fn render(&self, page: Page) -> Response {

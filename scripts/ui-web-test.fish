@@ -5,6 +5,7 @@ set -l root (path resolve (status dirname)/..)
 cd $root
 set -l port 3101
 
+node --check quench-ui-web/js/quench.js; and node --check quench-ui-web/tests/browser.mjs; or exit 1 # a syntax error stops the app before anything else shows it
 cargo build --target wasm32-unknown-unknown --profile wasm -p quench-example-ui-web-app; or exit 1
 cargo build -p quench-example-ui-web-server; or exit 1
 

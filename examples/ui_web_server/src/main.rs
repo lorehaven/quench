@@ -5,7 +5,8 @@
 //! cargo run -p quench-example-ui-web-server            # then open http://127.0.0.1:3000
 //! ```
 //!
-//! `PORT` and `WASM` (the path of the module) override the defaults. Pages, `quench.js` and the
+//! `PORT` and `WASM` (the path of the module) override the defaults. `QUENCH_EXPORT=<dir>` writes
+//! the gallery as a static bundle for the Android host and exits. Pages, `quench.js` and the
 //! module are served by `quench-fullstack` with content-hashed names and a strict
 //! Content-Security-Policy; `view-source:` shows a page already rendered.
 //!
@@ -199,6 +200,14 @@ async fn main() {
     let wasm_path = ui.paths().1.to_string();
     let (demo_style, notes_style, site_style) = (style.clone(), style.clone(), style);
 
+    let gallery_page = move || {
+        Page::new("Gallery", gallery::gallery())
+            .stylesheet_for(&dark, "(prefers-color-scheme: dark)")
+            .stylesheet_for(&light, "(prefers-color-scheme: light)")
+            .stylesheet(&gallery_style)
+            .state(PageState::Gallery.to_json())
+    };
+    let export = gallery_page.clone();
     let app = UiApp::new(ui)
         .page("/", move |_req| {
             let state = AppState {
@@ -208,13 +217,7 @@ async fn main() {
                 .stylesheet(&demo_style)
                 .state(PageState::Demo(state).to_json())
         })
-        .page("/gallery", move |_req| {
-            Page::new("Gallery", gallery::gallery())
-                .stylesheet_for(&dark, "(prefers-color-scheme: dark)")
-                .stylesheet_for(&light, "(prefers-color-scheme: light)")
-                .stylesheet(&gallery_style)
-                .state(PageState::Gallery.to_json())
-        })
+        .page("/gallery", move |_req| gallery_page())
         .pages_under("/app", move |req| {
             Page::routed("Routed app", req.uri().path_and_query(), site::site)
                 .stylesheet(&site_style)
@@ -232,6 +235,16 @@ async fn main() {
                 .stylesheet(&notes_style)
                 .state(PageState::Notes(state).to_json())
         });
+
+    // `QUENCH_EXPORT=<dir>` writes the gallery as a static bundle (what the Android host serves)
+    // instead of starting the server.
+    if let Some(dir) = std::env::var_os("QUENCH_EXPORT") {
+        app.ui()
+            .export(std::path::Path::new(&dir), export())
+            .expect("cannot write the bundle");
+        println!("bundle written to {}", std::path::Path::new(&dir).display());
+        return;
+    }
 
     // The stub issues the tokens; the service verifies them with the same configuration, as a
     // relying party would verify gatehouse's.

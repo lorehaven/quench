@@ -1,6 +1,7 @@
 [release]
 registry = "ennor"
 packages = [
+    "quench-android",
     "quench-archive",
     "quench-args",
     "quench-args-macros",
@@ -44,6 +45,7 @@ packages = [
     "quench-tz",
     "quench-ui",
     "quench-ui-web",
+    "quench-ui-web-macros",
     "quench-web",
     "quench-web-components",
 ]

@@ -19,7 +19,9 @@ path = "src/lib.rs"
 harness = false
 
 [dependencies]
+quench-serde = { workspace = true }
 quench-ui = { workspace = true }
+quench-ui-web-macros = { workspace = true }
 
 [lints]
 workspace = true

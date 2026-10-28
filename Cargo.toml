@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "quench-android",
   "quench-args",
   "quench-args-macros",
   "quench-auth",
@@ -31,6 +32,7 @@ members = [
   "quench-ui",
   "quench-tool",
   "quench-ui-web",
+  "quench-ui-web-macros",
   "quench-fullstack",
   "quench-fullstack-macros",
   "quench-qr",
@@ -62,6 +64,7 @@ readme = "README.md"
 libc = { version = "0.2" }
 getrandom = { version = "0.4" }
 proc-macro2 = { version = "1.0" }
+quench-android = { path = "quench-android", registry = "ennor", version = "0.1.0" }
 quench-args = { path = "quench-args", registry = "ennor", version = "0.1.0" }
 quench-args-macros = { path = "quench-args-macros", registry = "ennor", version = "0.1.0" }
 quench-auth = { path = "quench-auth", registry = "ennor", version = "0.4.0", default-features = false }
@@ -89,6 +92,7 @@ quench-proto = { path = "quench-proto", registry = "ennor", version = "0.1.0", d
 quench-tz = { path = "quench-tz", registry = "ennor", version = "0.1.0" }
 quench-tool = { path = "quench-tool", registry = "ennor", version = "0.1.0" }
 quench-ui = { path = "quench-ui", registry = "ennor", version = "0.1.0" }
+quench-ui-web-macros = { path = "quench-ui-web-macros", registry = "ennor", version = "0.1.0" }
 quench-ui-web = { path = "quench-ui-web", registry = "ennor", version = "0.1.0" }
 quench-fullstack = { path = "quench-fullstack", registry = "ennor", version = "0.1.0" }
 quench-fullstack-macros = { path = "quench-fullstack-macros", registry = "ennor", version = "0.1.0" }

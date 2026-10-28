@@ -1,5 +1,5 @@
 use super::support::*;
-use quench_tool::dev::dev;
+use quench_tool::dev::{Options, dev};
 use quench_tool::watch::{Event, Watch};
 
 struct Script(Vec<Event>);
@@ -23,8 +23,11 @@ fn it_builds_starts_the_server_in_dev_mode_and_stops_it_at_the_end() {
         &sys,
         &mut out,
         &p,
-        3456,
-        false,
+        Options {
+            port: 3456,
+            open: false,
+            android: false,
+        },
         &mut Script(vec![Event::Quiet]),
     )
     .unwrap();
@@ -59,8 +62,11 @@ fn a_change_rebuilds_and_restarts() {
         &sys,
         &mut out,
         &p,
-        3000,
-        false,
+        Options {
+            port: 3000,
+            open: false,
+            android: false,
+        },
         &mut Script(vec![Event::Quiet, Event::Changed, Event::Quiet]),
     )
     .unwrap();
@@ -84,8 +90,11 @@ fn a_failed_build_waits_for_the_next_change() {
         &sys,
         &mut out,
         &p,
-        3000,
-        false,
+        Options {
+            port: 3000,
+            open: false,
+            android: false,
+        },
         &mut Script(vec![Event::Quiet, Event::Changed]),
     )
     .unwrap();
@@ -107,8 +116,11 @@ fn a_server_that_exits_is_reported_once() {
         &sys,
         &mut out,
         &p,
-        3000,
-        false,
+        Options {
+            port: 3000,
+            open: false,
+            android: false,
+        },
         &mut Script(vec![Event::Quiet, Event::Quiet, Event::Quiet]),
     )
     .unwrap();
@@ -120,13 +132,35 @@ fn a_server_that_cannot_start_is_an_error_to_wait_out() {
     let p = project_named("dev-unstartable", "unstartable", "web");
     let sys = Fake::default();
     let mut out = Vec::new();
-    dev(&sys, &mut out, &p, 3000, false, &mut Script(vec![])).unwrap();
+    dev(
+        &sys,
+        &mut out,
+        &p,
+        Options {
+            port: 3000,
+            open: false,
+            android: false,
+        },
+        &mut Script(vec![]),
+    )
+    .unwrap();
     assert!(text(out).contains("cannot start"));
 }
 
 fn dev_open(sys: &Fake, p: &quench_tool::project::Project, events: Vec<Event>) -> String {
     let mut out = Vec::new();
-    dev(sys, &mut out, p, 3000, true, &mut Script(events)).unwrap();
+    dev(
+        sys,
+        &mut out,
+        p,
+        Options {
+            port: 3000,
+            open: true,
+            android: false,
+        },
+        &mut Script(events),
+    )
+    .unwrap();
     text(out)
 }
 
@@ -185,4 +219,86 @@ fn a_build_that_failed_opens_nothing_until_it_works() {
     *sys.fail_on.borrow_mut() = Some("-p demo-app".to_string());
     dev_open(&sys, &p, vec![Event::Changed]);
     assert!(sys.lines().iter().all(|l| !l.starts_with("xdg-open")));
+}
+
+#[quench_test::test]
+fn android_starts_the_app_on_the_device_once_the_server_is_up() {
+    let p = project("dev-android", "web");
+    quench_tool::android::init(&mut Vec::new(), &p, Some("dev.lorehaven.demo")).unwrap();
+    let sys = Fake::default();
+    sys.listening.set(true);
+    let mut out = Vec::new();
+    dev(
+        &sys,
+        &mut out,
+        &p,
+        Options {
+            port: 3000,
+            open: false,
+            android: true,
+        },
+        &mut Script(vec![Event::Changed, Event::Quiet]),
+    )
+    .unwrap();
+    let adb: Vec<String> = sys
+        .lines()
+        .into_iter()
+        .filter(|l| l.starts_with("adb"))
+        .collect();
+    assert_eq!(
+        adb,
+        [
+            "adb reverse tcp:3000 tcp:3000",
+            "adb shell am start -n dev.lorehaven.demo/.MainActivity --es dev_url http://127.0.0.1:3000"
+        ],
+        "once: a restart reloads the page the app already shows"
+    );
+}
+
+#[quench_test::test]
+fn a_device_that_is_not_there_is_said_and_the_server_still_runs() {
+    let p = project("dev-android-none", "web");
+    quench_tool::android::init(&mut Vec::new(), &p, Some("dev.lorehaven.demo")).unwrap();
+    let sys = Fake::default();
+    *sys.fail_on.borrow_mut() = Some("adb".to_string());
+    let mut out = Vec::new();
+    dev(
+        &sys,
+        &mut out,
+        &p,
+        Options {
+            port: 3000,
+            open: false,
+            android: true,
+        },
+        &mut Script(vec![]),
+    )
+    .unwrap();
+    assert!(text(out).contains("the device did not start"));
+    assert_eq!(sys.spawned.borrow().len(), 1);
+}
+
+#[quench_test::test]
+fn the_device_is_not_started_before_the_server_listens() {
+    let p = project("dev-android-wait", "web");
+    quench_tool::android::init(&mut Vec::new(), &p, Some("dev.lorehaven.demo")).unwrap();
+    let sys = Fake::default(); // nothing ever listens
+    let mut out = Vec::new();
+    dev(
+        &sys,
+        &mut out,
+        &p,
+        Options {
+            port: 3000,
+            open: false,
+            android: true,
+        },
+        &mut Script(vec![]),
+    )
+    .unwrap();
+    assert!(text(out).contains("did not start listening on port 3000"));
+    assert!(
+        sys.lines().iter().all(|l| !l.starts_with("adb")),
+        "no adb call"
+    );
 }

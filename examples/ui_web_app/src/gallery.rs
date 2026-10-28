@@ -15,6 +15,7 @@ use quench_ui::kit::{
 use quench_ui::platform;
 use quench_ui::prelude::*;
 use quench_ui::virtual_list::virtual_list;
+use quench_ui_web::{BridgeError, spawn};
 
 const EN: &str = include_str!("../i18n/en.ftl");
 const PL: &str = include_str!("../i18n/pl.ftl");
@@ -178,6 +179,97 @@ fn gestures() -> View {
     div().child(h2().text("Gestures")).child(pad).into_view()
 }
 
+/// What `echo.device` answers.
+#[derive(quench_serde::Deserialize)]
+struct Device {
+    sdk: u32,
+    model: String,
+}
+
+/// The echo plugin of the Android host (a debug aid there): `quench android init` writes it.
+#[quench_ui_web::plugin("echo")]
+trait Echo {
+    async fn say(text: String) -> Result<String, BridgeError>;
+    async fn device() -> Result<Device, BridgeError>;
+    async fn fail(code: String) -> Result<(), BridgeError>;
+    async fn notifications() -> Result<bool, BridgeError>;
+}
+
+fn show<T>(
+    out: &Signal<String>,
+    label: &'static str,
+    result: Result<T, BridgeError>,
+    ok: impl Fn(T) -> String,
+) {
+    out.set(match result {
+        Ok(value) => format!("{label}: {}", ok(value)),
+        Err(e) => format!("{label}: error {}", e.code),
+    });
+}
+
+/// Calls into the host app's plugins. In a plain browser every call answers `unavailable`.
+fn native() -> View {
+    let out = create_signal("idle".to_string());
+    let (say, device, fail, notify, shown) =
+        (out.clone(), out.clone(), out.clone(), out.clone(), out);
+    div()
+        .child(h2().text("Native"))
+        .child(
+            button()
+                .attr("id", "native-say")
+                .attr("type", "button")
+                .text("Say hi")
+                .on_click(move || {
+                    let out = say.clone();
+                    spawn(async move { show(&out, "say", Echo::say("hi".into()).await, |t| t) });
+                }),
+        )
+        .child(
+            button()
+                .attr("id", "native-device")
+                .attr("type", "button")
+                .text("Device")
+                .on_click(move || {
+                    let out = device.clone();
+                    spawn(async move {
+                        show(&out, "device", Echo::device().await, |d| {
+                            format!("{} {}", d.sdk, d.model)
+                        });
+                    });
+                }),
+        )
+        .child(
+            button()
+                .attr("id", "native-fail")
+                .attr("type", "button")
+                .text("Fail")
+                .on_click(move || {
+                    let out = fail.clone();
+                    spawn(async move {
+                        show(&out, "fail", Echo::fail("nope".into()).await, |()| {
+                            String::new()
+                        });
+                    });
+                }),
+        )
+        .child(
+            button()
+                .attr("id", "native-notify")
+                .attr("type", "button")
+                .text("Notifications")
+                .on_click(move || {
+                    let out = notify.clone();
+                    spawn(async move {
+                        show(&out, "notify", Echo::notifications().await, |g| {
+                            g.to_string()
+                        });
+                    });
+                }),
+        )
+        .child(p().attr("id", "native-result").text_fn(move || shown.get()))
+        .into_view()
+}
+
 fn motion() -> View {
     let shown = create_signal(false);
     let (flag, toggle) = (shown.clone(), shown);
@@ -271,14 +363,17 @@ pub fn gallery() -> View {
             )
             .child(tabs(
                 "g",
-                &["Controls", "Lists", "Gestures", "Motion", "Language"],
+                &[
+                    "Controls", "Lists", "Gestures", "Motion", "Language", "Native",
+                ],
                 &selected,
                 move |i| match i {
                     0 => controls(),
                     1 => lists(),
                     2 => gestures(),
                     3 => motion(),
-                    _ => language(&panel_i18n),
+                    4 => language(&panel_i18n),
+                    _ => native(),
                 },
             ))
             .child(fab("New", "+", || {}))

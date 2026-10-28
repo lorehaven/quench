@@ -141,3 +141,30 @@ fn the_flags_of_dev_and_test_are_accepted() {
     let (code, out) = go(&["test", "--browser"], &sys, &p.root);
     assert_eq!(code, 1, "the project has no tests/browser.mjs here: {out}");
 }
+
+#[quench_test::test]
+fn android_init_and_build_bundle_are_commands() {
+    let p = project("android-cli", "web");
+    let sys = Fake::default();
+    let (code, out) = go(
+        &["android", "init", "--package", "dev.lorehaven.demo"],
+        &sys,
+        &p.root,
+    );
+    assert_eq!(code, 0, "{out}");
+    assert!(out.contains("dev.lorehaven.demo"), "{out}");
+    assert_eq!(
+        go(&["android", "init"], &sys, &p.root).0,
+        1,
+        "it exists now"
+    );
+    assert_eq!(
+        go(&["android"], &sys, &p.root).0,
+        2,
+        "a subcommand is needed"
+    );
+    let (code, _) = go(&["build", "--bundle"], &sys, &p.root);
+    assert_eq!(code, 0);
+    assert!(sys.lines().iter().any(|l| l.ends_with("debug/demo-server")));
+    assert_eq!(go(&["android", "init"], &sys, &tmp("android-none")).0, 1);
+}

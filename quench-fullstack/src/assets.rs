@@ -34,6 +34,11 @@ impl Asset {
     pub fn bytes(&self) -> &[u8] {
         &self.body
     }
+
+    #[must_use]
+    pub fn content_type(&self) -> &str {
+        &self.content_type
+    }
 }
 
 /// A set of assets served under [`PREFIX`].
@@ -98,6 +103,11 @@ impl Assets {
             .iter()
             .find(|a| is_same_name(&a.path, name))
             .map(|a| a.path.as_str())
+    }
+
+    /// Every asset, in the order they were added.
+    pub fn iter(&self) -> impl Iterator<Item = &Asset> {
+        self.items.iter()
     }
 
     /// Looks an asset up by its public path.

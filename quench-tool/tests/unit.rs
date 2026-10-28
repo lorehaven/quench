@@ -19,6 +19,10 @@
 #[path = "unit/support.rs"]
 mod support;
 
+#[path = "unit/android_tests.rs"]
+mod android_tests;
+#[path = "unit/apk_tests.rs"]
+mod apk_tests;
 #[path = "unit/browser_tests.rs"]
 mod browser_tests;
 #[path = "unit/cli_tests.rs"]
@@ -27,8 +31,14 @@ mod cli_tests;
 mod dev_tests;
 #[path = "unit/doctor_tests.rs"]
 mod doctor_tests;
+#[path = "unit/native_tests.rs"]
+mod native_tests;
+#[path = "unit/plugins_tests.rs"]
+mod plugins_tests;
 #[path = "unit/project_tests.rs"]
 mod project_tests;
+#[path = "unit/publish_tests.rs"]
+mod publish_tests;
 #[path = "unit/release_tests.rs"]
 mod release_tests;
 #[path = "unit/scaffold_tests.rs"]

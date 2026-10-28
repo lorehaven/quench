@@ -6,12 +6,15 @@
 //! quench build --release     # dist/: one server binary with the app inside
 //! ```
 
+pub mod android;
 pub mod browser;
 pub mod cli;
 pub mod dev;
 pub mod doctor;
 pub mod error;
+pub mod plugins;
 pub mod project;
+pub mod publish;
 pub mod release;
 pub mod scaffold;
 pub mod system;
@@ -26,7 +29,7 @@ use std::time::Duration;
 
 use quench_args::{ErrorKind, Parser};
 
-use crate::cli::{Cli, Cmd};
+use crate::cli::{AndroidCmd, BuildTarget, Cli, Cmd, PluginCmd};
 use crate::error::Result;
 use crate::project::Project;
 use crate::system::{Cmd as Command, System};
@@ -80,6 +83,8 @@ where
     }
 }
 
+// One arm per command: it reads best as the list it is.
+#[allow(clippy::too_many_lines)]
 fn command(
     cmd: Cmd,
     sys: &dyn System,
@@ -104,19 +109,90 @@ fn command(
             )?;
             Ok(0)
         }
+        Cmd::Android { cmd } => {
+            let project = Project::find(cwd)?;
+            match cmd {
+                AndroidCmd::Init { package } => android::init(out, &project, package.as_deref())?,
+                AndroidCmd::Keystore { out: path, alias } => {
+                    android::keystore(sys, out, &project, &path, &alias)?;
+                }
+                AndroidCmd::BuildNative { release, abi } => {
+                    android::build_native(sys, out, &project, release, abi.as_deref())?;
+                }
+            }
+            Ok(0)
+        }
+        Cmd::Run { target: _, abi } => {
+            let project = Project::find(cwd)?;
+            android::run(sys, out, &project, abi.as_deref())?;
+            Ok(0)
+        }
+        Cmd::Publish {
+            dry_run,
+            apk,
+            allow_dirty,
+        } => {
+            let project = Project::find(cwd)?;
+            publish::run(
+                sys,
+                out,
+                &project,
+                &publish::Options {
+                    dry_run,
+                    apk,
+                    allow_dirty,
+                },
+            )?;
+            Ok(0)
+        }
+        Cmd::Plugin { cmd } => {
+            let project = Project::find(cwd)?;
+            match cmd {
+                PluginCmd::Add { name } => plugins::add(out, &project, &name)?,
+                PluginCmd::List => plugins::list(out, &project)?,
+            }
+            Ok(0)
+        }
         Cmd::Doctor => {
             writeln!(out, "quench doctor")?;
             Ok(i32::from(!doctor::report(out, &doctor::checks(sys))?))
         }
-        Cmd::Dev { port, open } => {
+        Cmd::Dev {
+            port,
+            open,
+            android,
+        } => {
             let project = Project::find(cwd)?;
             let mut watch = watcher(&project.root);
-            dev::dev(sys, out, &project, port, open, &mut *watch)?;
+            dev::dev(
+                sys,
+                out,
+                &project,
+                dev::Options {
+                    port,
+                    open,
+                    android,
+                },
+                &mut *watch,
+            )?;
             Ok(0)
         }
-        Cmd::Build { release, no_embed } => {
+        Cmd::Build {
+            release,
+            no_embed,
+            bundle,
+            target,
+            abi,
+        } => {
             let project = Project::find(cwd)?;
-            release::build(sys, out, &project, release, !no_embed)?;
+            if let Some(target) = target {
+                let aab = target == BuildTarget::Aab;
+                android::build_apk(sys, out, &project, release || aab, aab, abi.as_deref())?;
+            } else if bundle {
+                release::bundle(sys, out, &project)?;
+            } else {
+                release::build(sys, out, &project, release, !no_embed)?;
+            }
             Ok(0)
         }
         Cmd::Test { browser, args } => {

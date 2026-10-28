@@ -40,6 +40,7 @@ See [docs/](./docs/) for per-crate reference.
 - [Quench UI](./docs/quench-ui.md) — UI core: signals, views, events and the renderer interface
 - [Quench Fullstack](./docs/quench-fullstack.md) — serves Quench UI apps from Quench HTTP: server rendering, hashed assets, strict CSP, typed server functions, sessions
 - [Quench Fullstack Macros](./docs/quench-fullstack-macros.md) — the `#[server]` attribute
+- [Quench UI Web Macros](./docs/quench-ui-web-macros.md) — the `#[plugin]` attribute: a typed client for a native plugin of the host app
 - [Quench UI Web](./docs/quench-ui-web.md) — runs a Quench UI app in the browser from WebAssembly, with a small JS bridge
 - [Quench TLS](./docs/quench-tls.md) — async glue between tokio streams and rustls, with shared trust-store helpers
 - [Quench Log](./docs/quench-log.md) — leveled events, spans, console and rolling-file output

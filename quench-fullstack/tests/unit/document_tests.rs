@@ -271,3 +271,28 @@ async fn a_stylesheet_can_be_limited_to_a_media_query() {
         "{html}"
     );
 }
+
+#[quench_test::test]
+fn export_writes_the_page_and_every_asset_at_its_public_path() {
+    let mut ui = Ui::new(big());
+    let css = ui.add_asset("site.css", "body{margin:0}", "text/css");
+    let dir = std::env::temp_dir().join(format!("quench-export-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let page = Page::new("Bundle", p().text("hi"))
+        .stylesheet(&css)
+        .state("{\"a\":1}");
+    ui.export(&dir, page).unwrap();
+    let html = std::fs::read_to_string(dir.join("index.html")).unwrap();
+    assert!(html.contains("<p>hi</p>") && html.contains(&css), "{html}");
+    assert!(html.contains("nonce=\"bundle\""), "{html}");
+    let (script, wasm) = ui.paths();
+    for path in [script, wasm, css.as_str()] {
+        assert!(dir.join(path.trim_start_matches('/')).is_file(), "{path}");
+        assert!(html.contains(path) || path == wasm || path == css, "{path}");
+    }
+    assert_eq!(
+        std::fs::read(dir.join(wasm.trim_start_matches('/'))).unwrap(),
+        big()
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

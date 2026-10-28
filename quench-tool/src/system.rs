@@ -42,6 +42,15 @@ impl Cmd {
 }
 
 /// A process the tool started and may stop.
+/// A request for [`System::http`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Http {
+    pub method: &'static str,
+    pub url: String,
+    pub headers: Vec<(String, String)>,
+    pub body: Vec<u8>,
+}
+
 pub trait Process {
     fn kill(&mut self);
     /// The exit code, once the process has ended.
@@ -69,6 +78,11 @@ pub trait System {
     fn on_path(&self, program: &str) -> bool;
     /// A port nothing is listening on.
     fn free_port(&self) -> u16;
+    /// One HTTP request; the status and the body of the answer.
+    ///
+    /// # Errors
+    /// When the server cannot be reached.
+    fn http(&self, request: &Http) -> io::Result<(u16, Vec<u8>)>;
     /// Waits until something accepts connections on `port`, for at most `millis`.
     fn wait_port(&self, port: u16, millis: u64) -> bool;
 }
@@ -149,6 +163,26 @@ impl System for Host {
         std::env::var_os("PATH").is_some_and(|paths| {
             std::env::split_paths(&paths).any(|dir| dir.join(program).is_file())
         })
+    }
+
+    fn http(&self, request: &Http) -> io::Result<(u16, Vec<u8>)> {
+        let client = quench_client::blocking::Client::new();
+        let mut builder = match request.method {
+            "PUT" => client.put(&request.url),
+            _ => client.post(&request.url),
+        };
+        for (name, value) in &request.headers {
+            builder = builder.header(name, value);
+        }
+        let response = builder
+            .body(request.body.clone())
+            .send()
+            .map_err(|e| io::Error::other(e.to_string()))?;
+        let status = response.status().as_u16();
+        let body = response
+            .bytes()
+            .map_err(|e| io::Error::other(e.to_string()))?;
+        Ok((status, body.to_vec()))
     }
 
     fn free_port(&self) -> u16 {

@@ -147,6 +147,17 @@ The wasm module has no threads and no runtime of its own. `quench_ui_web::spawn(
 
 `EventSource` is the browser's own client for `text/event-stream`: it reconnects by itself and sends `Last-Event-ID`. Its events are named, and a browser can only listen for names it is told, so `q_sse_open` takes the names the app wants. Events reach Rust through `q_sse_event`; the Rust side keeps them in a queue per source, so none is lost while the app is busy. Closing is idempotent, and dropping a Rust `EventSource` closes it.
 
+## The host bridge
+
+A host app that shows the bundle in a `WebView` (the [Android host](./quench-android.md)) can offer native plugins to the app. The page and the host talk over one `MessagePort`, and the module reaches it **through the imports it already has**: there is no bridge-specific function in the contract.
+
+- **Calls are fetches.** `q_fetch` with the address `quench-bridge:call` and the JSON envelope as the body is a call. `quench.js` recognises the address and sends the body through the port instead of the network; the fetch completes (status `200`, the answer as the body) when the answer with the same `id` arrives, and with status `0` and a message when there is no host (`this page is not shown by a host app`) or it did not connect within 3 s. Aborting the fetch forgets the call.
+- **Events are an event source.** `q_sse_open` with the address `quench-bridge:events` registers the module as the receiver of the host's pushed events: each arrives as a `q_sse_event` named `event` whose data is the JSON message. A source that is closed stops receiving them.
+- **Detection.** The host appends `QuenchHost/1` to the user agent, so a page knows at once whether a host exists. In a plain browser every call fails immediately (`unavailable`).
+- **Connecting.** When a page has loaded, the host posts the message `"quench-bridge"` with one port to the window, addressed to the page's origin (`WebView.postWebMessage` delivers it to that origin only). `quench.js` listens for it from the start and takes the port **only** from an event that is trusted, has no source window and an empty origin: that is how a native post looks, and a script's or another window's `postMessage`, or a synthetic `MessageEvent`, looks different. A later port replaces the earlier one (a reload).
+- **Envelope.** A call is `{"id":7,"plugin":"echo","method":"say","args":{"text":"hi"}}`, the answer `{"id":7,"ok":<value>}` or `{"id":7,"err":{"code":"permission_denied","message":"..."}}`; an event is `{"event":"progress","plugin":"files","data":{..}}`. `id` matches them; answers may come in any order and from any thread. The host answers a call to a plugin it does not have with `unknown_plugin`, and arguments a method cannot read with `invalid_args`; error codes are otherwise the plugin's own. Messages over 1 MiB are dropped.
+- **Rust.** `quench_ui_web::bridge::call(plugin, method, &args)` makes a call; `#[quench_ui_web::plugin("echo")] trait Echo { async fn say(text: String) -> Result<String, BridgeError>; }` generates the typed client (`Echo::say("hi".into()).await`); `bridge::on_event(|plugin, event, data| ..)` listens for pushed events. Dropping the future forgets the call, and a late answer is ignored. See [`quench-ui-web-macros`](./quench-ui-web-macros.md).
+
 ## Panics
 
 `panic = "abort"` in the release profile. A panic first runs the hook, which sends the message to `q_log(3, ..)` (console, and the overlay in development); the instance then traps and every later export call throws, which `quench.js` catches and logs once.
@@ -170,13 +181,14 @@ The workspace `wasm` profile is release with `opt-level = "z"`, `lto`, one codeg
 | `spawn(future)`, `sleep(ms)` | the single-threaded executor and its timer |
 | `EventSource::open(url, &["event-name"])` | a server-sent events stream: `while let Some(event) = source.next().await` yields `SseEvent::{Open, Message { name, data }, Reconnecting, Closed}`; `close()` or dropping it ends it |
 | `Request::get/post/new(..).header(..).body(..).send()` | starts a request now; the `Fetch` future yields `Response { status, headers, body }` (`ok()`, `text()`, `header(name)`) or a `FetchError` (`Network`, `Aborted`). `Fetch::abort_handle()` and dropping the future both abort |
+| `bridge::call(..)`, `bridge::on_event(..)`, `BridgeError`, `#[plugin("name")]` | calls to the host app's native plugins, and the events they push |
 | `QUENCH_JS` | the source of `quench.js`, for a server to serve |
 
 A `value`, `checked` or `selected` attribute written by a view also sets the DOM property, so `attr_fn("value", ..)` keeps an input in step with a signal after the user has typed in it.
 
 ## Testing without a browser
 
-On any target other than `wasm32` the crate swaps the JS side for an in-memory host (`quench_ui_web::mock`) that keeps the handle table, records every call and lets a test play the part of `quench.js`: fire an event, a timer or a fetch completion. The renderer, the event decoder, the executor, `sleep`, `fetch` and the buffer functions are the same code in both builds.
+On any target other than `wasm32` the crate swaps the JS side for an in-memory host (`quench_ui_web::mock`) that keeps the handle table, records every call and lets a test play the part of `quench.js`: fire an event, a timer or a fetch completion. The renderer, the event decoder, the executor, `sleep`, `fetch`, the bridge and the buffer functions are the same code in both builds. `mock::bridge_sent()` lists the envelopes the app sent, `mock::bridge_deliver(text)` plays the host (an answer, or an event) and `mock::bridge_unavailable()` plays a page that has none.
 
 ## Testing in a browser
 

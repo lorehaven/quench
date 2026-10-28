@@ -26,6 +26,15 @@ fn start(
         .map_err(|e| crate::error::Error(format!("cannot start {}: {e}", binary.display())))
 }
 
+/// What `quench dev` was asked.
+#[derive(Debug, Clone, Copy)]
+pub struct Options {
+    pub port: u16,
+    pub open: bool,
+    /// Also start the app on the attached device.
+    pub android: bool,
+}
+
 /// Runs until `watch` says to stop (the real one never does: the person interrupts the process).
 ///
 /// # Errors
@@ -34,12 +43,17 @@ pub fn dev(
     sys: &dyn System,
     out: &mut dyn Write,
     project: &Project,
-    port: u16,
-    open: bool,
+    options: Options,
     watch: &mut dyn Watch,
 ) -> Result<()> {
+    let Options {
+        port,
+        open,
+        android,
+    } = options;
     // The browser is opened once: later restarts reload the page it already shows.
     let mut opened = false;
+    let mut launched = false;
     loop {
         let mut server = match start(sys, out, project, port) {
             Ok(child) => {
@@ -47,6 +61,10 @@ pub fn dev(
                     out,
                     "serving http://127.0.0.1:{port} - edit a file, the page reloads"
                 )?;
+                if android && !launched {
+                    launched = true;
+                    crate::android::launch_dev(sys, out, project, port)?;
+                }
                 if open && !opened {
                     opened = true;
                     open_browser(sys, out, &format!("http://127.0.0.1:{port}"))?;

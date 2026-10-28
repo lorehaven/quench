@@ -107,6 +107,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-android"
+version = "0.1.0"
+dependencies = [
+ "quench-core",
+ "quench-serde",
+ "quench-test",
+ "quench-tz",
+]
+
+[[package]]
 name = "quench-archive"
 version = "0.1.1"
 dependencies = [
@@ -592,6 +602,7 @@ name = "quench-tool"
 version = "0.1.0"
 dependencies = [
  "quench-args",
+ "quench-client",
  "quench-serde",
  "quench-template",
  "quench-test",
@@ -616,8 +627,19 @@ dependencies = [
 name = "quench-ui-web"
 version = "0.1.3"
 dependencies = [
+ "quench-serde",
  "quench-test",
  "quench-ui",
+ "quench-ui-web-macros",
+]
+
+[[package]]
+name = "quench-ui-web-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

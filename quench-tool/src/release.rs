@@ -127,3 +127,33 @@ pub fn build(
     )?;
     Ok(())
 }
+
+/// `quench build --bundle`: the app as a static bundle in `dist/www`, which the Android host serves.
+///
+/// The bundle is the page and the hashed assets. The project's server writes it: it is the one
+/// place that knows the page and its stylesheets.
+///
+/// # Errors
+/// The first step that fails.
+pub fn bundle(sys: &dyn System, out: &mut dyn Write, project: &Project) -> Result<()> {
+    build_wasm(sys, out, project, true)?;
+    build_server(sys, out, project, false, false)?;
+    let target = project.dist().join("www");
+    // A bundle that is rebuilt must not keep files of the last one: their names are hashes.
+    if target.exists() {
+        std::fs::remove_dir_all(&target)?;
+    }
+    let binary = project.server_path("debug");
+    step(
+        sys,
+        out,
+        &Cmd::new(&binary.to_string_lossy(), &[], &project.root)
+            .env("QUENCH_EXPORT", &target.to_string_lossy())
+            .env(
+                "WASM",
+                &project.wasm_path(wasm_profile(true)).to_string_lossy(),
+            ),
+    )?;
+    writeln!(out, "bundle {}", target.display())?;
+    Ok(())
+}

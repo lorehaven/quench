@@ -29,8 +29,10 @@ docs/
 ├── quench-fullstack.md
 ├── quench-fullstack-macros.md
 ├── quench-tool.md
+├── quench-android.md
 ├── quench-ui.md
 ├── quench-ui-web.md
+├── quench-ui-web-macros.md
 ├── quench-web.md
 ├── quench-web-components.md
 └── examples/                 # examples/* runnable references
@@ -65,10 +67,12 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench Regex](./quench-regex.md) — regular expressions with Unicode classes, no dependencies
 - [Quench Style](./quench-style.md) — shared design tokens, themes, base CSS and i18n for web, mobile and desktop
 - [Quench TZ](./quench-tz.md) — IANA time zones with the database built in
+- [Quench Android host](./quench-android.md) — the WebView app that runs a Quench UI bundle on Android, with a dev-server mode
 - [Quench Tool](./quench-tool.md) — the `quench` command: new projects, a dev loop with live reload, release builds, doctor
 - [Quench UI](./quench-ui.md) — UI core: signals, views, events and the renderer interface
 - [Quench Fullstack](./quench-fullstack.md) — serves Quench UI apps from Quench HTTP: server rendering, hashed assets, strict CSP, typed server functions, sessions
 - [Quench Fullstack Macros](./quench-fullstack-macros.md) — the `#[server]` attribute
+- [Quench UI Web Macros](./quench-ui-web-macros.md) — the `#[plugin]` attribute: a typed client for a native plugin of the host app
 - [Quench UI Web](./quench-ui-web.md) — runs a Quench UI app in the browser from WebAssembly, with a small JS bridge
 - [Quench PG](./quench-pg.md) — PostgreSQL wire-protocol client with SCRAM, TLS, pool
 - [Quench Redis](./quench-redis.md) — Redis client: RESP2/3, pool, cluster routing
@@ -168,8 +172,10 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ├── quench-style/           # shared tokens, themes, base CSS, i18n
 ├── quench-fullstack/       # serves quench-ui apps from quench-http: SSR, hashed assets, CSP, server functions, sessions
 ├── quench-fullstack-macros/ # #[server]
+├── quench-android/         # native code for the Android host: the program protocol, tz.next
 ├── quench-tool/            # the `quench` command: new, dev, build, doctor, test
 ├── quench-ui/              # UI core: signals, views, events, renderer interface
+├── quench-ui-web-macros/   # #[plugin]
 ├── quench-ui-web/          # runs quench-ui in the browser: wasm glue, quench.js, DOM renderer
 ├── quench-web/             # server-rendered HTML/CSS/JS page builder
 ├── quench-web-components/  # UI components built on quench-web

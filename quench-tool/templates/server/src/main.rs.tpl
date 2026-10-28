@@ -33,9 +33,18 @@ async fn main() {
         ui = ui.dev_reload();
     }
     let style = ui.add_asset("site.css", STYLE, "text/css");
-    let app = UiApp::new(ui).page("/", move |_req| {
-        Page::new("{{ name }}", {{ snake }}_app::app()).stylesheet(&style)
-    });
+    let home = move || Page::new("{{ name }}", {{ snake }}_app::app()).stylesheet(&style);
+    let export = home.clone();
+    let app = UiApp::new(ui).page("/", move |_req| home());
+    // `quench build --bundle` runs the server with QUENCH_EXPORT=<dir>: the page and the assets are
+    // written out as a static bundle (what the Android host serves) and the server does not start.
+    if let Some(dir) = std::env::var_os("QUENCH_EXPORT") {
+        app.ui()
+            .export(std::path::Path::new(&dir), export())
+            .expect("cannot write the bundle");
+        println!("bundle written to {}", std::path::Path::new(&dir).display());
+        return;
+    }
     let container = Arc::new(ContainerBuilder::new().build().await.expect("container"));
     let addr = format!("127.0.0.1:{port}").parse().expect("address");
     println!("http://{addr}");

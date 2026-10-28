@@ -53,6 +53,18 @@ fn a_web_project_has_no_shared_crate() {
 }
 
 #[quench_test::test]
+fn the_server_can_export_the_bundle_for_the_android_host() {
+    for template in [Template::Web, Template::Fullstack] {
+        let f = files(template, Some("/q"));
+        let main = get(&f, "server/src/main.rs");
+        assert!(
+            main.contains("QUENCH_EXPORT") && main.contains(".export("),
+            "{main}"
+        );
+    }
+}
+
+#[quench_test::test]
 fn nothing_of_the_template_syntax_is_left_over() {
     for template in [Template::Web, Template::Fullstack] {
         for (path, body) in files(template, None) {

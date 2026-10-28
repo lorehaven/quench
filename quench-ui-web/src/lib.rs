@@ -20,6 +20,9 @@
 //! Off `wasm32` the JS side is replaced by [`mock`], so everything but the thin wasm imports runs
 //! under `cargo test`.
 
+extern crate self as quench_ui_web;
+
+pub mod bridge;
 mod dom;
 mod events;
 mod exec;
@@ -28,12 +31,14 @@ mod ffi;
 mod history;
 mod host;
 mod platform;
+pub mod plugins;
 mod sse;
 mod state;
 
 use quench_ui::{IntoView, Mount, mount};
 use std::rc::Rc;
 
+pub use bridge::BridgeError;
 pub use dom::{DomRenderer, Node};
 pub use events::{decode as decode_event, kind_code};
 pub use exec::{Sleep, pending_tasks, sleep, spawn};
@@ -46,8 +51,15 @@ pub use history::BrowserHistory;
 #[cfg(not(target_arch = "wasm32"))]
 pub use host::mock;
 pub use platform::WebPlatform;
+pub use quench_ui_web_macros::plugin;
 pub use sse::{EventSource, SseEvent};
 pub use state::initial_state;
+
+/// What the expansion of [`plugin`] uses.
+#[doc(hidden)]
+pub mod __private {
+    pub use quench_serde::json;
+}
 
 /// The source of `quench.js`, for a server to serve at the URL the page loads it from.
 pub const QUENCH_JS: &str = include_str!("../js/quench.js");
@@ -97,6 +109,7 @@ pub(crate) fn reset_runtime() {
     exec::reset();
     fetch::reset();
     sse::reset();
+    bridge::reset();
 }
 
 /// Defines the `q_main` export that starts an app: `quench_ui_web::app!(my_app);` where

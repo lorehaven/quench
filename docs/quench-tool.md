@@ -30,6 +30,7 @@ The name is a lowercase letter followed by letters, digits, `-` and `_`, at most
 | `core/` | logic with no interface (`step`, here), tested natively with `quench-test` |
 | `shared/` | fullstack only: the types that cross the wire and the `#[server]` functions; built for the server and the browser |
 | `app/` | the interface: `cdylib` (the module the browser loads) and `rlib` (what the server renders pages from); ends with `quench_ui_web::app!(app)` |
+| `android/` | after `quench android init`: the Android host |
 | `server/` | a `quench-http` server using `quench-fullstack`: the page, the hashed assets, the server functions. Feature `embed` builds the module in |
 
 The root `quench.toml` (`name`, `template`) is how the other commands recognise a project; they find it from any directory below. The workspace defines two wasm profiles: `wasm-dev` (quick to compile, used by `dev` and a plain `build`) and `wasm` (size-optimised: `opt-level = "z"`, LTO, `panic = "abort"`, stripped). Without `--quench-path` the project depends on the registry `ennor` and gets a `.cargo/config.toml` naming it.
@@ -54,6 +55,46 @@ Without `--release`: the module with `wasm-dev` and the server in debug. With it
 2. the server with `cargo build --release --features embed`, copied to `dist/<name>-server`.
 
 The binary has the module inside, serves hashed asset names and the strict Content-Security-Policy, and needs no other file: it was run from an empty directory in the tool's acceptance test (page, module and `#[server]` call). With `--no-embed` the module stays a file the server reads from `WASM` (default: the cargo output path), which suits a deployment that serves it from elsewhere.
+
+## `quench build --bundle`
+
+Writes the app as a static bundle in `dist/www` for the Android host: the project's server is run once with `QUENCH_EXPORT=dist/www` and writes `index.html` (the page, rendered on the server side as for a browser) and every hashed asset under `_quench/` (`Ui::export` in [`quench-fullstack`](./quench-fullstack.md)); it then exits instead of serving. The module is the release build. The bundle directory is emptied first, because file names are hashes.
+
+## `quench android init [--package ID]`
+
+Writes `android/`, the Gradle project of the [Android host](./quench-android.md), next to the app (default application id `com.example.<name>`; it refuses to overwrite an existing `android/`). The project is Kotlin with no AndroidX; its Gradle build packages `dist/www` as the app's assets. The Gradle wrapper (9.3.1) is part of it, so `./gradlew assembleDebug` is all a machine with the Android SDK needs.
+
+## `quench plugin add <name>` / `quench plugin list`
+
+Adds a native capability to the project's Android host (`quench android init` first): its Kotlin files, its manifest entries and its line in `plugins()`, and what it needs (`jobs` adds `native`). `list` shows the plugins and which the project has (kept in `android/.quench-plugins`). What each does is in the [Android host](./quench-android.md#plugins).
+
+## `quench android build-native [--release] [--abi ABI]`
+
+Builds the program in `native/` (made by `quench plugin add native`) for arm64-v8a and x86_64 with the NDK's clang as the linker and copies it into `android/app/src/main/jniLibs/<abi>/` as `libquench_native.so`: the host runs it as a separate process, so there is no JNI and no unsafe code in the path. The NDK is `ANDROID_NDK_HOME`, or the newest under the SDK; the Rust targets come from `rustup target add aarch64-linux-android x86_64-linux-android` (`quench doctor` checks them).
+
+## `quench run android [--abi ABI]`
+
+Builds the bundle (and the native program for the device's ABI, found with `adb shell getprop ro.product.cpu.abi`, when the project has one), installs the debug APK with Gradle and starts it on the attached device or emulator. `quench dev --android` is the live version: it starts the app on the device pointing at the dev server (`adb reverse` and `dev_url`, once the server is listening), so an edit reloads the page on the device.
+
+## `quench build apk|aab [--release] [--abi ABI]` and signing
+
+`quench build apk` builds the bundle, the native program if there is one, and a debug APK; `--release` (and always for `aab`) signs with the key `quench.toml` names:
+
+```toml
+[android]
+package = "dev.lorehaven.demo"     # written by `quench android init`
+version_name = "0.1.0"
+version_code = 1                   # must go up with every release
+keystore = "release.keystore"      # from the project root; keep it out of git
+key_alias = "release"
+registry = "https://warehouse.example"   # where `quench publish` sends the build
+```
+
+`quench android keystore` makes the key with `keytool` and writes `keystore` and `key_alias` into the file. **The passwords are never in a file or on a command line**: `QUENCH_KEYSTORE_PASSWORD` (and `QUENCH_KEY_PASSWORD` if the key has its own) are read from the environment by `keytool`, by `quench`, and by the Gradle build. The result is copied to `dist/<name>-<version_name>-<version_code>.apk` (or `.aab`), and a signed APK is verified with the SDK's `apksigner` (the signer is printed). Measured on this machine: a signed release APK of the counter app is 725 KiB.
+
+## `quench publish [--dry-run] [--apk FILE] [--allow-dirty]`
+
+Builds the signed release APK (or takes `--apk`) and sends it to the warehouse apps are installed and updated from, with the protocol the old per-app scripts used: `PUT <registry>/warehouse/api/v1/artifacts/<package>/android/<version_code>` with a bearer token and the APK as the body; `201` is published, `409` means that version code exists (they are immutable: raise `version_code`). The registry is `WAREHOUSE_URL` or `registry` under `[android]` (there is no built-in default); the token is `WAREHOUSE_TOKEN`, or `WAREHOUSE_USER` and `WAREHOUSE_PASS` to log in through gatehouse. Before anything is sent it checks that the tree is clean (the published build must be traceable to a commit; `--allow-dirty` skips it and the commit is reported with `-dirty`), and that the APK is signed. `--dry-run` does all of that and sends nothing; the tests and the acceptance run publish to a local stand-in server (`scripts/android-fixtures.mjs warehouse`), never the real one.
 
 ## `quench doctor`
 

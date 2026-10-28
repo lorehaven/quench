@@ -93,6 +93,7 @@ struct State {
     styles: BTreeMap<(usize, String), String>,
     now: f64,
     reduced_motion: bool,
+    bridge_sent: Vec<String>,
 }
 
 impl State {
@@ -123,6 +124,7 @@ impl State {
             styles: BTreeMap::new(),
             now: 0.0,
             reduced_motion: false,
+            bridge_sent: Vec::new(),
         }
     }
 
@@ -168,8 +170,10 @@ fn try_with(f: impl FnOnce(&mut State)) {
 
 /// Forgets everything and starts again with just the root. Call at the start of a test.
 pub fn reset() {
-    with(|s| *s = State::new());
+    // The runtime first: dropping what the last test left (an open event source) calls the host, and
+    // that must not land in the state the next test starts with.
     crate::reset_runtime();
+    with(|s| *s = State::new());
 }
 
 /// The calls the Rust side made, oldest first.
@@ -367,6 +371,60 @@ pub fn run_ticks() -> bool {
         if ticked {
             ffi::q_tick();
         }
+    }
+}
+
+/// The envelopes the app sent to the host, oldest first. A bridge call is a fetch of
+/// `quench-bridge:call`, so it is also in [`fetches`] until it is answered.
+#[must_use]
+pub fn bridge_sent() -> Vec<String> {
+    with(|s| s.bridge_sent.clone())
+}
+
+/// The id of the envelope in `body`.
+fn envelope_id(body: &[u8]) -> Option<u64> {
+    let value: quench_serde::Value =
+        quench_serde::json::from_str(std::str::from_utf8(body).ok()?).ok()?;
+    value.get("id").and_then(quench_serde::Value::as_u64)
+}
+
+/// Plays the host: delivers one message as the message port would.
+///
+/// An answer completes the fetch of
+/// the call with that id; an event goes to the app's event source on the bridge. A message that is
+/// neither, or answers nothing, is ignored.
+pub fn bridge_deliver(text: &str) {
+    run_ticks(); // the app may have just asked for its event source
+    let Ok(value) = quench_serde::json::from_str::<quench_serde::Value>(text) else {
+        return;
+    };
+    if value.get("event").is_some() {
+        if let Some((id, _, _)) = sse_sources()
+            .into_iter()
+            .find(|(_, url, _)| url == "quench-bridge:events")
+        {
+            sse_emit(id, 1, "event", text);
+        }
+        return;
+    }
+    let Some(id) = value.get("id").and_then(quench_serde::Value::as_u64) else {
+        return;
+    };
+    let call = fetches()
+        .into_iter()
+        .find(|f| f.url == "quench-bridge:call" && envelope_id(&f.body) == Some(id));
+    if let Some(call) = call {
+        complete_fetch(call.id, 200, text.as_bytes(), "");
+    }
+}
+
+/// Plays a page that has no host: every call waiting for one fails, as `quench.js` fails it.
+pub fn bridge_unavailable() {
+    for call in fetches()
+        .into_iter()
+        .filter(|f| f.url == "quench-bridge:call")
+    {
+        complete_fetch(call.id, 0, b"this page is not shown by a host app", "");
     }
 }
 
@@ -614,6 +672,10 @@ pub(crate) mod imports {
 
     pub fn fetch(id: u32, method: &str, url: &str, headers: &str, body: &[u8]) {
         with(|s| {
+            if url == "quench-bridge:call" {
+                s.bridge_sent
+                    .push(String::from_utf8_lossy(body).into_owned());
+            }
             s.calls.push(Call::Fetch(id));
             s.fetches.insert(
                 id,
