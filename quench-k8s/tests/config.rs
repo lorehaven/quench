@@ -242,7 +242,7 @@ fn inference_uses_the_environment() {
         "KUBERNETES_SERVICE_PORT",
     ]
     .iter()
-    .map(|k| (*k, std::env::var_os(k)))
+    .map(|k| (*k, quench_core::env::var_os(k)))
     .collect();
     let dir = std::env::temp_dir().join(format!("quench-k8s-env-{}", std::process::id()));
     std::fs::create_dir_all(dir.join(".kube")).unwrap();

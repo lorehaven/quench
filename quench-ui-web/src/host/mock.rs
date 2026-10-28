@@ -5,6 +5,7 @@
 //! browser would: fire an event, a timer, a fetch completion, a tick.
 #![allow(clippy::must_use_candidate)] // the `fire_*` helpers are called for their effect
 
+pub use crate::ffi::alloc_copy;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -292,11 +293,7 @@ pub fn fire(handle: u32, kind: u32, payload: &str, a: f64, b: f64, c: i32, flags
         return false;
     }
     let (ptr, len) = ffi::alloc_copy(payload.as_bytes());
-    // SAFETY: `(ptr, len)` was just produced by `alloc_copy`, and is passed to one export.
-    #[allow(unsafe_code)]
-    unsafe {
-        ffi::q_dispatch_event(handle, kind, ptr, len, a, b, c, flags);
-    }
+    ffi::q_dispatch_event(handle, kind, ptr, len, a, b, c, flags);
     true
 }
 
@@ -336,11 +333,7 @@ pub fn complete_fetch(id: u32, status: u32, body: &[u8], headers: &str) -> bool 
     if known {
         let (bp, bl) = ffi::alloc_copy(body);
         let (hp, hl) = ffi::alloc_copy(headers.as_bytes());
-        // SAFETY: both buffers were just produced by `alloc_copy`, each passed to one export.
-        #[allow(unsafe_code)]
-        unsafe {
-            ffi::q_fetch_done(id, status, bp, bl, hp, hl);
-        }
+        ffi::q_fetch_done(id, status, bp, bl, hp, hl);
         run_ticks();
     }
     known
@@ -361,12 +354,7 @@ pub fn run_ticks() -> bool {
         ran = true;
         for id in aborts {
             let (bp, bl) = ffi::alloc_copy(b"aborted");
-            // SAFETY: the buffer was just produced by `alloc_copy`; a zero-length headers argument
-            // means "no data" and its pointer is ignored.
-            #[allow(unsafe_code)]
-            unsafe {
-                ffi::q_fetch_done(id, 0, bp, bl, std::ptr::null_mut(), 0);
-            }
+            ffi::q_fetch_done(id, 0, bp, bl, 0, 0);
         }
         if ticked {
             ffi::q_tick();
@@ -466,11 +454,7 @@ pub fn sse_emit(id: u32, kind: u32, name: &str, data: &str) -> bool {
     }
     let (np, nl) = ffi::alloc_copy(name.as_bytes());
     let (dp, dl) = ffi::alloc_copy(data.as_bytes());
-    // SAFETY: both buffers were just produced by `alloc_copy`, each passed to one export.
-    #[allow(unsafe_code)]
-    unsafe {
-        ffi::q_sse_event(id, kind, np, nl, dp, dl);
-    }
+    ffi::q_sse_event(id, kind, np, nl, dp, dl);
     run_ticks();
     true
 }
@@ -497,21 +481,13 @@ pub fn set_reduced_motion(on: bool) {
 /// The URL the page was loaded at, as `quench.js` reports it before `q_main`.
 pub fn set_location(url: &str) {
     let (ptr, len) = ffi::alloc_copy(url.as_bytes());
-    // SAFETY: `(ptr, len)` was just produced by `alloc_copy`, and is passed to one export.
-    #[allow(unsafe_code)]
-    unsafe {
-        ffi::q_set_location(ptr, len);
-    }
+    ffi::q_set_location(ptr, len);
 }
 
 /// The browser went to `url` through its history (the back or forward button).
 pub fn popstate(url: &str) {
     let (ptr, len) = ffi::alloc_copy(url.as_bytes());
-    // SAFETY: as for `set_location`.
-    #[allow(unsafe_code)]
-    unsafe {
-        ffi::q_popstate(ptr, len);
-    }
+    ffi::q_popstate(ptr, len);
 }
 
 /// The browser's session history: `(entries, index of the current one)`.

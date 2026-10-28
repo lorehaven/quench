@@ -233,10 +233,10 @@ pub struct Ignorer {
 }
 
 fn global_ignore_file() -> Option<PathBuf> {
-    if let Some(dir) = std::env::var_os("XDG_CONFIG_HOME").filter(|d| !d.is_empty()) {
+    if let Some(dir) = crate::env::var_os("XDG_CONFIG_HOME").filter(|d| !d.is_empty()) {
         return Some(PathBuf::from(dir).join("git/ignore"));
     }
-    std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config/git/ignore"))
+    crate::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config/git/ignore"))
 }
 
 impl Ignorer {

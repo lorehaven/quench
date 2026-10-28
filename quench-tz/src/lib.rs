@@ -181,7 +181,7 @@ impl Zone {
     /// rule), else `/etc/localtime`, else UTC.
     #[must_use]
     pub fn local() -> Self {
-        if let Ok(tz) = std::env::var("TZ") {
+        if let Some(tz) = quench_core::env::var("TZ") {
             let tz = tz.trim_start_matches(':');
             if !tz.is_empty() {
                 if let Ok(zone) = Self::named(tz) {

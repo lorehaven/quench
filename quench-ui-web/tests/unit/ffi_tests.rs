@@ -85,13 +85,13 @@ fn decoding_fills_in_payloads_and_modifier_flags() {
 
 #[quench_test::test]
 fn buffers_can_be_allocated_and_freed_including_empty_ones() {
-    let empty = q_alloc(0);
-    assert!(!empty.is_null());
-    unsafe { q_dealloc(empty, 0) };
-    let ptr = q_alloc(64);
-    assert!(!ptr.is_null());
-    unsafe { q_dealloc(ptr, 64) };
-    unsafe { q_dealloc(std::ptr::null_mut(), 8) }; // tolerated, not freed
+    assert_eq!(q_alloc(0), 0, "no room, no buffer");
+    q_dealloc(0, 0);
+    let address = q_alloc(64);
+    assert_ne!(address, 0);
+    q_dealloc(address, 64);
+    q_dealloc(address, 64); // already freed: tolerated
+    q_dealloc(8, 8); // not a buffer: tolerated
 }
 
 fn record_inputs() -> (
@@ -114,11 +114,8 @@ fn invalid_utf8_from_js_becomes_replacement_characters() {
     let (_, seen, m) = record_inputs();
     let h = mock::handles_by_tag("input")[0];
     let bad = [b'o', b'k', 0xff, 0xfe, b'!'];
-    let ptr = q_alloc(bad.len());
-    unsafe {
-        std::ptr::copy_nonoverlapping(bad.as_ptr(), ptr, bad.len());
-        q_dispatch_event(h, 2, ptr, bad.len(), 0.0, 0.0, 0, 0);
-    }
+    let (ptr, len) = quench_ui_web::mock::alloc_copy(&bad);
+    q_dispatch_event(h, 2, ptr, len, 0.0, 0.0, 0, 0);
     assert_eq!(*seen.borrow(), ["ok\u{fffd}\u{fffd}!"]);
     m.unmount();
 }
@@ -127,31 +124,13 @@ fn invalid_utf8_from_js_becomes_replacement_characters() {
 fn malformed_calls_are_ignored_without_panicking() {
     let (_, seen, m) = record_inputs();
     let h = mock::handles_by_tag("input")[0];
-    unsafe {
-        q_dispatch_event(h, 999, std::ptr::null_mut(), 0, 0.0, 0.0, 0, 0); // unknown kind
-        q_dispatch_event(0, 2, std::ptr::null_mut(), 0, 0.0, 0.0, 0, 0); // handle 0
-        q_dispatch_event(123_456, 2, std::ptr::null_mut(), 0, 0.0, 0.0, 0, 0); // never created
-        q_dispatch_event(h, 0, std::ptr::null_mut(), 0, 0.0, 0.0, 0, 0); // a kind with no listener
-        q_dispatch_event(
-            h,
-            2,
-            std::ptr::null_mut(),
-            0,
-            f64::NAN,
-            f64::INFINITY,
-            i32::MIN,
-            u32::MAX,
-        ); // empty text, odd numbers
-        q_fetch_done(77, 200, std::ptr::null_mut(), 0, std::ptr::null_mut(), 0); // nobody is waiting
-        q_fetch_done(
-            78,
-            u32::MAX,
-            std::ptr::null_mut(),
-            0,
-            std::ptr::null_mut(),
-            0,
-        );
-    }
+    q_dispatch_event(h, 999, 0, 0, 0.0, 0.0, 0, 0); // unknown kind
+    q_dispatch_event(0, 2, 0, 0, 0.0, 0.0, 0, 0); // handle 0
+    q_dispatch_event(123_456, 2, 0, 0, 0.0, 0.0, 0, 0); // never created
+    q_dispatch_event(h, 0, 0, 0, 0.0, 0.0, 0, 0); // a kind with no listener
+    q_dispatch_event(h, 2, 0, 0, f64::NAN, f64::INFINITY, i32::MIN, u32::MAX); // empty text, odd numbers
+    q_fetch_done(77, 200, 0, 0, 0, 0); // nobody is waiting
+    q_fetch_done(78, u32::MAX, 0, 0, 0, 0);
     assert_eq!(
         *seen.borrow(),
         [""],
@@ -162,7 +141,7 @@ fn malformed_calls_are_ignored_without_panicking() {
 
 fn q_dispatch_input_after_unmount(m: quench_ui::Mount<quench_ui_web::DomRenderer>) {
     m.unmount();
-    unsafe { q_dispatch_event(2, 2, std::ptr::null_mut(), 0, 0.0, 0.0, 0, 0) };
+    q_dispatch_event(2, 2, 0, 0, 0.0, 0.0, 0, 0);
 }
 
 #[quench_test::test]
@@ -178,26 +157,21 @@ fn the_embedded_state_is_stored_for_the_app() {
     mock::reset();
     assert_eq!(quench_ui_web::initial_state(), None);
     let json = "{\"todos\":[1,2],\"title\":\"café\"}".as_bytes();
-    let (ptr, len) = {
-        let ptr = q_alloc(json.len());
-        unsafe { std::ptr::copy_nonoverlapping(json.as_ptr(), ptr, json.len()) };
-        (ptr, json.len())
-    };
-    unsafe { quench_ui_web::q_set_state(ptr, len) };
+    let (ptr, len) = mock::alloc_copy(json);
+    quench_ui_web::q_set_state(ptr, len);
     assert_eq!(
         quench_ui_web::initial_state().as_deref(),
         Some(std::str::from_utf8(json).unwrap())
     );
     // Invalid UTF-8 is replaced, and an empty buffer gives an empty string, never a panic.
     let bad = [b'{', 0xff, b'}'];
-    let ptr = q_alloc(bad.len());
-    unsafe { std::ptr::copy_nonoverlapping(bad.as_ptr(), ptr, bad.len()) };
-    unsafe { quench_ui_web::q_set_state(ptr, bad.len()) };
+    let (ptr, len) = mock::alloc_copy(&bad);
+    quench_ui_web::q_set_state(ptr, len);
     assert_eq!(
         quench_ui_web::initial_state().as_deref(),
         Some("{\u{fffd}}")
     );
-    unsafe { quench_ui_web::q_set_state(std::ptr::null_mut(), 0) };
+    quench_ui_web::q_set_state(0, 0);
     assert_eq!(quench_ui_web::initial_state().as_deref(), Some(""));
     mock::reset();
     assert_eq!(quench_ui_web::initial_state(), None);

@@ -59,7 +59,7 @@ fn on_path(name: &str) -> bool {
     if name.contains(std::path::MAIN_SEPARATOR) {
         return is_executable(Path::new(name));
     }
-    let Some(paths) = std::env::var_os("PATH") else {
+    let Some(paths) = quench_core::env::var_os("PATH") else {
         return false;
     };
     std::env::split_paths(&paths).any(|dir| {

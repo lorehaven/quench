@@ -292,7 +292,7 @@ fn version_one_files_are_read_without_a_rule() {
 #[quench_test::test]
 fn the_local_zone_comes_from_the_environment() {
     // `TZ` is process-wide, so everything about it is in one test.
-    let saved = std::env::var_os("TZ");
+    let saved = quench_core::env::var_os("TZ");
     quench_core::env::set("TZ", "Asia/Tokyo");
     assert_eq!(Zone::local().name(), "Asia/Tokyo");
     quench_core::env::set("TZ", ":Europe/Warsaw");

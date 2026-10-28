@@ -170,7 +170,7 @@ fn the_directory_follows_the_environment() {
     // Environment variables are process-wide, so everything about them is in this one test.
     let saved: Vec<_> = ["QUENCH_TEST_REPORT", "QUENCH_TEST_REPORT_DIR", "NEXTEST"]
         .iter()
-        .map(|k| (*k, std::env::var_os(k)))
+        .map(|k| (*k, quench_core::env::var_os(k)))
         .collect();
     quench_core::env::remove("QUENCH_TEST_REPORT");
     quench_core::env::remove("QUENCH_TEST_REPORT_DIR");

@@ -10,7 +10,7 @@ pub fn init() {
     load_env_from_ancestors(); // Load from project root
 
     // Try to load from service-specific .env file if it exists
-    if let Ok(bin_name) = std::env::var("CARGO_BIN_NAME") {
+    if let Some(bin_name) = quench_core::env::var("CARGO_BIN_NAME") {
         let service_env_path = format!("docker/{bin_name}/");
         let env_file = std::path::Path::new(&service_env_path).join(".env");
         if env_file.exists() {
@@ -20,7 +20,7 @@ pub fn init() {
 
     quench_log::init();
 
-    let actual_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
+    let actual_level = quench_core::env::var("RUST_LOG").unwrap_or_else(|| "info".to_string());
     quench_log::debug!("Logging initialized with RUST_LOG={}", actual_level);
 }
 
@@ -44,16 +44,13 @@ fn load_env_from_ancestors() {
 /// Sets every `KEY=VALUE` line of `path` that isn't already in the
 /// environment (a real variable always wins over the file). Understands
 /// `#` comments, an `export ` prefix, and single / double quoted values.
-#[allow(unsafe_code)] // `set_var`, see the SAFETY note below
 fn load_env_file(path: &std::path::Path) {
     let Ok(content) = std::fs::read_to_string(path) else {
         return;
     };
     for (key, value) in parse_env(&content) {
-        if std::env::var_os(&key).is_none() {
-            // SAFETY: logging is initialised first thing in `main`, before
-            // any other thread reads or writes the environment.
-            unsafe { std::env::set_var(key, value) };
+        if quench_core::env::var_os(&key).is_none() {
+            quench_core::env::set(key, value);
         }
     }
 }
@@ -132,6 +129,11 @@ mod loader_tests {
         assert_eq!(
             quench_core::env::get_or("QUENCH_TEST_ENV_OLD", ""),
             "from-process"
+        );
+        // Plain `std::env` sees it too: services and libraries read it that way.
+        assert_eq!(
+            std::env::var("QUENCH_TEST_ENV_NEW").as_deref(),
+            Ok("from-file")
         );
         load_env_file(&dir.path().join("missing.env"));
         quench_core::env::remove("QUENCH_TEST_ENV_NEW");

@@ -11,8 +11,8 @@ pub struct PostgresDb {
 
 impl PostgresDb {
     pub async fn new(url: &str) -> Result<Self, DbError> {
-        let max_size = std::env::var("DB_POOL_MAX_SIZE")
-            .unwrap_or_else(|_| "5".to_string())
+        let max_size = quench_core::env::var("DB_POOL_MAX_SIZE")
+            .unwrap_or_else(|| "5".to_string())
             .parse()
             .unwrap_or(5);
         let pool = Pool::connect_with(
@@ -32,7 +32,8 @@ impl PostgresDb {
     }
 
     fn migration_table() -> String {
-        std::env::var("DB_MIGRATION_TABLE").unwrap_or_else(|_| "quench_migrations".to_string())
+        quench_core::env::var("DB_MIGRATION_TABLE")
+            .unwrap_or_else(|| "quench_migrations".to_string())
     }
 
     async fn ensure_migration_table(&self) -> Result<(), DbError> {

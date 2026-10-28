@@ -52,7 +52,7 @@ impl CacheStore {
     pub async fn from_env(key_prefix: impl Into<String>) -> Result<Self, CacheError> {
         let url = ["CACHE_URL", "REDIS_URL"]
             .iter()
-            .find_map(|key| std::env::var(key).ok())
+            .find_map(quench_core::env::var)
             .filter(|value| !value.trim().is_empty());
 
         match url {
@@ -61,7 +61,7 @@ impl CacheStore {
             Some(url) => {
                 let forced = ["CACHE_CLUSTER", "REDIS_CLUSTER"]
                     .iter()
-                    .find_map(|key| std::env::var(key).ok())
+                    .find_map(quench_core::env::var)
                     .is_some_and(|value| value.trim().eq_ignore_ascii_case("true"));
                 Ok(Self::Redis(
                     RedisStore::connect_with(&url, key_prefix, forced).await?,

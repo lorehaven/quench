@@ -4,9 +4,9 @@
 //! with a timeout so a program can do other work between keys. Escape sequences for arrows, Home/End,
 //! Page Up/Down, Insert/Delete and F1-F12 are understood, with Shift/Alt/Ctrl modifiers.
 
-#![allow(unsafe_code)]
-
-use std::io;
+use crate::tty::open_fd;
+use std::io::{self, Read};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
 /// What was pressed.
@@ -284,24 +284,55 @@ fn finish_csi(final_byte: u8, params: &[u32], used: usize) -> Parsed {
 const ESC_WAIT: Duration = Duration::from_millis(30);
 
 /// A source of key presses: a descriptor in raw mode, usually standard input.
+///
+/// A thread reads the descriptor and hands the bytes over, so that [`poll`](Keys::poll) can wait with a
+/// timeout without `poll(2)`. It reads on until the descriptor ends, so a program that stops using a
+/// `Keys` and goes on reading the same descriptor itself loses the next chunk of input to it.
 #[derive(Debug)]
 pub struct Keys {
-    fd: i32,
+    bytes: Receiver<io::Result<Vec<u8>>>,
     pending: Vec<u8>,
+    /// How the input ended, once it has: every later wait fails the same way.
+    ended: Option<io::ErrorKind>,
 }
 
 impl Keys {
     /// Keys from standard input.
     #[must_use]
-    pub const fn stdin() -> Self {
+    pub fn stdin() -> Self {
         Self::on_fd(0)
     }
 
     #[must_use]
-    pub const fn on_fd(fd: i32) -> Self {
+    pub fn on_fd(fd: i32) -> Self {
+        let (sender, bytes) = mpsc::channel();
+        let file = open_fd(fd);
+        std::thread::spawn(move || {
+            let Some(mut file) = file else {
+                let _ = sender.send(Err(io::Error::other("no such descriptor")));
+                return;
+            };
+            let mut buf = [0u8; 64];
+            loop {
+                let sent = match file.read(&mut buf) {
+                    Ok(0) => Err(io::Error::new(
+                        io::ErrorKind::UnexpectedEof,
+                        "the terminal input has ended",
+                    )),
+                    Ok(n) => Ok(buf[..n].to_vec()),
+                    Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                    Err(error) => Err(error),
+                };
+                let done = sent.is_err();
+                if sender.send(sent).is_err() || done {
+                    return;
+                }
+            }
+        });
         Self {
-            fd,
+            bytes,
             pending: Vec::new(),
+            ended: None,
         }
     }
 
@@ -378,44 +409,25 @@ impl Keys {
 
     /// Waits up to `timeout` for input and appends it; `false` when none came.
     fn fill(&mut self, timeout: Duration) -> io::Result<bool> {
-        let mut pollfd = libc::pollfd {
-            fd: self.fd,
-            events: libc::POLLIN,
-            revents: 0,
-        };
-        let millis = i32::try_from(timeout.as_millis()).unwrap_or(i32::MAX);
-        // SAFETY: one valid `pollfd`.
-        let ready = unsafe { libc::poll(&raw mut pollfd, 1, millis) };
-        if ready < 0 {
-            let error = io::Error::last_os_error();
-            return if error.kind() == io::ErrorKind::Interrupted {
-                Ok(false)
-            } else {
-                Err(error)
-            };
+        if let Some(kind) = self.ended {
+            return Err(io::Error::new(kind, "the terminal input has ended"));
         }
-        if ready == 0 {
-            return Ok(false);
-        }
-        let mut buf = [0u8; 64];
-        // SAFETY: reads into a local buffer of the stated length.
-        let n = unsafe { libc::read(self.fd, buf.as_mut_ptr().cast(), buf.len()) };
-        match usize::try_from(n) {
-            Ok(0) => Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "the terminal input has ended",
-            )),
-            Ok(n) => {
-                self.pending.extend_from_slice(&buf[..n]);
+        match self.bytes.recv_timeout(timeout) {
+            Ok(Ok(chunk)) => {
+                self.pending.extend_from_slice(&chunk);
                 Ok(true)
             }
-            Err(_) => {
-                let error = io::Error::last_os_error();
-                if error.kind() == io::ErrorKind::Interrupted {
-                    Ok(false)
-                } else {
-                    Err(error)
-                }
+            Ok(Err(error)) => {
+                self.ended = Some(error.kind());
+                Err(error)
+            }
+            Err(RecvTimeoutError::Timeout) => Ok(false),
+            Err(RecvTimeoutError::Disconnected) => {
+                self.ended = Some(io::ErrorKind::UnexpectedEof);
+                Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "the terminal input has ended",
+                ))
             }
         }
     }
@@ -424,7 +436,8 @@ impl Keys {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::fd::RawFd;
+    use std::io::Write;
+    use std::os::fd::AsRawFd;
 
     fn key(bytes: &[u8]) -> (KeyCode, Modifiers, usize) {
         match parse_key(bytes) {
@@ -570,75 +583,53 @@ mod tests {
         assert_eq!(KeyEvent::from(KeyCode::Up).modifiers, Modifiers::NONE);
     }
 
-    fn pipe() -> (RawFd, RawFd) {
-        let mut fds = [0 as RawFd; 2];
-        // SAFETY: `pipe` fills the array.
-        assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
-        fds.into()
-    }
-
-    fn write_fd(fd: RawFd, bytes: &[u8]) {
-        // SAFETY: a valid buffer and descriptor.
-        let n = unsafe { libc::write(fd, bytes.as_ptr().cast(), bytes.len()) };
-        assert_eq!(usize::try_from(n).unwrap(), bytes.len());
-    }
-
-    fn close(fd: RawFd) {
-        // SAFETY: a descriptor this test opened.
-        unsafe { libc::close(fd) };
-    }
-
     #[quench_test::test]
     fn the_reader_assembles_keys_and_tells_escape_from_sequences() {
-        let (rd, wr) = pipe();
-        let mut keys = Keys::on_fd(rd);
+        let (rd, mut wr) = io::pipe().unwrap();
+        let mut keys = Keys::on_fd(rd.as_raw_fd());
         assert!(!keys.poll(Duration::ZERO).unwrap());
 
-        write_fd(wr, b"q\x1b[A\x1b[1;5");
+        wr.write_all(b"q\x1b[A\x1b[1;5").unwrap();
         assert!(keys.poll(Duration::from_millis(100)).unwrap());
         assert_eq!(keys.read().unwrap().code, KeyCode::Char('q'));
         assert_eq!(keys.read().unwrap().code, KeyCode::Up);
         // The rest of a split sequence arrives later.
         assert!(!keys.poll(Duration::ZERO).unwrap());
-        write_fd(wr, b"C");
+        wr.write_all(b"C").unwrap();
         let event = keys.read().unwrap();
         assert_eq!((event.code, event.modifiers), (KeyCode::Right, CTRL));
 
         // A lone ESC is the Escape key once nothing follows.
-        write_fd(wr, b"\x1b");
+        wr.write_all(b"\x1b").unwrap();
         assert!(keys.poll(Duration::from_millis(200)).unwrap());
         assert_eq!(keys.read().unwrap().code, KeyCode::Esc);
 
         // Unknown sequences are skipped, not returned.
-        write_fd(wr, b"\x1b[99~x");
+        wr.write_all(b"\x1b[99~x").unwrap();
         assert!(keys.poll(Duration::from_millis(100)).unwrap());
         assert_eq!(keys.read().unwrap().code, KeyCode::Char('x'));
 
         // The end of input is an error, not a hang.
-        close(wr);
+        drop(wr);
         assert_eq!(
             keys.read().unwrap_err().kind(),
             io::ErrorKind::UnexpectedEof
         );
         assert!(keys.poll(Duration::ZERO).is_err());
-        close(rd);
         assert!(format!("{keys:?}").contains("Keys"));
-        let _ = Keys::stdin();
     }
 
     #[quench_test::test]
     fn an_unfinished_sequence_is_dropped_rather_than_wedging_the_reader() {
-        let (rd, wr) = pipe();
-        let mut keys = Keys::on_fd(rd);
-        write_fd(wr, b"\x1b[1;");
-        write_fd(wr, b"");
+        let (rd, mut wr) = io::pipe().unwrap();
+        let mut keys = Keys::on_fd(rd.as_raw_fd());
+        wr.write_all(b"\x1b[1;").unwrap();
         let reader = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(150));
-            write_fd(wr, b"z");
+            wr.write_all(b"z").unwrap();
             wr
         });
         assert_eq!(keys.read().unwrap().code, KeyCode::Char('z'));
-        close(reader.join().unwrap());
-        close(rd);
+        drop(reader.join().unwrap());
     }
 }

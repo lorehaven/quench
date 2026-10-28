@@ -187,7 +187,7 @@ impl<T> Styled<T> {
 impl<T: fmt::Display> fmt::Display for Styled<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let plain = !(self.bold || self.dim || self.underlined || self.color.is_some())
-            || std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty());
+            || quench_core::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty());
         if plain {
             return self.value.fmt(f);
         }
@@ -306,7 +306,7 @@ mod tests {
     #[quench_test::test]
     fn codes_wrap_the_text_unless_no_color_is_set() {
         // SAFETY of env use: this is the only test in the crate that touches `NO_COLOR`.
-        let saved = std::env::var_os("NO_COLOR");
+        let saved = quench_core::env::var_os("NO_COLOR");
         quench_core::env::remove("NO_COLOR");
 
         assert_eq!("hi".to_string(), format!("{}", "hi".styled()));

@@ -124,8 +124,7 @@ fn build_client_config(
 pub fn root_store(options: &ClientOptions) -> Result<RootCertStore, String> {
     let mut roots = RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
     if options.use_system_roots {
-        let path = std::env::var("SSL_CERT_FILE")
-            .ok()
+        let path = quench_core::env::var("SSL_CERT_FILE")
             .filter(|p| Path::new(p).is_file())
             .or_else(|| {
                 SYSTEM_BUNDLES

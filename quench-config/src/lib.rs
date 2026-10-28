@@ -79,7 +79,7 @@ impl ConfigLoader {
             }
         }
 
-        if let Ok(content) = std::env::var(env_var)
+        if let Some(content) = quench_core::env::var(env_var)
             && let Ok(config) = quench_serde::json::from_str::<T>(&content)
         {
             return Ok(config);
@@ -94,9 +94,9 @@ impl ConfigLoader {
     #[must_use]
     pub fn env_string(&self, key: &str, default: &str) -> String {
         let prefixed_key = format!("{}_{}", self.env_prefix, key);
-        std::env::var(&prefixed_key)
-            .or_else(|_| std::env::var(key))
-            .unwrap_or_else(|_| default.to_string())
+        quench_core::env::var(&prefixed_key)
+            .or_else(|| quench_core::env::var(key))
+            .unwrap_or_else(|| default.to_string())
     }
 
     /// Get environment variable as u64

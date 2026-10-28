@@ -30,7 +30,7 @@ pub fn which(name: impl AsRef<str>) -> Result<PathBuf, NotFound> {
     let found = if name.contains(std::path::MAIN_SEPARATOR) || name.contains('/') {
         candidates(Path::new(name)).find(|path| is_executable(path))
     } else {
-        env::var_os("PATH").and_then(|path| {
+        crate::env::var_os("PATH").and_then(|path| {
             env::split_paths(&path)
                 .filter(|dir| !dir.as_os_str().is_empty())
                 .flat_map(|dir| candidates(&dir.join(name)))
@@ -42,8 +42,8 @@ pub fn which(name: impl AsRef<str>) -> Result<PathBuf, NotFound> {
 
 #[cfg(windows)]
 fn candidates(base: &Path) -> impl Iterator<Item = PathBuf> + use<> {
-    let extensions: Vec<String> = env::var("PATHEXT")
-        .unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".to_string())
+    let extensions: Vec<String> = crate::env::var("PATHEXT")
+        .unwrap_or_else(|| ".COM;.EXE;.BAT;.CMD".to_string())
         .split(';')
         .filter(|ext| !ext.is_empty())
         .map(str::to_string)

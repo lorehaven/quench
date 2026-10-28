@@ -73,7 +73,7 @@ impl ConsoleSink {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            ansi: std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none(),
+            ansi: std::io::stdout().is_terminal() && quench_core::env::var_os("NO_COLOR").is_none(),
         }
     }
 }

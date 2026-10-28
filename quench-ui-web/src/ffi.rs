@@ -1,64 +1,75 @@
 //! The functions `quench.js` calls, and the buffer rules behind them.
-#![allow(unsafe_code)] // raw buffers cross the wasm boundary as (pointer, length) pairs
+//!
+//! Text and events cross the boundary as `(address, length)` pairs in linear memory. The buffers are
+//! ordinary `Vec`s kept here by address: [`q_alloc`] makes one and tells JS where it is, JS fills it, and
+//! the export it is handed to takes it back by that address. An address is only a number to this
+//! module, so nothing in it reads or writes through a raw pointer. The one thing the compiler asks to be
+//! called unsafe is the `no_mangle` that makes each function an export.
+#![allow(unsafe_code)] // `#[unsafe(no_mangle)]`: the export attribute is the only unsafe left here
 
 use crate::{dom, events, exec, fetch, history, sse, state};
+use std::cell::RefCell;
+use std::collections::BTreeMap;
 
-/// Room for `len` bytes that JS fills in and hands to one export. The export takes ownership.
+thread_local! {
+    /// The buffers JS has been given and not yet handed back, by address.
+    static BUFFERS: RefCell<BTreeMap<usize, Vec<u8>>> = const { RefCell::new(BTreeMap::new()) };
+}
+
+/// Room for `len` bytes that JS fills in and hands to one export. Returns where it is (0 for none).
+/// The export takes ownership.
 #[must_use]
 #[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
-pub extern "C" fn q_alloc(len: usize) -> *mut u8 {
+pub extern "C" fn q_alloc(len: usize) -> usize {
     if len == 0 {
-        return std::ptr::NonNull::dangling().as_ptr();
+        return 0;
     }
-    Box::into_raw(vec![0_u8; len].into_boxed_slice()).cast::<u8>()
+    let buffer = vec![0_u8; len];
+    let address = buffer.as_ptr().addr();
+    BUFFERS.with(|b| b.borrow_mut().insert(address, buffer));
+    address
 }
 
-/// Frees a buffer from [`q_alloc`] that was not passed to an export.
-///
-/// # Safety
-/// `ptr` and `len` must be exactly what `q_alloc(len)` returned and `len`, and not be used again.
+/// Frees a buffer from [`q_alloc`] that was not handed to an export. An address that is not one is
+/// ignored.
 #[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
-pub unsafe extern "C" fn q_dealloc(ptr: *mut u8, len: usize) {
-    drop(unsafe { take(ptr, len) });
+pub extern "C" fn q_dealloc(address: usize, len: usize) {
+    drop(take(address, len));
 }
 
-/// Takes ownership of a buffer from [`q_alloc`]. A zero `len` means "no data".
-///
-/// # Safety
-/// As for [`q_dealloc`].
-unsafe fn take(ptr: *mut u8, len: usize) -> Vec<u8> {
-    if len == 0 || ptr.is_null() {
+/// Takes the buffer at `address` back, cut to `len` bytes. A zero `len`, or an address that is not
+/// a buffer, means "no data".
+fn take(address: usize, len: usize) -> Vec<u8> {
+    if len == 0 {
+        BUFFERS.with(|b| b.borrow_mut().remove(&address));
         return Vec::new();
     }
-    let slice = std::ptr::slice_from_raw_parts_mut(ptr, len);
-    unsafe { Box::from_raw(slice) }.into_vec()
+    let mut bytes = BUFFERS
+        .with(|b| b.borrow_mut().remove(&address))
+        .unwrap_or_default();
+    bytes.truncate(len);
+    bytes
 }
 
 fn lossy(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }
 
-/// A listener fired on the node `handle`.
-///
-/// `ptr`/`len` carry the text payload (the value of an input, the key of a key event). Returns 1
-/// if a listener asked for the browser's default action to be stopped
-/// (`quench_ui::prevent_default`), else 0.
-///
-/// # Safety
-/// `ptr` and `len` must be a buffer from `q_alloc`, or `len` must be 0.
+/// A DOM event happened on node `handle`. `kind` selects the event (see `events::decode`). Returns 1
+/// when a handler asked for `preventDefault`.
 #[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
-#[allow(clippy::too_many_arguments)] // the shape fixed by the contract
-pub unsafe extern "C" fn q_dispatch_event(
+#[allow(clippy::too_many_arguments, clippy::must_use_candidate)] // the shape fixed by the contract
+pub extern "C" fn q_dispatch_event(
     handle: u32,
     kind: u32,
-    ptr: *mut u8,
+    address: usize,
     len: usize,
     a: f64,
     b: f64,
     c: i32,
     flags: u32,
 ) -> u32 {
-    let payload = lossy(&unsafe { take(ptr, len) });
+    let payload = lossy(&take(address, len));
     let _ = quench_ui::take_prevent_request();
     if let Some(event) = events::decode(kind, payload, a, b, c, flags) {
         dom::dispatch(handle, &event);
@@ -66,48 +77,36 @@ pub unsafe extern "C" fn q_dispatch_event(
     u32::from(quench_ui::take_prevent_request())
 }
 
-/// The JSON the server embedded in the page for the app, read before `q_main`.
-///
-/// # Safety
-/// `ptr` and `len` must be a buffer from `q_alloc`, or `len` must be 0.
+/// The state the server embedded in the page, read before `q_main`.
 #[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
-pub unsafe extern "C" fn q_set_state(ptr: *mut u8, len: usize) {
-    state::set(lossy(&unsafe { take(ptr, len) }));
+pub extern "C" fn q_set_state(address: usize, len: usize) {
+    state::set(lossy(&take(address, len)));
 }
 
 /// The URL (path, query and hash) the page was loaded at, read before `q_main`.
-///
-/// # Safety
-/// `ptr` and `len` must be a buffer from `q_alloc`, or `len` must be 0.
 #[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
-pub unsafe extern "C" fn q_set_location(ptr: *mut u8, len: usize) {
-    history::set_initial(&lossy(&unsafe { take(ptr, len) }));
+pub extern "C" fn q_set_location(address: usize, len: usize) {
+    history::set_initial(&lossy(&take(address, len)));
 }
 
 /// The browser moved through its history (back, forward): the URL it is at now.
-///
-/// # Safety
-/// `ptr` and `len` must be a buffer from `q_alloc`, or `len` must be 0.
 #[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
-pub unsafe extern "C" fn q_popstate(ptr: *mut u8, len: usize) {
-    history::popstate(&lossy(&unsafe { take(ptr, len) }));
+pub extern "C" fn q_popstate(address: usize, len: usize) {
+    history::popstate(&lossy(&take(address, len)));
 }
 
 /// Something happened to an event source opened with `q_sse_open`. Both buffers are consumed.
-///
-/// # Safety
-/// Each `(ptr, len)` pair must be a buffer from `q_alloc`, or have `len` 0.
 #[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
-pub unsafe extern "C" fn q_sse_event(
+pub extern "C" fn q_sse_event(
     id: u32,
     kind: u32,
-    name_ptr: *mut u8,
+    name_address: usize,
     name_len: usize,
-    data_ptr: *mut u8,
+    data_address: usize,
     data_len: usize,
 ) {
-    let name = lossy(&unsafe { take(name_ptr, name_len) });
-    let data = lossy(&unsafe { take(data_ptr, data_len) });
+    let name = lossy(&take(name_address, name_len));
+    let data = lossy(&take(data_address, data_len));
     sse::event(id, kind, name, data);
 }
 
@@ -125,29 +124,29 @@ pub extern "C" fn q_timer_fire(id: u32) {
 
 /// A fetch started with `q_fetch` finished (`status` 0: it failed or was aborted, and the body is
 /// a message).
-///
-/// # Safety
-/// Each `(ptr, len)` pair must be a buffer from `q_alloc`, or have `len` 0.
 #[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
-pub unsafe extern "C" fn q_fetch_done(
+pub extern "C" fn q_fetch_done(
     id: u32,
     status: u32,
-    body_ptr: *mut u8,
+    body_address: usize,
     body_len: usize,
-    headers_ptr: *mut u8,
+    headers_address: usize,
     headers_len: usize,
 ) {
-    let body = unsafe { take(body_ptr, body_len) };
-    let headers = lossy(&unsafe { take(headers_ptr, headers_len) });
+    let body = take(body_address, body_len);
+    let headers = lossy(&take(headers_address, headers_len));
     fetch::completed(id, status, body, &headers);
 }
 
-/// A copy of `bytes` in a fresh `q_alloc` buffer, as `quench.js` would make.
+/// A copy of `bytes` in a fresh `q_alloc` buffer, as `quench.js` would make: `(address, length)`.
 #[cfg(not(target_arch = "wasm32"))]
-pub fn alloc_copy(bytes: &[u8]) -> (*mut u8, usize) {
-    let ptr = q_alloc(bytes.len());
-    if !bytes.is_empty() {
-        unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len()) };
-    }
-    (ptr, bytes.len())
+#[must_use]
+pub fn alloc_copy(bytes: &[u8]) -> (usize, usize) {
+    let address = q_alloc(bytes.len());
+    BUFFERS.with(|b| {
+        if let Some(buffer) = b.borrow_mut().get_mut(&address) {
+            buffer.copy_from_slice(bytes);
+        }
+    });
+    (address, bytes.len())
 }

@@ -3,7 +3,7 @@ use std::io::Write;
 /// `text` wrapped in the SGR `codes` (e.g. `"1;96"`), or untouched when the
 /// `NO_COLOR` convention (<https://no-color.org>) asks for plain output.
 fn paint(codes: &str, text: impl std::fmt::Display) -> String {
-    if std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()) {
+    if quench_core::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()) {
         text.to_string()
     } else {
         format!("\x1b[{codes}m{text}\x1b[0m")

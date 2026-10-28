@@ -102,9 +102,10 @@ impl Config {
     ///
     /// [`Error::Config`] outside a cluster, or when the mounted files are unreadable.
     pub fn in_cluster() -> Result<Self> {
-        let host = std::env::var("KUBERNETES_SERVICE_HOST")
-            .map_err(|_| Error::Config("KUBERNETES_SERVICE_HOST is not set".to_string()))?;
-        let port = std::env::var("KUBERNETES_SERVICE_PORT").unwrap_or_else(|_| "443".to_string());
+        let host = quench_core::env::var("KUBERNETES_SERVICE_HOST")
+            .ok_or_else(|| Error::Config("KUBERNETES_SERVICE_HOST is not set".to_string()))?;
+        let port =
+            quench_core::env::var("KUBERNETES_SERVICE_PORT").unwrap_or_else(|| "443".to_string());
         Self::in_cluster_at(Path::new(SERVICE_ACCOUNT), &host, &port)
     }
 
@@ -260,13 +261,13 @@ fn resolve(base: Option<&Path>, file: &str) -> PathBuf {
 
 /// The first existing kubeconfig of `KUBECONFIG`, else `~/.kube/config`.
 fn default_kubeconfig() -> Option<PathBuf> {
-    if let Some(list) = std::env::var_os("KUBECONFIG") {
+    if let Some(list) = quench_core::env::var_os("KUBECONFIG") {
         let first = std::env::split_paths(&list).find(|p| p.is_file());
         if first.is_some() {
             return first;
         }
     }
-    let home = std::env::var_os("HOME")?;
+    let home = quench_core::env::var_os("HOME")?;
     let path = Path::new(&home).join(".kube/config");
     path.is_file().then_some(path)
 }

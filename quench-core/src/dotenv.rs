@@ -123,7 +123,7 @@ pub fn parse(text: &str) -> Result<Vec<(String, String)>, ParseError> {
         let lookup = |name: &str| {
             seen.get(name)
                 .cloned()
-                .or_else(|| std::env::var(name).ok())
+                .or_else(|| env::var(name))
                 .unwrap_or_default()
         };
         let value =
@@ -261,7 +261,7 @@ fn expand(chars: &[char], at: &mut usize, out: &mut String, lookup: &dyn Fn(&str
 pub fn load_from(path: impl AsRef<Path>) -> Result<(), Error> {
     let text = std::fs::read_to_string(path)?;
     for (key, value) in parse(&text)? {
-        if std::env::var_os(&key).is_none() {
+        if env::var_os(&key).is_none() {
             env::set(key, value);
         }
     }
@@ -384,6 +384,27 @@ mod tests {
         );
         assert!(parse("bad key=1").is_err());
         assert_eq!(parse("A=\"1\nB=2\n").unwrap_err().line, 1);
+    }
+
+    #[quench_test::test]
+    fn a_loaded_file_is_the_real_environment_for_std_and_for_children() {
+        let dir = TempDir::new().unwrap();
+        let file = dir.path().join(".env");
+        std::fs::write(&file, "QUENCH_DOTENV_REAL=\"from the file\"\n").unwrap();
+        env::remove("QUENCH_DOTENV_REAL");
+        load_from(&file).unwrap();
+        // What a library that reads `std::env` directly sees ...
+        assert_eq!(
+            std::env::var("QUENCH_DOTENV_REAL").as_deref(),
+            Ok("from the file")
+        );
+        // ... and what a process started afterwards inherits.
+        let child = std::process::Command::new("sh")
+            .args(["-c", "printf %s \"$QUENCH_DOTENV_REAL\""])
+            .output()
+            .unwrap();
+        assert_eq!(String::from_utf8_lossy(&child.stdout), "from the file");
+        env::remove("QUENCH_DOTENV_REAL");
     }
 
     #[quench_test::test]

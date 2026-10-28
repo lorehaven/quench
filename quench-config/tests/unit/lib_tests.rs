@@ -1,7 +1,5 @@
 //! Unit tests for `lib.rs`.
 
-#![allow(unsafe_code)] // tests mutate the process environment (`set_var` is unsafe in edition 2024)
-
 use quench_config::*;
 use quench_serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -26,9 +24,7 @@ fn temp_file(name: &str, ext: &str, contents: &str) -> PathBuf {
 
 #[quench_test::test]
 fn test_config_loader_env() {
-    unsafe {
-        std::env::set_var("TEST_VAR", "test_value");
-    }
+    quench_core::env::set("TEST_VAR", "test_value");
     let loader = ConfigLoader::new("TEST");
     let value = loader.env_string("VAR", "default");
     assert_eq!(value, "test_value");
@@ -36,9 +32,7 @@ fn test_config_loader_env() {
 
 #[quench_test::test]
 fn test_config_loader_env_list() {
-    unsafe {
-        std::env::set_var("TEST_LIST", "item1, item2, item3");
-    }
+    quench_core::env::set("TEST_LIST", "item1, item2, item3");
     let loader = ConfigLoader::new("TEST");
     let list = loader.env_list("LIST", &[]);
     assert_eq!(list.len(), 3);
@@ -47,15 +41,11 @@ fn test_config_loader_env_list() {
 
 #[quench_test::test]
 fn test_config_loader_bool() {
-    unsafe {
-        std::env::set_var("TEST_ENABLED", "true");
-    }
+    quench_core::env::set("TEST_ENABLED", "true");
     let loader = ConfigLoader::new("TEST");
     assert!(loader.env_bool("ENABLED", false));
 
-    unsafe {
-        std::env::set_var("TEST_DISABLED", "false");
-    }
+    quench_core::env::set("TEST_DISABLED", "false");
     assert!(!loader.env_bool("DISABLED", true));
 }
 
@@ -68,24 +58,18 @@ fn env_string_falls_back_to_the_default_when_neither_prefixed_nor_bare_key_is_se
 
 #[quench_test::test]
 fn env_string_falls_back_to_the_bare_key_when_the_prefixed_one_is_absent() {
-    unsafe {
-        std::env::set_var("BARE_ONLY_KEY", "bare-value");
-    }
+    quench_core::env::set("BARE_ONLY_KEY", "bare-value");
     let loader = ConfigLoader::new("QCFG");
     assert_eq!(loader.env_string("BARE_ONLY_KEY", "default"), "bare-value");
 }
 
 #[quench_test::test]
 fn env_u64_parses_a_valid_number_and_falls_back_on_a_bad_one() {
-    unsafe {
-        std::env::set_var("TEST_PORT", "9090");
-    }
+    quench_core::env::set("TEST_PORT", "9090");
     let loader = ConfigLoader::new("TEST");
     assert_eq!(loader.env_u64("PORT", 8080), 9090);
 
-    unsafe {
-        std::env::set_var("TEST_NOT_A_NUMBER", "not-a-number");
-    }
+    quench_core::env::set("TEST_NOT_A_NUMBER", "not-a-number");
     assert_eq!(loader.env_u64("NOT_A_NUMBER", 42), 42);
 }
 
@@ -97,18 +81,14 @@ fn env_bool_recognises_every_truthy_spelling_case_insensitively() {
         ("TRUTHY_YES", "YES"),
         ("TRUTHY_ON", "On"),
     ] {
-        unsafe {
-            std::env::set_var(format!("TEST_{key}"), value);
-        }
+        quench_core::env::set(format!("TEST_{key}"), value);
         assert!(loader.env_bool(key, false), "{value} should be truthy");
     }
 }
 
 #[quench_test::test]
 fn env_bool_treats_an_unrecognised_present_value_as_false_regardless_of_default() {
-    unsafe {
-        std::env::set_var("TEST_GIBBERISH", "not-a-bool");
-    }
+    quench_core::env::set("TEST_GIBBERISH", "not-a-bool");
     let loader = ConfigLoader::new("TEST");
     assert!(!loader.env_bool("GIBBERISH", true));
 }
@@ -126,9 +106,7 @@ fn env_list_falls_back_to_the_default_list_and_trims_and_drops_empty_entries() {
     let list = loader.env_list("UNSET_LIST_KEY", &["a", "b"]);
     assert_eq!(list, vec!["a".to_string(), "b".to_string()]);
 
-    unsafe {
-        std::env::set_var("TEST_MESSY_LIST", " one ,, two ,");
-    }
+    quench_core::env::set("TEST_MESSY_LIST", " one ,, two ,");
     let list = ConfigLoader::new("TEST").env_list("MESSY_LIST", &[]);
     assert_eq!(list, vec!["one".to_string(), "two".to_string()]);
 }
@@ -237,9 +215,7 @@ fn load_with_fallback_reads_from_a_toml_file_by_extension() {
 
 #[quench_test::test]
 fn load_with_fallback_falls_back_to_the_env_var_when_no_file_path_is_given() {
-    unsafe {
-        std::env::set_var("FALLBACK_ENV_ONLY", r#"{"name":"from-env","count":9}"#);
-    }
+    quench_core::env::set("FALLBACK_ENV_ONLY", r#"{"name":"from-env","count":9}"#);
     let loaded: Sample =
         ConfigLoader::load_with_fallback(None, "FALLBACK_ENV_ONLY", None).expect("load from env");
     assert_eq!(loaded.name, "from-env");
@@ -247,12 +223,10 @@ fn load_with_fallback_falls_back_to_the_env_var_when_no_file_path_is_given() {
 
 #[quench_test::test]
 fn load_with_fallback_falls_back_to_the_env_var_when_the_file_path_does_not_exist() {
-    unsafe {
-        std::env::set_var(
-            "FALLBACK_ENV_OVER_MISSING_FILE",
-            r#"{"name":"from-env-2","count":10}"#,
-        );
-    }
+    quench_core::env::set(
+        "FALLBACK_ENV_OVER_MISSING_FILE",
+        r#"{"name":"from-env-2","count":10}"#,
+    );
     let loaded: Sample = ConfigLoader::load_with_fallback(
         Some("/no/such/file.json"),
         "FALLBACK_ENV_OVER_MISSING_FILE",
@@ -293,13 +267,11 @@ fn load_with_fallback_errors_when_nothing_is_available_and_there_is_no_default()
 
 #[quench_test::test]
 fn app_config_from_env_reads_every_field_with_its_prefix() {
-    unsafe {
-        std::env::set_var("APP_SERVICE_NAME", "my-service");
-        std::env::set_var("APP_PORT", "3000");
-        std::env::set_var("APP_DATABASE_URL", "postgres://localhost/db");
-        std::env::set_var("APP_LOG_LEVEL", "debug");
-        std::env::set_var("APP_DEBUG", "true");
-    }
+    quench_core::env::set("APP_SERVICE_NAME", "my-service");
+    quench_core::env::set("APP_PORT", "3000");
+    quench_core::env::set("APP_DATABASE_URL", "postgres://localhost/db");
+    quench_core::env::set("APP_LOG_LEVEL", "debug");
+    quench_core::env::set("APP_DEBUG", "true");
     let config = AppConfig::from_env();
     assert_eq!(config.service_name, "my-service");
     assert_eq!(config.port, 3000);

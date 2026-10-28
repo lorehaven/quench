@@ -351,15 +351,16 @@ fn suite_from_value(value: &Value) -> Option<Suite> {
 #[must_use]
 pub fn report_directory() -> Option<PathBuf> {
     if matches!(
-        std::env::var("QUENCH_TEST_REPORT").as_deref(),
-        Ok("off" | "0" | "false")
+        quench_core::env::var("QUENCH_TEST_REPORT").as_deref(),
+        Some("off" | "0" | "false")
     ) {
         return None;
     }
-    if let Some(dir) = std::env::var_os("QUENCH_TEST_REPORT_DIR").filter(|d| !d.is_empty()) {
+    if let Some(dir) = quench_core::env::var_os("QUENCH_TEST_REPORT_DIR").filter(|d| !d.is_empty())
+    {
         return Some(PathBuf::from(dir));
     }
-    if std::env::var_os("NEXTEST").is_some() {
+    if quench_core::env::var_os("NEXTEST").is_some() {
         return None;
     }
     let from_exe = std::env::current_exe().ok().and_then(|exe| {

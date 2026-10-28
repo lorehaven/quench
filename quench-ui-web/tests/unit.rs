@@ -1,5 +1,5 @@
 // The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
-#![allow(clippy::wildcard_imports, unsafe_code)]
+#![allow(clippy::wildcard_imports)]
 
 #[path = "unit/async_tests.rs"]
 mod async_tests;

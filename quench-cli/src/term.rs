@@ -1,9 +1,9 @@
 //! Terminal queries and screen control: is this a terminal, how big, and the escape sequences for the
 //! alternate screen, clearing and cursor placement.
 
-#![allow(unsafe_code)]
-
-use std::io::{self, Write};
+use crate::tty::{open_fd, save, stty};
+use std::fs::File;
+use std::io::{self, IsTerminal, Read, Write};
 
 /// Switches to the alternate screen buffer (a full-screen program's own page).
 pub const ENTER_ALTERNATE_SCREEN: &str = "\x1b[?1049h";
@@ -35,8 +35,7 @@ pub fn clear_screen(out: &mut impl Write) -> io::Result<()> {
 /// Whether file descriptor `fd` is a terminal.
 #[must_use]
 pub fn is_tty(fd: i32) -> bool {
-    // SAFETY: `isatty` only inspects the descriptor.
-    unsafe { libc::isatty(fd) == 1 }
+    open_fd(fd).is_some_and(|file| file.is_terminal())
 }
 
 #[must_use]
@@ -55,17 +54,19 @@ pub fn stdout_is_tty() -> bool {
 ///
 /// When `fd` is not a terminal or reports no size.
 pub fn size_of(fd: i32) -> io::Result<(u16, u16)> {
-    let mut ws = std::mem::MaybeUninit::<libc::winsize>::zeroed();
-    // SAFETY: `TIOCGWINSZ` fills the `winsize` it is given.
-    if unsafe { libc::ioctl(fd, libc::TIOCGWINSZ, ws.as_mut_ptr()) } != 0 {
-        return Err(io::Error::last_os_error());
-    }
-    // SAFETY: zero-initialised, and written by the successful ioctl.
-    let ws = unsafe { ws.assume_init() };
-    if ws.ws_col == 0 || ws.ws_row == 0 {
+    let tty = open_fd(fd)
+        .filter(File::is_terminal)
+        .ok_or_else(|| io::Error::other("not a terminal"))?;
+    // `stty size` prints "rows columns".
+    let said = stty(&tty, &["size"])?;
+    let mut numbers = said.split_whitespace().map(str::parse::<u16>);
+    let (Some(Ok(rows)), Some(Ok(columns))) = (numbers.next(), numbers.next()) else {
+        return Err(io::Error::other("the terminal reports no size"));
+    };
+    if rows == 0 || columns == 0 {
         return Err(io::Error::other("the terminal reports no size"));
     }
-    Ok((ws.ws_col, ws.ws_row))
+    Ok((columns, rows))
 }
 
 /// `(columns, rows)` of the terminal on standard output, falling back to standard error and input.
@@ -87,10 +88,12 @@ pub fn read_secret(fd: i32, prompt: &str) -> io::Result<String> {
     let mut err = io::stderr();
     write!(err, "{prompt}")?;
     err.flush()?;
+    let mut file = open_fd(fd).ok_or_else(|| io::Error::other("no such descriptor"))?;
     let echo_off = EchoOff::new(fd)?;
-    let line = read_line(fd);
+    let line = read_line(&mut file);
+    let was_terminal = echo_off.is_some();
     drop(echo_off);
-    if is_tty(fd) {
+    if was_terminal {
         writeln!(err)?;
     }
     line
@@ -105,24 +108,17 @@ pub fn prompt_password(prompt: &str) -> io::Result<String> {
     read_secret(0, prompt)
 }
 
-/// Reads bytes up to a newline straight from the descriptor, so nothing is left in a userspace buffer.
-fn read_line(fd: i32) -> io::Result<String> {
+/// Reads bytes up to a newline straight from the file, so nothing is left in a userspace buffer.
+fn read_line(file: &mut File) -> io::Result<String> {
     let mut bytes = Vec::new();
     loop {
-        let mut byte = 0u8;
-        // SAFETY: reads at most one byte into a local.
-        let n = unsafe { libc::read(fd, (&raw mut byte).cast(), 1) };
-        match n {
-            0 => break,
-            1 if byte == b'\n' => break,
-            1 => bytes.push(byte),
-            _ => {
-                let error = io::Error::last_os_error();
-                if error.kind() == io::ErrorKind::Interrupted {
-                    continue;
-                }
-                return Err(error);
-            }
+        let mut byte = [0u8; 1];
+        match file.read(&mut byte) {
+            Ok(0) => break,
+            Ok(_) if byte[0] == b'\n' => break,
+            Ok(_) => bytes.push(byte[0]),
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(error),
         }
     }
     if bytes.last() == Some(&b'\r') {
@@ -132,98 +128,36 @@ fn read_line(fd: i32) -> io::Result<String> {
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "input is not UTF-8"))
 }
 
-/// Echo switched off on a terminal until dropped; nothing happens for a descriptor that is not one.
+/// Echo switched off on a terminal until dropped.
 struct EchoOff {
-    fd: i32,
-    original: Option<libc::termios>,
+    tty: File,
+    saved: String,
 }
 
 impl EchoOff {
-    fn new(fd: i32) -> io::Result<Self> {
-        if !is_tty(fd) {
-            return Ok(Self { fd, original: None });
-        }
-        let mut attrs = std::mem::MaybeUninit::<libc::termios>::uninit();
-        // SAFETY: `tcgetattr` fills the struct on success.
-        if unsafe { libc::tcgetattr(fd, attrs.as_mut_ptr()) } != 0 {
-            return Err(io::Error::last_os_error());
-        }
-        // SAFETY: initialised by the successful call above.
-        let original = unsafe { attrs.assume_init() };
-        let mut quiet = original;
-        quiet.c_lflag &= !(libc::ECHO | libc::ECHOE | libc::ECHOK);
-        quiet.c_lflag |= libc::ECHONL;
-        // SAFETY: a valid termios derived from the kernel's own.
-        if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &raw const quiet) } != 0 {
-            return Err(io::Error::last_os_error());
-        }
-        Ok(Self {
-            fd,
-            original: Some(original),
-        })
+    /// `None` for a descriptor that is not a terminal: nothing to switch.
+    fn new(fd: i32) -> io::Result<Option<Self>> {
+        let Some((tty, saved)) = save(fd)? else {
+            return Ok(None);
+        };
+        stty(&tty, &["-echo", "-echoe", "-echok", "echonl"])?;
+        Ok(Some(Self { tty, saved }))
     }
 }
 
 impl Drop for EchoOff {
     fn drop(&mut self) {
-        if let Some(original) = &self.original {
-            // SAFETY: restores the attributes saved in `new`.
-            unsafe { libc::tcsetattr(self.fd, libc::TCSANOW, original) };
-        }
+        // Nothing to do when it fails: the terminal is gone.
+        let _ = stty(&self.tty, &[&self.saved]);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::fd::RawFd;
+    use std::os::fd::AsRawFd;
 
-    fn pty() -> (RawFd, RawFd) {
-        let (mut master, mut slave) = (0, 0);
-        // SAFETY: `openpty` writes two descriptors into the integers it is given.
-        let rc = unsafe {
-            libc::openpty(
-                &raw mut master,
-                &raw mut slave,
-                std::ptr::null_mut(),
-                std::ptr::null(),
-                std::ptr::null(),
-            )
-        };
-        assert_eq!(rc, 0);
-        (master, slave)
-    }
-
-    fn write_fd(fd: RawFd, bytes: &[u8]) {
-        // SAFETY: a valid buffer and descriptor.
-        let n = unsafe { libc::write(fd, bytes.as_ptr().cast(), bytes.len()) };
-        assert_eq!(usize::try_from(n).unwrap(), bytes.len());
-    }
-
-    fn read_available(fd: RawFd) -> Vec<u8> {
-        let mut pollfd = libc::pollfd {
-            fd,
-            events: libc::POLLIN,
-            revents: 0,
-        };
-        let mut out = Vec::new();
-        // SAFETY: one valid `pollfd`; the reads are into a local buffer.
-        while unsafe { libc::poll(&raw mut pollfd, 1, 50) } > 0 {
-            let mut buf = [0u8; 256];
-            let n = unsafe { libc::read(fd, buf.as_mut_ptr().cast(), buf.len()) };
-            if n <= 0 {
-                break;
-            }
-            out.extend_from_slice(&buf[..usize::try_from(n).unwrap()]);
-        }
-        out
-    }
-
-    fn close(fd: RawFd) {
-        // SAFETY: a descriptor this test opened.
-        unsafe { libc::close(fd) };
-    }
-
+    // What needs a real terminal (size, the secret without echo) is tested under one in `tests/pty.rs`.
     #[quench_test::test]
     fn escape_sequences() {
         assert_eq!(move_to(0, 0), "\x1b[1;1H");
@@ -234,66 +168,24 @@ mod tests {
     }
 
     #[quench_test::test]
-    fn terminals_are_recognised_and_sized() {
-        let (master, slave) = pty();
-        assert!(is_tty(slave));
+    fn a_pipe_is_not_a_terminal() {
+        let (reader, _writer) = io::pipe().unwrap();
+        assert!(!is_tty(reader.as_raw_fd()));
         assert!(!is_tty(-1));
-        let ws = libc::winsize {
-            ws_row: 30,
-            ws_col: 100,
-            ws_xpixel: 0,
-            ws_ypixel: 0,
-        };
-        // SAFETY: sets the size of the pty this test owns.
-        assert_eq!(
-            unsafe { libc::ioctl(slave, libc::TIOCSWINSZ, &raw const ws) },
-            0
-        );
-        assert_eq!(size_of(slave).unwrap(), (100, 30));
-        close(master);
-        close(slave);
-
-        let mut fds = [0 as RawFd; 2];
-        // SAFETY: `pipe` fills the array.
-        assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
-        assert!(size_of(fds[0]).is_err());
-        close(fds[0]);
-        close(fds[1]);
+        assert!(size_of(reader.as_raw_fd()).is_err());
         // Whatever the test runner's stdio is, these must not panic.
         let _ = (stdin_is_tty(), stdout_is_tty(), size());
     }
 
     #[quench_test::test]
-    fn a_secret_is_read_without_echo() {
-        let (master, slave) = pty();
-        // Typed after the prompt is up, as a person would.
-        let typist = std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(150));
-            write_fd(master, b"hunter2\r\n");
-        });
-        let secret = read_secret(slave, "Password: ").unwrap();
-        typist.join().unwrap();
-        assert_eq!(secret, "hunter2");
-        let echoed = read_available(master);
-        assert!(
-            !String::from_utf8_lossy(&echoed).contains("hunter2"),
-            "the password was echoed: {echoed:?}"
-        );
-        close(master);
-        close(slave);
-    }
-
-    #[quench_test::test]
     fn a_pipe_is_read_as_it_is() {
-        let mut fds = [0 as RawFd; 2];
-        // SAFETY: `pipe` fills the array.
-        assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
-        write_fd(fds[1], b"from a pipe\nnext line\n");
-        assert_eq!(read_secret(fds[0], "").unwrap(), "from a pipe");
-        assert_eq!(read_secret(fds[0], "").unwrap(), "next line");
-        close(fds[1]);
-        assert_eq!(read_secret(fds[0], "").unwrap(), "");
-        close(fds[0]);
+        let (reader, mut writer) = io::pipe().unwrap();
+        writer.write_all(b"from a pipe\nnext line\n").unwrap();
+        let fd = reader.as_raw_fd();
+        assert_eq!(read_secret(fd, "").unwrap(), "from a pipe");
+        assert_eq!(read_secret(fd, "").unwrap(), "next line");
+        drop(writer);
+        assert_eq!(read_secret(fd, "").unwrap(), "");
 
         // A closed descriptor is an error, not a hang.
         assert!(read_secret(-1, "").is_err());
@@ -301,15 +193,11 @@ mod tests {
 
     #[quench_test::test]
     fn invalid_utf8_is_an_error() {
-        let mut fds = [0 as RawFd; 2];
-        // SAFETY: `pipe` fills the array.
-        assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
-        write_fd(fds[1], b"\xff\xfe\n");
+        let (reader, mut writer) = io::pipe().unwrap();
+        writer.write_all(b"\xff\xfe\n").unwrap();
         assert_eq!(
-            read_secret(fds[0], "").unwrap_err().kind(),
+            read_secret(reader.as_raw_fd(), "").unwrap_err().kind(),
             io::ErrorKind::InvalidData
         );
-        close(fds[0]);
-        close(fds[1]);
     }
 }

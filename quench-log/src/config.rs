@@ -212,5 +212,5 @@ fn env_bool(key: &str, default: bool) -> bool {
 /// container that sets `RUST_LOG=""` to "clear" it should fall back to the
 /// default, not hand an empty directive string to `EnvFilter`.
 fn non_empty_env(key: &str) -> Option<String> {
-    std::env::var(key).ok().filter(|v| !v.trim().is_empty())
+    quench_core::env::var(key).filter(|v| !v.trim().is_empty())
 }

@@ -172,7 +172,6 @@ dependencies = [
 name = "quench-cli"
 version = "0.1.13"
 dependencies = [
- "libc",
  "quench-core",
  "quench-test",
 ]

@@ -385,7 +385,7 @@ impl Printer<'_> {
 
 /// `<package> <binary>`, from Cargo's environment and the running executable.
 fn report_title() -> String {
-    let package = std::env::var("CARGO_PKG_NAME").unwrap_or_else(|_| "tests".to_string());
+    let package = quench_core::env::var("CARGO_PKG_NAME").unwrap_or_else(|| "tests".to_string());
     let binary = std::env::current_exe()
         .ok()
         .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned()))

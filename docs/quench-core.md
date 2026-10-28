@@ -11,7 +11,7 @@
 - **`base64`** — `STANDARD`, `STANDARD_NO_PAD`, `URL_SAFE`, `URL_SAFE_NO_PAD` with `encode`/`decode`. Strict decoding: bad characters, padding and non-zero trailing bits are errors (verified against the `base64` crate on random and mutated input).
 - **`hex`** — `encode`, `encode_upper`, `decode`.
 - **`error`** — `Error`, `Result`, the `Context` trait (`.context()` / `.with_context()` on `Result` and `Option`) and the `err!`, `bail!`, `ensure!` macros. `{e}` prints the outermost message, `{e:#}` the whole chain, `{e:?}` a `Caused by:` list.
-- **`env`** — `get_or`, `get_any`, `is_or` (an unset variable gives the default; set to anything except empty/`false`/`no`/`0` is true), `get_parsed::<T>(key, default)` (any `FromStr`; unset or unparsable gives the default), plus `set`/`remove` for tests and startup code.
+- **`env`** — `get_or`, `get_any`, `is_or` (an unset variable gives the default; set to anything except empty/`false`/`no`/`0` is true), `get_parsed::<T>(key, default)` (any `FromStr`; unset or unparsable gives the default), plus `var`/`var_os` and `set`/`remove` for tests and startup code (see below).
 - **`map`** — `ShardedMap`, a concurrent map with closure-based access (`get`, `with`, `update`, `update_existing`, `remove_if`, `retain`, `for_each`). No guards, so holding one across another call cannot deadlock.
 - **`version`** — `Version` and `VersionReq` with cargo's rules (`^`, `~`, `=`, `<`/`>`/`<=`/`>=`, `*` wildcards, comma-separated comparators, the pre-release rule). Checked against `semver` on thousands of generated requirements.
 - **`bytes`** — `Bytes`, an immutable shareable buffer; clones and slices share storage.
@@ -35,3 +35,15 @@
 Unit tests live next to the code. RFC 4648 (base64), RFC 4122 (UUID) and RFC 3339/2822 vectors are covered; line coverage is ~99% for `quench-core` and ~96% for `quench-core-macros`, whose expansion logic is a plain function so the unit tests can reach it.
 
 [Home](../README.md)
+
+## The environment and its one `unsafe`
+
+`env::set` and `env::remove` change the real environment of the process: `std::env::var`, child processes and code in other libraries all see the change. That is what `.env` loading has to do, since services and libraries read their settings with `std::env::var`. They are also the only `unsafe` in the workspace's libraries that has no alternative: `std` marks `set_var` and `remove_var` `unsafe` (edition 2024) because on Unix the environment is a global C array, and changing it while another thread reads it (`getenv`, which libc itself calls for `TZ`, `LANG` and the resolver) is undefined behaviour. A design with an in-process overlay or a re-exec after loading was tried and rejected: the first leaves every `std::env` reader blind to `.env` values, the second restarts the process.
+
+**The contract**, which the callers keep and the code cannot check:
+
+- **Startup.** `dotenv::load`, `dotenv::load_from` and the `.env` loader of `quench-starter` (`logging::init`) run first thing in `main`, before the program has started a thread. A service must call `quench_starter::logging::init()` before it starts a runtime or a thread.
+- **Tests.** The harness runs tests on threads. A test that calls `set` or `remove` uses variables nothing else reads (name them for the test), and the workspace's libraries read the environment only when asked, never from a background thread.
+- **Nothing else.** Code that wants to pass a setting to other code passes a value. Code that starts a process sets the variable on the `Command`.
+
+**How it is tested** (`quench-core/src/env.rs`, `dotenv.rs`, `quench-starter/src/logging.rs`): a variable set is seen by `std::env::var`, `var`, `var_os` and the getters; replacing and removing work, including removing what was never set; a child process (`sh -c`) inherits what was set and sees a removed variable as unset; a value that is not UTF-8 survives for `var_os` and is hidden from `var`; a loaded `.env` file is visible to plain `std::env` and to a child, and never overrides a variable that was already set. The `unsafe` is confined to these two functions, each with its `SAFETY` note, and the security gate allows no other file to use it (`scripts/unsafe-allowlist.txt`).
