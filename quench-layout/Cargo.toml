@@ -1,6 +1,6 @@
 [package]
 name = "quench-layout"
-version = "0.1.1"
+version = "0.1.2"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - box layout with no dependencies: block and inline flow, flexbox, positioning, margin collapsing, over computed styles from quench-css and text from quench-text"

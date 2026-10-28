@@ -118,7 +118,7 @@ dependencies = [
 
 [[package]]
 name = "quench-android-surface"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "quench-css",
  "quench-raster",
@@ -289,7 +289,7 @@ dependencies = [
 
 [[package]]
 name = "quench-desktop-atspi"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "quench-test",
  "quench-ui-native",
@@ -297,7 +297,7 @@ dependencies = [
 
 [[package]]
 name = "quench-desktop-native"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "quench-desktop-atspi",
  "quench-desktop-wayland",
@@ -483,7 +483,7 @@ dependencies = [
 
 [[package]]
 name = "quench-layout"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "quench-css",
  "quench-test",
@@ -521,7 +521,7 @@ dependencies = [
 
 [[package]]
 name = "quench-paint"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "quench-css",
  "quench-layout",
@@ -714,7 +714,7 @@ dependencies = [
 
 [[package]]
 name = "quench-text"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "quench-core",
  "quench-raster",
@@ -761,7 +761,7 @@ dependencies = [
 
 [[package]]
 name = "quench-ui-native"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "quench-core",
  "quench-css",
