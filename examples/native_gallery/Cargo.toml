@@ -1,0 +1,39 @@
+[package]
+name = "quench-example-native-gallery"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - the component gallery drawn by the native stack: writes the page as HTML, its layout as JSON and its pixels as PNG, for comparing with a browser"
+keywords = ["development", "tools"]
+categories = ["development-tools"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+publish = false
+
+[[bin]]
+name = "quench-example-native-gallery"
+path = "src/main.rs"
+
+[dependencies]
+quench-archive = { workspace = true }
+quench-desktop-native = { workspace = true }
+quench-example-ui-web-app = { path = "../ui_web_app" }
+quench-layout = { workspace = true }
+quench-raster = { workspace = true }
+quench-style = { workspace = true }
+quench-ui = { workspace = true }
+quench-ui-native = { workspace = true }
+
+[lints]
+workspace = true
+
+[[test]]
+name = "gallery"
+path = "tests/gallery.rs"
+harness = false
+
+[dev-dependencies]
+quench-raster = { workspace = true }
+quench-test = { workspace = true }

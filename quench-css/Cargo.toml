@@ -1,0 +1,29 @@
+[package]
+name = "quench-css"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - a CSS engine with no dependencies: parser with nesting, selectors, the cascade, custom properties, calc() and media queries, computing the styles of a tree"
+keywords = ["css", "style", "cascade", "selectors"]
+categories = ["parser-implementations", "rendering"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+autotests = false
+
+[lib]
+name = "quench_css"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false
+
+[dev-dependencies]
+quench-style = { workspace = true }
+quench-test = { workspace = true }

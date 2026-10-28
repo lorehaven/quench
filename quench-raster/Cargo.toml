@@ -1,0 +1,28 @@
+[package]
+name = "quench-raster"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - a software rasteriser: anti-aliased paths, rectangles and rounded rectangles composited into a premultiplied BGRA canvas"
+keywords = ["raster", "graphics", "antialiasing", "software-rendering"]
+categories = ["graphics", "rendering"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+autotests = false
+
+[lib]
+name = "quench_raster"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false
+
+[dev-dependencies]
+quench-test = { workspace = true }

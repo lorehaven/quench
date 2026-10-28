@@ -27,6 +27,7 @@ fn every_plugin_is_listed_and_checked() {
         names(),
         [
             "native",
+            "surface",
             "jobs",
             "device",
             "secure-storage",
@@ -100,6 +101,46 @@ fn adding_a_plugin_adds_what_it_needs_first_and_edits_the_project() {
         "markers stay"
     );
     assert!(read(&p, &format!("{SRC}/Plugins.kt")).contains("JobsPlugin(activity),"));
+}
+
+#[quench_test::test]
+fn the_surface_plugin_adds_an_activity_and_the_program_that_draws_it() {
+    let p = host("plugins-surface");
+    add(&mut Vec::new(), &p, "surface").unwrap();
+    assert_eq!(installed(&p), ["surface"]);
+    for file in [
+        "SurfaceHost.kt",
+        "QuenchSurfaceView.kt",
+        "SurfaceActivity.kt",
+    ] {
+        let kotlin = read(&p, &format!("{SRC}/{file}"));
+        assert!(kotlin.starts_with("package dev.lorehaven.myapp"), "{file}");
+    }
+    assert!(read(&p, "surface/Cargo.toml").contains("name = \"my-app-surface\""));
+    assert!(read(&p, "surface/src/main.rs").contains("quench_android_surface::run"));
+    let cargo = read(&p, "Cargo.toml");
+    assert!(
+        cargo.contains("members = [\"surface\", \"core\""),
+        "{cargo}"
+    );
+    assert!(
+        cargo.contains("quench-android-surface = { path = \"/q/quench-android-surface\" }"),
+        "{cargo}"
+    );
+    assert!(cargo.contains("quench-ui-native ="), "{cargo}");
+    let manifest = read(&p, "android/app/src/main/AndroidManifest.xml");
+    assert!(
+        manifest.contains("<activity android:name=\".SurfaceActivity\""),
+        "{manifest}"
+    );
+    assert!(
+        manifest.contains("<!-- quench:components -->"),
+        "the marker stays"
+    );
+    assert!(
+        !read(&p, &format!("{SRC}/Plugins.kt")).contains("Surface"),
+        "it is an activity, not a bridge plugin"
+    );
 }
 
 #[quench_test::test]

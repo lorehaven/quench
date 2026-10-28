@@ -35,14 +35,6 @@ use quench_http::prelude::*;
 use quench_proto::sse::Event;
 use quench_style::theme::Theme;
 
-const GALLERY_STYLE: &str = "body{--q-fab-offset:72px;margin:0;font-family:system-ui,sans-serif;background:var(--bs-gray-950);color:var(--bs-gray-100);padding-bottom:72px}\
-#gallery{max-width:40rem;margin:0 auto}#gallery>*:not(.q-appbar):not(.q-bottomnav){padding-left:var(--q-space-4);padding-right:var(--q-space-4)}\
-.q-bottomnav{position:fixed;left:0;right:0;bottom:0}button:not([class]){min-height:44px;margin:.25rem;font:inherit;color:var(--bs-gray-100);background:var(--bs-gray-800);border:2px solid var(--bs-gray-400);border-radius:.5rem;padding:0 1rem}\
-button:focus-visible{outline:3px solid var(--bs-gray-100);outline-offset:2px}\
-.gallery-pad{height:10rem;display:flex;align-items:center;justify-content:center;border:2px dashed var(--bs-gray-400);border-radius:.5rem;user-select:none}\
-.gallery-card{padding:1rem;margin-top:1rem;background:var(--bs-gray-900);border-radius:.5rem}\
-.gallery-rows{height:18rem;border:1px solid var(--bs-gray-700)}#pull{max-height:14rem;border:1px solid var(--bs-gray-700)}";
-
 const STYLE: &str = "body{font-family:sans-serif;margin:2rem auto;max-width:36rem;padding:0 1rem}\
 .card{border:1px solid #ccc;border-radius:.5rem;padding:1rem;margin:1rem 0}\
 li.done span{text-decoration:line-through;color:#888}li{margin:.25rem 0}button{margin-left:.5rem}\
@@ -181,10 +173,11 @@ async fn main() {
     let sheet = format!("{STYLE}\n{}", quench_style::components::stylesheet());
     let style = ui.add_asset("site.css", sheet, "text/css");
     let gallery_css = format!(
-        "{}\n{}\n{}\n{GALLERY_STYLE}",
+        "{}\n{}\n{}\n{}",
         quench_style::tokens::stylesheet(),
         quench_style::mobile::stylesheet(),
         quench_style::components::stylesheet(),
+        gallery::GALLERY_STYLE,
     );
     let gallery_style = ui.add_asset("gallery.css", gallery_css, "text/css");
     let dark = ui.add_asset(

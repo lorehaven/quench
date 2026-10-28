@@ -1,0 +1,25 @@
+[package]
+name = "quench-example-native-window"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - a window drawn by the native stack: rounded shapes, an anti-aliased circle and wrapped Noto Sans text on a Wayland compositor"
+keywords = ["development", "tools"]
+categories = ["development-tools"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+publish = false
+
+[[bin]]
+name = "quench-example-native-window"
+path = "src/main.rs"
+
+[dependencies]
+quench-desktop-wayland = { workspace = true }
+quench-raster = { workspace = true }
+quench-text = { workspace = true }
+
+[lints]
+workspace = true

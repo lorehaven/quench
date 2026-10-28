@@ -117,6 +117,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-android-surface"
+version = "0.1.0"
+dependencies = [
+ "quench-css",
+ "quench-raster",
+ "quench-test",
+ "quench-ui",
+ "quench-ui-native",
+]
+
+[[package]]
 name = "quench-archive"
 version = "0.1.2"
 dependencies = [
@@ -235,6 +246,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-css"
+version = "0.1.0"
+dependencies = [
+ "quench-style",
+ "quench-test",
+]
+
+[[package]]
 name = "quench-db"
 version = "0.2.14"
 dependencies = [
@@ -264,6 +283,36 @@ version = "0.1.0"
 dependencies = [
  "quench-core",
  "quench-serde",
+ "quench-test",
+]
+
+[[package]]
+name = "quench-desktop-atspi"
+version = "0.1.0"
+dependencies = [
+ "quench-test",
+ "quench-ui-native",
+]
+
+[[package]]
+name = "quench-desktop-native"
+version = "0.1.0"
+dependencies = [
+ "quench-desktop-atspi",
+ "quench-desktop-wayland",
+ "quench-raster",
+ "quench-test",
+ "quench-ui",
+ "quench-ui-native",
+]
+
+[[package]]
+name = "quench-desktop-wayland"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "quench-core",
+ "quench-raster",
  "quench-test",
 ]
 
@@ -301,6 +350,30 @@ dependencies = [
  "quench-log",
  "quench-serde",
  "tokio",
+]
+
+[[package]]
+name = "quench-example-native-gallery"
+version = "0.1.0"
+dependencies = [
+ "quench-archive",
+ "quench-desktop-native",
+ "quench-example-ui-web-app",
+ "quench-layout",
+ "quench-raster",
+ "quench-style",
+ "quench-test",
+ "quench-ui",
+ "quench-ui-native",
+]
+
+[[package]]
+name = "quench-example-native-window"
+version = "0.1.0"
+dependencies = [
+ "quench-desktop-wayland",
+ "quench-raster",
+ "quench-text",
 ]
 
 [[package]]
@@ -400,6 +473,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-layout"
+version = "0.1.0"
+dependencies = [
+ "quench-css",
+ "quench-test",
+ "quench-text",
+]
+
+[[package]]
 name = "quench-log"
 version = "0.1.9"
 dependencies = [
@@ -426,6 +508,16 @@ dependencies = [
  "quench-test",
  "quench-tls",
  "tokio",
+]
+
+[[package]]
+name = "quench-paint"
+version = "0.1.0"
+dependencies = [
+ "quench-css",
+ "quench-layout",
+ "quench-raster",
+ "quench-test",
 ]
 
 [[package]]
@@ -463,6 +555,13 @@ dependencies = [
 [[package]]
 name = "quench-qr"
 version = "0.1.2"
+dependencies = [
+ "quench-test",
+]
+
+[[package]]
+name = "quench-raster"
+version = "0.1.0"
 dependencies = [
  "quench-test",
 ]
@@ -595,6 +694,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-text"
+version = "0.1.0"
+dependencies = [
+ "quench-core",
+ "quench-raster",
+ "quench-test",
+]
+
+[[package]]
 name = "quench-tls"
 version = "0.1.8"
 dependencies = [
@@ -630,6 +738,19 @@ name = "quench-ui"
 version = "0.1.2"
 dependencies = [
  "quench-test",
+]
+
+[[package]]
+name = "quench-ui-native"
+version = "0.1.0"
+dependencies = [
+ "quench-css",
+ "quench-layout",
+ "quench-paint",
+ "quench-raster",
+ "quench-style",
+ "quench-test",
+ "quench-ui",
 ]
 
 [[package]]

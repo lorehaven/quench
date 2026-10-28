@@ -23,6 +23,16 @@ See [docs/](./docs/) for per-crate reference.
 - [Quench Core](./docs/quench-core.md) — dependency-free foundations: time, uuid, base64/hex, errors, env, sharded map, versions, bytes
 - [Quench Proto](./docs/quench-proto.md) — HTTP types, an HTTP/1.1 codec for servers and clients, multipart, cookies, WebSocket and SSE
 - [Quench QR](./docs/quench-qr.md) — QR code encoder (ISO 18004, versions 1-40) with SVG output, no dependencies
+- [Quench desktop Wayland](./docs/quench-desktop-wayland.md) — a Wayland client on the wire protocol: window, shared-memory frames, pointer input
+- [Quench CSS](./docs/quench-css.md) — a CSS engine: parser with nesting, selectors, the cascade, custom properties, calc() and media queries
+- [Quench Layout](./docs/quench-layout.md) — box layout: block and inline flow, flexbox, positioning, margin collapsing
+- [Quench Paint](./docs/quench-paint.md) — paints a laid out box tree: backgrounds, borders, radii, shadows, clipping, opacity, text
+- [Quench UI Native](./docs/quench-ui-native.md) — a quench-ui renderer that draws itself: DOM, style, layout and paint with no WebView
+- [Quench Desktop Native](./docs/quench-desktop-native.md) — runs a quench-ui-native renderer in a Wayland window: input, repeat, caret, input method, accessibility
+- [Quench Desktop AT-SPI](./docs/quench-desktop-atspi.md) — screen-reader support on Linux: the D-Bus protocol by hand and the AT-SPI objects
+- [Quench Android Surface](./docs/quench-android-surface.md) — an Android app drawn by the native renderer: the program side, the protocol, the Kotlin host plugin
+- [Quench Text](./docs/quench-text.md) — a TrueType parser, kerning, line breaking and Noto Sans embedded, drawn through quench-raster
+- [Quench Raster](./docs/quench-raster.md) — software rasteriser: anti-aliased paths, rounded rectangles, premultiplied BGRA canvas, no dependencies
 - [Quench HTML](./docs/quench-html.md) — HTML parser with CSS selectors, and CommonMark to HTML
 - [Quench Test](./docs/quench-test.md) — test harness with JSON/HTML result pages, command runner, predicates, mock HTTP server
 - [Quench Test BDD](./docs/quench-test-bdd.md) — Gherkin runner with cucumber expressions, async steps, concurrent scenarios, JSON/HTML pages

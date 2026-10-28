@@ -16,3 +16,8 @@
 # boundary would only move the same calls). Every unsafe of the crate is in this one file, behind safe `!Send` types with
 # the contract written at the top of it and in docs/quench-desktop.md; the window tests exercise each call.
 ./quench-desktop/src/ffi.rs
+# The native renderer's Wayland client: file descriptors over the compositor's socket (`sendmsg`/`recvmsg` with
+# `SCM_RIGHTS`) and shared memory (`memfd_create`, `mmap`), none of which the standard library offers. Every unsafe of
+# the crate is in this one file, with the contract at the top and a test for each call; docs/quench-desktop-wayland.md.
+./quench-desktop-wayland/src/sys.rs
+

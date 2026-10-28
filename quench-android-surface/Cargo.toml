@@ -1,0 +1,34 @@
+[package]
+name = "quench-android-surface"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - the program side of an Android app drawn by the native renderer: reads touch, key and text events from the Kotlin host, sends it frames, keyboard requests, the text field state and the accessibility tree"
+keywords = ["android", "ui", "native", "surface"]
+categories = ["gui"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+autotests = false
+
+[lib]
+name = "quench_android_surface"
+path = "src/lib.rs"
+
+[dependencies]
+quench-raster = { workspace = true }
+quench-ui = { workspace = true }
+quench-ui-native = { workspace = true }
+
+[lints]
+workspace = true
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false
+
+[dev-dependencies]
+quench-css = { workspace = true }
+quench-test = { workspace = true }

@@ -1,7 +1,11 @@
 [workspace]
 members = [
   "quench-android",
+  "quench-android-surface",
   "quench-desktop",
+  "quench-desktop-atspi",
+  "quench-desktop-native",
+  "quench-desktop-wayland",
   "quench-args",
   "quench-args-macros",
   "quench-auth",
@@ -10,6 +14,10 @@ members = [
   "quench-client",
   "quench-config",
   "quench-core",
+  "quench-css",
+  "quench-layout",
+  "quench-paint",
+  "quench-ui-native",
   "quench-core-macros",
   "quench-crypto",
   "quench-db",
@@ -37,12 +45,14 @@ members = [
   "quench-fullstack",
   "quench-fullstack-macros",
   "quench-qr",
+  "quench-raster",
   "quench-archive",
   "quench-template",
   "quench-pdf",
   "quench-convert",
   "quench-html",
   "quench-test",
+  "quench-text",
   "quench-test-macros",
   "quench-test-bdd",
   "quench-test-bdd-macros",
@@ -63,8 +73,10 @@ readme = "README.md"
 
 [workspace.dependencies]
 getrandom = { version = "0.4" }
+libc = { version = "0.2" }
 proc-macro2 = { version = "1.0" }
 quench-android = { path = "quench-android", registry = "ennor", version = "0.1.0" }
+quench-desktop-wayland = { path = "quench-desktop-wayland", registry = "ennor", version = "0.1.0" }
 quench-desktop = { path = "quench-desktop", registry = "ennor", version = "0.1.0" }
 quench-args = { path = "quench-args", registry = "ennor", version = "0.1.0" }
 quench-args-macros = { path = "quench-args-macros", registry = "ennor", version = "0.1.0" }
@@ -73,6 +85,13 @@ quench-cache = { path = "quench-cache", registry = "ennor", version = "0.1.7" }
 quench-cli = { path = "quench-cli", registry = "ennor", version = "0.1.2", default-features = false }
 quench-client = { path = "quench-client", registry = "ennor", version = "0.2.2", default-features = false }
 quench-config = { path = "quench-config", registry = "ennor", version = "0.1.2" }
+quench-css = { path = "quench-css", registry = "ennor", version = "0.1.0" }
+quench-layout = { path = "quench-layout", registry = "ennor", version = "0.1.0" }
+quench-paint = { path = "quench-paint", registry = "ennor", version = "0.1.0" }
+quench-ui-native = { path = "quench-ui-native", registry = "ennor", version = "0.1.0" }
+quench-desktop-native = { path = "quench-desktop-native", registry = "ennor", version = "0.1.0" }
+quench-desktop-atspi = { path = "quench-desktop-atspi", registry = "ennor", version = "0.1.0" }
+quench-android-surface = { path = "quench-android-surface", registry = "ennor", version = "0.1.0" }
 quench-core = { path = "quench-core", registry = "ennor", version = "0.1.0" }
 quench-crypto = { path = "quench-crypto", registry = "ennor", version = "0.1.0", default-features = false }
 quench-core-macros = { path = "quench-core-macros", registry = "ennor", version = "0.1.0" }
@@ -98,7 +117,9 @@ quench-ui-web = { path = "quench-ui-web", registry = "ennor", version = "0.1.0" 
 quench-fullstack = { path = "quench-fullstack", registry = "ennor", version = "0.1.0" }
 quench-fullstack-macros = { path = "quench-fullstack-macros", registry = "ennor", version = "0.1.0" }
 quench-tls = { path = "quench-tls", registry = "ennor", version = "0.1.0" }
+quench-raster = { path = "quench-raster", registry = "ennor", version = "0.1.0" }
 quench-qr = { path = "quench-qr", registry = "ennor", version = "0.1.0" }
+quench-text = { path = "quench-text", registry = "ennor", version = "0.1.0" }
 quench-test = { path = "quench-test", registry = "ennor", version = "0.1.0" }
 quench-test-bdd = { path = "quench-test-bdd", registry = "ennor", version = "0.1.0" }
 quench-test-bdd-macros = { path = "quench-test-bdd-macros", registry = "ennor", version = "0.1.0" }

@@ -69,6 +69,39 @@ const PLUGINS: &[Plugin] = &[
         crates: &["quench-android", "quench-core", "quench-serde"],
     },
     Plugin {
+        name: "surface",
+        about: "an activity whose screen is drawn by the app's Rust program with no WebView (the native renderer)",
+        needs: &[],
+        files: &[
+            file!(
+                "android/app/src/main/kotlin/@package_path@/SurfaceHost.kt",
+                "surface/kotlin/SurfaceHost.kt.tpl"
+            ),
+            file!(
+                "android/app/src/main/kotlin/@package_path@/QuenchSurfaceView.kt",
+                "surface/kotlin/QuenchSurfaceView.kt.tpl"
+            ),
+            file!(
+                "android/app/src/main/kotlin/@package_path@/SurfaceActivity.kt",
+                "surface/kotlin/SurfaceActivity.kt.tpl"
+            ),
+            file!("surface/Cargo.toml", "surface/crate/Cargo.toml.tpl"),
+            file!("surface/src/main.rs", "surface/crate/main.rs.tpl"),
+        ],
+        permissions: &[],
+        top: "",
+        components: "<activity android:name=\".SurfaceActivity\" android:exported=\"true\" android:windowSoftInputMode=\"adjustResize\" android:configChanges=\"orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|density|fontScale|layoutDirection|locale\" />",
+        activity: "",
+        register: &[],
+        member: Some("surface"),
+        crates: &[
+            "quench-android-surface",
+            "quench-style",
+            "quench-ui",
+            "quench-ui-native",
+        ],
+    },
+    Plugin {
         name: "jobs",
         about: "background work: scheduled tasks run by native code with no page open, with constraints",
         needs: &["native"],

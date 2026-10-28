@@ -1,0 +1,35 @@
+[package]
+name = "quench-desktop-native"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - runs a quench-ui-native renderer in a Wayland window: draws frames when something changed, turns pointer, wheel and keyboard input into the events views listen for, blinks the caret and repeats held keys"
+keywords = ["ui", "wayland", "native", "window"]
+categories = ["gui"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+autotests = false
+
+[lib]
+name = "quench_desktop_native"
+path = "src/lib.rs"
+
+[dependencies]
+quench-desktop-atspi = { workspace = true }
+quench-desktop-wayland = { workspace = true }
+quench-ui = { workspace = true }
+quench-ui-native = { workspace = true }
+
+[lints]
+workspace = true
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false
+
+[dev-dependencies]
+quench-raster = { workspace = true }
+quench-test = { workspace = true }

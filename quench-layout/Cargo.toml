@@ -1,0 +1,32 @@
+[package]
+name = "quench-layout"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - box layout with no dependencies: block and inline flow, flexbox, positioning, margin collapsing, over computed styles from quench-css and text from quench-text"
+keywords = ["layout", "flexbox", "css", "boxes"]
+categories = ["rendering", "gui"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+autotests = false
+
+[lib]
+name = "quench_layout"
+path = "src/lib.rs"
+
+[dependencies]
+quench-css = { workspace = true }
+quench-text = { workspace = true }
+
+[lints]
+workspace = true
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false
+
+[dev-dependencies]
+quench-test = { workspace = true }

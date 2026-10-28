@@ -1,0 +1,37 @@
+[package]
+name = "quench-ui-native"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - a quench-ui renderer that draws itself: a DOM in memory, styled by quench-css, laid out by quench-layout and painted by quench-paint, with no WebView"
+keywords = ["ui", "renderer", "native", "css"]
+categories = ["gui", "rendering"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+autotests = false
+include = ["src/**", "tests/**", "Cargo.toml"]
+
+[lib]
+name = "quench_ui_native"
+path = "src/lib.rs"
+
+[dependencies]
+quench-css = { workspace = true }
+quench-layout = { workspace = true }
+quench-paint = { workspace = true }
+quench-raster = { workspace = true }
+quench-ui = { workspace = true }
+
+[lints]
+workspace = true
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false
+
+[dev-dependencies]
+quench-style = { workspace = true }
+quench-test = { workspace = true }

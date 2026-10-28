@@ -108,7 +108,12 @@ pub fn build_native(
     release: bool,
     abi: Option<&str>,
 ) -> Result<()> {
-    if !project.root.join("native/Cargo.toml").is_file() {
+    // The programs this project has: the native operations, and the program that draws a screen.
+    let programs: Vec<(&str, &str)> = [("native", "quench_native"), ("surface", "quench_surface")]
+        .into_iter()
+        .filter(|(dir, _)| project.root.join(dir).join("Cargo.toml").is_file())
+        .collect();
+    if programs.is_empty() {
         return fail("no native/ in this project: `quench plugin add native` makes it");
     }
     let abis: Vec<(&str, &str)> = match abi {
@@ -130,7 +135,6 @@ pub fn build_native(
         .join("toolchains/llvm/prebuilt")
         .join(host_tag())
         .join("bin");
-    let package = format!("{}-native", project.name);
     let profile = if release { "release" } else { "debug" };
     for (abi, target) in abis {
         let linker = bin.join(format!("{target}{API}-clang"));
@@ -138,28 +142,25 @@ pub fn build_native(
             "CARGO_TARGET_{}_LINKER",
             target.to_uppercase().replace('-', "_")
         );
-        let mut args = vec!["build", "-p", &package, "--target", target];
-        if release {
-            args.push("--release");
+        for (dir, binary) in &programs {
+            let package = format!("{}-{dir}", project.name);
+            let mut args = vec!["build", "-p", &package, "--target", target];
+            if release {
+                args.push("--release");
+            }
+            let cmd =
+                Cmd::new("cargo", &args, &project.root).env(&env_name, &linker.to_string_lossy());
+            crate::release::step(sys, out, &cmd)?;
+            // The program the host starts. Android only extracts files named lib*.so from the APK, so it
+            // is packaged under that name.
+            let built = project.target_dir().join(target).join(profile).join(binary);
+            let dest_dir = project.root.join("android/app/src/main/jniLibs").join(abi);
+            std::fs::create_dir_all(&dest_dir)?;
+            let dest = dest_dir.join(format!("lib{binary}.so"));
+            std::fs::copy(&built, &dest)
+                .map_err(|e| crate::error::Error(format!("{}: {e}", built.display())))?;
+            writeln!(out, "{dir} {abi}: {}", dest.display())?;
         }
-        let cmd = Cmd::new("cargo", &args, &project.root).env(&env_name, &linker.to_string_lossy());
-        crate::release::step(sys, out, &cmd)?;
-        // The program the host starts. Android only extracts files named lib*.so from the APK, so it
-        // is packaged under that name.
-        let built = project
-            .target_dir()
-            .join(target)
-            .join(profile)
-            .join("quench_native");
-        let dest_dir = project.root.join("android/app/src/main/jniLibs").join(abi);
-        std::fs::create_dir_all(&dest_dir)?;
-        std::fs::copy(&built, dest_dir.join("libquench_native.so"))
-            .map_err(|e| crate::error::Error(format!("{}: {e}", built.display())))?;
-        writeln!(
-            out,
-            "native {abi}: {}",
-            dest_dir.join("libquench_native.so").display()
-        )?;
     }
     Ok(())
 }

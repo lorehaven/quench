@@ -30,6 +30,16 @@ docs/
 ├── quench-fullstack-macros.md
 ├── quench-tool.md
 ├── quench-android.md
+├── quench-raster.md
+├── quench-css.md
+├── quench-layout.md
+├── quench-paint.md
+├── quench-ui-native.md
+├── quench-desktop-native.md
+├── quench-desktop-atspi.md
+├── quench-android-surface.md
+├── quench-text.md
+├── quench-desktop-wayland.md
 ├── quench-desktop.md
 ├── quench-ui.md
 ├── quench-ui-web.md
@@ -55,6 +65,16 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench DB](./quench-db.md) — ORM/CRUD abstraction plus a migration catalog engine
 - [Quench Log](./quench-log.md) — leveled events, spans, console and rolling-file output
 - [Quench QR](./quench-qr.md) — QR code encoder (ISO 18004, versions 1-40) with SVG output, no dependencies
+- [Quench desktop Wayland](./quench-desktop-wayland.md) — a Wayland client on the wire protocol: window, shared-memory frames, pointer input
+- [Quench CSS](./quench-css.md) — a CSS engine: parser with nesting, selectors, the cascade, custom properties, calc() and media queries
+- [Quench Layout](./quench-layout.md) — box layout: block and inline flow, flexbox, positioning, margin collapsing
+- [Quench Paint](./quench-paint.md) — paints a laid out box tree: backgrounds, borders, radii, shadows, clipping, opacity, text
+- [Quench UI Native](./quench-ui-native.md) — a quench-ui renderer that draws itself: DOM, style, layout and paint with no WebView
+- [Quench Desktop Native](./quench-desktop-native.md) — runs a quench-ui-native renderer in a Wayland window: input, repeat, caret, input method, accessibility
+- [Quench Desktop AT-SPI](./quench-desktop-atspi.md) — screen-reader support on Linux: the D-Bus protocol by hand and the AT-SPI objects
+- [Quench Android Surface](./quench-android-surface.md) — an Android app drawn by the native renderer: the program side, the protocol, the Kotlin host plugin
+- [Quench Text](./quench-text.md) — a TrueType parser, kerning, line breaking and Noto Sans embedded, drawn through quench-raster
+- [Quench Raster](./quench-raster.md) — software rasteriser: anti-aliased paths, rounded rectangles, premultiplied BGRA canvas, no dependencies
 - [Quench Archive](./quench-archive.md) — tar, zip, deflate, gzip and zstd (decoder and encoder), no dependencies
 - [Quench Template](./quench-template.md) — Jinja-compatible templates over quench-serde values (filters, tests, macros, imports)
 - [Quench PDF](./quench-pdf.md) — PDF text extraction (xref tables and streams, object streams, fonts, encodings)
@@ -170,6 +190,16 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ├── quench-serde-macros/    # derives for quench-serde
 ├── quench-starter/         # service bootstrap
 ├── quench-qr/              # QR code encoder
+├── quench-raster/          # software rasteriser: paths, rounded rectangles, BGRA canvas
+├── quench-css/             # CSS parser, selectors, cascade, computed values
+├── quench-layout/          # block, inline and flex layout, positioning
+├── quench-paint/           # paints a box tree into a raster canvas
+├── quench-ui-native/       # quench-ui renderer: DOM, style, layout, paint
+├── quench-desktop-native/  # runs the renderer in a Wayland window
+├── quench-desktop-atspi/   # AT-SPI accessibility, D-Bus by hand
+├── quench-android-surface/ # the program side of an Android native-renderer app
+├── quench-text/            # TrueType parser, GPOS kerning, line breaking, Noto Sans embedded
+├── quench-desktop-wayland/ # Wayland client on the wire protocol: window, shm frames, pointer
 ├── quench-tls/             # rustls glue and trust stores
 ├── quench-style/           # shared tokens, themes, base CSS, i18n
 ├── quench-fullstack/       # serves quench-ui apps from quench-http: SSR, hashed assets, CSP, server functions, sessions

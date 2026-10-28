@@ -340,6 +340,15 @@ fn language_chip(label: &str, i18n: &I18n, code: &'static str) -> Element {
         .on_click(move || pick.set_language(code))
 }
 
+/// The page's own style on top of the framework's (the body, the layout of the gallery and its demo boxes).
+pub const GALLERY_STYLE: &str = "body{--q-fab-offset:72px;margin:0;font-family:system-ui,sans-serif;background:var(--bs-gray-950);color:var(--bs-gray-100);padding-bottom:72px}\
+#gallery{max-width:40rem;margin:0 auto}#gallery>*:not(.q-appbar):not(.q-bottomnav){padding-left:var(--q-space-4);padding-right:var(--q-space-4)}\
+.q-bottomnav{position:fixed;left:0;right:0;bottom:0}button:not([class]){min-height:44px;margin:.25rem;font:inherit;color:var(--bs-gray-100);background:var(--bs-gray-800);border:2px solid var(--bs-gray-400);border-radius:.5rem;padding:0 1rem}\
+button:focus-visible{outline:3px solid var(--bs-gray-100);outline-offset:2px}\
+.gallery-pad{height:10rem;display:flex;align-items:center;justify-content:center;border:2px dashed var(--bs-gray-400);border-radius:.5rem;user-select:none}\
+.gallery-card{padding:1rem;margin-top:1rem;background:var(--bs-gray-900);border-radius:.5rem}\
+.gallery-rows{height:18rem;border:1px solid var(--bs-gray-700)}#pull{max-height:14rem;border:1px solid var(--bs-gray-700)}";
+
 /// The whole gallery.
 #[must_use]
 pub fn gallery() -> View {
