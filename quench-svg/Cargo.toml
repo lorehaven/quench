@@ -1,0 +1,33 @@
+[package]
+name = "quench-svg"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - an SVG renderer with no dependencies: shapes, paths with curves and arcs, transforms, fills and strokes into RGBA, through quench-raster"
+keywords = ["svg", "vector", "raster", "image"]
+categories = ["multimedia::images", "rendering"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+autotests = false
+
+[lib]
+name = "quench_svg"
+path = "src/lib.rs"
+
+[dependencies]
+quench-css = { workspace = true }
+quench-image = { workspace = true }
+quench-raster = { workspace = true }
+
+[lints]
+workspace = true
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false
+
+[dev-dependencies]
+quench-test = { workspace = true }

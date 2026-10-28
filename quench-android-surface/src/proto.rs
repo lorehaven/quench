@@ -39,6 +39,11 @@ pub enum Event {
     Back,
     /// The app went to the background (`false`) or came back.
     Visible(bool),
+    /// The system clipboard's text (sent when it changes and when the app comes back to the front).
+    Clipboard(String),
+    /// A plugin's answer to a call, or an event it pushed: a JSON envelope, `{"id","ok"}`, `{"id","err"}` or
+    /// `{"event","plugin","data"}`.
+    Reply(String),
 }
 
 fn short() -> io::Error {
@@ -81,6 +86,13 @@ impl Reader<'_> {
         Ok(f32::from_be_bytes(
             self.take(4)?.try_into().map_err(|_| short())?,
         ))
+    }
+
+    /// A string with a 4-byte length.
+    fn long_string(&mut self) -> io::Result<String> {
+        let n = self.u32()? as usize;
+        String::from_utf8(self.take(n)?.to_vec())
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "text that is not UTF-8"))
     }
 
     fn string(&mut self) -> io::Result<String> {
@@ -147,6 +159,8 @@ pub fn read_event(input: &mut impl Read) -> io::Result<Option<Event>> {
         8 => Event::Scheme { dark: r.u8()? != 0 },
         9 => Event::Back,
         10 => Event::Visible(r.u8()? != 0),
+        11 => Event::Clipboard(r.long_string()?),
+        12 => Event::Reply(r.long_string()?),
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -211,6 +225,15 @@ pub fn encode_event(event: &Event) -> Vec<u8> {
         Event::Scheme { dark } => body.extend_from_slice(&[8, u8::from(*dark)]),
         Event::Back => body.push(9),
         Event::Visible(v) => body.extend_from_slice(&[10, u8::from(*v)]),
+        Event::Clipboard(t) | Event::Reply(t) => {
+            body.push(if matches!(event, Event::Clipboard(_)) {
+                11
+            } else {
+                12
+            });
+            body.extend_from_slice(&(t.len() as u32).to_be_bytes());
+            body.extend_from_slice(t.as_bytes());
+        }
     }
     let mut out = (body.len() as u32).to_be_bytes().to_vec();
     out.extend(body);
@@ -242,6 +265,10 @@ pub enum Out<'a> {
     BackHandled,
     /// The app is finished.
     Exit,
+    /// Text for the system clipboard.
+    Clipboard(&'a str),
+    /// A call to a plugin of the Kotlin host: a JSON envelope, `{"id","plugin","method","args"}`.
+    Call(&'a str),
 }
 
 /// Writes a message.
@@ -283,6 +310,15 @@ pub fn write_out(output: &mut impl Write, message: &Out<'_>) -> io::Result<()> {
         }
         Out::BackHandled => body.push(5),
         Out::Exit => body.push(6),
+        Out::Clipboard(text) | Out::Call(text) => {
+            body.push(if matches!(message, Out::Clipboard(_)) {
+                7
+            } else {
+                8
+            });
+            body.extend_from_slice(&(text.len() as u32).to_be_bytes());
+            body.extend_from_slice(text.as_bytes());
+        }
     }
     output.write_all(&(body.len() as u32).to_be_bytes())?;
     output.write_all(&body)?;
@@ -313,6 +349,8 @@ const fn role_code(role: Role) -> u8 {
         Role::Image => 19,
         Role::Form => 20,
         Role::Group => 21,
+        Role::Slider => 22,
+        Role::ProgressBar => 23,
     }
 }
 
@@ -374,6 +412,17 @@ pub fn encode_tree(root: &AccessNode) -> Vec<u8> {
         put(out, &n.name);
         put(out, n.value.as_deref().unwrap_or(""));
         put(out, &n.description);
+        // A slider or progress bar: a flag, then the smallest, the largest and the current value (not a number while
+        // a progress bar is indeterminate).
+        match n.range {
+            Some((min, max, now)) => {
+                out.push(1);
+                for v in [min as f32, max as f32, now.map_or(f32::NAN, |v| v as f32)] {
+                    out.extend_from_slice(&v.to_be_bytes());
+                }
+            }
+            None => out.push(0),
+        }
         for c in &n.children {
             walk(c, n.id as u32, out, count);
         }

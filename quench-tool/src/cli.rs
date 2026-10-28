@@ -137,6 +137,13 @@ pub enum Cmd {
     },
 }
 
+/// The activities the launcher can start.
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LauncherChoice {
+    Web,
+    Surface,
+}
+
 /// What `quench build` can make besides the web app.
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BuildTarget {
@@ -186,6 +193,12 @@ pub enum AndroidCmd {
         /// The application id (default: com.example.<name>)
         #[arg(long, value_name = "ID")]
         package: Option<String>,
+    },
+    /// Choose which activity the launcher starts: the web app, or the native renderer's `surface`
+    Launcher {
+        /// `web` (the `WebView` app, `.MainActivity`) or `surface` (the native renderer, `.SurfaceActivity`)
+        #[arg(value_enum)]
+        which: LauncherChoice,
     },
     /// Build the project's native library (`native/`) for the Android ABIs
     BuildNative {

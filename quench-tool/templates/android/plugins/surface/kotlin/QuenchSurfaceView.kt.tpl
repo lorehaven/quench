@@ -1,5 +1,7 @@
 package {{ package }}
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
@@ -40,6 +42,26 @@ class QuenchSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.
     private var tree: List<Node> = emptyList()
     private val provider = TreeProvider()
 
+    /** The way to the app's plugins (set by the activity): the program's calls go to it. */
+    var bridge: Bridge? = null
+
+    private val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    private var clipboardFromProgram: String? = null
+    private val clipboardListener = ClipboardManager.OnPrimaryClipChangedListener { sendClipboard() }
+
+    /** Tells the program what the system clipboard holds (unless it is what the program just put there). */
+    private fun sendClipboard() {
+        val text = try {
+            clipboardManager.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+        } catch (_: SecurityException) {
+            null // the clipboard is not readable while the app is in the background
+        } ?: return
+        if (text != clipboardFromProgram) host.clipboard(text)
+    }
+
+    /** A plugin's answer or event for the program. */
+    fun reply(json: String) = host.reply(json)
+
     /** Called when the program says the app is finished. */
     var exitHandler: () -> Unit = {}
 
@@ -52,11 +74,18 @@ class QuenchSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.
 
     fun start() {
         host.start()
+        clipboardManager.addPrimaryClipChangedListener(clipboardListener)
     }
 
-    fun stop() = host.stop()
+    fun stop() {
+        clipboardManager.removePrimaryClipChangedListener(clipboardListener)
+        host.stop()
+    }
 
-    fun setVisible(shown: Boolean) = host.visible(shown)
+    fun setVisible(shown: Boolean) {
+        host.visible(shown)
+        if (shown) post { sendClipboard() }
+    }
 
     fun setDark(dark: Boolean) = host.scheme(dark)
 
@@ -263,6 +292,8 @@ class QuenchSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.
         val name: String,
         val value: String,
         val description: String,
+        /** The smallest, largest and current value of a slider or progress bar, or null. */
+        val range: FloatArray?,
     ) {
         val children = ArrayList<Int>()
         fun flag(bit: Int) = (flags and (1 shl bit)) != 0
@@ -293,7 +324,11 @@ class QuenchSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.
             val flags = b.short.toInt() and 0xffff
             val level = b.get().toInt()
             val bounds = FloatArray(4) { b.float }
-            nodes.add(Node(id, parent, role, flags, level, bounds, text(), text(), text()))
+            val name = text()
+            val value = text()
+            val description = text()
+            val range = if (b.get().toInt() != 0) FloatArray(3) { b.float } else null
+            nodes.add(Node(id, parent, role, flags, level, bounds, name, value, description, range))
         }
         val byId = nodes.associateBy { it.id }
         for (n in nodes) byId[n.parent]?.children?.add(n.id)
@@ -310,6 +345,8 @@ class QuenchSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.
         9 -> "android.widget.EditText"
         10 -> "android.widget.ListView"
         19 -> "android.widget.ImageView"
+        22 -> "android.widget.SeekBar"
+        23 -> "android.widget.ProgressBar"
         else -> "android.widget.TextView"
     }
 
@@ -360,6 +397,11 @@ class QuenchSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.
             info.isSelected = n.flag(6)
             info.isEditable = n.role == 9 && !n.flag(10)
             if (Build.VERSION.SDK_INT >= 28) info.isHeading = n.role == 1
+            n.range?.let {
+                // A progress bar that has no value yet is reported as at its start.
+                val now = if (it[2].isNaN()) it[0] else it[2]
+                info.rangeInfo = AccessibilityNodeInfo.RangeInfo.obtain(AccessibilityNodeInfo.RangeInfo.RANGE_TYPE_FLOAT, it[0], it[1], now)
+            }
             if (n.flag(11)) info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK)
             if (n.flag(12)) info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_FOCUS)
             info.addAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_ACCESSIBILITY_FOCUS)
@@ -392,6 +434,18 @@ class QuenchSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.
     // ---- the rest of the listener ------------------------------------------------------------------------
 
     override fun onBackHandled() {}
+
+    override fun onClipboard(text: String) {
+        post {
+            clipboardFromProgram = text
+            clipboardManager.setPrimaryClip(ClipData.newPlainText(null, text))
+        }
+    }
+
+    override fun onCall(json: String) {
+        // Plugins run on the main thread, as they do for a page.
+        post { bridge?.handle(json) }
+    }
 
     override fun onExit() {
         post { exitHandler() }

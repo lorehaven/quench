@@ -104,6 +104,10 @@ impl Client {
                     Event::DeleteId(id) => {
                         self.interfaces.remove(id);
                     }
+                    // The compositor made this id: it is an offer of data, and says what it is about later.
+                    Event::DataOffer(id) => {
+                        self.interfaces.insert(*id, Interface::DataOffer);
+                    }
                     _ => {}
                 }
                 self.ready.push_back((message.object, event));

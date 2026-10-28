@@ -8,4 +8,8 @@
 
 Verified against a **real AT-SPI client** (the Python `Atspi` library Orca is built on): the gallery window's tree is listed with roles, names and screen positions, `grab_focus` moves focus into a field, and `do_action` on a button clicks it (opening the gallery's dialog). The unit tests play both ends over socket pairs and fake buses.
 
-Not done: `EditableText` and `Value` (a screen reader reads fields but does not edit them through the bus), text attributes and per-word extents, relations (labels are folded into names), `ChildrenChanged` and `NameChanged` signals (a client re-reads the tree), keyboard events from the registry, and any test with Orca itself.
+**Value and EditableText.** Sliders and progress bars (`Role::Slider`, `Role::ProgressBar`) have the `Value` interface (`MinimumValue`, `MaximumValue`, `CurrentValue`, `MinimumIncrement`; read only). Text boxes that are not read only or disabled have `EditableText`: `SetTextContents`, `InsertText` and `DeleteText` are queued as whole new texts (`take_edits()`), which the window host applies with `NativeRenderer::set_field_value` (focus, the text replaced, an `Input` event); `CopyText`, `CutText` and `PasteText` answer false (the clipboard is the window's).
+
+**Signals.** Each publish is compared with the one before, and the service sends `PropertyChange` (`accessible-name`), `ChildrenChanged` (`add` and `remove`, with the child's reference), `TextChanged` (`insert` and `delete` with the offset, length and text, found as the changed middle of the old and new text), `TextCaretMoved`, and `StateChanged` for `checked`, `expanded` and `selected`, besides the `focused` ones.
+
+Not done: text attributes and per-word extents, a writable `Value`, relations (labels are folded into names), keyboard events from the registry, and any test with Orca itself.

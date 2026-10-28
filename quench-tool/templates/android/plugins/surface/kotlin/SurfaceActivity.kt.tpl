@@ -11,11 +11,15 @@ import android.os.Bundle
  */
 class SurfaceActivity : Activity() {
     private lateinit var surface: QuenchSurfaceView
+    private lateinit var bridge: Bridge
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         surface = QuenchSurfaceView(this)
         surface.exitHandler = { finish() }
+        // The program calls the app's plugins as a page does; their answers and events go back to it.
+        bridge = Bridge(this, null, plugins(this), { surface.reply(it.toString()) }) { false }
+        surface.bridge = bridge
         setContentView(surface)
         surface.setDark(isDark())
         surface.start()
@@ -43,6 +47,22 @@ class SurfaceActivity : Activity() {
     @Deprecated("the platform's back handling")
     override fun onBackPressed() {
         surface.back()
+    }
+
+    @Deprecated("the platform's result handling")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        bridge.onActivityResult(requestCode, resultCode, data)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        bridge.onPermissionResult(requestCode, grantResults)
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        bridge.onIntent(intent)
     }
 
     override fun onDestroy() {

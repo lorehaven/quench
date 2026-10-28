@@ -18,6 +18,8 @@ pub enum Display {
     InlineBlock,
     Flex,
     InlineFlex,
+    Grid,
+    InlineGrid,
     ListItem,
 }
 
@@ -35,6 +37,123 @@ pub enum BorderStyle {
     Solid,
     Dashed,
     Dotted,
+}
+
+/// The size of one row or column of a grid.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Track {
+    Length(Length),
+    /// A share of the space that is left: `1fr`.
+    Fr(f32),
+    /// As big as its content needs (`auto`, `min-content`, `max-content`), and stretched when there is room.
+    Auto,
+    /// At least the first, at most the second: `minmax(100px, 1fr)`.
+    MinMax(Box<Track>, Box<Track>),
+}
+
+/// A `grid-template-columns` or `-rows`: the tracks, and the ones that `repeat(auto-fill, ...)` adds to fill the box.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct TrackList {
+    pub tracks: Vec<Track>,
+    /// Tracks that repeat after `tracks` as many times as fit; `true` collapses the empty ones (`auto-fit`).
+    pub repeat_to_fill: Option<(Vec<Track>, bool)>,
+}
+
+/// One end of a grid item's place in a row or column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GridLine {
+    Auto,
+    /// A line number from 1; negative numbers count from the end.
+    Line(i32),
+    /// As many tracks as this.
+    Span(u32),
+}
+
+/// The curve of a transition: how the progress in time maps to progress in the value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Timing {
+    Linear,
+    #[default]
+    Ease,
+    EaseIn,
+    EaseOut,
+    EaseInOut,
+}
+
+/// One entry of `transition`: which property changes gradually, for how long, after what delay (seconds).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Transition {
+    /// A property name, or `all`.
+    pub property: String,
+    pub duration: f32,
+    pub delay: f32,
+    pub timing: Timing,
+}
+
+impl Default for Transition {
+    fn default() -> Self {
+        Self {
+            property: "all".into(),
+            duration: 0.0,
+            delay: 0.0,
+            timing: Timing::Ease,
+        }
+    }
+}
+
+/// Which way an animation runs through its keyframes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Direction {
+    #[default]
+    Normal,
+    Reverse,
+    Alternate,
+    AlternateReverse,
+}
+
+/// What an animation does outside its run: before it starts and after it ends.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FillMode {
+    #[default]
+    None,
+    Forwards,
+    Backwards,
+    Both,
+}
+
+/// One entry of `animation`: a `@keyframes` name played with a duration, delay, curve, count, direction and fill.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Animation {
+    pub name: String,
+    pub duration: f32,
+    pub delay: f32,
+    pub timing: Timing,
+    /// How many times it runs; `f32::INFINITY` for `infinite`.
+    pub iterations: f32,
+    pub direction: Direction,
+    pub fill: FillMode,
+}
+
+impl Default for Animation {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            duration: 0.0,
+            delay: 0.0,
+            timing: Timing::Ease,
+            iterations: 1.0,
+            direction: Direction::Normal,
+            fill: FillMode::None,
+        }
+    }
+}
+
+/// `background-size`: the image's own size, or scaled to cover or fit inside the box.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BackgroundSize {
+    Auto,
+    Cover,
+    Contain,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -148,6 +267,24 @@ impl Default for Transform {
 /// corners are `[top-left, top-right, bottom-right, bottom-left]`. `None` is `auto` (or no limit).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ComputedStyle {
+    pub animations: Vec<Animation>,
+    /// `grid-template-areas`: the name in each cell, row by row (`.` for an empty cell), and `grid-area` of an item.
+    pub grid_areas: Vec<Vec<String>>,
+    pub grid_area: Option<String>,
+    pub transitions: Vec<Transition>,
+    pub grid_columns: TrackList,
+    pub grid_rows: TrackList,
+    pub grid_auto_columns: Track,
+    pub grid_auto_rows: Track,
+    /// `grid-column` and `grid-row` of an item: where it starts and where it ends.
+    pub grid_column: (GridLine, GridLine),
+    pub grid_row: (GridLine, GridLine),
+    /// The `url()` of `background-image`, how it is sized and placed, and whether it tiles.
+    pub background_image: Option<String>,
+    pub background_size: BackgroundSize,
+    pub background_repeat: bool,
+    /// Where the image sits in its box, as fractions of the free space: `(0.5, 0.5)` is `center`.
+    pub background_position: (f32, f32),
     pub display: Display,
     pub position: Position,
     pub inset: [Option<Length>; 4],
@@ -229,6 +366,20 @@ impl Default for ComputedStyle {
             outline_color: ColorValue::CurrentColor,
             outline_offset: 0.0,
             background: ColorValue::Color(Color::TRANSPARENT),
+            animations: Vec::new(),
+            transitions: Vec::new(),
+            grid_areas: Vec::new(),
+            grid_area: None,
+            grid_columns: TrackList::default(),
+            grid_rows: TrackList::default(),
+            grid_auto_columns: Track::Auto,
+            grid_auto_rows: Track::Auto,
+            grid_column: (GridLine::Auto, GridLine::Auto),
+            grid_row: (GridLine::Auto, GridLine::Auto),
+            background_image: None,
+            background_size: BackgroundSize::Auto,
+            background_repeat: true,
+            background_position: (0.0, 0.0),
             opacity: 1.0,
             shadows: Vec::new(),
             overflow: (Overflow::Visible, Overflow::Visible),
@@ -299,6 +450,7 @@ impl ComputedStyle {
 #[derive(Debug, Clone)]
 pub struct Cascade {
     rules: Vec<Rule>,
+    keyframes: HashMap<String, crate::sheet::Keyframes>,
     pub media: MediaEnv,
     /// `env(safe-area-inset-*)`: top, right, bottom, left, in device pixels.
     pub safe_area: [f32; 4],
@@ -308,9 +460,10 @@ pub struct Cascade {
 
 impl Cascade {
     #[must_use]
-    pub const fn new(media: MediaEnv) -> Self {
+    pub fn new(media: MediaEnv) -> Self {
         Self {
             rules: Vec::new(),
+            keyframes: HashMap::new(),
             media,
             safe_area: [0.0; 4],
             zoom: 1.0,
@@ -325,6 +478,40 @@ impl Cascade {
             rule.order += base;
             self.rules.push(rule);
         }
+        for k in &sheet.keyframes {
+            self.keyframes.insert(k.name.clone(), k.clone());
+        }
+    }
+
+    /// The `@keyframes` of that name (the last one added wins).
+    #[must_use]
+    pub fn keyframes(&self, name: &str) -> Option<&crate::sheet::Keyframes> {
+        self.keyframes.get(name)
+    }
+
+    /// `base` with the declarations of a keyframe applied: the style an element has at that point of an animation.
+    #[must_use]
+    pub fn style_with(
+        &self,
+        base: &ComputedStyle,
+        parent: &ComputedStyle,
+        root_font_size: f32,
+        declarations: &[Declaration],
+    ) -> ComputedStyle {
+        let units = Units {
+            font_size: base.font_size,
+            root_font_size,
+            viewport_width: self.media.width * self.zoom,
+            viewport_height: self.media.height * self.zoom,
+            zoom: self.zoom,
+        };
+        let mut style = base.clone();
+        for d in declarations.iter().filter(|d| !d.name.starts_with("--")) {
+            if let Some(values) = self.substitute(&d.value, &base.custom, 0) {
+                apply(&mut style, parent, &d.name, &values, &units);
+            }
+        }
+        style
     }
 
     #[must_use]
@@ -510,6 +697,256 @@ impl Cascade {
             }
         }
         Some(out)
+    }
+}
+
+fn iterations_of(v: &Value) -> Option<f32> {
+    match v {
+        Value::Ident(s) if s.eq_ignore_ascii_case("infinite") => Some(f32::INFINITY),
+        Value::Number(n) if *n >= 0.0 => Some(*n),
+        _ => None,
+    }
+}
+
+fn direction_of(v: &Value) -> Option<Direction> {
+    match v {
+        Value::Ident(s) => match s.to_ascii_lowercase().as_str() {
+            "normal" => Some(Direction::Normal),
+            "reverse" => Some(Direction::Reverse),
+            "alternate" => Some(Direction::Alternate),
+            "alternate-reverse" => Some(Direction::AlternateReverse),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn fill_of(v: &Value) -> Option<FillMode> {
+    match v {
+        Value::Ident(s) => match s.to_ascii_lowercase().as_str() {
+            "none" => Some(FillMode::None),
+            "forwards" => Some(FillMode::Forwards),
+            "backwards" => Some(FillMode::Backwards),
+            "both" => Some(FillMode::Both),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// `animation: spin 1s linear infinite, fade 2s ease-in 0.5s 3 alternate both`.
+fn animation_list(values: &[Value]) -> Option<Vec<Animation>> {
+    let mut out = Vec::new();
+    for part in split_commas(values) {
+        if matches!(part.as_slice(), [Value::Ident(s)] if s.eq_ignore_ascii_case("none")) {
+            continue;
+        }
+        let mut a = Animation::default();
+        let mut times = 0;
+        for v in &part {
+            if let Some(seconds) = time_of(v).filter(|_| !matches!(v, Value::Number(_))) {
+                if times == 0 {
+                    a.duration = seconds.max(0.0);
+                } else {
+                    a.delay = seconds;
+                }
+                times += 1;
+            } else if let Some(n) = iterations_of(v) {
+                a.iterations = n;
+            } else if let Some(d) = direction_of(v) {
+                a.direction = d;
+            } else if let Some(f) = fill_of(v) {
+                a.fill = f;
+            } else if let Some(t) = timing_of(v) {
+                a.timing = t;
+            } else if matches!(v, Value::Ident(s) if matches!(s.to_ascii_lowercase().as_str(), "running" | "paused"))
+            {
+            } else if let Value::Ident(s) = v {
+                a.name.clone_from(s);
+            } else {
+                return None;
+            }
+        }
+        out.push(a);
+    }
+    Some(out)
+}
+
+/// A time in seconds: `0.3s`, `200ms`.
+fn time_of(v: &Value) -> Option<f32> {
+    match v {
+        Value::Dimension(n, unit) if unit.eq_ignore_ascii_case("s") => Some(*n),
+        Value::Dimension(n, unit) if unit.eq_ignore_ascii_case("ms") => Some(*n / 1000.0),
+        Value::Number(n) if *n == 0.0 => Some(0.0),
+        _ => None,
+    }
+}
+
+fn timing_of(v: &Value) -> Option<Timing> {
+    match v {
+        Value::Ident(s) => match s.to_ascii_lowercase().as_str() {
+            "linear" | "step-start" | "step-end" => Some(Timing::Linear),
+            "ease" => Some(Timing::Ease),
+            "ease-in" => Some(Timing::EaseIn),
+            "ease-out" => Some(Timing::EaseOut),
+            "ease-in-out" => Some(Timing::EaseInOut),
+            _ => None,
+        },
+        // Custom curves and steps are approximated by the nearest named one.
+        Value::Function(name, _) if name.eq_ignore_ascii_case("cubic-bezier") => Some(Timing::Ease),
+        Value::Function(name, _) if name.eq_ignore_ascii_case("steps") => Some(Timing::Linear),
+        _ => None,
+    }
+}
+
+/// Makes the transition list at least `n` long (new entries are `all 0s ease`).
+fn fill_transitions(style: &mut ComputedStyle, n: usize) {
+    while style.transitions.len() < n {
+        style.transitions.push(Transition::default());
+    }
+}
+
+/// `transition: opacity 0.3s ease-in-out 0.1s, color 1s`.
+fn transition_list(values: &[Value]) -> Option<Vec<Transition>> {
+    let mut out = Vec::new();
+    for part in split_commas(values) {
+        if matches!(part.as_slice(), [Value::Ident(s)] if s.eq_ignore_ascii_case("none")) {
+            continue;
+        }
+        let mut t = Transition::default();
+        let mut times = 0;
+        for v in &part {
+            if let Some(seconds) = time_of(v) {
+                if times == 0 {
+                    t.duration = seconds.max(0.0);
+                } else {
+                    t.delay = seconds;
+                }
+                times += 1;
+            } else if let Some(curve) = timing_of(v) {
+                t.timing = curve;
+            } else if let Value::Ident(s) = v {
+                t.property = s.to_ascii_lowercase();
+            } else {
+                return None;
+            }
+        }
+        out.push(t);
+    }
+    Some(out)
+}
+
+/// One track: a length, `1fr`, `auto` or `minmax(a, b)`.
+fn track_of(v: &Value, units: &Units) -> Option<Track> {
+    match v {
+        Value::Dimension(n, unit) if unit.eq_ignore_ascii_case("fr") => Some(Track::Fr(*n)),
+        Value::Ident(s)
+            if matches!(
+                s.to_ascii_lowercase().as_str(),
+                "auto" | "min-content" | "max-content"
+            ) =>
+        {
+            Some(Track::Auto)
+        }
+        Value::Function(name, args) if name.eq_ignore_ascii_case("minmax") => {
+            let parts = split_commas(args);
+            let [a, b] = parts.as_slice() else {
+                return None;
+            };
+            let (a, b) = (track_of(a.first()?, units)?, track_of(b.first()?, units)?);
+            Some(Track::MinMax(Box::new(a), Box::new(b)))
+        }
+        other => parse_length(other, units).map(Track::Length),
+    }
+}
+
+/// The value of `grid-template-columns` or `-rows`: tracks, line names (ignored) and `repeat()`.
+fn track_list(values: &[Value], units: &Units) -> Option<TrackList> {
+    let mut list = TrackList::default();
+    for v in values {
+        match v {
+            Value::Ident(s) if s.eq_ignore_ascii_case("none") => {}
+            Value::Block('[', _) => {}
+            Value::Function(name, args) if name.eq_ignore_ascii_case("repeat") => {
+                let parts = split_commas(args);
+                let (head, tracks) = parts.split_first()?;
+                let inner: Vec<Track> = tracks
+                    .iter()
+                    .flat_map(|part| part.iter())
+                    .filter(|v| !matches!(v, Value::Block('[', _)))
+                    .map(|v| track_of(v, units))
+                    .collect::<Option<_>>()?;
+                if inner.is_empty() {
+                    return None;
+                }
+                match head.as_slice() {
+                    [Value::Number(n)] if *n >= 1.0 => {
+                        for _ in 0..(*n as usize).min(1000) {
+                            list.tracks.extend(inner.iter().cloned());
+                        }
+                    }
+                    [Value::Ident(s)] if s.eq_ignore_ascii_case("auto-fill") => {
+                        list.repeat_to_fill = Some((inner, false));
+                    }
+                    [Value::Ident(s)] if s.eq_ignore_ascii_case("auto-fit") => {
+                        list.repeat_to_fill = Some((inner, true));
+                    }
+                    _ => return None,
+                }
+            }
+            other => list.tracks.push(track_of(other, units)?),
+        }
+    }
+    Some(list)
+}
+
+/// One end of an item's place: `3`, `span 2`, `auto`.
+fn grid_line(values: &[Value]) -> Option<GridLine> {
+    match values {
+        [Value::Ident(s)] if s.eq_ignore_ascii_case("auto") => Some(GridLine::Auto),
+        [Value::Number(n)] if *n != 0.0 => Some(GridLine::Line(*n as i32)),
+        [Value::Ident(s), Value::Number(n)] | [Value::Number(n), Value::Ident(s)]
+            if s.eq_ignore_ascii_case("span") && *n >= 1.0 =>
+        {
+            Some(GridLine::Span(*n as u32))
+        }
+        _ => None,
+    }
+}
+
+/// `grid-column` or `grid-row`: `1 / 3`, `2`, `span 2`, `1 / span 2`.
+fn grid_lines(values: &[Value]) -> Option<(GridLine, GridLine)> {
+    let mut parts = values.split(|v| matches!(v, Value::Delim('/')));
+    let start = grid_line(parts.next()?)?;
+    let end = match parts.next() {
+        Some(part) => grid_line(part)?,
+        None => GridLine::Auto,
+    };
+    parts.next().is_none().then_some((start, end))
+}
+
+/// The address in a `url(...)`.
+fn url_of(v: &Value) -> Option<String> {
+    match v {
+        Value::Function(name, args) if name.eq_ignore_ascii_case("url") => match args.as_slice() {
+            [Value::Str(s)] => Some(s.clone()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// A keyword of the `background` shorthand.
+fn background_word(style: &mut ComputedStyle, v: &Value) {
+    if let Value::Ident(s) = v {
+        match s.to_ascii_lowercase().as_str() {
+            "no-repeat" => style.background_repeat = false,
+            "repeat" => style.background_repeat = true,
+            "cover" => style.background_size = BackgroundSize::Cover,
+            "contain" => style.background_size = BackgroundSize::Contain,
+            "center" => style.background_position = (0.5, 0.5),
+            _ => {}
+        }
     }
 }
 
@@ -886,6 +1323,8 @@ fn try_apply(
                 "inline-block" => Display::InlineBlock,
                 "flex" => Display::Flex,
                 "inline-flex" => Display::InlineFlex,
+                "grid" => Display::Grid,
+                "inline-grid" => Display::InlineGrid,
                 "list-item" => Display::ListItem,
                 _ => Display::Block,
             };
@@ -1042,10 +1481,71 @@ fn try_apply(
             if word.as_deref() == Some("none") {
                 style.background = ColorValue::Color(Color::TRANSPARENT);
             } else {
-                // Images are not drawn; the colour layer is.
                 let color = values.iter().rev().find_map(parse_color);
                 style.background = color.unwrap_or(ColorValue::Color(Color::TRANSPARENT));
+                if name == "background" {
+                    // The shorthand sets the image layer too (gradients are not drawn).
+                    style.background_image = values.iter().find_map(url_of);
+                    style.background_size = BackgroundSize::Auto;
+                    style.background_repeat = true;
+                    style.background_position = (0.0, 0.0);
+                    for v in values {
+                        background_word(style, v);
+                    }
+                }
             }
+        }
+        "background-image" => style.background_image = values.iter().find_map(url_of),
+        "background-size" => {
+            style.background_size = match word.as_deref()? {
+                "cover" => BackgroundSize::Cover,
+                "contain" => BackgroundSize::Contain,
+                "auto" => BackgroundSize::Auto,
+                _ => return None,
+            };
+        }
+        "background-repeat" => {
+            style.background_repeat = match word.as_deref()? {
+                "no-repeat" => false,
+                "repeat" => true,
+                _ => return None,
+            };
+        }
+        "background-position" => {
+            let mut position = (0.5, 0.5);
+            for (n, v) in values.iter().enumerate() {
+                match v {
+                    Value::Ident(s)
+                        if matches!(s.to_ascii_lowercase().as_str(), "top" | "bottom") =>
+                    {
+                        position.1 = if s.eq_ignore_ascii_case("top") {
+                            0.0
+                        } else {
+                            1.0
+                        };
+                    }
+                    Value::Ident(s)
+                        if matches!(s.to_ascii_lowercase().as_str(), "left" | "right") =>
+                    {
+                        position.0 = if s.eq_ignore_ascii_case("left") {
+                            0.0
+                        } else {
+                            1.0
+                        };
+                    }
+                    Value::Ident(s) if s.eq_ignore_ascii_case("center") => {}
+                    Value::Percent(p) => {
+                        // The first percentage is horizontal, the second vertical.
+                        if n == 0 {
+                            position.0 = p / 100.0;
+                        } else {
+                            position.1 = p / 100.0;
+                        }
+                    }
+                    _ => return None,
+                }
+            }
+            style.background_position = position;
         }
         "opacity" => {
             style.opacity = match one()? {
@@ -1113,13 +1613,127 @@ fn try_apply(
                 _ => return None,
             };
         }
-        "gap" => match values {
+        "gap" | "grid-gap" => match values {
             [a] => (style.row_gap, style.column_gap) = (len(a)?, len(a)?),
             [a, b] => (style.row_gap, style.column_gap) = (len(a)?, len(b)?),
             _ => return None,
         },
-        "row-gap" => style.row_gap = len(one()?)?,
-        "column-gap" => style.column_gap = len(one()?)?,
+        "animation" => style.animations = animation_list(values)?,
+        "animation-name"
+        | "animation-duration"
+        | "animation-delay"
+        | "animation-timing-function"
+        | "animation-iteration-count"
+        | "animation-direction"
+        | "animation-fill-mode" => {
+            let items = split_commas(values);
+            while style.animations.len() < items.len() {
+                style.animations.push(Animation::default());
+            }
+            for (i, a) in style.animations.iter_mut().enumerate() {
+                let item = items[i % items.len()].as_slice();
+                match name {
+                    "animation-name" => {
+                        a.name = match item {
+                            [Value::Ident(s)] if s.eq_ignore_ascii_case("none") => String::new(),
+                            [Value::Ident(s)] => s.clone(),
+                            _ => return None,
+                        };
+                    }
+                    "animation-duration" => a.duration = time_of(item.first()?)?.max(0.0),
+                    "animation-delay" => a.delay = time_of(item.first()?)?,
+                    "animation-timing-function" => a.timing = timing_of(item.first()?)?,
+                    "animation-iteration-count" => a.iterations = iterations_of(item.first()?)?,
+                    "animation-direction" => a.direction = direction_of(item.first()?)?,
+                    _ => a.fill = fill_of(item.first()?)?,
+                }
+            }
+        }
+        "transition" => style.transitions = transition_list(values)?,
+        "transition-property" => {
+            let names = split_commas(values);
+            fill_transitions(style, names.len());
+            for (i, t) in style.transitions.iter_mut().enumerate() {
+                t.property = match names[i % names.len()].as_slice() {
+                    [Value::Ident(s)] => s.to_ascii_lowercase(),
+                    _ => return None,
+                };
+            }
+        }
+        "transition-duration" | "transition-delay" => {
+            let times = split_commas(values);
+            let seconds: Vec<f32> = times
+                .iter()
+                .map(|t| match t.as_slice() {
+                    [v] => time_of(v),
+                    _ => None,
+                })
+                .collect::<Option<_>>()?;
+            fill_transitions(style, seconds.len());
+            for (i, t) in style.transitions.iter_mut().enumerate() {
+                if name == "transition-duration" {
+                    t.duration = seconds[i % seconds.len()].max(0.0);
+                } else {
+                    t.delay = seconds[i % seconds.len()];
+                }
+            }
+        }
+        "transition-timing-function" => {
+            let curves = split_commas(values);
+            fill_transitions(style, curves.len());
+            for (i, t) in style.transitions.iter_mut().enumerate() {
+                t.timing = timing_of(curves[i % curves.len()].first()?)?;
+            }
+        }
+        "grid-template-columns" => style.grid_columns = track_list(values, units)?,
+        "grid-template-rows" => style.grid_rows = track_list(values, units)?,
+        "grid-template-areas" => {
+            let mut rows: Vec<Vec<String>> = Vec::new();
+            for v in values {
+                match v {
+                    Value::Ident(s) if s.eq_ignore_ascii_case("none") && values.len() == 1 => {}
+                    Value::Str(s) => rows.push(s.split_whitespace().map(str::to_string).collect()),
+                    _ => return None,
+                }
+            }
+            // Every row has the same number of cells, and a name covers a rectangle.
+            if rows
+                .iter()
+                .any(|r| r.len() != rows[0].len() || r.is_empty())
+            {
+                return None;
+            }
+            style.grid_areas = rows;
+        }
+        "grid-area" => match values {
+            [Value::Ident(name)] if !name.eq_ignore_ascii_case("auto") => {
+                style.grid_area = Some(name.clone());
+            }
+            _ => {
+                // `row-start / column-start / row-end / column-end`, each from the end backwards when left out.
+                let parts: Vec<&[Value]> =
+                    values.split(|v| matches!(v, Value::Delim('/'))).collect();
+                let lines: Vec<GridLine> =
+                    parts.iter().map(|p| grid_line(p)).collect::<Option<_>>()?;
+                let at = |i: usize| lines.get(i).copied().unwrap_or(GridLine::Auto);
+                if lines.is_empty() || lines.len() > 4 {
+                    return None;
+                }
+                style.grid_area = None;
+                style.grid_row = (at(0), at(2));
+                style.grid_column = (at(1), at(3));
+            }
+        },
+        "grid-auto-columns" => style.grid_auto_columns = track_of(one()?, units)?,
+        "grid-auto-rows" => style.grid_auto_rows = track_of(one()?, units)?,
+        "grid-column" => style.grid_column = grid_lines(values)?,
+        "grid-row" => style.grid_row = grid_lines(values)?,
+        "grid-column-start" => style.grid_column.0 = grid_line(values)?,
+        "grid-column-end" => style.grid_column.1 = grid_line(values)?,
+        "grid-row-start" => style.grid_row.0 = grid_line(values)?,
+        "grid-row-end" => style.grid_row.1 = grid_line(values)?,
+        "row-gap" | "grid-row-gap" => style.row_gap = len(one()?)?,
+        "column-gap" | "grid-column-gap" => style.column_gap = len(one()?)?,
         "color" => {
             if inherit {
                 style.color = parent.color;

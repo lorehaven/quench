@@ -22,6 +22,8 @@ members = [
   "quench-crypto",
   "quench-db",
   "quench-http",
+  "quench-image",
+  "quench-svg",
   "quench-http-macros",
   "quench-k8s",
   "quench-log",
@@ -91,6 +93,8 @@ quench-paint = { path = "quench-paint", registry = "ennor", version = "0.1.0" }
 quench-ui-native = { path = "quench-ui-native", registry = "ennor", version = "0.1.0" }
 quench-desktop-native = { path = "quench-desktop-native", registry = "ennor", version = "0.1.0" }
 quench-desktop-atspi = { path = "quench-desktop-atspi", registry = "ennor", version = "0.1.0" }
+quench-image = { path = "quench-image", registry = "ennor", version = "0.1.0" }
+quench-svg = { path = "quench-svg", registry = "ennor", version = "0.1.0" }
 quench-android-surface = { path = "quench-android-surface", registry = "ennor", version = "0.1.0" }
 quench-core = { path = "quench-core", registry = "ennor", version = "0.1.0" }
 quench-crypto = { path = "quench-crypto", registry = "ennor", version = "0.1.0", default-features = false }

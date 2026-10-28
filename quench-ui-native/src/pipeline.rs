@@ -173,12 +173,16 @@ fn build(
                 root_font,
                 &inline_style(dom, id),
             );
+            dom.anim
+                .borrow_mut()
+                .apply(id, &mut style, cascade, parent, root_font);
             let root_font = if tag == "html" {
                 style.font_size
             } else {
                 root_font
             };
             let mut kids: Vec<Rc<Node>> = Vec::new();
+            let mut replaced: Option<(f32, f32)> = None;
             let text_child = |style: &Rc<ComputedStyle>, text: &str, color: Option<Css>| {
                 let mut inherited = style.inherited();
                 inherited.display = Display::Inline;
@@ -221,6 +225,39 @@ fn build(
                         if style.height.is_none() && style.min_height.is_none() {
                             style.min_height = Some(Length::Px(line + extra));
                         }
+                    }
+                }
+                "img" => {
+                    keep_children = false;
+                    let found = dom
+                        .attr(id, "src")
+                        .and_then(|src| dom.images.get(src))
+                        .and_then(Clone::clone);
+                    let number = |name: &str| {
+                        dom.attr(id, name)
+                            .and_then(|v| v.parse::<f32>().ok())
+                            .filter(|v| *v > 0.0)
+                    };
+                    if let Some(image) = found {
+                        // Its own size in CSS pixels unless the page gave one (and the other side follows).
+                        let (nw, nh) = (
+                            image.width as f32 / image.scale,
+                            image.height as f32 / image.scale,
+                        );
+                        let (w, h) = match (number("width"), number("height")) {
+                            (Some(w), Some(h)) => (w, h),
+                            (Some(w), None) => (w, w * nh / nw),
+                            (None, Some(h)) => (h * nw / nh, h),
+                            (None, None) => (nw, nh),
+                        };
+                        replaced = Some((w * dom.zoom, h * dom.zoom));
+                        if matches!(style.display, Display::Inline) {
+                            style.display = Display::InlineBlock;
+                        }
+                    } else if let Some(alt) = dom.attr(id, "alt").filter(|a| !a.is_empty()) {
+                        // A picture that is not there is its description.
+                        let shared = Rc::new(style.clone());
+                        kids.push(text_child(&shared, alt, None));
                     }
                 }
                 "textarea" => {
@@ -272,6 +309,13 @@ fn build(
                 style.justify_content = quench_css::Justify::Center;
             }
             let style = Rc::new(style);
+            if let Some((w, h)) = replaced {
+                return Some(Rc::new(Node {
+                    key: id,
+                    style,
+                    content: quench_layout::Content::Replaced(w, h),
+                }));
+            }
             if keep_children {
                 for child in &dom.nodes[id].children {
                     if let Some(node) = build(dom, cascade, *child, &style, root_font) {
@@ -298,11 +342,159 @@ fn build(
     }
 }
 
+/// The boxes that have a `background-image`, by key.
+fn collect_backgrounds(b: &LayoutBox, out: &mut Vec<(usize, String)>) {
+    if let Some(url) = &b.style.background_image {
+        out.push((b.key, url.clone()));
+    }
+    for child in &b.children {
+        collect_backgrounds(child, out);
+    }
+}
+
+fn box_of(b: &LayoutBox, key: usize) -> Option<&LayoutBox> {
+    if b.key == key {
+        return Some(b);
+    }
+    b.children.iter().find_map(|c| box_of(c, key))
+}
+
+/// The bytes in a `data:` URL (after the scheme): base64, or text with %-escapes.
+fn data_url(rest: &str) -> Option<Vec<u8>> {
+    let (head, data) = rest.split_once(',')?;
+    if head.ends_with(";base64") {
+        return quench_core::base64::STANDARD.decode(data).ok();
+    }
+    let raw = data.as_bytes();
+    let mut out = Vec::with_capacity(raw.len());
+    let mut i = 0;
+    while i < raw.len() {
+        let hex = |b: u8| char::from(b).to_digit(16);
+        match raw[i] {
+            b'%' if i + 2 < raw.len() && hex(raw[i + 1]).is_some() && hex(raw[i + 2]).is_some() => {
+                out.push((hex(raw[i + 1])? * 16 + hex(raw[i + 2])?) as u8);
+                i += 3;
+            }
+            b => {
+                out.push(b);
+                i += 1;
+            }
+        }
+    }
+    Some(out)
+}
+
+/// A picture from a file's bytes: a bitmap as it is, a drawing made at `zoom` device pixels per CSS pixel.
+pub(crate) fn picture(bytes: &[u8], zoom: f32) -> Result<crate::dom::Picture, quench_image::Error> {
+    match quench_image::decode(bytes) {
+        Ok(image) => Ok(crate::dom::Picture::from(image)),
+        Err(quench_image::Error::Unsupported("SVG" | "unknown")) => {
+            let drawn = std::str::from_utf8(bytes)
+                .ok()
+                .and_then(|text| quench_svg::render(text, zoom).ok())
+                .ok_or(quench_image::Error::Corrupt("not a readable drawing"))?;
+            Ok(crate::dom::Picture {
+                scale: zoom,
+                svg: true,
+                ..crate::dom::Picture::from(drawn)
+            })
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// How a progress bar, a meter or a slider shows its value: bars from the border box's corner.
+fn gauge_decorations(dom: &Dom, key: usize, b: &LayoutBox) -> Vec<Decoration> {
+    let slider = crate::input::is_range(dom, key);
+    let role = if slider {
+        crate::access::Role::Slider
+    } else {
+        crate::access::Role::ProgressBar
+    };
+    let (min, max, now) = crate::access::range_of(dom, key, role);
+    let Some(now) = now else {
+        return Vec::new();
+    };
+    let frac = if max > min {
+        ((now - min) / (max - min)) as f32
+    } else {
+        0.0
+    };
+    let accent = Css::rgba(0, 117, 255, 255);
+    let z = dom.zoom;
+    if slider {
+        let track = 4.0 * z;
+        let thumb = 10.0 * z;
+        let y = (b.height - track) / 2.0;
+        return vec![
+            Decoration::Bar {
+                x: 0.0,
+                y,
+                width: b.width,
+                height: track,
+                color: Css::rgba(196, 196, 196, 255),
+            },
+            Decoration::Bar {
+                x: 0.0,
+                y,
+                width: b.width * frac,
+                height: track,
+                color: accent,
+            },
+            Decoration::Bar {
+                x: (b.width - thumb) * frac,
+                y: 2.0 * z,
+                width: thumb,
+                height: (b.height - 4.0 * z).max(0.0),
+                color: accent,
+            },
+        ];
+    }
+    let edge = b.border[0];
+    vec![Decoration::Bar {
+        x: edge,
+        y: edge,
+        width: (b.width - 2.0 * edge).max(0.0) * frac,
+        height: (b.height - 2.0 * edge).max(0.0),
+        color: accent,
+    }]
+}
+
 fn cascade_line_height(dom: &Dom, style: &ComputedStyle) -> f32 {
     dom.fonts.line_height(style)
 }
 
 impl NativeRenderer {
+    /// Loads and decodes the images the document asks for that are not known yet (a failure is remembered).
+    fn resolve_images(&self) {
+        let wanted: Vec<String> = {
+            let dom = self.dom.borrow();
+            (0..dom.nodes.len())
+                .filter(|n| dom.tag(*n) == Some("img"))
+                .filter_map(|n| dom.attr(n, "src").map(String::from))
+                .filter(|src| !dom.images.contains_key(src))
+                .collect()
+        };
+        self.load_images(wanted);
+    }
+
+    /// Loads and decodes `wanted` (those not known yet).
+    fn load_images(&self, wanted: Vec<String>) {
+        for src in wanted {
+            if self.dom.borrow().images.contains_key(&src) {
+                continue;
+            }
+            let loader = self.dom.borrow().loader.clone();
+            let bytes = match src.strip_prefix("data:") {
+                Some(rest) => data_url(rest),
+                None => loader.and_then(|load| load(&src)),
+            };
+            let zoom = self.dom.borrow().zoom;
+            let image = bytes.and_then(|b| picture(&b, zoom).ok());
+            self.dom.borrow_mut().images.insert(src, image);
+        }
+    }
+
     fn cascade(&self) -> Rc<Cascade> {
         if let Some(c) = self.cascade.borrow().as_ref() {
             return Rc::clone(c);
@@ -324,13 +516,16 @@ impl NativeRenderer {
     /// are matched against.
     #[must_use]
     pub fn layout(&self) -> Rc<LayoutBox> {
+        self.resolve_images();
         let cascade = self.cascade();
+        let reduced = quench_ui::platform::Platform::prefers_reduced_motion(&*self.platform);
         let boxes = {
             let dom = self.dom.borrow();
             let root_style = Rc::new(ComputedStyle {
                 font_size: 16.0 * dom.zoom,
                 ..ComputedStyle::default()
             });
+            dom.anim.borrow_mut().begin(reduced);
             let tree = build(&dom, &cascade, 0, &root_style, 16.0 * dom.zoom)
                 .expect("the document has a root");
             Rc::new(layout(&tree, dom.viewport, &dom.fonts))
@@ -346,6 +541,10 @@ impl NativeRenderer {
     /// Draws the document into `canvas` (laid out for the viewport that was set, not for the canvas).
     pub fn render<S: AsRef<[u8]> + AsMut<[u8]>>(&self, canvas: &mut Canvas<S>) -> Rc<LayoutBox> {
         let boxes = self.layout();
+        // The pictures that boxes ask for with `background-image`.
+        let mut backgrounds: Vec<(usize, String)> = Vec::new();
+        collect_backgrounds(&boxes, &mut backgrounds);
+        self.load_images(backgrounds.iter().map(|(_, url)| url.clone()).collect());
         // The page background is the root's, or else the body's, and it fills the whole canvas.
         let page = [Some(&*boxes), boxes.children.first()]
             .into_iter()
@@ -363,6 +562,40 @@ impl NativeRenderer {
                     Some("radio") => out.push(Decoration::Dot(Css::rgba(255, 255, 255, 255))),
                     _ => {}
                 }
+            }
+            if dom.tag(key) == Some("img")
+                && let Some(Some(image)) = dom.attr(key, "src").and_then(|src| dom.images.get(src))
+            {
+                out.push(Decoration::Image {
+                    rgba: Rc::clone(&image.rgba),
+                    width: image.width,
+                    height: image.height,
+                });
+            }
+            if let Some((_, url)) = backgrounds.iter().find(|(k, _)| *k == key)
+                && let Some(Some(image)) = dom.images.get(url)
+                && let Some(b) = box_of(&boxes, key)
+            {
+                out.push(Decoration::Background {
+                    rgba: Rc::clone(&image.rgba),
+                    width: image.width,
+                    height: image.height,
+                    size: b.style.background_size,
+                    repeat: b.style.background_repeat,
+                    position: b.style.background_position,
+                    scale: dom.zoom / image.scale,
+                });
+            }
+            if let Some(b) = matches!(dom.tag(key), Some("progress" | "meter"))
+                .then(|| box_of(&boxes, key))
+                .flatten()
+                .or_else(|| {
+                    crate::input::is_range(&dom, key)
+                        .then(|| box_of(&boxes, key))
+                        .flatten()
+                })
+            {
+                out.extend(gauge_decorations(&dom, key, b));
             }
             if dom.ui.focused == Some(key) && crate::input::is_text_field(&dom, key) {
                 out.extend(field_decorations(&dom, &boxes, key));
@@ -471,10 +704,6 @@ fn field_decorations(dom: &Dom, boxes: &LayoutBox, f: usize) -> Vec<Decoration> 
 
 /// Where the caret of text field `f` is in the window: `(x, top, height)`.
 pub(crate) fn caret_spot(dom: &Dom, boxes: &LayoutBox, f: usize) -> Option<(f32, f32, f32)> {
-    let field = boxes.find(f)?;
-    let (bx, by) = boxes.position_of(f)?;
-    let frags = boxes.text_fragments(f);
-    let value: Vec<char> = crate::input::displayed_value(dom, f).chars().collect();
     let plain = crate::input::field_value(dom, f).chars().count();
     let caret = match &dom.ui.preedit {
         Some((text, cursor)) if !text.is_empty() => {
@@ -482,6 +711,20 @@ pub(crate) fn caret_spot(dom: &Dom, boxes: &LayoutBox, f: usize) -> Option<(f32,
         }
         _ => dom.ui.caret.min(plain),
     };
+    spot_at(dom, boxes, f, caret)
+}
+
+/// Where the character position `caret` of a field is on the screen: `(x, top, height)`.
+pub(crate) fn spot_at(
+    dom: &Dom,
+    boxes: &LayoutBox,
+    f: usize,
+    caret: usize,
+) -> Option<(f32, f32, f32)> {
+    let field = boxes.find(f)?;
+    let (bx, by) = boxes.position_of(f)?;
+    let frags = boxes.text_fragments(f);
+    let value: Vec<char> = crate::input::displayed_value(dom, f).chars().collect();
     if frags.is_empty() {
         let (cx, cy, _, _) = field.content_rect();
         let m = dom.fonts.metrics(&field.style);

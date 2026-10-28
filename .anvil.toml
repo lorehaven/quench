@@ -28,6 +28,8 @@ packages = [
     "quench-fullstack-macros",
     "quench-html",
     "quench-http",
+    "quench-image",
+    "quench-svg",
     "quench-http-macros",
     "quench-k8s",
     "quench-log",

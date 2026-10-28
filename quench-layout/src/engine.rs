@@ -111,7 +111,7 @@ pub fn is_inline_level(node: &Node) -> bool {
         || (!is_out_of_flow(node)
             && matches!(
                 node.style.display,
-                Display::Inline | Display::InlineBlock | Display::InlineFlex
+                Display::Inline | Display::InlineBlock | Display::InlineFlex | Display::InlineGrid
             ))
 }
 
@@ -205,6 +205,23 @@ impl Engine<'_> {
         let mut content_w = match (c.width, specified_w, replaced) {
             (Width::Exact(bb), _, _) => (bb - extra_w).max(0.0),
             (_, Some(w), _) => w,
+            // Only its height given: the width follows the proportions.
+            (_, None, Some((w, h)))
+                if h > 0.0 && style.height.as_ref().is_some_and(|l| l.as_px().is_some()) =>
+            {
+                let wanted = style
+                    .height
+                    .as_ref()
+                    .and_then(quench_css::Length::as_px)
+                    .map_or(h, |px| {
+                        if style.border_box {
+                            (px - e.vertical()).max(0.0)
+                        } else {
+                            px
+                        }
+                    });
+                wanted * w / h
+            }
             (_, None, Some((w, _))) => w,
             (Width::Fill, None, None) => (c.avail_w - margin_fixed - extra_w).max(0.0),
             (Width::Shrink, None, None) => {
@@ -258,6 +275,10 @@ impl Engine<'_> {
             (None, Some(l), _) if l.as_px().is_some() || c.avail_h.is_some() => {
                 Some(to_content_h(l.resolve(c.avail_h.unwrap_or(0.0))))
             }
+            // A replaced box with only its width given keeps its proportions.
+            (None, None, Some((w, h))) if specified_w.is_some() && w > 0.0 => {
+                Some(content_w * h / w)
+            }
             (None, _, Some((_, h))) => Some(h),
             _ => None,
         };
@@ -285,6 +306,11 @@ impl Engine<'_> {
                     limit(&style.max_height).unwrap_or(f32::INFINITY),
                 );
                 self.flex_flow(style, children, content_w, definite_h, limits)
+            }
+            Content::Children(children)
+                if matches!(style.display, Display::Grid | Display::InlineGrid) =>
+            {
+                self.grid_flow(style, children, content_w, definite_h)
             }
             Content::Children(children) => self.block_flow(
                 style,

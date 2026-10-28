@@ -18,7 +18,10 @@ name = "quench_ui_native"
 path = "src/lib.rs"
 
 [dependencies]
+quench-core = { workspace = true }
 quench-css = { workspace = true }
+quench-image = { workspace = true }
+quench-svg = { workspace = true }
 quench-layout = { workspace = true }
 quench-paint = { workspace = true }
 quench-raster = { workspace = true }

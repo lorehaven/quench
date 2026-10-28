@@ -52,6 +52,12 @@ fn the_embedded_fonts_parse_and_say_what_licence_they_are_under() {
     for (font, family, style) in [
         (noto_sans(), "Noto Sans", "Regular"),
         (noto_sans_bold(), "Noto Sans", "Bold"),
+        (quench_text::noto_sans_light(), "Noto Sans Light", "Regular"),
+        (
+            quench_text::noto_sans_medium(),
+            "Noto Sans Medium",
+            "Regular",
+        ),
     ] {
         assert_eq!((font.units_per_em(), font.glyph_count()), (1000, 3884));
         assert_eq!(font.name(1).as_deref(), Some(family));

@@ -28,5 +28,7 @@ mod layout;
 mod system;
 
 pub use font::{Font, FontError, Outline, Point};
-pub use layout::{FontSet, Glyph, Layout, Line, noto_sans, noto_sans_bold};
+pub use layout::{
+    FontSet, Glyph, Layout, Line, noto_sans, noto_sans_bold, noto_sans_light, noto_sans_medium,
+};
 pub use system::SystemFonts;

@@ -17,13 +17,19 @@
 
 // Pixel sizes and coordinates are small numbers; the wire is 32-bit.
 #![allow(
+    clippy::suboptimal_flops,
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
     clippy::cast_possible_wrap
 )]
 
+pub mod bridge;
 pub mod proto;
+
+pub use bridge::{Bridge, CallError};
+/// The JSON value of a call's arguments and answer, and the map an object of arguments is made with.
+pub use quench_serde::{Map, Value};
 
 use std::io::{self, Read, Write};
 use std::rc::Rc;
@@ -41,12 +47,44 @@ const SLOP: f32 = 8.0;
 /// How long the caret is on and off.
 const BLINK: Duration = Duration::from_millis(530);
 
+/// How long the movement that sets a fling's speed is looked at, how fast a finger must go (device pixels a second)
+/// for the content to keep moving, how quickly it slows down (per second) and when it is slow enough to stop.
+const FLING_WINDOW: Duration = Duration::from_millis(100);
+const FLING_MIN_SPEED: f32 = 150.0;
+const FLING_FRICTION: f32 = 3.5;
+const FLING_STOP_SPEED: f32 = 25.0;
+/// How long a finger must stay before it selects a word, and how far from a handle's centre it takes hold of it
+/// (in CSS pixels).
+const LONG_PRESS: Duration = Duration::from_millis(500);
+const HANDLE_REACH: f32 = 28.0;
+/// The size of a handle's knob, in CSS pixels.
+const HANDLE_KNOB: f32 = 9.0;
+
+/// How often a fling moves the content.
+const FLING_STEP: Duration = Duration::from_millis(16);
+
 /// A finger on the screen.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct Touch {
     start: (f32, f32),
     last: (f32, f32),
     scrolling: bool,
+    /// When the finger came down, and whether it has been held long enough to select a word.
+    started: Instant,
+    long: bool,
+    /// A selection handle the finger took hold of: `false` for the start of the selection, `true` for its end.
+    handle: Option<bool>,
+    /// Where the finger was and when, over the last moments (to know how fast it left).
+    samples: Vec<(Instant, f32, f32)>,
+}
+
+/// Content that keeps moving after the finger has left it.
+#[derive(Debug, Clone, Copy)]
+struct Fling {
+    at: (f32, f32),
+    /// The finger's velocity, device pixels a second.
+    velocity: (f32, f32),
+    last: Instant,
 }
 
 /// The state of the program: the renderer, the window it draws into and what it last told the host.
@@ -57,6 +95,7 @@ pub struct Surface<W: Write> {
     size: Option<(u32, u32)>,
     density: f32,
     touch: Option<Touch>,
+    fling: Option<Fling>,
     dark: bool,
     visible: bool,
     ime: Option<ImeState>,
@@ -64,6 +103,7 @@ pub struct Surface<W: Write> {
     caret_on: bool,
     blink_at: Instant,
     exit: bool,
+    bridge: Bridge,
 }
 
 impl<W: Write> std::fmt::Debug for Surface<W> {
@@ -107,12 +147,18 @@ fn move_utf16(text: &str, from: usize, units: i32) -> usize {
 impl<W: Write> Surface<W> {
     /// A program that draws `renderer` and writes to `out`.
     pub fn new(renderer: &Rc<NativeRenderer>, out: W) -> Self {
+        Self::with_bridge(renderer, out, Bridge::new())
+    }
+
+    /// A program whose calls to the host's plugins go through `bridge`.
+    pub fn with_bridge(renderer: &Rc<NativeRenderer>, out: W, bridge: Bridge) -> Self {
         Self {
             renderer: Rc::clone(renderer),
             out,
             size: None,
             density: 1.0,
             touch: None,
+            fling: None,
             dark: true,
             visible: true,
             ime: None,
@@ -120,6 +166,7 @@ impl<W: Write> Surface<W> {
             caret_on: true,
             blink_at: Instant::now() + BLINK,
             exit: false,
+            bridge,
         }
     }
 
@@ -217,6 +264,8 @@ impl<W: Write> Surface<W> {
                 );
             }
             Event::Visible(v) => self.visible = v,
+            Event::Clipboard(text) => self.renderer.set_clipboard(&text),
+            Event::Reply(envelope) => self.bridge.deliver(&envelope),
         }
     }
 
@@ -224,17 +273,35 @@ impl<W: Write> Surface<W> {
     fn touch(&mut self, action: u8, x: f32, y: f32) {
         match action {
             0 => {
+                // A finger on moving content stops it.
+                self.fling = None;
+                // A finger on a selection handle drags that end of the selection instead of pressing the page.
+                let handle = self.handle_at(x, y);
                 self.touch = Some(Touch {
                     start: (x, y),
                     last: (x, y),
                     scrolling: false,
+                    started: Instant::now(),
+                    long: false,
+                    handle,
+                    samples: vec![(Instant::now(), x, y)],
                 });
-                self.renderer.pointer_down(x, y);
+                if handle.is_none() {
+                    self.renderer.pointer_down(x, y);
+                }
             }
             1 => {
-                let Some(mut t) = self.touch else { return };
+                let Some(mut t) = self.touch.take() else {
+                    return;
+                };
+                if let Some(end) = t.handle {
+                    self.renderer.move_selection_end(end, x);
+                    t.last = (x, y);
+                    self.touch = Some(t);
+                    return;
+                }
                 let slop = SLOP * self.density;
-                if !t.scrolling && (x - t.start.0).hypot(y - t.start.1) > slop {
+                if !t.scrolling && !t.long && (x - t.start.0).hypot(y - t.start.1) > slop {
                     // Moved too far to be a tap: the finger scrolls what is under it, and nothing is clicked.
                     t.scrolling = true;
                     self.renderer.pointer_cancel();
@@ -243,13 +310,22 @@ impl<W: Write> Surface<W> {
                     self.renderer.wheel(x, y, t.last.0 - x, t.last.1 - y);
                 }
                 t.last = (x, y);
+                let now = Instant::now();
+                t.samples.push((now, x, y));
+                t.samples
+                    .retain(|(at, ..)| now.duration_since(*at) <= FLING_WINDOW);
                 self.touch = Some(t);
             }
             2 => {
-                if let Some(t) = self.touch.take()
-                    && !t.scrolling
-                {
-                    self.renderer.pointer_up(x, y);
+                if let Some(t) = self.touch.take() {
+                    if t.scrolling {
+                        self.start_fling(&t, x, y);
+                    } else if t.long || t.handle.is_some() {
+                        // The press was a selection, not a click.
+                        self.renderer.pointer_cancel();
+                    } else {
+                        self.renderer.pointer_up(x, y);
+                    }
                 }
                 // A finger leaves no hover behind.
                 self.renderer.pointer_move(-1.0, -1.0);
@@ -263,14 +339,110 @@ impl<W: Write> Surface<W> {
         }
     }
 
-    /// The next timer: the caret blinks while a text field has focus.
+    /// Content keeps moving at the speed the finger had when it left it, if that was fast enough.
+    fn start_fling(&mut self, touch: &Touch, x: f32, y: f32) {
+        let now = Instant::now();
+        let Some(&(from, fx, fy)) = touch
+            .samples
+            .iter()
+            .find(|(at, ..)| now.duration_since(*at) <= FLING_WINDOW)
+        else {
+            return;
+        };
+        let seconds = now.duration_since(from).as_secs_f32();
+        if seconds < 0.005 {
+            return;
+        }
+        let velocity = ((x - fx) / seconds, (y - fy) / seconds);
+        if velocity.0.hypot(velocity.1) >= FLING_MIN_SPEED {
+            self.fling = Some(Fling {
+                at: (x, y),
+                velocity,
+                last: now,
+            });
+        }
+    }
+
+    /// The next timer: the caret blinks while a text field has focus, and a fling moves the content.
     #[must_use]
-    pub const fn next_timer(&self) -> Instant {
-        self.blink_at
+    pub fn next_timer(&self) -> Instant {
+        let mut next = self
+            .fling
+            .map_or(self.blink_at, |f| self.blink_at.min(f.last + FLING_STEP));
+        if let Some(t) = &self.touch
+            && !t.long
+            && !t.scrolling
+            && t.handle.is_none()
+        {
+            next = next.min(t.started + LONG_PRESS);
+        }
+        next
+    }
+
+    /// Draws a handle at each end of the selection: a stem along the caret and a knob below it.
+    fn draw_handles(&self, canvas: &mut Canvas) {
+        let Some(handles) = self.renderer.selection_handles() else {
+            return;
+        };
+        let accent = quench_raster::Color::rgb(0, 117, 255);
+        let (radius, stem) = (HANDLE_KNOB * self.density, 2.0 * self.density);
+        for (x, top, height) in handles {
+            canvas.fill_rect(x - stem / 2.0, top, stem, height + radius, accent);
+            canvas.fill_rounded_rect(
+                x - radius,
+                top + height,
+                radius * 2.0,
+                radius * 2.0,
+                radius,
+                accent,
+            );
+        }
+    }
+
+    /// The knob of a selection handle near `(x, y)`: `false` for the start of the selection, `true` for the end.
+    fn handle_at(&self, x: f32, y: f32) -> Option<bool> {
+        let handles = self.renderer.selection_handles()?;
+        let reach = HANDLE_REACH * self.density;
+        let knob = |h: (f32, f32, f32)| (h.0, h.1 + h.2 + HANDLE_KNOB * self.density);
+        let distance = |h| {
+            let (kx, ky) = knob(h);
+            (x - kx).hypot(y - ky)
+        };
+        let (a, b) = (distance(handles[0]), distance(handles[1]));
+        (a.min(b) <= reach).then_some(b < a)
     }
 
     /// Runs the timers that are due.
     pub fn timers(&mut self, now: Instant) {
+        // A finger that has stayed where it came down selects the word there.
+        if let Some(t) = &mut self.touch
+            && !t.long
+            && !t.scrolling
+            && t.handle.is_none()
+            && now >= t.started + LONG_PRESS
+        {
+            t.long = true;
+            let (x, y) = t.start;
+            self.renderer.pointer_cancel();
+            self.renderer.select_word_at(x, y);
+        }
+        if let Some(mut fling) = self.fling
+            && now >= fling.last + FLING_STEP
+        {
+            let seconds = now.duration_since(fling.last).as_secs_f32().min(0.05);
+            // The content follows the finger's direction: the page moves by what the wheel is told, reversed.
+            self.renderer.wheel(
+                fling.at.0,
+                fling.at.1,
+                -fling.velocity.0 * seconds,
+                -fling.velocity.1 * seconds,
+            );
+            let slow = (-FLING_FRICTION * seconds).exp();
+            fling.velocity = (fling.velocity.0 * slow, fling.velocity.1 * slow);
+            fling.last = now;
+            self.fling =
+                (fling.velocity.0.hypot(fling.velocity.1) >= FLING_STOP_SPEED).then_some(fling);
+        }
         if now >= self.blink_at {
             self.caret_on = !self.caret_on;
             if self.renderer.focused().is_some() {
@@ -286,6 +458,12 @@ impl<W: Write> Surface<W> {
     /// # Errors
     /// The output's: the host has gone away.
     pub fn flush(&mut self) -> io::Result<()> {
+        for call in self.bridge.take_outbox() {
+            write_out(&mut self.out, &Out::Call(&call))?;
+        }
+        if let Some(text) = self.renderer.take_clipboard_out() {
+            write_out(&mut self.out, &Out::Clipboard(&text))?;
+        }
         let Some((w, h)) = self.size else {
             return Ok(());
         };
@@ -294,6 +472,7 @@ impl<W: Write> Surface<W> {
         }
         let mut canvas = Canvas::new(w as usize, h as usize);
         self.renderer.render(&mut canvas);
+        self.draw_handles(&mut canvas);
         // The frame goes as RGBA, the byte order of an Android bitmap; the canvas is BGRA.
         let mut rgba = canvas.bytes().to_vec();
         for px in rgba.as_chunks_mut::<4>().0 {
@@ -350,14 +529,35 @@ pub fn run(renderer: &Rc<NativeRenderer>) -> io::Result<()> {
     serve(renderer, io::stdin(), io::stdout())
 }
 
+/// [`run`] for a program that calls the host's plugins through `bridge`.
+///
+/// # Errors
+/// The output's.
+pub fn run_with(renderer: &Rc<NativeRenderer>, bridge: &Bridge) -> io::Result<()> {
+    serve_with(renderer, io::stdin(), io::stdout(), bridge)
+}
+
 /// Runs the program over any pair of streams (what [`run`] does with standard input and output).
 ///
 /// # Errors
 /// The output's.
 pub fn serve(
     renderer: &Rc<NativeRenderer>,
+    input: impl Read + Send + 'static,
+    output: impl Write,
+) -> io::Result<()> {
+    serve_with(renderer, input, output, &Bridge::new())
+}
+
+/// [`serve`] for a program that calls the host's plugins through `bridge`.
+///
+/// # Errors
+/// The output's.
+pub fn serve_with(
+    renderer: &Rc<NativeRenderer>,
     mut input: impl Read + Send + 'static,
     output: impl Write,
+    bridge: &Bridge,
 ) -> io::Result<()> {
     let (tx, rx) = mpsc::channel();
     std::thread::Builder::new()
@@ -374,11 +574,14 @@ pub fn serve(
                 }
             }
         })?;
-    let mut surface = Surface::new(renderer, output);
+    let mut surface = Surface::with_bridge(renderer, output, bridge.clone());
     while !surface.finished() {
-        let wait = surface
+        let mut wait = surface
             .next_timer()
             .saturating_duration_since(Instant::now());
+        if let Some(wake) = surface.renderer.next_wake() {
+            wait = wait.min(wake);
+        }
         match rx.recv_timeout(wait) {
             Ok(Message::Event(event)) => {
                 surface.handle(event);
@@ -391,6 +594,7 @@ pub fn serve(
             Err(RecvTimeoutError::Timeout) => {}
         }
         surface.timers(Instant::now());
+        surface.renderer.tick();
         surface.flush()?;
     }
     Ok(())

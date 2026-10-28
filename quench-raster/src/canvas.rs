@@ -334,6 +334,75 @@ impl<S: AsRef<[u8]> + AsMut<[u8]>> Canvas<S> {
         }
     }
 
+    /// Draws an RGBA image (straight alpha, `image_width * image_height * 4` bytes) scaled to the rectangle
+    /// `(x, y, width, height)` with bilinear filtering, over what is there, at `opacity` (0 to 1). Pixels outside
+    /// the clip are not drawn; an image that does not match its size is not drawn at all.
+    pub fn draw_image(
+        &mut self,
+        rgba: &[u8],
+        image_width: usize,
+        image_height: usize,
+        rect: (f32, f32, f32, f32),
+        opacity: f32,
+    ) {
+        if image_width == 0
+            || image_height == 0
+            || rgba.len() != image_width * image_height * 4
+            || rect.2 <= 0.0
+            || rect.3 <= 0.0
+        {
+            return;
+        }
+        let (x0, y0) = (rect.0.round() as i32, rect.1.round() as i32);
+        let (x1, y1) = (
+            (rect.0 + rect.2).round() as i32,
+            (rect.1 + rect.3).round() as i32,
+        );
+        let (w, h) = ((x1 - x0) as f32, (y1 - y0) as f32);
+        if w <= 0.0 || h <= 0.0 {
+            return;
+        }
+        let at = |ix: usize, iy: usize| -> [f32; 4] {
+            let i = (iy * image_width + ix) * 4;
+            let a = f32::from(rgba[i + 3]) / 255.0;
+            // Premultiplied, so a transparent pixel's colour does not bleed into its neighbours.
+            [
+                f32::from(rgba[i]) * a,
+                f32::from(rgba[i + 1]) * a,
+                f32::from(rgba[i + 2]) * a,
+                a,
+            ]
+        };
+        for y in y0.max(self.clip.1)..y1.min(self.clip.3) {
+            let fy = ((y - y0) as f32 + 0.5) / h * image_height as f32 - 0.5;
+            let (iy0, ty) = (fy.floor().max(0.0) as usize, fy - fy.floor());
+            let iy1 = (iy0 + 1).min(image_height - 1);
+            let (iy0, ty) = (iy0.min(image_height - 1), if fy < 0.0 { 0.0 } else { ty });
+            for x in x0.max(self.clip.0)..x1.min(self.clip.2) {
+                let fx = ((x - x0) as f32 + 0.5) / w * image_width as f32 - 0.5;
+                let (ix0, tx) = (fx.floor().max(0.0) as usize, fx - fx.floor());
+                let ix1 = (ix0 + 1).min(image_width - 1);
+                let (ix0, tx) = (ix0.min(image_width - 1), if fx < 0.0 { 0.0 } else { tx });
+                let (p00, p10, p01, p11) = (at(ix0, iy0), at(ix1, iy0), at(ix0, iy1), at(ix1, iy1));
+                let mut mix = [0.0f32; 4];
+                for k in 0..4 {
+                    mix[k] = (p00[k] * (1.0 - tx) + p10[k] * tx) * (1.0 - ty)
+                        + (p01[k] * (1.0 - tx) + p11[k] * tx) * ty;
+                }
+                if mix[3] <= 0.0 {
+                    continue;
+                }
+                let color = Color::rgba(
+                    (mix[0] / mix[3]).round().clamp(0.0, 255.0) as u8,
+                    (mix[1] / mix[3]).round().clamp(0.0, 255.0) as u8,
+                    (mix[2] / mix[3]).round().clamp(0.0, 255.0) as u8,
+                    (mix[3] * opacity.clamp(0.0, 1.0) * 255.0).round() as u8,
+                );
+                self.blend(x, y, color, 255);
+            }
+        }
+    }
+
     /// Draws `layer` with its top left corner at `(x, y)` over this canvas, scaled in opacity by `opacity`.
     /// Both are premultiplied, so this is the usual "source over".
     pub fn draw_layer<T: AsRef<[u8]> + AsMut<[u8]>>(

@@ -18,6 +18,7 @@ path = "src/lib.rs"
 
 [dependencies]
 quench-raster = { workspace = true }
+quench-serde = { workspace = true }
 quench-ui = { workspace = true }
 quench-ui-native = { workspace = true }
 

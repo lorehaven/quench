@@ -151,6 +151,23 @@ pub fn tokenize(text: &str) -> Vec<Token> {
                 let name: String = chars[start..i].iter().collect();
                 if peek(i) == Some('(') {
                     i += 1;
+                    // An unquoted `url(...)` is one string to the closing parenthesis (a data URL has colons,
+                    // semicolons and commas in it).
+                    let mut at = i;
+                    while peek(at).is_some_and(char::is_whitespace) {
+                        at += 1;
+                    }
+                    if name.eq_ignore_ascii_case("url") && !matches!(peek(at), Some('"' | '\'')) {
+                        let end = chars[at..]
+                            .iter()
+                            .position(|c| *c == ')')
+                            .map_or(chars.len(), |p| at + p);
+                        let raw: String = chars[at..end].iter().collect();
+                        out.push(Token::Function(name));
+                        out.push(Token::Str(raw.trim().to_string()));
+                        i = end;
+                        continue;
+                    }
                     out.push(Token::Function(name));
                 } else {
                     out.push(Token::Ident(name));

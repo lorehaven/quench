@@ -6,11 +6,13 @@ use std::collections::HashMap;
 use quench_css::ComputedStyle;
 use quench_text::FontSet;
 
-/// Regular and bold Noto Sans, each with the machine's fonts behind it for what Noto lacks.
+/// Light, regular, medium and bold Noto Sans, each with the machine's fonts behind it for what Noto lacks.
 pub struct Fonts {
+    pub light: FontSet,
     pub regular: FontSet,
+    pub medium: FontSet,
     pub bold: FontSet,
-    spaces: RefCell<HashMap<(u32, bool), f32>>,
+    spaces: RefCell<HashMap<(u32, usize), f32>>,
 }
 
 /// The vertical metrics of a font at a size, rounded to whole pixels as browsers do.
@@ -27,7 +29,9 @@ impl Fonts {
     #[must_use]
     pub fn embedded() -> Self {
         Self {
+            light: FontSet::noto_sans_light(),
             regular: FontSet::noto_sans(),
+            medium: FontSet::noto_sans_medium(),
             bold: FontSet::noto_sans_bold(),
             spaces: RefCell::default(),
         }
@@ -37,19 +41,32 @@ impl Fonts {
     #[must_use]
     pub fn system() -> Self {
         Self {
+            light: FontSet::noto_sans_light().with_system_fonts(),
             regular: FontSet::noto_sans().with_system_fonts(),
+            medium: FontSet::noto_sans_medium().with_system_fonts(),
             bold: FontSet::noto_sans_bold().with_system_fonts(),
             spaces: RefCell::default(),
         }
     }
 
-    /// The face for a style: bold from weight 600.
+    /// Which of the four faces a weight uses: light up to 350, regular to 449, medium to 599, bold from 600.
+    const fn face_of(weight: u16) -> usize {
+        match weight {
+            0..=350 => 0,
+            351..=449 => 1,
+            450..=599 => 2,
+            _ => 3,
+        }
+    }
+
+    /// The face for a style (see the weights above).
     #[must_use]
     pub const fn set(&self, style: &ComputedStyle) -> &FontSet {
-        if style.font_weight >= 600 {
-            &self.bold
-        } else {
-            &self.regular
+        match Self::face_of(style.font_weight) {
+            0 => &self.light,
+            1 => &self.regular,
+            2 => &self.medium,
+            _ => &self.bold,
         }
     }
 
@@ -73,7 +90,7 @@ impl Fonts {
     /// The width of a space (measured between two letters, as a line's trailing space counts for nothing).
     #[must_use]
     pub fn space(&self, style: &ComputedStyle) -> f32 {
-        let key = (style.font_size.to_bits(), style.font_weight >= 600);
+        let key = (style.font_size.to_bits(), Self::face_of(style.font_weight));
         if let Some(w) = self.spaces.borrow().get(&key) {
             return *w;
         }

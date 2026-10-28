@@ -893,6 +893,26 @@ fn fonts_give_metrics_and_line_heights() {
         fonts.measure(&style, "Hello") > fonts.measure(&ComputedStyle::default(), "Hello"),
         "bold is wider"
     );
+    let width = |weight: u16| {
+        let mut s = ComputedStyle::default();
+        s.font_weight = weight;
+        fonts.measure(&s, "Hello world")
+    };
+    assert!(
+        width(300) < width(400) && width(400) < width(500) && width(500) < width(700),
+        "light, regular, medium, bold"
+    );
+    assert_eq!(
+        (width(100), width(350)),
+        (width(300), width(300)),
+        "thin is light"
+    );
+    assert_eq!((width(449), width(450)), (width(400), width(500)));
+    assert_eq!(
+        (width(599), width(600)),
+        (width(500), width(700)),
+        "semibold is bold"
+    );
     assert!(
         fonts.space(&style) > 0.0 && fonts.space(&style) == fonts.space(&style),
         "cached"
@@ -1059,6 +1079,195 @@ fn boxes_report_their_rectangles() {
     assert!(b.find(99).is_none());
     assert!(b.position_of(99).is_none());
     assert_eq!(b.position_of(2), Some((10.0, 10.0)));
+}
+
+#[quench_test::test]
+fn a_replaced_box_keeps_its_proportions_when_one_side_is_given() {
+    let mut root = ComputedStyle::default();
+    root.display = Display::Block;
+    let image = |decls: &str| {
+        let mut style = compute(decls, &root);
+        style.display = Display::InlineBlock;
+        Node::replaced(2, style, 200.0, 100.0)
+    };
+    let size = |decls: &str| {
+        let b = layout(
+            &Node::element(1, root.clone(), vec![image(decls)]),
+            (800.0, 600.0),
+            &fonts(),
+        );
+        let found = b.find(2).unwrap();
+        (found.width, found.height)
+    };
+    assert_eq!(size(""), (200.0, 100.0), "its own size");
+    assert_eq!(size("width: 50px"), (50.0, 25.0));
+    assert_eq!(size("height: 40px"), (80.0, 40.0));
+    assert_eq!(
+        size("width: 50px; height: 50px"),
+        (50.0, 50.0),
+        "both given: as asked"
+    );
+    assert_eq!(size("width: 50%"), (400.0, 200.0));
+}
+
+#[quench_test::test]
+fn a_grid_shares_its_width_by_fr_and_fixed_tracks_and_flows_items_into_cells() {
+    let b = run(&E(
+        "display: grid; grid-template-columns: 100px 1fr 2fr; column-gap: 10px; row-gap: 5px; width: 400px",
+        vec![
+            E("height: 20px", vec![]),
+            E("height: 30px", vec![]),
+            E("height: 10px", vec![]),
+            E("height: 40px", vec![]),
+        ],
+    ));
+    // 400 - 100 - two gaps of 10 = 280 for 3fr: 1fr is 93.33.
+    let fr = 280.0 / 3.0;
+    assert_eq!(
+        rect(&b, 2),
+        (0.0, 0.0, 100.0, 20.0),
+        "an item with a height keeps it; the row is as tall as the tallest"
+    );
+    let second = rect(&b, 3);
+    assert!(
+        (second.0 - 110.0).abs() < 0.01 && (second.2 - fr).abs() < 0.01,
+        "{second:?}"
+    );
+    let third = rect(&b, 4);
+    assert!(
+        (third.0 - (110.0 + fr + 10.0)).abs() < 0.01 && (third.2 - 2.0 * fr).abs() < 0.01,
+        "{third:?}"
+    );
+    // The fourth item starts the next row, after the row gap.
+    assert_eq!(rect(&b, 5), (0.0, 35.0, 100.0, 40.0));
+    assert_eq!(rect(&b, 1).3, 75.0, "30 + 5 + 40");
+}
+
+#[quench_test::test]
+fn grid_items_can_be_placed_by_line_and_span_and_repeat_fills_the_box() {
+    let b = run(&E(
+        "display: grid; grid-template-columns: repeat(4, 50px); grid-auto-rows: 20px; width: 300px",
+        vec![
+            E("grid-column: 2 / 4", vec![]),
+            E("grid-column: span 2", vec![]),
+            E("grid-column: 1; grid-row: 3", vec![]),
+            E("", vec![]),
+        ],
+    ));
+    assert_eq!(
+        rect(&b, 2),
+        (50.0, 0.0, 100.0, 20.0),
+        "from line 2 to line 4"
+    );
+    // Flowing starts at the first cell: two columns do not fit before the first item's, so a new row begins.
+    assert_eq!(rect(&b, 3), (0.0, 20.0, 100.0, 20.0));
+    assert_eq!(rect(&b, 4), (0.0, 40.0, 50.0, 20.0), "row 3, column 1");
+    assert_eq!(
+        (rect(&b, 5).0, rect(&b, 5).1),
+        (100.0, 20.0),
+        "the last takes the next free cell after the one before it"
+    );
+    let fill = run(&E(
+        "display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); width: 350px",
+        vec![
+            E("height: 10px", vec![]),
+            E("height: 10px", vec![]),
+            E("height: 10px", vec![]),
+            E("height: 10px", vec![]),
+        ],
+    ));
+    // 3 columns of 100px fit in 350: they share it, 116.67 each, and the fourth item starts a row.
+    let first = rect(&fill, 2);
+    assert!((first.2 - 350.0 / 3.0).abs() < 0.01, "{first:?}");
+    assert_eq!(rect(&fill, 5).0, 0.0);
+    assert_eq!(rect(&fill, 5).1, 10.0);
+}
+
+#[quench_test::test]
+fn grid_tracks_follow_their_content_and_a_height_stretches_the_rows() {
+    // Auto columns take their content and share what is left.
+    let b = run(&E(
+        "display: grid; grid-template-columns: auto auto; width: 300px",
+        vec![
+            E("width: 50px; height: 10px", vec![]),
+            E("width: 100px; height: 10px", vec![]),
+        ],
+    ));
+    // The tracks are 125 and 175: what they want, plus the 150 left over shared equally. The items keep their widths.
+    let (a, c) = (rect(&b, 2), rect(&b, 3));
+    assert_eq!((a.0, a.2, c.0, c.2), (0.0, 50.0, 125.0, 100.0));
+    // Fixed rows, fr rows in a box with a height, and alignment inside a cell.
+    let rows = run(&E(
+        "display: grid; grid-template-rows: 30px 1fr; height: 200px; align-items: center",
+        vec![E("height: 10px", vec![]), E("height: 20px", vec![])],
+    ));
+    assert_eq!(rect(&rows, 2).1, 10.0, "centred in 30");
+    assert_eq!(rect(&rows, 3).1, 30.0 + 75.0, "centred in the rest, 170");
+    // A margin counts inside the cell.
+    let m = run(&E(
+        "display: grid; grid-template-columns: 100px; width: 100px",
+        vec![E("margin: 5px 10px; height: 20px", vec![])],
+    ));
+    assert_eq!(rect(&m, 2), (10.0, 5.0, 80.0, 20.0));
+    assert_eq!(rect(&m, 1).3, 30.0);
+    // An inline grid shrinks to its tracks.
+    let inline = run(&E(
+        "",
+        vec![E(
+            "display: inline-grid; grid-template-columns: 40px 60px",
+            vec![E("height: 10px", vec![])],
+        )],
+    ));
+    assert_eq!(rect(&inline, 2).2, 100.0);
+}
+
+#[quench_test::test]
+fn named_grid_areas_place_items_and_the_template_sets_the_size_of_the_grid() {
+    // A header across the top, a side column and the main part, with the tracks sized in the template.
+    let b = run(&E(
+        "display: grid; width: 300px; grid-template-columns: 100px 1fr; grid-template-rows: 20px 1fr 10px; height: 100px; \
+         grid-template-areas: \"head head\" \"side main\" \"foot foot\"",
+        vec![
+            E("grid-area: main", vec![]),
+            E("grid-area: head", vec![]),
+            E("grid-area: side", vec![]),
+            E("grid-area: foot", vec![]),
+            E("grid-area: nowhere; height: 5px", vec![]),
+        ],
+    ));
+    assert_eq!(
+        rect(&b, 2),
+        (100.0, 20.0, 200.0, 65.0),
+        "main: the second column of the middle row"
+    );
+    assert_eq!(
+        rect(&b, 3),
+        (0.0, 0.0, 300.0, 20.0),
+        "head spans both columns"
+    );
+    assert_eq!(rect(&b, 4), (0.0, 20.0, 100.0, 65.0));
+    assert_eq!(rect(&b, 5), (0.0, 85.0, 300.0, 10.0));
+    // The one that is in no area flows into the first free cell, after the areas' cells are taken: a new row.
+    assert_eq!(
+        rect(&b, 6).1,
+        95.0,
+        "in an implicit row that takes 5px from the fr row"
+    );
+    // Without column tracks the template's cells make the columns.
+    let auto = run(&E(
+        "display: grid; width: 200px; grid-template-areas: \"a b\"",
+        vec![
+            E("grid-area: b; height: 10px", vec![]),
+            E("grid-area: a; height: 10px", vec![]),
+        ],
+    ));
+    assert_eq!((rect(&auto, 3).0, rect(&auto, 2).0), (0.0, 100.0));
+    // Numbers: row start, column start, row end, column end.
+    let lines = run(&E(
+        "display: grid; width: 90px; grid-template-columns: repeat(3, 30px); grid-auto-rows: 10px",
+        vec![E("grid-area: 2 / 2 / 3 / 4", vec![])],
+    ));
+    assert_eq!(rect(&lines, 2), (30.0, 10.0, 60.0, 10.0));
 }
 
 quench_test::main!();

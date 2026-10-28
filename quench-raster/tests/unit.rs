@@ -493,4 +493,38 @@ fn clip_to_narrows_the_clip_it_never_widens_it() {
     c.restore_clip(outer);
 }
 
+#[quench_test::test]
+fn an_image_is_scaled_filtered_blended_and_clipped() {
+    // A 2x1 image, red then blue, stretched over 4 pixels: the middle pixels are mixes.
+    let image = [255, 0, 0, 255, 0, 0, 255, 255];
+    let mut c = Canvas::new(8, 4);
+    c.clear(Color::WHITE);
+    c.draw_image(&image, 2, 1, (2.0, 1.0, 4.0, 2.0), 1.0);
+    assert_eq!(c.pixel(2, 1), Color::rgb(255, 0, 0));
+    assert_eq!(c.pixel(5, 2), Color::rgb(0, 0, 255));
+    let middle = c.pixel(3, 1);
+    assert!(
+        middle.r > 100 && middle.b > 30 && middle.g == 0,
+        "{middle:?}"
+    );
+    assert_eq!(c.pixel(1, 1), Color::WHITE, "outside the rectangle");
+    assert_eq!(c.pixel(2, 3), Color::WHITE);
+    // Transparent pixels show what is under them, and opacity scales the rest.
+    let mut c = Canvas::new(2, 1);
+    c.clear(Color::WHITE);
+    c.draw_image(&[0, 0, 0, 0, 0, 0, 0, 255], 2, 1, (0.0, 0.0, 2.0, 1.0), 0.5);
+    assert_eq!(c.pixel(0, 0), Color::WHITE);
+    let half = c.pixel(1, 0);
+    assert!((120..=135).contains(&half.r), "{half:?}");
+    // The clip applies, and bad input draws nothing.
+    let mut c = Canvas::new(4, 4);
+    c.set_clip(0, 0, 2, 2);
+    c.draw_image(&[9, 9, 9, 255], 1, 1, (0.0, 0.0, 4.0, 4.0), 1.0);
+    assert_eq!(c.pixel(1, 1), Color::rgb(9, 9, 9));
+    assert_eq!(c.pixel(3, 3), Color::TRANSPARENT);
+    c.draw_image(&[1, 2, 3], 1, 1, (0.0, 0.0, 1.0, 1.0), 1.0);
+    c.draw_image(&[], 0, 0, (0.0, 0.0, 1.0, 1.0), 1.0);
+    c.draw_image(&[9, 9, 9, 255], 1, 1, (0.0, 0.0, 0.0, 4.0), 1.0);
+}
+
 quench_test::main!();

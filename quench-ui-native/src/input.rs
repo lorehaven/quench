@@ -117,6 +117,14 @@ impl NativeRenderer {
                 dom.ui.dirty = true;
             }
         }
+        // A slider follows a finger or a button held down on it.
+        let dragged = {
+            let dom = self.dom.borrow();
+            dom.ui.active.filter(|a| is_range(&dom, *a))
+        };
+        if let Some(f) = dragged {
+            self.range_to_x(f, x);
+        }
         if let Some(t) = target {
             self.dispatch(t, &Event::PointerMove(pointer(x, y)), true);
         }
@@ -159,6 +167,8 @@ impl NativeRenderer {
                 self.focus_node(f, false);
                 if is_text_field(&self.dom.borrow(), f) {
                     self.place_caret(f, x, y);
+                } else if is_range(&self.dom.borrow(), f) {
+                    self.range_to_x(f, x);
                 }
             }
             None => self.blur(),
@@ -202,6 +212,37 @@ impl NativeRenderer {
             self.focus_node(l, false);
             self.click(l);
         }
+        if !prevented && let Some(form) = self.submitted_form(node) {
+            self.dispatch(form, &Event::Submit, false);
+        }
+    }
+
+    /// The form a click on `node` submits: `node` is (inside) a submit button, `<button>` with no other type or
+    /// `<input type=submit>`, and has a `<form>` around it.
+    fn submitted_form(&self, node: usize) -> Option<usize> {
+        let dom = self.dom.borrow();
+        let mut at = Some(node);
+        let mut submits = false;
+        while let Some(n) = at {
+            match dom.tag(n) {
+                Some("button") if !submits => {
+                    submits = matches!(dom.attr(n, "type"), None | Some("submit" | ""));
+                    if !submits {
+                        return None;
+                    }
+                }
+                Some("input") if !submits => {
+                    submits = dom.attr(n, "type") == Some("submit");
+                    if !submits {
+                        return None;
+                    }
+                }
+                Some("form") => return submits.then_some(n),
+                _ => {}
+            }
+            at = dom.nodes[n].parent;
+        }
+        None
     }
 
     /// Checks or unchecks a checkbox or radio button the way a click does.
@@ -392,6 +433,9 @@ impl NativeRenderer {
             self.edit_key(f, key, &tag);
             return false;
         }
+        if kind == "range" && tag == "input" && self.range_key(f, k) {
+            return false;
+        }
         let activates = match (tag.as_str(), k) {
             ("button" | "a", "Enter" | " ") => true,
             ("input", " ") if matches!(kind.as_str(), "checkbox" | "radio") => true,
@@ -431,6 +475,25 @@ impl NativeRenderer {
         self.scroll_from(at, dx, dy);
     }
 
+    fn copied(&self, text: String) {
+        let mut dom = self.dom.borrow_mut();
+        dom.ui.clipboard = text;
+        dom.ui.clipboard_out = true;
+    }
+
+    /// Makes `text` what a paste inserts (the host reads the system clipboard into it before a paste key).
+    pub fn set_clipboard(&self, text: &str) {
+        let mut dom = self.dom.borrow_mut();
+        dom.ui.clipboard = text.to_string();
+        dom.ui.clipboard_out = false;
+    }
+
+    /// What was copied or cut since the last call, for the host to put on the system clipboard.
+    pub fn take_clipboard_out(&self) -> Option<String> {
+        let mut dom = self.dom.borrow_mut();
+        std::mem::take(&mut dom.ui.clipboard_out).then(|| dom.ui.clipboard.clone())
+    }
+
     /// Text typed (or pasted, or committed by an input method) into the focused field.
     pub fn text(&self, text: &str) {
         let Some(f) = self.dom.borrow().ui.focused else {
@@ -449,6 +512,105 @@ impl NativeRenderer {
     }
 
     /// Replaces the selection of field `f` with `with` and tells the listeners.
+    /// Selects the word under `(x, y)` in a text field (a long press): the field takes focus and the word is the
+    /// selection. Returns whether there was a text field there.
+    pub fn select_word_at(&self, x: f32, y: f32) -> bool {
+        self.ensure_layout();
+        let field = {
+            let dom = self.dom.borrow();
+            hit(&dom, x, y).filter(|n| is_text_field(&dom, *n))
+        };
+        let Some(f) = field else { return false };
+        self.focus_node(f, false);
+        self.place_caret(f, x, y);
+        let mut dom = self.dom.borrow_mut();
+        let chars: Vec<char> = field_value(&dom, f).chars().collect();
+        let at = dom.ui.caret.min(chars.len());
+        let word = |c: char| c.is_alphanumeric() || c == '_';
+        // The word the caret is in or at the end of; else the one character beside it.
+        let on = |i: usize| chars.get(i).copied().is_some_and(word);
+        let (mut lo, mut hi) = (at, at);
+        if on(at) || (at > 0 && on(at - 1)) {
+            lo = if on(at) { at } else { at - 1 };
+            while lo > 0 && on(lo - 1) {
+                lo -= 1;
+            }
+            hi = lo;
+            while on(hi) {
+                hi += 1;
+            }
+        } else if at < chars.len() {
+            hi = at + 1;
+        }
+        dom.ui.anchor = lo;
+        dom.ui.caret = hi;
+        dom.ui.dirty = true;
+        true
+    }
+
+    /// Where the ends of the selection in the focused text field are on the screen, for handles to be drawn at:
+    /// `(x, top, height)` of the start and of the end. `None` when nothing is selected.
+    #[must_use]
+    pub fn selection_handles(&self) -> Option<[(f32, f32, f32); 2]> {
+        self.ensure_layout();
+        let dom = self.dom.borrow();
+        let f = dom.ui.focused.filter(|f| is_text_field(&dom, *f))?;
+        let (a, b) = (dom.ui.anchor, dom.ui.caret);
+        if a == b {
+            return None;
+        }
+        let root = dom.layout.clone()?;
+        let at = |i: usize| crate::pipeline::spot_at(&dom, &root, f, i);
+        Some([at(a.min(b))?, at(a.max(b))?])
+    }
+
+    /// Moves one end of the selection to the character nearest `x` (a handle being dragged): `end` is the later
+    /// end of the selection, else the earlier one.
+    pub fn move_selection_end(&self, end: bool, x: f32) {
+        self.ensure_layout();
+        let mut dom = self.dom.borrow_mut();
+        let Some(f) = dom.ui.focused.filter(|f| is_text_field(&dom, *f)) else {
+            return;
+        };
+        let Some(root) = dom.layout.clone() else {
+            return;
+        };
+        let value = field_value(&dom, f);
+        let index = caret_index(&dom, &root, f, &value, x);
+        let (a, b) = (dom.ui.anchor, dom.ui.caret);
+        // The end that moves keeps being the one that is dragged, so a handle can cross the other.
+        let moving_caret = if end { b >= a } else { b <= a };
+        if moving_caret {
+            dom.ui.caret = index;
+        } else {
+            dom.ui.anchor = index;
+        }
+        dom.ui.dirty = true;
+    }
+
+    /// Replaces the whole text of a text field (what an assistive technology asks for): the field takes focus, the
+    /// caret goes to the end and listeners see an `Input` event, as if the text had been typed.
+    ///
+    /// Returns whether `id` is a text field.
+    pub fn set_field_value(&self, id: usize, text: &str) -> bool {
+        let is_field = {
+            let dom = self.dom.borrow();
+            is_text_field(&dom, id)
+        };
+        if !is_field {
+            return false;
+        }
+        self.focus_node(id, true);
+        {
+            let mut dom = self.dom.borrow_mut();
+            let len = field_value(&dom, id).chars().count();
+            dom.ui.anchor = 0;
+            dom.ui.caret = len;
+        }
+        self.replace_selection(id, text);
+        true
+    }
+
     fn replace_selection(&self, f: usize, with: &str) {
         let value = {
             let mut dom = self.dom.borrow_mut();
@@ -584,11 +746,11 @@ impl NativeRenderer {
             }
             "c" | "C" if key.ctrl => {
                 let selected: String = chars[lo..hi].iter().collect();
-                self.dom.borrow_mut().ui.clipboard = selected;
+                self.copied(selected);
             }
             "x" | "X" if key.ctrl => {
                 let selected: String = chars[lo..hi].iter().collect();
-                self.dom.borrow_mut().ui.clipboard = selected;
+                self.copied(selected);
                 if lo != hi {
                     self.replace_selection(f, "");
                 }
@@ -690,6 +852,81 @@ impl NativeRenderer {
     }
 
     /// Puts the caret of field `f` where the click at `(x, y)` landed.
+    /// Sets a slider to the value under `x` (the box's left edge is the minimum, its right edge the maximum).
+    fn range_to_x(&self, f: usize, x: f32) {
+        let (min, max, step, left, width) = {
+            let dom = self.dom.borrow();
+            let Some(root) = dom.layout.clone() else {
+                return;
+            };
+            let (Some(b), Some((left, _))) = (root.find(f), root.position_of(f)) else {
+                return;
+            };
+            let (min, max, _) = crate::access::range_of(&dom, f, crate::access::Role::Slider);
+            let step = dom
+                .attr(f, "step")
+                .and_then(|s| s.parse::<f64>().ok())
+                .filter(|s| *s > 0.0);
+            (min, max, step, left, b.width)
+        };
+        if width <= 0.0 {
+            return;
+        }
+        let frac = f64::from(((x - left) / width).clamp(0.0, 1.0));
+        self.set_range(f, min + (max - min) * frac, min, max, step.unwrap_or(1.0));
+    }
+
+    /// Arrow keys, Page Up and Down, Home and End on a slider. Returns whether the key was used.
+    fn range_key(&self, f: usize, k: &str) -> bool {
+        let (min, max, now, step) = {
+            let dom = self.dom.borrow();
+            let (min, max, now) = crate::access::range_of(&dom, f, crate::access::Role::Slider);
+            let step = dom
+                .attr(f, "step")
+                .and_then(|s| s.parse::<f64>().ok())
+                .filter(|s| *s > 0.0);
+            (min, max, now.unwrap_or(min), step)
+        };
+        let small = step.unwrap_or(1.0);
+        let big = ((max - min) / 10.0).max(small);
+        let to = match k {
+            "ArrowRight" | "ArrowUp" => now + small,
+            "ArrowLeft" | "ArrowDown" => now - small,
+            "PageUp" => now + big,
+            "PageDown" => now - big,
+            "Home" => min,
+            "End" => max,
+            _ => return false,
+        };
+        self.set_range(f, to, min, max, step.unwrap_or(1.0));
+        true
+    }
+
+    /// Stores a slider's new value (kept to its step and range) and tells listeners when it changed.
+    fn set_range(&self, f: usize, to: f64, min: f64, max: f64, step: f64) {
+        let mut value = to.clamp(min, max);
+        if step > 0.0 {
+            value = (min + ((value - min) / step).round() * step).clamp(min, max);
+        }
+        let text = if value.fract() == 0.0 {
+            format!("{value:.0}")
+        } else {
+            format!("{value:.4}")
+                .trim_end_matches('0')
+                .trim_end_matches('.')
+                .to_string()
+        };
+        {
+            let mut dom = self.dom.borrow_mut();
+            if dom.attr(f, "value") == Some(text.as_str()) {
+                return;
+            }
+            set_attr_raw(&mut dom, f, "value", Some(&text));
+            dom.ui.dirty = true;
+        }
+        self.dispatch(f, &Event::Input(text), true);
+    }
+
     fn place_caret(&self, f: usize, x: f32, _y: f32) {
         let mut dom = self.dom.borrow_mut();
         let Some(root) = dom.layout.clone() else {
@@ -766,6 +1003,10 @@ pub(crate) fn is_text_field(dom: &Dom, id: usize) -> bool {
         ),
         _ => false,
     }
+}
+
+pub(crate) fn is_range(dom: &Dom, id: usize) -> bool {
+    dom.tag(id) == Some("input") && dom.attr(id, "type") == Some("range")
 }
 
 pub(crate) fn focusable(dom: &Dom, id: usize) -> bool {

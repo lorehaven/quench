@@ -42,12 +42,14 @@ $quench new surfacetest --template web --quench-path $root >/dev/null; or exit 1
 cd surfacetest
 $quench android init --package $pkg >/dev/null; or exit 1
 $quench plugin add surface >/dev/null; or exit 1
+$quench android launcher surface >/dev/null; or exit 1
 $quench android build-native --abi $abi; or exit 1
 cd android
 ./gradlew -q assembleDebug 2>&1 | string match -rv '^w:'; test $pipestatus[1] -eq 0; or exit 1
 adb uninstall $pkg >/dev/null 2>&1
 adb install app/build/outputs/apk/debug/app-debug.apk >/dev/null; or exit 1
-adb shell am start -n $pkg/.SurfaceActivity >/dev/null
+# Started the way the launcher starts it: the surface is the launcher activity.
+adb shell monkey -p $pkg -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
 sleep 6
 
 check "the program runs as a process of its own" (adb shell "ps -A | grep -c libquench_surface" | string trim) 1
@@ -66,6 +68,9 @@ check "typing reaches the field" (tree | string match -r '^EditText hello' | cou
 adb shell input tap (center "I agree" | string split ' ')
 sleep 1
 check "a tap checks the box" (tree | string match -r '^CheckBox I agree checked=true' | count) 1
+adb shell input tap (center "Ask the host" | string split ' ')
+sleep 2
+check "a plugin of the host answers the program" (tree | string match -r '^\S+ host: (?!not asked|failed)\S' | count) 1
 adb exec-out screencap -p >$work/screen.png
 echo "screenshot: $work/screen.png"
 exit $failed

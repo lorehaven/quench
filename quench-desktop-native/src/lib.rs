@@ -258,6 +258,28 @@ impl Controller {
 }
 
 impl Host {
+    /// Hands an event to the controller, with the system clipboard on both sides of it: read before a paste,
+    /// written after a copy or cut.
+    fn deliver(&mut self, event: WindowEvent) -> io::Result<()> {
+        if let WindowEvent::Key {
+            pressed: true,
+            key,
+            modifiers,
+            ..
+        } = &event
+            && modifiers.ctrl
+            && key.name.eq_ignore_ascii_case("v")
+            && let Some(text) = self.window.clipboard()?
+        {
+            self.control.renderer.set_clipboard(&text);
+        }
+        self.control.handle(event);
+        if let Some(text) = self.control.renderer.take_clipboard_out() {
+            self.window.set_clipboard(&text)?;
+        }
+        Ok(())
+    }
+
     /// Opens the window, sizes the renderer's viewport to it and draws the first frame.
     ///
     /// # Errors
@@ -310,6 +332,9 @@ impl Host {
         for (id, action) in access.take_actions() {
             self.control.renderer.perform(id, action);
         }
+        for (id, text) in access.take_edits() {
+            self.control.renderer.set_field_value(id, &text);
+        }
     }
 
     /// Tells the input method which field has focus and where its caret is, when that changed.
@@ -356,20 +381,28 @@ impl Host {
     /// # Errors
     /// The connection's.
     pub fn step(&mut self, timeout: Duration) -> io::Result<()> {
-        let wait = timeout.min(
+        let wake = self.control.renderer.next_wake().unwrap_or(timeout);
+        // A screen reader asked something lately: look often, so its answers are quick.
+        let hurry = if Instant::now() < self.hurry_until {
+            Duration::from_millis(25)
+        } else {
+            timeout
+        };
+        let wait = timeout.min(wake).min(hurry).min(
             self.control
                 .next_timer()
                 .saturating_duration_since(Instant::now()),
         );
         if let Some(event) = self.window.next_event(Some(wait))? {
             self.control.set_repeat(self.window.key_repeat());
-            self.control.handle(event);
+            self.deliver(event)?;
             // Whatever else arrived with it.
             while let Some(event) = self.window.next_event(Some(Duration::from_millis(1)))? {
-                self.control.handle(event);
+                self.deliver(event)?;
             }
         }
         self.control.timers(Instant::now());
+        self.control.renderer.tick();
         self.serve_access();
         if self.draw()? {
             self.publish_access();

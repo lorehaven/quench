@@ -29,6 +29,8 @@ input[type="checkbox"], input[type="radio"] { box-sizing: border-box; width: 13p
 input[type="radio"] { border-radius: 50%; }
 input[type="checkbox"]:checked, input[type="radio"]:checked { background: #0075ff; border-color: #0075ff; }
 input[type="checkbox"][disabled], input[type="radio"][disabled] { opacity: 0.5; }
-input[type="range"], input[type="color"], input[type="file"] { }
+progress, meter { display: inline-block; box-sizing: border-box; width: 160px; height: 16px; vertical-align: -3px; border: 1px solid #767676; border-radius: 3px; background: #e5e5e5; }
+input[type="range"] { box-sizing: border-box; width: 129px; height: 20px; margin: 2px; padding: 0; border: 0; background: transparent; }
+input[type="color"], input[type="file"] { }
 img, svg, canvas, video { display: inline-block; }
 label { display: inline; }

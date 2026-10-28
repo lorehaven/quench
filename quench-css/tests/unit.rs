@@ -4,11 +4,14 @@
 use std::rc::Rc;
 
 use quench_css::{
-    Align, BorderStyle, Cascade, Color, ColorValue, ComputedStyle, Display, Element, Justify,
-    Length, MediaEnv, Position, Simple, State, Stylesheet, Token, Value, accepts, parse,
-    parse_selector_list, parse_values, tokenize,
+    Align, BackgroundSize, BorderStyle, Cascade, Color, ColorValue, ComputedStyle, Display,
+    Element, Justify, Length, MediaEnv, Position, Simple, State, Stylesheet, Token, Value, accepts,
+    parse, parse_selector_list, parse_values, tokenize,
 };
-use quench_css::{ColorScheme, IGNORED, LineHeight, Pointer, SUPPORTED, TextTransform};
+use quench_css::{
+    ColorScheme, Direction, FillMode, GridLine, IGNORED, LineHeight, Pointer, SUPPORTED,
+    TextTransform, Timing, Track,
+};
 
 /// A small tree to match selectors against.
 struct Tree {
@@ -901,7 +904,9 @@ fn longhands_and_keywords_of_every_supported_property() {
         ("display: inline-block", Display::InlineBlock),
         ("display: inline-flex", Display::InlineFlex),
         ("display: list-item", Display::ListItem),
-        ("display: grid", Display::Block),
+        ("display: grid", Display::Grid),
+        ("display: inline-grid", Display::InlineGrid),
+        ("display: contents", Display::Block),
         ("display: none", Display::None),
     ] {
         assert_eq!(p_with(decl).display, want, "{decl}");
@@ -1261,7 +1266,7 @@ fn shadows_and_borders_with_odd_values() {
     let plain = p_with("");
     assert_eq!(p_with("unheard-of: 3"), plain);
     assert_eq!(
-        p_with("cursor: pointer; transition: all 1s; user-select: none"),
+        p_with("cursor: pointer; will-change: opacity; user-select: none"),
         plain,
         "ignored properties do nothing"
     );
@@ -1547,7 +1552,7 @@ fn rules_and_at_rules_in_their_other_forms() {
     assert!(
         quench_css::is_known("--anything")
             && quench_css::is_known("cursor")
-            && !quench_css::is_known("grid-area")
+            && !quench_css::is_known("grid-auto-flow")
     );
 }
 
@@ -1592,6 +1597,327 @@ fn zoom_scales_absolute_lengths_but_not_relative_ones() {
         root.font_size, 32.0,
         "the root's default size is 16 CSS pixels"
     );
+}
+
+#[quench_test::test]
+fn background_images_keep_their_address_size_repeat_and_place() {
+    let s = style(
+        "p { background: #123 url(data:image/png;base64,AAA=) no-repeat center }",
+        3,
+    );
+    assert_eq!(
+        s.background_image.as_deref(),
+        Some("data:image/png;base64,AAA=")
+    );
+    assert!(!s.background_repeat);
+    assert_eq!(s.background_position, (0.5, 0.5));
+    let s = style(
+        "p { background-image: url('a.png'); background-size: contain; background-position: right 25% } p { background-repeat: repeat }",
+        3,
+    );
+    assert_eq!(s.background_image.as_deref(), Some("a.png"));
+    assert_eq!(s.background_size, BackgroundSize::Contain);
+    assert!(s.background_repeat);
+    assert_eq!(s.background_position, (1.0, 0.25));
+    assert_eq!(
+        style("p { background-image: none }", 3).background_image,
+        None
+    );
+    // A word the property does not take leaves the earlier value.
+    let s = style("p { background-size: cover; background-size: banana }", 3);
+    assert_eq!(s.background_size, BackgroundSize::Cover);
+}
+
+#[quench_test::test]
+fn grid_properties_parse_tracks_repeats_and_lines() {
+    use quench_css::Display;
+    let s = style(
+        "p { display: inline-grid; grid-template-columns: repeat(2, 1fr) [mid] 100px minmax(10px, 2fr) auto; \
+         grid-template-rows: none; grid-auto-rows: 40px; gap: 4px 8px; grid-column: 2 / span 2; grid-row: -1 }",
+        3,
+    );
+    assert_eq!(s.display, Display::InlineGrid);
+    assert_eq!(
+        s.grid_columns.tracks,
+        [
+            Track::Fr(1.0),
+            Track::Fr(1.0),
+            Track::Length(Length::Px(100.0)),
+            Track::MinMax(
+                Box::new(Track::Length(Length::Px(10.0))),
+                Box::new(Track::Fr(2.0))
+            ),
+            Track::Auto
+        ]
+    );
+    assert!(s.grid_rows.tracks.is_empty());
+    assert_eq!(s.grid_auto_rows, Track::Length(Length::Px(40.0)));
+    assert_eq!(
+        (s.row_gap, s.column_gap),
+        (Length::Px(4.0), Length::Px(8.0))
+    );
+    assert_eq!(s.grid_column, (GridLine::Line(2), GridLine::Span(2)));
+    assert_eq!(s.grid_row, (GridLine::Line(-1), GridLine::Auto));
+    let fill = style(
+        "p { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) }",
+        3,
+    );
+    assert_eq!(fill.display, Display::Grid);
+    assert_eq!(
+        fill.grid_columns
+            .repeat_to_fill
+            .as_ref()
+            .map(|(t, fit)| (t.len(), *fit)),
+        Some((1, false))
+    );
+    let fit = style("p { grid-template-columns: repeat(auto-fit, 50px) }", 3);
+    assert_eq!(
+        fit.grid_columns
+            .repeat_to_fill
+            .as_ref()
+            .map(|(_, fit)| *fit),
+        Some(true)
+    );
+    let ends = style(
+        "p { grid-column-start: span 3; grid-column-end: auto; grid-row-start: 2; grid-row-end: 4; grid-gap: 6px }",
+        3,
+    );
+    assert_eq!(
+        (ends.grid_column, ends.grid_row),
+        (
+            (GridLine::Span(3), GridLine::Auto),
+            (GridLine::Line(2), GridLine::Line(4))
+        )
+    );
+    assert_eq!(ends.row_gap, Length::Px(6.0));
+    // What is not a track or a line leaves the earlier value.
+    let bad = style(
+        "p { grid-template-columns: 1fr; grid-template-columns: banana; grid-column: 0; grid-row: 1 / 2 / 3 }",
+        3,
+    );
+    assert_eq!(bad.grid_columns.tracks, [Track::Fr(1.0)]);
+    assert_eq!(bad.grid_column, (GridLine::Auto, GridLine::Auto));
+    assert_eq!(bad.grid_row, (GridLine::Auto, GridLine::Auto));
+}
+
+#[quench_test::test]
+fn transitions_parse_as_a_shorthand_and_as_lists() {
+    let s = style(
+        "p { transition: opacity 0.3s ease-in-out 100ms, color 1s linear, background 200ms }",
+        3,
+    );
+    assert_eq!(s.transitions.len(), 3);
+    let first = &s.transitions[0];
+    assert_eq!(
+        (
+            first.property.as_str(),
+            first.duration,
+            first.delay,
+            first.timing
+        ),
+        ("opacity", 0.3, 0.1, Timing::EaseInOut)
+    );
+    assert_eq!(
+        (s.transitions[1].duration, s.transitions[1].timing),
+        (1.0, Timing::Linear)
+    );
+    assert_eq!(
+        (
+            s.transitions[2].property.as_str(),
+            s.transitions[2].duration
+        ),
+        ("background", 0.2)
+    );
+    // The longhands make the list, cycling the shorter ones.
+    let l = style(
+        "p { transition-property: opacity, color, border-color; transition-duration: 1s, 2s; transition-timing-function: linear; transition-delay: 0.5s }",
+        3,
+    );
+    let got: Vec<_> = l
+        .transitions
+        .iter()
+        .map(|t| (t.property.as_str(), t.duration, t.delay, t.timing))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            ("opacity", 1.0, 0.5, Timing::Linear),
+            ("color", 2.0, 0.5, Timing::Linear),
+            ("border-color", 1.0, 0.5, Timing::Linear)
+        ]
+    );
+    // Only a duration: every property, ease.
+    let d = style("p { transition-duration: 150ms }", 3);
+    assert_eq!(
+        (
+            d.transitions[0].property.as_str(),
+            d.transitions[0].duration,
+            d.transitions[0].timing
+        ),
+        ("all", 0.15, Timing::Ease)
+    );
+    assert!(style("p { transition: none }", 3).transitions.is_empty());
+    assert_eq!(
+        style(
+            "p { transition: all 1s cubic-bezier(0.1, 0.7, 1, 0.1), x steps(4) 2s }",
+            3
+        )
+        .transitions[1]
+            .timing,
+        Timing::Linear
+    );
+    // A value that is not a time leaves the earlier one.
+    let bad = style("p { transition: color 1s; transition: color banana(3) }", 3);
+    assert_eq!(bad.transitions.len(), 1);
+}
+
+#[quench_test::test]
+fn grid_areas_parse_and_must_be_rectangular() {
+    let s = style(
+        "p { grid-template-areas: \"a a .\" \"b c c\"; grid-area: a }",
+        3,
+    );
+    assert_eq!(s.grid_areas, [vec!["a", "a", "."], vec!["b", "c", "c"]]);
+    assert_eq!(s.grid_area.as_deref(), Some("a"));
+    let numbers = style("p { grid-area: 1 / 2 / 3 / 4 }", 3);
+    assert_eq!(
+        (numbers.grid_row, numbers.grid_column),
+        (
+            (GridLine::Line(1), GridLine::Line(3)),
+            (GridLine::Line(2), GridLine::Line(4))
+        )
+    );
+    assert_eq!(numbers.grid_area, None);
+    let ragged = style("p { grid-template-areas: \"a b\" \"c\" }", 3);
+    assert!(
+        ragged.grid_areas.is_empty(),
+        "rows of different lengths are refused"
+    );
+    assert!(
+        style("p { grid-template-areas: none }", 3)
+            .grid_areas
+            .is_empty()
+    );
+    assert_eq!(style("p { grid-area: auto }", 3).grid_area, None);
+    assert_eq!(
+        style("p { grid-area: 1 / 2 / 3 / 4 / 5 }", 3).grid_row,
+        (GridLine::Auto, GridLine::Auto)
+    );
+}
+
+#[quench_test::test]
+fn animations_parse_as_a_shorthand_and_as_lists_and_keyframes_are_kept() {
+    let s = style(
+        "p { animation: spin 2s linear 0.5s infinite alternate both, fade 300ms ease-in 3 }",
+        3,
+    );
+    let first = &s.animations[0];
+    assert_eq!(
+        (
+            first.name.as_str(),
+            first.duration,
+            first.delay,
+            first.timing,
+            first.iterations,
+            first.direction,
+            first.fill
+        ),
+        (
+            "spin",
+            2.0,
+            0.5,
+            Timing::Linear,
+            f32::INFINITY,
+            Direction::Alternate,
+            FillMode::Both
+        )
+    );
+    let second = &s.animations[1];
+    assert_eq!(
+        (
+            second.name.as_str(),
+            second.duration,
+            second.iterations,
+            second.timing
+        ),
+        ("fade", 0.3, 3.0, Timing::EaseIn)
+    );
+    let l = style(
+        "p { animation-name: a, b; animation-duration: 1s; animation-delay: 1s, 2s; animation-iteration-count: 2; animation-direction: reverse; animation-fill-mode: forwards; animation-timing-function: ease-out }",
+        3,
+    );
+    let got: Vec<_> = l
+        .animations
+        .iter()
+        .map(|a| {
+            (
+                a.name.as_str(),
+                a.duration,
+                a.delay,
+                a.iterations,
+                a.direction,
+                a.fill,
+                a.timing,
+            )
+        })
+        .collect();
+    assert_eq!(
+        got,
+        [
+            (
+                "a",
+                1.0,
+                1.0,
+                2.0,
+                Direction::Reverse,
+                FillMode::Forwards,
+                Timing::EaseOut
+            ),
+            (
+                "b",
+                1.0,
+                2.0,
+                2.0,
+                Direction::Reverse,
+                FillMode::Forwards,
+                Timing::EaseOut
+            )
+        ]
+    );
+    assert!(style("p { animation: none }", 3).animations.is_empty());
+    assert!(
+        style("p { animation: x 1s; animation-name: none }", 3).animations[0]
+            .name
+            .is_empty()
+    );
+    let paused = style(
+        "p { animation: x 1s paused running alternate-reverse backwards }",
+        3,
+    );
+    assert_eq!(
+        (paused.animations[0].direction, paused.animations[0].fill),
+        (Direction::AlternateReverse, FillMode::Backwards)
+    );
+    assert_eq!(
+        style("p { animation: x 1s; animation: 5 banana(1) }", 3)
+            .animations
+            .len(),
+        1
+    );
+    // Keyframes reach the cascade and can be applied to a style.
+    let mut cascade = Cascade::new(MediaEnv::default());
+    cascade.add(&parse(
+        "@keyframes k { from { opacity: 0 } to { opacity: 1; width: 9px } }",
+    ));
+    let k = cascade.keyframes("k").unwrap();
+    assert_eq!(k.frames.len(), 2);
+    let base = ComputedStyle::default();
+    let made = cascade.style_with(&base, &base, 16.0, &k.frames[1].1);
+    assert_eq!(
+        (made.opacity, made.width.as_ref().and_then(Length::as_px)),
+        (1.0, Some(9.0))
+    );
+    assert!(cascade.keyframes("nope").is_none());
 }
 
 quench_test::main!();

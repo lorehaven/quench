@@ -54,7 +54,14 @@ impl Outline {
     /// `(x, y)` and y pointing down. Curves are flattened in pixel space, so the tolerance is in pixels.
     #[must_use]
     pub fn to_path(&self, scale: f32, x: f32, y: f32) -> Path {
-        let at = |p: Point| (x + p.x * scale, y - p.y * scale);
+        self.to_path_slanted(scale, x, y, 0.0)
+    }
+
+    /// [`to_path`](Self::to_path) leaning to the right: every point moves right by `slant` times its height above
+    /// the baseline (0.2 is the lean of a synthetic italic).
+    #[must_use]
+    pub fn to_path_slanted(&self, scale: f32, x: f32, y: f32, slant: f32) -> Path {
+        let at = |p: Point| (x + p.x * scale + slant * p.y * scale, y - p.y * scale);
         let mid = |a: (f32, f32), b: (f32, f32)| (f32::midpoint(a.0, b.0), f32::midpoint(a.1, b.1));
         let mut path = Path::new();
         for contour in &self.contours {

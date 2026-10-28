@@ -1,6 +1,6 @@
 # Fonts
 
-`NotoSans-Regular.ttf` and `NotoSans-Bold.ttf` (the Latin, Greek and Cyrillic build of Noto Sans, 2022) are embedded
+`NotoSans-Light.ttf`, `NotoSans-Regular.ttf`, `NotoSans-Medium.ttf` and `NotoSans-Bold.ttf` (the Latin, Greek and Cyrillic build of Noto Sans, 2022) are embedded
 into `quench-text` so that text looks the same on every machine.
 
 Their licence is the **SIL Open Font License, Version 1.1** (`OFL.txt`): the fonts' own `name` table says so (name ID

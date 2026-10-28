@@ -5,7 +5,7 @@ use std::fmt::Write as _;
 
 pub const CRATES: &[(&str, &str)] = &[
     ("quench-android", "0.1.0"),
-    ("quench-android-surface", "0.1.0"),
+    ("quench-android-surface", "0.1.1"),
     ("quench-core", "0.1.6"),
     ("quench-desktop", "0.1.0"),
     ("quench-fullstack", "0.1.3"),
@@ -14,7 +14,7 @@ pub const CRATES: &[(&str, &str)] = &[
     ("quench-style", "0.1.2"),
     ("quench-test", "0.1.2"),
     ("quench-ui", "0.1.1"),
-    ("quench-ui-native", "0.1.0"),
+    ("quench-ui-native", "0.1.1"),
     ("quench-ui-web", "0.1.3"),
 ];
 

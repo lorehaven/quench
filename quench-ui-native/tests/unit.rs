@@ -1,6 +1,8 @@
 // The custom harness does not set `cfg(test)`, so clippy no longer treats these files as test code.
 #![allow(
     clippy::unwrap_used,
+    clippy::many_single_char_names,
+    clippy::suboptimal_flops,
     clippy::too_many_lines,
     clippy::float_cmp,
     clippy::cast_precision_loss,
@@ -673,8 +675,22 @@ fn typing_edits_the_value_and_tells_the_view() {
     r.key_down(&ctrl("v"));
     r.key_down(&ctrl("v"));
     assert_eq!(*typed.borrow(), "XYZXYZXYZ", "copy and paste");
+    assert_eq!(
+        r.take_clipboard_out().as_deref(),
+        Some("XYZ"),
+        "a copy is for the host to put on the system clipboard"
+    );
+    assert_eq!(r.take_clipboard_out(), None, "once");
+    r.set_clipboard("sys");
+    r.key_down(&ctrl("v"));
+    assert_eq!(
+        *typed.borrow(),
+        "XYZXYZXYZsys",
+        "a paste inserts what the host set"
+    );
     r.key_down(&ctrl("a"));
     r.key_down(&ctrl("x"));
+    assert_eq!(r.take_clipboard_out().as_deref(), Some("XYZXYZXYZsys"));
     assert_eq!(*typed.borrow(), "");
     r.text("a b c");
     r.key_down(&ctrl("Backspace"));
@@ -1200,4 +1216,663 @@ fn a_scale_makes_css_pixels_bigger_and_media_see_css_pixels() {
     assert_eq!(clicks.get(), 0);
 }
 
+fn png(width: u32, height: u32, rgba: [u8; 4]) -> Vec<u8> {
+    quench_image::encode_png(width, height, &rgba.repeat((width * height) as usize))
+}
+
+#[quench_test::test]
+fn images_come_from_data_urls_registered_bytes_and_a_loader() {
+    let red = png(4, 2, [255, 0, 0, 255]);
+    let data = format!(
+        "data:image/png;base64,{}",
+        quench_core::base64::STANDARD.encode(&red)
+    );
+    let view = div()
+        .child(
+            quench_ui::prelude::img()
+                .attr("src", data.as_str())
+                .attr("alt", "red")
+                .attr("id", "a"),
+        )
+        .child(
+            quench_ui::prelude::img()
+                .attr("src", "registered.png")
+                .attr("width", "8")
+                .attr("id", "b"),
+        )
+        .child(
+            quench_ui::prelude::img()
+                .attr("src", "loaded.png")
+                .attr("height", "6")
+                .attr("id", "c"),
+        )
+        .child(
+            quench_ui::prelude::img()
+                .attr("src", "missing.png")
+                .attr("alt", "a missing picture")
+                .attr("id", "d"),
+        );
+    let r = Rc::new(NativeRenderer::new());
+    r.add_stylesheet("body { margin: 0 } div { display: block } img { display: block; margin: 0 }");
+    r.set_viewport(100.0, 100.0);
+    r.add_image("registered.png", &png(2, 2, [0, 255, 0, 255]))
+        .unwrap();
+    let blue = png(3, 3, [0, 0, 255, 255]);
+    r.set_image_loader(move |src| (src == "loaded.png").then(|| blue.clone()));
+    let _m = mount(&r, &r.root(), view);
+    let mut canvas = Canvas::new(100, 100);
+    let boxes = r.render(&mut canvas);
+    let size = |id: &str| {
+        let all = r.children(r.children(r.root())[0]);
+        let n = all
+            .into_iter()
+            .find(|n| r.attr(*n, "id").as_deref() == Some(id))
+            .unwrap();
+        let b = boxes.find(n.index()).unwrap();
+        (b.width, b.height, boxes.position_of(n.index()).unwrap())
+    };
+    assert_eq!((size("a").0, size("a").1), (4.0, 2.0), "its own size");
+    assert_eq!(
+        (size("b").0, size("b").1),
+        (8.0, 8.0),
+        "a width and the proportions"
+    );
+    assert_eq!(
+        (size("c").0, size("c").1),
+        (6.0, 6.0),
+        "a height and the proportions"
+    );
+    let (ax, ay) = (size("a").2.0 as usize, size("a").2.1 as usize);
+    assert_eq!(canvas.pixel(ax + 1, ay), Color::rgb(255, 0, 0));
+    let (bx, by) = (size("b").2.0 as usize, size("b").2.1 as usize);
+    assert_eq!(canvas.pixel(bx + 4, by + 4), Color::rgb(0, 255, 0));
+    let (cx, cy) = (size("c").2.0 as usize, size("c").2.1 as usize);
+    assert_eq!(canvas.pixel(cx + 2, cy + 2), Color::rgb(0, 0, 255));
+    assert!(
+        texts(&boxes).join(" ").contains("missing"),
+        "what cannot be shown is described"
+    );
+    // At twice the density a picture is twice as big in device pixels.
+    r.set_scale(2.0);
+    let doubled = r.render(&mut canvas);
+    let a = r.children(r.children(r.root())[0])[0];
+    assert_eq!(doubled.find(a.index()).unwrap().width, 8.0);
+    assert!(r.add_image("bad.png", b"not an image").is_err());
+}
+
+#[quench_test::test]
+fn timers_channels_and_motion_preference_follow_the_hosts_ticks() {
+    let r = Rc::new(NativeRenderer::new());
+    let fired = Rc::new(Cell::new(0));
+    let (a, b) = (fired.clone(), fired.clone());
+    let _t = quench_ui::platform::after(20, move || a.set(a.get() + 1));
+    let cancelled = quench_ui::platform::after(30, move || b.set(b.get() + 100));
+    cancelled.cancel();
+    assert!(
+        r.next_wake()
+            .is_some_and(|d| d <= std::time::Duration::from_millis(20))
+    );
+    assert!(!r.tick(), "nothing is due yet");
+    std::thread::sleep(std::time::Duration::from_millis(40));
+    assert!(r.tick());
+    assert_eq!(
+        fired.get(),
+        1,
+        "the timer ran once and the cancelled one never"
+    );
+    assert_eq!(r.next_wake(), None, "nothing left to wait for");
+    assert!(quench_ui::platform::now() > 30.0);
+    // Other threads hand data to the views.
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let s = seen.clone();
+    let tx = r.channel(move |n: u32| s.borrow_mut().push(n));
+    assert!(r.next_wake().is_some(), "channels are looked at");
+    std::thread::spawn(move || {
+        tx.send(1).unwrap();
+        tx.send(2).unwrap();
+    })
+    .join()
+    .unwrap();
+    assert!(
+        seen.borrow().is_empty(),
+        "handled on the views' thread, at a tick"
+    );
+    assert!(r.tick());
+    assert_eq!(*seen.borrow(), [1, 2]);
+    assert!(!r.tick());
+    // The motion preference comes from the media the host sets.
+    assert!(!quench_ui::platform::prefers_reduced_motion());
+    r.set_media(quench_css::MediaEnv {
+        reduced_motion: true,
+        ..quench_css::MediaEnv::default()
+    });
+    assert!(quench_ui::platform::prefers_reduced_motion());
+    // `@media` sees CSS pixels after the media are set at a scale.
+    r.set_scale(2.0);
+    r.set_viewport(600.0, 400.0);
+    r.set_media(quench_css::MediaEnv::default());
+    r.add_stylesheet("body { margin: 0; background: red } @media (max-width: 300px) { body { background: blue } }");
+    let mut canvas = Canvas::new(600, 400);
+    r.render(&mut canvas);
+    assert_eq!(canvas.pixel(5, 5), Color::rgb(0, 0, 255));
+}
+
 quench_test::main!();
+
+#[quench_test::test]
+fn a_background_image_is_tiled_sized_and_placed_in_the_padding_box() {
+    let side = |top_left: [u8; 4], rest: [u8; 4]| {
+        // A 2x2 picture with one different pixel.
+        let mut px = rest.repeat(4);
+        px[..4].copy_from_slice(&top_left);
+        quench_image::encode_png(2, 2, &px)
+    };
+    let tile = side([255, 0, 0, 255], [0, 0, 255, 255]);
+    let r = Rc::new(NativeRenderer::new());
+    r.add_image("tile.png", &tile).unwrap();
+    let boxes = |css: &str| {
+        let r = Rc::new(NativeRenderer::new());
+        r.add_image("tile.png", &tile).unwrap();
+        r.add_stylesheet(&format!(
+            "body {{ margin: 0 }} div {{ width: 8px; height: 8px; border: 2px solid rgb(0, 255, 0); {css} }}"
+        ));
+        r.set_viewport(40.0, 40.0);
+        let _m = mount(&r, &r.root(), div());
+        let mut canvas = Canvas::new(40, 40);
+        r.render(&mut canvas);
+        canvas
+    };
+    // Tiles of 2x2 start at the padding box (2, 2) and repeat.
+    let tiled = boxes("background-image: url(tile.png)");
+    assert_eq!(tiled.pixel(2, 2), Color::rgb(255, 0, 0));
+    assert_eq!(tiled.pixel(3, 2), Color::rgb(0, 0, 255));
+    assert_eq!(tiled.pixel(4, 2), Color::rgb(255, 0, 0), "the next tile");
+    assert_eq!(
+        tiled.pixel(0, 0),
+        Color::rgb(0, 255, 0),
+        "the border is on top"
+    );
+    // No repeat: one tile, the rest is the colour behind.
+    let once = boxes("background: rgb(9, 9, 9) url(tile.png) no-repeat");
+    assert_eq!(once.pixel(2, 2), Color::rgb(255, 0, 0));
+    assert_eq!(once.pixel(4, 2), Color::rgb(9, 9, 9));
+    // Cover: the 8x8 padding box shows the picture four times larger.
+    let cover = boxes(
+        "background-image: url(tile.png); background-size: cover; background-repeat: no-repeat",
+    );
+    assert_eq!(cover.pixel(2, 2), Color::rgb(255, 0, 0));
+    // Scaled up and smoothed: the corner is still red, and red reaches further than one pixel.
+    assert!(cover.pixel(3, 3).r > 150, "{:?}", cover.pixel(3, 3));
+    assert!(cover.pixel(9, 9).b > 200, "{:?}", cover.pixel(9, 9));
+    drop(r);
+}
+
+#[quench_test::test]
+fn drawings_come_from_data_urls_and_are_made_again_at_the_density() {
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><rect width="10" height="6" fill="#f00"/></svg>"##;
+    let escaped = svg
+        .replace('<', "%3C")
+        .replace('>', "%3E")
+        .replace('#', "%23")
+        .replace('"', "'");
+    let page = |src: String| {
+        let r = Rc::new(NativeRenderer::new());
+        r.add_stylesheet("body { margin: 0 } img { display: block }");
+        r.set_viewport(60.0, 40.0);
+        let m = mount(
+            &r,
+            &r.root(),
+            div().child(
+                quench_ui::prelude::img()
+                    .attr("src", src.as_str())
+                    .attr("alt", "d"),
+            ),
+        );
+        (r, m)
+    };
+    let (r, _m) = page(format!("data:image/svg+xml,{escaped}"));
+    let mut canvas = Canvas::new(60, 40);
+    let boxes = r.render(&mut canvas);
+    let img = r.children(r.children(r.root())[0])[0];
+    let found = boxes.find(img.index()).unwrap();
+    assert_eq!((found.width, found.height), (10.0, 6.0), "its own size");
+    assert_eq!(canvas.pixel(5, 3), Color::rgb(255, 0, 0));
+    // At twice the density the box is twice as big and the drawing is sharp, not a stretched small one.
+    r.set_scale(2.0);
+    let doubled = r.render(&mut canvas);
+    assert_eq!(doubled.find(img.index()).unwrap().width, 20.0);
+    assert_eq!(canvas.pixel(19, 11), Color::rgb(255, 0, 0));
+    // The same through base64 and through registered bytes.
+    let b64 = quench_core::base64::STANDARD.encode(svg);
+    let (r, _m) = page(format!("data:image/svg+xml;base64,{b64}"));
+    let boxes = r.render(&mut Canvas::new(60, 40));
+    let img = r.children(r.children(r.root())[0])[0];
+    assert_eq!(boxes.find(img.index()).unwrap().width, 10.0);
+    assert!(r.add_image("a.svg", svg.as_bytes()).is_ok());
+    assert!(r.add_image("b.svg", b"<svg").is_err());
+}
+
+#[quench_test::test]
+fn sliders_and_progress_bars_have_a_range_and_assistive_technology_can_set_a_fields_text() {
+    let typed = Rc::new(std::cell::RefCell::new(String::new()));
+    let t = typed.clone();
+    let view = div()
+        .child(
+            input()
+                .attr("type", "range")
+                .attr("min", "10")
+                .attr("max", "20")
+                .attr("value", "12")
+                .attr("aria-label", "Level"),
+        )
+        .child(input().attr("type", "range").attr("aria-label", "Middle"))
+        .child(
+            quench_ui::view::element("progress")
+                .attr("value", "0.25")
+                .attr("aria-label", "Done"),
+        )
+        .child(quench_ui::view::element("progress").attr("aria-label", "Waiting"))
+        .child(
+            div()
+                .attr("role", "slider")
+                .attr("aria-valuemin", "1")
+                .attr("aria-valuemax", "3")
+                .attr("aria-valuenow", "7")
+                .attr("aria-label", "Aria"),
+        )
+        .child(
+            input()
+                .attr("type", "text")
+                .attr("aria-label", "Name")
+                .on_input(move |v| *t.borrow_mut() = v.to_string()),
+        );
+    let (r, _m) = live(
+        "body { margin: 0 } input, div { display: block; height: 20px; width: 100px }",
+        view,
+        300,
+        300,
+    );
+    let tree = r.accessibility_tree();
+    let all = flat(&tree);
+    let by = |name: &str| {
+        all.iter()
+            .find(|n| n.name == name)
+            .copied()
+            .unwrap_or_else(|| {
+                panic!(
+                    "{name}: {:?}",
+                    all.iter().map(|n| (&n.name, n.role)).collect::<Vec<_>>()
+                )
+            })
+    };
+    assert_eq!(
+        (by("Level").role, by("Level").range),
+        (Role::Slider, Some((10.0, 20.0, Some(12.0))))
+    );
+    assert_eq!(by("Level").value.as_deref(), Some("12"));
+    assert_eq!(
+        by("Middle").range,
+        Some((0.0, 100.0, Some(50.0))),
+        "a slider starts in the middle"
+    );
+    assert_eq!(
+        (by("Done").role, by("Done").range),
+        (Role::ProgressBar, Some((0.0, 1.0, Some(0.25))))
+    );
+    assert_eq!(by("Waiting").range, Some((0.0, 1.0, None)), "indeterminate");
+    assert_eq!(
+        by("Aria").range,
+        Some((1.0, 3.0, Some(3.0))),
+        "clamped into the range"
+    );
+    // A field's whole text is replaced, with an Input event, and the caret goes to its end.
+    let field = by("Name").id;
+    assert!(r.set_field_value(field, "Ann"));
+    assert_eq!(*typed.borrow(), "Ann");
+    assert_eq!(
+        flat(&r.accessibility_tree())
+            .iter()
+            .find(|n| n.id == field)
+            .unwrap()
+            .caret,
+        Some((3, 3))
+    );
+    assert!(r.set_field_value(field, "Bo"));
+    assert_eq!(*typed.borrow(), "Bo");
+    assert!(
+        !r.set_field_value(by("Level").id, "x"),
+        "only text fields take text"
+    );
+}
+
+#[quench_test::test]
+fn a_slider_moves_with_keys_and_the_pointer_and_shows_where_it_is() {
+    let seen = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let s = seen.clone();
+    let view = div()
+        .child(
+            input()
+                .attr("type", "range")
+                .attr("min", "0")
+                .attr("max", "10")
+                .attr("value", "5")
+                .attr("aria-label", "Level")
+                .on_input(move |v| s.borrow_mut().push(v.to_string())),
+        )
+        .child(
+            quench_ui::view::element("progress")
+                .attr("value", "0.5")
+                .attr("aria-label", "Done"),
+        );
+    let (r, _m) = live(
+        "body { margin: 0 } div { display: block } input[type=range] { width: 100px; height: 20px; margin: 0 } progress { display: block; width: 100px; height: 10px; border: 0; margin: 0; background: #000000 }",
+        view,
+        200,
+        100,
+    );
+    let level = |r: &NativeRenderer| {
+        flat(&r.accessibility_tree())
+            .iter()
+            .find(|n| n.name == "Level")
+            .unwrap()
+            .range
+            .unwrap()
+            .2
+    };
+    // Tab to it; the arrows, Page and Home/End move it by its step, a tenth of the range and to the ends.
+    r.key_down(&key("Tab"));
+    r.key_down(&key("ArrowRight"));
+    assert_eq!(level(&r), Some(6.0));
+    r.key_down(&key("ArrowLeft"));
+    r.key_down(&key("ArrowLeft"));
+    r.key_down(&key("PageUp"));
+    assert_eq!(level(&r), Some(5.0));
+    r.key_down(&key("End"));
+    r.key_down(&key("ArrowRight"));
+    assert_eq!(level(&r), Some(10.0), "kept in range");
+    r.key_down(&key("Home"));
+    assert_eq!(level(&r), Some(0.0));
+    assert_eq!(seen.borrow().last().map(String::as_str), Some("0"));
+    // The pointer sets the value under it, and dragging follows.
+    r.pointer_down(75.0, 10.0);
+    assert_eq!(
+        level(&r),
+        Some(8.0),
+        "7.5 rounds to a whole step, as the default step of 1 asks"
+    );
+    r.pointer_move(25.0, 10.0);
+    r.pointer_up(25.0, 10.0);
+    assert_eq!(level(&r), Some(3.0), "dragged, then released");
+    // The progress bar is half full: the left half is the accent, the right half the background.
+    let mut canvas = Canvas::new(200, 100);
+    r.render(&mut canvas);
+    assert_eq!(canvas.pixel(20, 25), Color::rgb(0, 117, 255));
+    assert_eq!(canvas.pixel(80, 25), Color::rgb(0, 0, 0));
+}
+
+#[quench_test::test]
+fn a_transition_moves_a_value_gradually_and_keeps_frames_coming_until_it_is_done() {
+    let on = create_signal(false);
+    let flag = on.clone();
+    let view = div().child(div().attr("id", "t").attr_fn("class", move || {
+        if flag.get() {
+            "after".to_string()
+        } else {
+            "before".to_string()
+        }
+    }));
+    let r = Rc::new(NativeRenderer::new());
+    r.add_stylesheet(
+        "body { margin: 0 } #t { width: 20px; height: 20px } \
+         .before { opacity: 1; background: rgb(0, 0, 0); transition: opacity 1s linear, background-color 1s linear } \
+         .after { opacity: 0; background: rgb(200, 100, 0); transition: opacity 1s linear, background-color 1s linear }",
+    );
+    r.set_viewport(40.0, 40.0);
+    let _m = mount(&r, &r.root(), view);
+    let mut canvas = Canvas::new(40, 40);
+    let shown = |r: &NativeRenderer, canvas: &mut Canvas| {
+        let boxes = r.render(canvas);
+        let t = r.children(r.children(r.root())[0])[0];
+        let b = boxes.find(t.index()).unwrap();
+        (b.style.opacity, b.style.resolve(b.style.background))
+    };
+    let (opacity, background) = shown(&r, &mut canvas);
+    assert_eq!(
+        (opacity, background.r),
+        (1.0, 0),
+        "the first style is not transitioned to"
+    );
+    assert!(r.next_wake().is_none(), "nothing moves yet");
+    on.set(true);
+    let (opacity, background) = shown(&r, &mut canvas);
+    assert_eq!(
+        (opacity, background.r),
+        (1.0, 0),
+        "the change starts from what was shown"
+    );
+    assert!(
+        r.next_wake()
+            .is_some_and(|w| w <= std::time::Duration::from_millis(16)),
+        "frames are wanted"
+    );
+    r.advance_animations(std::time::Duration::from_millis(500));
+    assert!(r.tick(), "a step makes the page stale");
+    let (opacity, background) = shown(&r, &mut canvas);
+    assert!((opacity - 0.5).abs() < 0.05, "{opacity}");
+    assert!((i32::from(background.r) - 100).abs() < 8, "{background:?}");
+    // A change half way starts from where it is.
+    on.set(false);
+    let (reverse, _) = shown(&r, &mut canvas);
+    assert!((reverse - 0.5).abs() < 0.05, "{reverse}");
+    r.advance_animations(std::time::Duration::from_millis(2000));
+    r.tick();
+    let (done, background) = shown(&r, &mut canvas);
+    assert_eq!((done, background.r), (1.0, 0));
+    assert!(r.next_wake().is_none(), "finished: the page rests");
+    // With reduced motion the change is immediate.
+    r.set_media(quench_css::MediaEnv {
+        reduced_motion: true,
+        ..quench_css::MediaEnv::default()
+    });
+    on.set(true);
+    let (instant, background) = shown(&r, &mut canvas);
+    assert_eq!((instant, background.r), (0.0, 200));
+}
+
+#[quench_test::test]
+fn keyframe_animations_play_repeat_alternate_fill_and_stop() {
+    use std::time::Duration;
+    let r = Rc::new(NativeRenderer::new());
+    r.add_stylesheet(
+        "body { margin: 0 } div { width: 10px; height: 10px } \
+         @keyframes fade { from { opacity: 1 } to { opacity: 0 } } \
+         @keyframes spin { 0% { transform: rotate(0deg) } 50% { background: rgb(0, 0, 0) } 100% { transform: rotate(360deg); background: rgb(200, 0, 0) } } \
+         #a { animation: fade 1s linear infinite } \
+         #b { animation: fade 1s linear 2 alternate forwards } \
+         #c { animation-name: fade; animation-duration: 1s; animation-delay: 1s; animation-timing-function: linear; animation-fill-mode: backwards; opacity: 0.5 } \
+         #d { animation: spin 2s linear infinite; background: rgb(100, 0, 0) } \
+         #e { animation: missing 1s }",
+    );
+    r.set_viewport(100.0, 100.0);
+    let view = div()
+        .child(div().attr("id", "a"))
+        .child(div().attr("id", "b"))
+        .child(div().attr("id", "c"))
+        .child(div().attr("id", "d"))
+        .child(div().attr("id", "e"));
+    let _m = mount(&r, &r.root(), view);
+    let mut canvas = Canvas::new(100, 100);
+    let styles = |r: &NativeRenderer, canvas: &mut Canvas| {
+        let boxes = r.render(canvas);
+        let wrapper = r.children(r.children(r.root())[0])[0];
+        let _ = wrapper;
+        let kids = r.children(r.children(r.root())[0]);
+        kids.iter()
+            .map(|k| boxes.find(k.index()).unwrap().style.clone())
+            .collect::<Vec<_>>()
+    };
+    let at = |r: &NativeRenderer, canvas: &mut Canvas, ms: u64| {
+        r.advance_animations(Duration::from_millis(ms));
+        r.tick();
+        styles(r, canvas)
+    };
+    let start = styles(&r, &mut canvas);
+    assert_eq!(start[0].opacity, 1.0);
+    assert_eq!(
+        start[2].opacity, 1.0,
+        "backwards fill: the first frame while it waits for its delay"
+    );
+    assert!(r.next_wake().is_some(), "frames are wanted");
+    let half = at(&r, &mut canvas, 500);
+    assert!((half[0].opacity - 0.5).abs() < 0.05, "{}", half[0].opacity);
+    assert!((half[1].opacity - 0.5).abs() < 0.05);
+    assert!(
+        (half[3].transform.rotate - 90.0).abs() < 5.0,
+        "a quarter of the way: {}",
+        half[3].transform.rotate
+    );
+    let third = at(&r, &mut canvas, 1000);
+    // 1.5 s: `a` is half way through its second run; `b` runs backwards in its second (alternate) run; `c` has
+    // begun its first second; `d` is 3/4 of the way, past the middle keyframe.
+    assert!((third[0].opacity - 0.5).abs() < 0.05);
+    assert!(
+        (third[1].opacity - 0.5).abs() < 0.05,
+        "alternate: back up from 0 to 1 half way is 0.5"
+    );
+    assert!(
+        (third[2].opacity - 0.5).abs() < 0.05,
+        "c runs its own keyframes now: 1 to 0 at half way"
+    );
+    assert!(
+        (third[3].transform.rotate - 270.0).abs() < 5.0,
+        "{}",
+        third[3].transform.rotate
+    );
+    assert_eq!(
+        third[4].opacity, 1.0,
+        "an animation with no keyframes does nothing"
+    );
+    // After two alternating runs (2 s) b stays at its end: forwards. `a` never ends.
+    let late = at(&r, &mut canvas, 1000);
+    assert_eq!(
+        late[1].opacity, 1.0,
+        "forwards: the last frame of the last run (it ran backwards)"
+    );
+    assert!(late[0].opacity <= 1.0);
+    assert!(r.next_wake().is_some(), "`a` and `d` go on for ever");
+    // Reduced motion shows the plain styles.
+    r.set_media(quench_css::MediaEnv {
+        reduced_motion: true,
+        ..quench_css::MediaEnv::default()
+    });
+    let still = at(&r, &mut canvas, 100);
+    assert_eq!((still[0].opacity, still[3].transform.rotate), (1.0, 0.0));
+}
+
+#[quench_test::test]
+fn clicking_a_submit_button_submits_its_form_and_other_buttons_do_not() {
+    let submitted = Rc::new(Cell::new(0));
+    let s = submitted.clone();
+    let view = div().child(
+        quench_ui::view::element("form")
+            .on_submit(move || s.set(s.get() + 1))
+            .child(button().attr("aria-label", "plain").text("Go"))
+            .child(
+                button()
+                    .attr("aria-label", "typed")
+                    .attr("type", "button")
+                    .text("Not"),
+            )
+            .child(
+                button()
+                    .attr("aria-label", "reset")
+                    .attr("type", "reset")
+                    .text("Reset"),
+            )
+            .child(input().attr("aria-label", "send").attr("type", "submit"))
+            .child(input().attr("aria-label", "field").attr("type", "text")),
+    );
+    let (r, _m) = live(
+        "body { margin: 0 } button, input { display: block; width: 100px; height: 20px }",
+        view,
+        200,
+        200,
+    );
+    let click = |id: &str| {
+        let all = r.accessibility_tree();
+        let node = flat(&all).into_iter().find(|n| n.name == id).unwrap();
+        let (x, y, w, h) = node.bounds;
+        r.pointer_down(x + w / 2.0, y + h / 2.0);
+        r.pointer_up(x + w / 2.0, y + h / 2.0);
+    };
+    click("plain");
+    assert_eq!(submitted.get(), 1, "a button with no type submits");
+    click("typed");
+    click("reset");
+    click("field");
+    assert_eq!(
+        submitted.get(),
+        1,
+        "buttons of other types and fields do not"
+    );
+    click("send");
+    assert_eq!(submitted.get(), 2, "an input of type submit does");
+}
+
+#[quench_test::test]
+fn a_long_press_selects_a_word_and_its_handles_can_be_moved() {
+    let view = div().child(
+        input()
+            .attr("type", "text")
+            .attr("aria-label", "t")
+            .attr("value", "hello brave world, ok"),
+    );
+    let (r, _m) = live(
+        "body { margin: 0 } input { display: block; width: 300px; height: 24px; font-size: 14px; padding: 0; border: 0 }",
+        view,
+        400,
+        100,
+    );
+    let field = |r: &NativeRenderer| {
+        flat(&r.accessibility_tree())
+            .into_iter()
+            .find(|n| n.name == "t")
+            .unwrap()
+            .clone()
+    };
+    let selection = |r: &NativeRenderer| {
+        let (caret, anchor) = field(r).caret.unwrap();
+        (caret.min(anchor), caret.max(anchor))
+    };
+    assert!(r.selection_handles().is_none(), "nothing is selected");
+    assert!(
+        !r.select_word_at(350.0, 90.0),
+        "nothing to select where there is no field"
+    );
+    let (x, y, _, h) = field(&r).bounds;
+    // The middle of "brave" is some way along the text: find it from where the caret goes for each character.
+    let second_word_x = x + 6.0 * 7.0 + 12.0;
+    assert!(r.select_word_at(second_word_x, y + h / 2.0));
+    assert_eq!(selection(&r), (6, 11), "the word under the finger");
+    let handles = r.selection_handles().unwrap();
+    assert!(
+        handles[0].0 < handles[1].0 && handles[0].2 > 0.0,
+        "{handles:?}"
+    );
+    // Dragging the end handle to the right extends the selection; to the left of the start flips it.
+    r.move_selection_end(true, handles[1].0 + 40.0);
+    let (lo, hi) = selection(&r);
+    assert_eq!(lo, 6);
+    assert!(hi > 11, "{hi}");
+    r.move_selection_end(true, handles[0].0 - 20.0);
+    let (lo, hi) = selection(&r);
+    assert!(
+        lo < 6 && hi == 6,
+        "the dragged end went past the other: {lo} {hi}"
+    );
+    // A space or punctuation selects itself; the end of the text and elsewhere does not break.
+    assert!(r.select_word_at(x + 300.0 - 2.0, y + h / 2.0));
+    assert!(selection(&r).1 >= selection(&r).0);
+    r.move_selection_end(false, x - 50.0);
+    assert_eq!(selection(&r).0, 0);
+}

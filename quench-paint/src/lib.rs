@@ -26,10 +26,27 @@ use quench_raster::{Canvas, Color, Path};
 pub type Scroll<'a> = &'a dyn Fn(usize) -> (f32, f32);
 
 /// Something drawn on top of a box that is not made of CSS: the mark in a checkbox, the caret in a text field.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Decoration {
     /// A check mark filling the content box.
     Check(quench_css::Color),
+    /// An image (straight-alpha RGBA, `width * height * 4` bytes) stretched over the content box.
+    Image {
+        rgba: std::rc::Rc<Vec<u8>>,
+        width: u32,
+        height: u32,
+    },
+    /// A `background-image`: drawn over the padding box, after the background colour. `scale` is device pixels
+    /// per CSS pixel (the image's own size is in CSS pixels).
+    Background {
+        rgba: std::rc::Rc<Vec<u8>>,
+        width: u32,
+        height: u32,
+        size: quench_css::BackgroundSize,
+        repeat: bool,
+        position: (f32, f32),
+        scale: f32,
+    },
     /// A filled circle in the middle of the content box (a selected radio button).
     Dot(quench_css::Color),
     /// A bar `width` wide at `(x, y)` from the border box's top left, `height` tall (a caret).
@@ -114,6 +131,9 @@ struct Painter<'a> {
     /// The scrolling of every container above the box being painted, which fixed boxes do not follow.
     scrolled: std::cell::Cell<(f32, f32)>,
 }
+
+/// How far italic text leans (about 11 degrees).
+const ITALIC_SLANT: f32 = 0.2;
 
 /// A box edge snapped to whole pixels, as browsers do for backgrounds and borders.
 fn snap(x: f32, y: f32, w: f32, h: f32) -> (f32, f32, f32, f32) {
@@ -222,6 +242,11 @@ impl Painter<'_> {
                 (rect.2 - b.border[1] - b.border[3]).max(0.0),
                 (rect.3 - b.border[0] - b.border[2]).max(0.0),
             );
+            for d in (self.decorations)(b.key) {
+                if let Decoration::Background { .. } = d {
+                    Self::background_image(canvas, padding, &d);
+                }
+            }
             let inner_r: [f32; 4] = [
                 (r[0] - b.border[0].max(b.border[3])).max(0.0),
                 (r[1] - b.border[0].max(b.border[1])).max(0.0),
@@ -389,6 +414,62 @@ impl Painter<'_> {
         );
     }
 
+    /// Draws a `background-image` into the padding box: sized, placed and tiled as the style says.
+    fn background_image<S: AsRef<[u8]> + AsMut<[u8]>>(
+        canvas: &mut Canvas<S>,
+        padding: (f32, f32, f32, f32),
+        d: &Decoration,
+    ) {
+        let Decoration::Background {
+            rgba,
+            width,
+            height,
+            size,
+            repeat,
+            position,
+            scale,
+        } = d
+        else {
+            return;
+        };
+        let (iw, ih) = (*width as f32, *height as f32);
+        if padding.2 <= 0.0 || padding.3 <= 0.0 || iw <= 0.0 || ih <= 0.0 {
+            return;
+        }
+        let factor = match size {
+            quench_css::BackgroundSize::Auto => *scale,
+            quench_css::BackgroundSize::Cover => (padding.2 / iw).max(padding.3 / ih),
+            quench_css::BackgroundSize::Contain => (padding.2 / iw).min(padding.3 / ih),
+        };
+        let (tw, th) = (iw * factor, ih * factor);
+        let left = padding.0 + (padding.2 - tw) * position.0;
+        let top = padding.1 + (padding.3 - th) * position.1;
+        let before = canvas.clip_to(
+            padding.0 as i32,
+            padding.1 as i32,
+            padding.2 as i32,
+            padding.3 as i32,
+        );
+        // The first tile that can show: tiles go back from the placed one to the box's edge.
+        let (x0, y0, columns, rows) = if *repeat {
+            let back =
+                |from: f32, edge: f32, step: f32| from - ((from - edge) / step).ceil() * step;
+            let (x0, y0) = (back(left, padding.0, tw), back(top, padding.1, th));
+            let columns = ((padding.0 + padding.2 - x0) / tw).ceil().clamp(1.0, 256.0) as u32;
+            let rows = ((padding.1 + padding.3 - y0) / th).ceil().clamp(1.0, 256.0) as u32;
+            (x0, y0, columns, rows)
+        } else {
+            (left, top, 1, 1)
+        };
+        for row in 0..rows {
+            for column in 0..columns {
+                let at = (x0 + column as f32 * tw, y0 + row as f32 * th, tw, th);
+                canvas.draw_image(rgba, *width as usize, *height as usize, at, 1.0);
+            }
+        }
+        canvas.restore_clip(before);
+    }
+
     fn decorate<S: AsRef<[u8]> + AsMut<[u8]>>(
         canvas: &mut Canvas<S>,
         b: &LayoutBox,
@@ -417,6 +498,14 @@ impl Painter<'_> {
                 }
                 canvas.fill_path(&path, 0.0, 0.0, to_raster(color));
             }
+            Decoration::Image {
+                rgba,
+                width,
+                height,
+            } => {
+                canvas.draw_image(&rgba, width as usize, height as usize, (x, y, cw, ch), 1.0);
+            }
+            Decoration::Background { .. } => {}
             Decoration::Dot(color) => {
                 let size = cw.min(ch) * 0.5;
                 let mut path = Path::new();
@@ -453,12 +542,14 @@ impl Painter<'_> {
         }
         let set = self.fonts.set(&t.style);
         let layout = set.layout(&t.text, t.style.font_size, None);
-        set.draw(
+        set.draw_slanted(
             canvas,
             &layout,
             (ox + t.x).round(),
             (oy + t.baseline).round() - layout.ascent,
             to_raster(t.style.color),
+            // No italic face is embedded: the regular one is leaned.
+            if t.style.italic { ITALIC_SLANT } else { 0.0 },
         );
     }
 

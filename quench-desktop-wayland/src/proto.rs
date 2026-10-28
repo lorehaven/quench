@@ -104,6 +104,30 @@ pub mod text_input {
     pub const DONE: u16 = 5;
 }
 
+pub mod data_device_manager {
+    pub const CREATE_DATA_SOURCE: u16 = 0;
+    pub const GET_DATA_DEVICE: u16 = 1;
+}
+
+pub mod data_source {
+    pub const OFFER: u16 = 0;
+    pub const DESTROY: u16 = 1;
+    pub const SEND: u16 = 1;
+    pub const CANCELLED: u16 = 2;
+}
+
+pub mod data_device {
+    pub const SET_SELECTION: u16 = 1;
+    pub const DATA_OFFER: u16 = 0;
+    pub const SELECTION: u16 = 5;
+}
+
+pub mod data_offer {
+    pub const RECEIVE: u16 = 1;
+    pub const DESTROY: u16 = 2;
+    pub const OFFER: u16 = 0;
+}
+
 pub mod keyboard {
     pub const KEYMAP: u16 = 0;
     pub const ENTER: u16 = 1;
@@ -141,6 +165,10 @@ pub enum Interface {
     Keyboard,
     TextInputManager,
     TextInput,
+    DataDeviceManager,
+    DataDevice,
+    DataSource,
+    DataOffer,
 }
 
 /// What the compositor tells us.
@@ -202,7 +230,9 @@ pub enum Event {
     KeyboardKeymap {
         size: u32,
     },
-    KeyboardEnter,
+    KeyboardEnter {
+        serial: u32,
+    },
     KeyboardLeave,
     TextInputEnter,
     TextInputLeave,
@@ -221,10 +251,21 @@ pub enum Event {
     /// The events since the last `done` are one change: apply them now.
     TextInputDone,
     KeyboardKey {
+        serial: u32,
         /// The Linux input code.
         key: u32,
         pressed: bool,
     },
+    /// A new offer of data (the id the compositor gave it): its types follow as `OfferType` events.
+    DataOffer(u32),
+    OfferType(String),
+    /// The clipboard changed: the offer that holds it (`None` when it is empty).
+    Selection(Option<u32>),
+    /// Somebody wants what this program put on the clipboard: write it to the descriptor.
+    SourceSend {
+        mime: String,
+    },
+    SourceCancelled,
     KeyboardModifiers {
         depressed: u32,
         latched: u32,
@@ -336,12 +377,20 @@ pub fn decode(interface: Interface, message: &Message) -> Result<Event, WireErro
             }
         }
         (Interface::TextInput, text_input::DONE) => Event::TextInputDone,
-        (Interface::Keyboard, keyboard::ENTER) => Event::KeyboardEnter,
+        (Interface::Keyboard, keyboard::ENTER) => Event::KeyboardEnter { serial: r.uint()? },
+        (Interface::DataDevice, data_device::DATA_OFFER) => Event::DataOffer(r.object()?),
+        (Interface::DataDevice, data_device::SELECTION) => {
+            Event::Selection(Some(r.object()?).filter(|id| *id != 0))
+        }
+        (Interface::DataOffer, data_offer::OFFER) => Event::OfferType(r.string()?),
+        (Interface::DataSource, data_source::SEND) => Event::SourceSend { mime: r.string()? },
+        (Interface::DataSource, data_source::CANCELLED) => Event::SourceCancelled,
         (Interface::Keyboard, keyboard::LEAVE) => Event::KeyboardLeave,
         (Interface::Keyboard, keyboard::KEY) => {
-            let _serial = r.uint()?;
+            let serial = r.uint()?;
             let _time = r.uint()?;
             Event::KeyboardKey {
+                serial,
                 key: r.uint()?,
                 pressed: r.uint()? == 1,
             }

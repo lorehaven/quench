@@ -23,6 +23,10 @@ class SurfaceHost(private val context: Context, private val listener: Listener) 
         fun onIme(text: String, cursor: Int, anchor: Int, rect: FloatArray)
         fun onTree(bytes: ByteArray)
         fun onBackHandled()
+        /** Text for the system clipboard. */
+        fun onClipboard(text: String)
+        /** A call to a plugin: the JSON envelope `{"id","plugin","method","args"}`. */
+        fun onCall(json: String)
         fun onExit()
         fun onClosed(reason: String)
     }
@@ -41,7 +45,12 @@ class SurfaceHost(private val context: Context, private val listener: Listener) 
             return false
         }
         val started = try {
-            ProcessBuilder(file.absolutePath).start()
+            // The program lives in the app's own files: its working directory and `HOME` are there, so what it writes
+            // (a session, a cache, a database) goes where the system looks after it.
+            ProcessBuilder(file.absolutePath)
+                .directory(context.filesDir)
+                .apply { environment()["HOME"] = context.filesDir.absolutePath }
+                .start()
         } catch (e: IOException) {
             listener.onClosed("cannot start the surface program: ${e.message}")
             return false
@@ -97,6 +106,12 @@ class SurfaceHost(private val context: Context, private val listener: Listener) 
                 6 -> {
                     listener.onExit()
                     return
+                }
+                7, 8 -> {
+                    val bytes = ByteArray(input.readInt())
+                    input.readFully(bytes)
+                    val text = String(bytes, Charsets.UTF_8)
+                    if (kind == 7) listener.onClipboard(text) else listener.onCall(text)
                 }
                 else -> input.skipBytes(length - 1)
             }
@@ -172,6 +187,18 @@ class SurfaceHost(private val context: Context, private val listener: Listener) 
     fun back() = send(9) {}
 
     fun visible(shown: Boolean) = send(10) { writeByte(if (shown) 1 else 0) }
+
+    /** The system clipboard's text, when it changes and when the app comes back to the front. */
+    fun clipboard(text: String) = send(11) { writeLong(text) }
+
+    /** A plugin's answer or event (a JSON envelope). */
+    fun reply(json: String) = send(12) { writeLong(json) }
+
+    private fun DataOutputStream.writeLong(text: String) {
+        val bytes = text.toByteArray(Charsets.UTF_8)
+        writeInt(bytes.size)
+        write(bytes)
+    }
 
     fun stop() {
         try {

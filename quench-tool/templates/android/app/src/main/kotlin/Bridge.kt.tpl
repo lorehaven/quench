@@ -20,8 +20,10 @@ import org.json.JSONObject
  */
 class Bridge(
     internal val activity: Activity,
-    private val web: WebView,
+    private val web: WebView?,
     plugins: List<Plugin>,
+    /** Where answers and events go when there is no page: a program that draws the screen (see `SurfaceHost`). */
+    private val sink: ((JSONObject) -> Unit)? = null,
     private val allowed: (Uri) -> Boolean,
 ) {
     companion object {
@@ -48,6 +50,7 @@ class Bridge(
     /** Opens the port to the page that just loaded at [url], if the page is the app's. */
     fun connect(url: String?) {
         disconnect()
+        val web = web ?: return
         val uri = Uri.parse(url ?: return)
         if (!allowed(uri)) {
             Log.w(TAG, "refused origin ${origin(uri)}: the page gets no bridge")
@@ -78,7 +81,8 @@ class Bridge(
 
     fun onIntent(intent: android.content.Intent) = byName.values.forEach { it.onIntent(intent) }
 
-    private fun handle(text: String?) {
+    /** One call, as the JSON envelope a page sends (a program that draws the screen sends the same). */
+    fun handle(text: String?) {
         if (text == null || text.length > MAX_MESSAGE) return
         val message = try {
             JSONObject(text)
@@ -100,6 +104,7 @@ class Bridge(
     }
 
     internal fun reply(message: JSONObject) {
+        sink?.let { return it(message) }
         // Answers may come from any thread; the port is used on the main one.
         activity.runOnUiThread { port?.postMessage(WebMessage(message.toString())) }
     }

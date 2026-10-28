@@ -42,6 +42,12 @@ impl Engine<'_> {
                     )
                 }
             }
+            Content::Children(children)
+                if matches!(node.style.display, Display::Grid | Display::InlineGrid) =>
+            {
+                let items = self.flex_items(children);
+                self.grid_intrinsic(node, &items)
+            }
             Content::Children(children) => {
                 let (mut min, mut max) = (0.0_f32, 0.0_f32);
                 for group in groups(children) {

@@ -43,6 +43,36 @@ pub fn noto_sans_bold() -> Arc<Font> {
     }))
 }
 
+/// The embedded light face (weights up to 350), parsed once.
+///
+/// # Panics
+/// Never for the file that is embedded (a test parses it).
+#[must_use]
+pub fn noto_sans_light() -> Arc<Font> {
+    static FONT: OnceLock<Arc<Font>> = OnceLock::new();
+    Arc::clone(FONT.get_or_init(|| {
+        Arc::new(
+            Font::parse(&include_bytes!("../fonts/NotoSans-Light.ttf")[..])
+                .expect("the embedded font is valid"),
+        )
+    }))
+}
+
+/// The embedded medium face (weights from 450 to 599), parsed once.
+///
+/// # Panics
+/// Never for the file that is embedded (a test parses it).
+#[must_use]
+pub fn noto_sans_medium() -> Arc<Font> {
+    static FONT: OnceLock<Arc<Font>> = OnceLock::new();
+    Arc::clone(FONT.get_or_init(|| {
+        Arc::new(
+            Font::parse(&include_bytes!("../fonts/NotoSans-Medium.ttf")[..])
+                .expect("the embedded font is valid"),
+        )
+    }))
+}
+
 /// A glyph placed on a line.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Glyph {
@@ -116,6 +146,18 @@ impl FontSet {
     #[must_use]
     pub fn noto_sans() -> Self {
         Self::new(noto_sans())
+    }
+
+    /// The embedded Noto Sans Light.
+    #[must_use]
+    pub fn noto_sans_light() -> Self {
+        Self::new(noto_sans_light())
+    }
+
+    /// The embedded Noto Sans Medium.
+    #[must_use]
+    pub fn noto_sans_medium() -> Self {
+        Self::new(noto_sans_medium())
     }
 
     /// The embedded Noto Sans Bold.
@@ -296,6 +338,19 @@ impl FontSet {
         y: f32,
         color: Color,
     ) {
+        self.draw_slanted(canvas, layout, x, y, color, 0.0);
+    }
+
+    /// [`draw`](Self::draw) leaning right by `slant` (0.2 for a synthetic italic): the advances do not change.
+    pub fn draw_slanted<S: AsRef<[u8]> + AsMut<[u8]>>(
+        &self,
+        canvas: &mut Canvas<S>,
+        layout: &Layout,
+        x: f32,
+        y: f32,
+        color: Color,
+        slant: f32,
+    ) {
         for (n, line) in layout.lines.iter().enumerate() {
             let baseline = y + layout.ascent + layout.line_height * n as f32;
             for glyph in &line.glyphs {
@@ -306,7 +361,7 @@ impl FontSet {
                 let scale = layout.size / f32::from(font.units_per_em());
                 if let Some(outline) = font.outline(glyph.id) {
                     canvas.fill_path(
-                        &outline.to_path(scale, x + glyph.x, baseline),
+                        &outline.to_path_slanted(scale, x + glyph.x, baseline, slant),
                         0.0,
                         0.0,
                         color,

@@ -35,8 +35,9 @@ pub use selector::{
 };
 pub use sheet::{Declaration, Keyframes, Rule, Stylesheet, parse, parse_declarations};
 pub use style::{
-    Align, BorderStyle, Cascade, ComputedStyle, Display, FlexDirection, Justify, LineHeight,
-    ListStyle, Overflow, Position, Shadow, TextAlign, TextTransform, Transform, accepts,
+    Align, Animation, BackgroundSize, BorderStyle, Cascade, ComputedStyle, Direction, Display,
+    FillMode, FlexDirection, GridLine, Justify, LineHeight, ListStyle, Overflow, Position, Shadow,
+    TextAlign, TextTransform, Timing, Track, TrackList, Transform, Transition, accepts,
 };
 pub use token::{Token, tokenize};
 pub use value::{Value, parse_values, split_commas};

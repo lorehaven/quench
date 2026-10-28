@@ -31,6 +31,12 @@ fn current() -> Option<Rc<dyn Platform>> {
     PLATFORM.with(|p| p.borrow().clone())
 }
 
+/// Whether a platform is installed on this thread (without one, [`after`] runs its function at once).
+#[must_use]
+pub fn installed() -> bool {
+    current().is_some()
+}
+
 /// The clock, or 0 when no platform is installed.
 #[must_use]
 pub fn now() -> f64 {

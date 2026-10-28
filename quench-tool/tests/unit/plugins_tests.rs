@@ -1,4 +1,6 @@
 use super::support::*;
+use quench_tool::android::launcher;
+use quench_tool::cli::LauncherChoice;
 use quench_tool::plugins::{add, check, installed, list, names};
 use quench_tool::project::Project;
 
@@ -339,4 +341,57 @@ fn the_native_watchdog_cannot_take_the_app_down() {
         kotlin.contains("ProcessBuilder") && !kotlin.contains("System.loadLibrary"),
         "a program, not a loaded library"
     );
+}
+
+#[quench_test::test]
+fn the_launcher_moves_between_the_web_app_and_the_native_renderer() {
+    let p = host("plugins-launcher");
+    let manifest = |p: &Project| read(p, "android/app/src/main/AndroidManifest.xml");
+    // Without the surface activity there is nothing to move to.
+    let e = launcher(&mut Vec::new(), &p, LauncherChoice::Surface)
+        .unwrap_err()
+        .to_string();
+    assert!(e.contains("plugin add surface"), "{e}");
+    add(&mut Vec::new(), &p, "surface").unwrap();
+    let launcher_in = |m: &str, name: &str| {
+        let named = m.find(&format!("android:name=\"{name}\"")).unwrap();
+        let start = m[..named].rfind("<activity").unwrap();
+        let open = start + m[start..].find('>').unwrap();
+        let end = if m[..open].ends_with('/') {
+            open
+        } else {
+            open + m[open..].find("</activity>").unwrap()
+        };
+        m[start..end].contains("category.LAUNCHER")
+    };
+    assert!(launcher_in(&manifest(&p), ".MainActivity"));
+    assert!(!launcher_in(&manifest(&p), ".SurfaceActivity"));
+    let mut out = Vec::new();
+    launcher(&mut out, &p, LauncherChoice::Surface).unwrap();
+    assert!(text(out).contains(".SurfaceActivity"));
+    let m = manifest(&p);
+    assert!(
+        launcher_in(&m, ".SurfaceActivity") && !launcher_in(&m, ".MainActivity"),
+        "{m}"
+    );
+    assert_eq!(m.matches("category.LAUNCHER").count(), 1);
+    assert!(
+        m.contains("<!-- quench:components -->") && m.contains("<!-- quench:activity -->"),
+        "markers stay: {m}"
+    );
+    // Again changes nothing, and back restores the web app (and the surface element to its short form).
+    let before = manifest(&p);
+    launcher(&mut Vec::new(), &p, LauncherChoice::Surface).unwrap();
+    assert_eq!(manifest(&p), before);
+    launcher(&mut Vec::new(), &p, LauncherChoice::Web).unwrap();
+    let m = manifest(&p);
+    assert!(
+        launcher_in(&m, ".MainActivity") && !launcher_in(&m, ".SurfaceActivity"),
+        "{m}"
+    );
+    assert_eq!(m.matches("category.LAUNCHER").count(), 1);
+    assert!(m.contains(".SurfaceActivity"));
+    // No android/ at all.
+    let none = project("plugins-launcher-none", "web");
+    assert!(launcher(&mut Vec::new(), &none, LauncherChoice::Web).is_err());
 }

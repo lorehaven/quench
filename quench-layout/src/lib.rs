@@ -21,6 +21,7 @@
 mod engine;
 mod flex;
 mod fonts;
+mod grid;
 mod inline;
 mod intrinsic;
 mod node;

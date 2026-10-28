@@ -6,11 +6,13 @@
 
 // Pixel arithmetic in `f32`.
 #![allow(
+    clippy::suboptimal_flops,
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
     clippy::too_many_lines,
     clippy::float_cmp,
     clippy::redundant_pub_crate,
+    clippy::option_if_let_else,
     clippy::items_after_statements,
     clippy::redundant_guards,
     clippy::cast_sign_loss,
@@ -19,9 +21,11 @@
 )]
 
 mod access;
+mod anim;
 mod dom;
 mod input;
 mod pipeline;
+mod timers;
 
 pub use access::{AccessAction, AccessNode, Role};
 pub use dom::{NativeRenderer, NodeId, NodeKind};

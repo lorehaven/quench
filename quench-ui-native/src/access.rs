@@ -39,6 +39,10 @@ pub enum Role {
     Image,
     Form,
     Group,
+    /// `input type=range`, `role=slider`.
+    Slider,
+    /// `progress`, `meter`, `role=progressbar`.
+    ProgressBar,
 }
 
 /// An action a user of assistive technology can ask for.
@@ -81,6 +85,8 @@ pub struct AccessNode {
     pub read_only: bool,
     /// For a text field: the caret and the other end of the selection, in characters.
     pub caret: Option<(usize, usize)>,
+    /// For a slider or progress bar: the smallest, the largest and the current value (`None` while indeterminate).
+    pub range: Option<(f64, f64, Option<f64>)>,
     pub actions: Vec<AccessAction>,
     pub children: Vec<Self>,
 }
@@ -132,6 +138,7 @@ impl NativeRenderer {
             required: false,
             read_only: false,
             caret: None,
+            range: None,
             actions: Vec::new(),
             children: kids,
         }
@@ -263,6 +270,36 @@ fn inline_like(dom: &Dom, id: usize) -> bool {
     )
 }
 
+/// The bounds and the value of a slider or a progress bar (the element's own attributes, else `aria-value*`).
+pub(crate) fn range_of(dom: &Dom, id: usize, role: Role) -> (f64, f64, Option<f64>) {
+    let number = |name: &str| attr(dom, id, name).and_then(|v| v.trim().parse::<f64>().ok());
+    let tag = dom.tag(id);
+    let min = number("min")
+        .or_else(|| number("aria-valuemin"))
+        .unwrap_or(0.0);
+    let default_max = if role == Role::Slider {
+        100.0
+    } else if tag == Some("progress") {
+        1.0
+    } else {
+        100.0
+    };
+    let max = number("max")
+        .or_else(|| number("aria-valuemax"))
+        .unwrap_or(default_max)
+        .max(min);
+    let now = number("value")
+        .or_else(|| number("aria-valuenow"))
+        .map(|v| v.clamp(min, max));
+    // A slider with no value sits in the middle; a progress bar with none is indeterminate.
+    let now = if role == Role::Slider {
+        now.or(Some(min + (max - min) / 2.0))
+    } else {
+        now
+    };
+    (min, max, now)
+}
+
 fn role_of(dom: &Dom, id: usize) -> Option<(Role, u8)> {
     let tag = dom.tag(id)?;
     if let Some(role) = attr(dom, id, "role") {
@@ -280,6 +317,8 @@ fn role_of(dom: &Dom, id: usize) -> Option<(Role, u8)> {
             "navigation" => Role::Navigation,
             "status" => Role::Status,
             "alert" => Role::Alert,
+            "slider" => Role::Slider,
+            "progressbar" => Role::ProgressBar,
             "list" => Role::List,
             "listitem" => Role::ListItem,
             "img" | "image" => Role::Image,
@@ -304,11 +343,13 @@ fn role_of(dom: &Dom, id: usize) -> Option<(Role, u8)> {
         "input" => match attr(dom, id, "type").unwrap_or("text") {
             "checkbox" => (Role::Checkbox, 0),
             "radio" => (Role::Radio, 0),
+            "range" => (Role::Slider, 0),
             "button" | "submit" | "reset" => (Role::Button, 0),
             "hidden" => return None,
             _ => (Role::TextBox, 0),
         },
         "textarea" | "select" => (Role::TextBox, 0),
+        "progress" | "meter" => (Role::ProgressBar, 0),
         "ul" | "ol" => (Role::List, 0),
         "li" => (Role::ListItem, 0),
         "nav" => (Role::Navigation, 0),
@@ -486,6 +527,18 @@ fn collect(
             node.selected =
                 flag(dom, id, "aria-pressed").or_else(|| flag(dom, id, "aria-selected"));
             node.expanded = flag(dom, id, "aria-expanded");
+            if matches!(role, Role::Slider | Role::ProgressBar) {
+                let range = range_of(dom, id, role);
+                // Read out as text where there is no numeric interface (a plain number, whole when it is).
+                node.value = range.2.map(|v| {
+                    if v.fract() == 0.0 {
+                        format!("{v:.0}")
+                    } else {
+                        v.to_string()
+                    }
+                });
+                node.range = Some(range);
+            }
             if field {
                 node.value = Some(field_value(dom, id));
                 if node.focused {
@@ -591,6 +644,7 @@ const fn leaf(id: usize, role: Role) -> AccessNode {
         required: false,
         read_only: false,
         caret: None,
+        range: None,
         actions: Vec::new(),
         children: Vec::new(),
     }

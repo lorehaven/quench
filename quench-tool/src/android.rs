@@ -499,3 +499,100 @@ pub fn keystore(
     )?;
     Ok(())
 }
+
+const LAUNCHER_FILTER: &str = "<intent-filter>
+                <action android:name=\"android.intent.action.MAIN\" />
+                <category android:name=\"android.intent.category.LAUNCHER\" />
+            </intent-filter>";
+
+/// The byte range of the `<activity ...>` element named `.name`, and whether it is written `<activity ... />`.
+fn activity_span(manifest: &str, name: &str) -> Option<(usize, usize, bool)> {
+    let named = manifest.find(&format!("android:name=\"{name}\""))?;
+    let start = manifest[..named].rfind("<activity")?;
+    let open_end = start + manifest[start..].find('>')?;
+    if manifest[..open_end].ends_with('/') {
+        return Some((start, open_end + 1, true));
+    }
+    let close = open_end + manifest[open_end..].find("</activity>")? + "</activity>".len();
+    Some((start, close, false))
+}
+
+/// Makes `which` the activity the launcher starts.
+///
+/// The launcher intent filter moves between `.MainActivity` (the web app) and `.SurfaceActivity` (the native
+/// renderer, added by `quench plugin add surface`).
+///
+/// # Errors
+/// No Android host, no surface plugin, or a manifest that has lost its activities.
+pub fn launcher(
+    out: &mut dyn Write,
+    project: &Project,
+    which: crate::cli::LauncherChoice,
+) -> Result<()> {
+    let path = project
+        .root
+        .join("android/app/src/main/AndroidManifest.xml");
+    let Ok(mut manifest) = std::fs::read_to_string(&path) else {
+        return fail("no android/ in this project: `quench android init` makes it");
+    };
+    let (to, from) = match which {
+        crate::cli::LauncherChoice::Surface => (".SurfaceActivity", ".MainActivity"),
+        crate::cli::LauncherChoice::Web => (".MainActivity", ".SurfaceActivity"),
+    };
+    if activity_span(&manifest, to).is_none() {
+        return fail(if to == ".SurfaceActivity" {
+            "this project has no surface activity: `quench plugin add surface` adds it".to_string()
+        } else {
+            format!("the manifest has no {to}")
+        });
+    }
+    // Take it off the other activity (an element that is left empty goes back to `<activity ... />`).
+    if let Some((start, end, _)) = activity_span(&manifest, from) {
+        let element = manifest[start..end].to_string();
+        if let Some(at) = element
+            .find("<intent-filter>")
+            .filter(|_| element.contains("category.LAUNCHER"))
+        {
+            let filter_end = at
+                + element[at..]
+                    .find("</intent-filter>")
+                    .map_or(0, |e| e + "</intent-filter>".len());
+            let mut changed = element.clone();
+            changed.replace_range(at..filter_end, "");
+            let leftover = changed
+                .find('>')
+                .map(|open| changed[open + 1..].replace("</activity>", ""))
+                .unwrap_or_default();
+            if leftover.trim().is_empty()
+                && !changed.contains("<!--")
+                && let Some(open) = changed.find('>')
+            {
+                changed = format!("{} />", changed[..open].trim_end());
+            }
+            manifest.replace_range(start..end, &changed);
+        }
+    }
+    // Put it on this one, unless it is there.
+    if let Some((start, end, self_closing)) = activity_span(&manifest, to) {
+        let element = manifest[start..end].to_string();
+        if !element.contains("category.LAUNCHER") {
+            let changed = if self_closing {
+                let head = element.trim_end_matches("/>").trim_end();
+                format!("{head}>\n            {LAUNCHER_FILTER}\n        </activity>")
+            } else if let Some(marker) = element.find("<!-- quench:activity -->") {
+                let mut e = element;
+                e.insert_str(marker, &format!("{LAUNCHER_FILTER}\n            "));
+                e
+            } else {
+                let close = element.rfind("</activity>").unwrap_or(element.len());
+                let mut e = element;
+                e.insert_str(close, &format!("    {LAUNCHER_FILTER}\n        "));
+                e
+            };
+            manifest.replace_range(start..end, &changed);
+        }
+    }
+    std::fs::write(&path, manifest)?;
+    writeln!(out, "the launcher starts {to}")?;
+    Ok(())
+}

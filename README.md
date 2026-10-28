@@ -27,6 +27,8 @@ See [docs/](./docs/) for per-crate reference.
 - [Quench CSS](./docs/quench-css.md) — a CSS engine: parser with nesting, selectors, the cascade, custom properties, calc() and media queries
 - [Quench Layout](./docs/quench-layout.md) — box layout: block and inline flow, flexbox, positioning, margin collapsing
 - [Quench Paint](./docs/quench-paint.md) — paints a laid out box tree: backgrounds, borders, radii, shadows, clipping, opacity, text
+- [Quench Image](./docs/quench-image.md) — PNG decoding (every colour type, Adam7) and encoding, no dependencies
+- [Quench SVG](./docs/quench-svg.md) — an SVG renderer: shapes, paths with arcs, transforms, fills and strokes into RGBA
 - [Quench UI Native](./docs/quench-ui-native.md) — a quench-ui renderer that draws itself: DOM, style, layout and paint with no WebView
 - [Quench Desktop Native](./docs/quench-desktop-native.md) — runs a quench-ui-native renderer in a Wayland window: input, repeat, caret, input method, accessibility
 - [Quench Desktop AT-SPI](./docs/quench-desktop-atspi.md) — screen-reader support on Linux: the D-Bus protocol by hand and the AT-SPI objects

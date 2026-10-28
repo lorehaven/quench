@@ -27,6 +27,8 @@ const APPLICATION: &str = "org.a11y.atspi.Application";
 const COMPONENT: &str = "org.a11y.atspi.Component";
 const ACTION: &str = "org.a11y.atspi.Action";
 const TEXT: &str = "org.a11y.atspi.Text";
+const EDITABLE: &str = "org.a11y.atspi.EditableText";
+const VALUE: &str = "org.a11y.atspi.Value";
 const PROPERTIES: &str = "org.freedesktop.DBus.Properties";
 
 /// AT-SPI role numbers (`AtspiRole`).
@@ -55,6 +57,8 @@ const fn atspi_role(node: &AccessNode) -> u32 {
         Role::Image => 27,
         Role::Form => 87,
         Role::Group => 85,
+        Role::Slider => 51,
+        Role::ProgressBar => 48,
     }
 }
 
@@ -125,6 +129,124 @@ fn index(node: &AccessNode, parents: &mut HashMap<usize, (usize, usize)>) {
     }
 }
 
+/// What changed between two published pages, for the signals assistive technology listens to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Change {
+    /// The accessible name of a node.
+    Name(usize, String),
+    /// A child was added or removed at an index.
+    Child {
+        parent: usize,
+        child: usize,
+        index: usize,
+        added: bool,
+    },
+    /// Text was removed from a field and text was put in its place (offsets in characters).
+    Text {
+        id: usize,
+        offset: usize,
+        removed: String,
+        inserted: String,
+    },
+    /// The caret moved.
+    Caret(usize, usize),
+    /// A state that is on or off: `checked`, `expanded`, `selected`.
+    State(usize, &'static str, bool),
+}
+
+/// What [`Shared::publish`] found.
+#[derive(Debug)]
+pub struct Published {
+    /// The focused node before and now.
+    pub focus: (Option<usize>, Option<usize>),
+    pub changes: Vec<Change>,
+}
+
+fn collect_nodes<'a>(n: &'a AccessNode, out: &mut HashMap<usize, &'a AccessNode>) {
+    out.insert(n.id, n);
+    for c in &n.children {
+        collect_nodes(c, out);
+    }
+}
+
+/// The changes that turn `old` into `new`, for the nodes that are in both (and their children lists).
+fn diff(old: &AccessNode, new: &AccessNode) -> Vec<Change> {
+    let (mut before, mut after) = (HashMap::new(), HashMap::new());
+    collect_nodes(old, &mut before);
+    collect_nodes(new, &mut after);
+    let mut ids: Vec<usize> = after.keys().copied().collect();
+    ids.sort_unstable();
+    let mut out = Vec::new();
+    for id in ids {
+        let (Some(was), Some(is)) = (before.get(&id), after.get(&id)) else {
+            continue;
+        };
+        if was.name != is.name {
+            out.push(Change::Name(id, is.name.clone()));
+        }
+        if was.role == Role::TextBox && is.role == Role::TextBox && was.value != is.value {
+            let (a, b): (Vec<char>, Vec<char>) = (
+                was.value.clone().unwrap_or_default().chars().collect(),
+                is.value.clone().unwrap_or_default().chars().collect(),
+            );
+            let prefix = a.iter().zip(&b).take_while(|(x, y)| x == y).count();
+            let suffix = a[prefix..]
+                .iter()
+                .rev()
+                .zip(b[prefix..].iter().rev())
+                .take_while(|(x, y)| x == y)
+                .count();
+            out.push(Change::Text {
+                id,
+                offset: prefix,
+                removed: a[prefix..a.len() - suffix].iter().collect(),
+                inserted: b[prefix..b.len() - suffix].iter().collect(),
+            });
+        }
+        if was.caret != is.caret
+            && let Some((caret, _)) = is.caret
+        {
+            out.push(Change::Caret(id, caret));
+        }
+        for (name, a, b) in [
+            ("checked", was.checked, is.checked),
+            ("expanded", was.expanded, is.expanded),
+            ("selected", was.selected, is.selected),
+        ] {
+            if a != b
+                && let Some(on) = b
+            {
+                out.push(Change::State(id, name, on));
+            }
+        }
+        let known: Vec<usize> = was.children.iter().map(|c| c.id).collect();
+        let current: Vec<usize> = is.children.iter().map(|c| c.id).collect();
+        if known != current {
+            for (index, child) in known.iter().enumerate() {
+                if !current.contains(child) {
+                    out.push(Change::Child {
+                        parent: id,
+                        child: *child,
+                        index,
+                        added: false,
+                    });
+                }
+            }
+            for (index, child) in current.iter().enumerate() {
+                if !known.contains(child) {
+                    out.push(Change::Child {
+                        parent: id,
+                        child: *child,
+                        index,
+                        added: true,
+                    });
+                }
+            }
+        }
+    }
+    out
+}
+
 enum Object<'a> {
     Application,
     Window,
@@ -135,6 +257,8 @@ enum Object<'a> {
 pub struct Shared {
     snapshot: Mutex<Snapshot>,
     actions: Mutex<VecDeque<(usize, AccessAction)>>,
+    /// Whole new texts that assistive technology set in text fields, by node.
+    edits: Mutex<VecDeque<(usize, String)>>,
     asked: AtomicBool,
     name: Mutex<String>,
     title: Mutex<String>,
@@ -160,6 +284,7 @@ impl Shared {
         Arc::new(Self {
             snapshot: Mutex::new(Snapshot::default()),
             actions: Mutex::new(VecDeque::new()),
+            edits: Mutex::new(VecDeque::new()),
             asked: AtomicBool::new(false),
             name: Mutex::new(String::new()),
             title: Mutex::new(app_name.to_string()),
@@ -183,7 +308,7 @@ impl Shared {
     }
 
     /// Replaces the snapshot; returns the id that had focus before and the one that has it now.
-    pub fn publish(&self, tree: AccessNode) -> (Option<usize>, Option<usize>) {
+    pub fn publish(&self, tree: AccessNode) -> Published {
         fn focused(n: &AccessNode) -> Option<usize> {
             if n.focused {
                 return Some(n.id);
@@ -196,11 +321,28 @@ impl Shared {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let before = snapshot.tree.as_ref().and_then(focused);
         let now = focused(&tree);
+        let changes = snapshot
+            .tree
+            .as_ref()
+            .map(|old| diff(old, &tree))
+            .unwrap_or_default();
         let mut parents = HashMap::new();
         index(&tree, &mut parents);
         snapshot.parents = parents;
         snapshot.tree = Some(tree);
-        (before, now)
+        Published {
+            focus: (before, now),
+            changes,
+        }
+    }
+
+    /// The texts assistive technology set in text fields since the last call.
+    pub fn take_edits(&self) -> Vec<(usize, String)> {
+        self.edits
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .drain(..)
+            .collect()
     }
 
     /// The actions asked for since the last call.
@@ -215,6 +357,13 @@ impl Shared {
     /// Whether anything has asked a question since the last call (a screen reader is attached and active).
     pub fn take_asked(&self) -> bool {
         self.asked.swap(false, Ordering::Relaxed)
+    }
+
+    fn queue_edit(&self, id: usize, text: String) {
+        self.edits
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push_back((id, text));
     }
 
     fn me(&self) -> String {
@@ -428,6 +577,12 @@ impl Shared {
                     if matches!(n.role, Role::TextBox | Role::Text) {
                         list.push(TEXT);
                     }
+                    if n.role == Role::TextBox && !n.read_only && !n.disabled {
+                        list.push(EDITABLE);
+                    }
+                    if n.range.is_some() {
+                        list.push(VALUE);
+                    }
                 }
             }
             list
@@ -449,6 +604,12 @@ impl Shared {
                 .collect(),
             _ => Vec::new(),
         };
+        let range = || match object {
+            Object::Node(n) => n
+                .range
+                .map_or((0.0, 0.0, 0.0), |(lo, hi, now)| (lo, hi, now.unwrap_or(lo))),
+            _ => (0.0, 0.0, 0.0),
+        };
         let get = |interface: &str, prop: &str| -> Option<Value> {
             Some(match (interface, prop) {
                 (ACCESSIBLE, "Name") => Value::Str(name.clone()),
@@ -461,6 +622,10 @@ impl Shared {
                 (APPLICATION, "Version") => Value::str("0.1"),
                 (APPLICATION, "Id") => Value::I32(0),
                 (ACTION, "NActions") => Value::I32(actions.len() as i32),
+                (VALUE, "MinimumValue") => Value::F64(range().0),
+                (VALUE, "MaximumValue") => Value::F64(range().1),
+                (VALUE, "CurrentValue") => Value::F64(range().2),
+                (VALUE, "MinimumIncrement") => Value::F64((range().1 - range().0) / 100.0),
                 (TEXT, "CharacterCount") => Value::I32(text().chars().count() as i32),
                 (TEXT, "CaretOffset") => Value::I32(match object {
                     Object::Node(n) => n.caret.map_or(0, |c| c.0 as i32),
@@ -504,6 +669,12 @@ impl Shared {
                     APPLICATION => &["ToolkitName", "Version", "Id"],
                     ACTION => &["NActions"],
                     TEXT => &["CharacterCount", "CaretOffset"],
+                    VALUE => &[
+                        "MinimumValue",
+                        "MaximumValue",
+                        "CurrentValue",
+                        "MinimumIncrement",
+                    ],
                     _ => &[],
                 };
                 let entries = names
@@ -657,6 +828,47 @@ impl Shared {
                         .collect(),
                 )])
             }
+            (EDITABLE, "SetTextContents") => {
+                let Object::Node(n) = object else {
+                    return ok(vec![Value::Bool(false)]);
+                };
+                self.queue_edit(n.id, call.body.first()?.as_str()?.to_string());
+                ok(vec![Value::Bool(true)])
+            }
+            (EDITABLE, "InsertText") => {
+                let Object::Node(n) = object else {
+                    return ok(vec![Value::Bool(false)]);
+                };
+                let (at, inserted) = (
+                    usize::try_from(arg(0)?).unwrap_or(0),
+                    call.body.get(1)?.as_str()?,
+                );
+                let all = text();
+                let at = at.min(all.chars().count());
+                let mut out: String = all.chars().take(at).collect();
+                out.push_str(inserted);
+                out.extend(all.chars().skip(at));
+                self.queue_edit(n.id, out);
+                ok(vec![Value::Bool(true)])
+            }
+            (EDITABLE, "DeleteText") => {
+                let Object::Node(n) = object else {
+                    return ok(vec![Value::Bool(false)]);
+                };
+                let all = text();
+                let len = all.chars().count();
+                let start = usize::try_from(arg(0)?).unwrap_or(0).min(len);
+                let end = usize::try_from(arg(1)?).unwrap_or(len).clamp(start, len);
+                let out: String = all
+                    .chars()
+                    .take(start)
+                    .chain(all.chars().skip(end))
+                    .collect();
+                self.queue_edit(n.id, out);
+                ok(vec![Value::Bool(true)])
+            }
+            // The clipboard belongs to the window: assistive technology edits through the three above.
+            (EDITABLE, "CopyText" | "CutText" | "PasteText") => ok(vec![Value::Bool(false)]),
             (TEXT, "GetCharacterCount") => ok(vec![Value::I32(text().chars().count() as i32)]),
             (TEXT, "GetCaretOffset") => ok(vec![get(TEXT, "CaretOffset")?]),
             (TEXT, "GetNSelections") => ok(vec![Value::I32(match object {
@@ -773,7 +985,78 @@ impl Service {
 
     /// Shows the service the page as it is now, and tells assistive technology when focus moved.
     pub fn publish(&self, tree: AccessNode) {
-        let (_, now) = self.shared.publish(tree);
+        let published = self.shared.publish(tree);
+        let send = |id: usize, member: &str, body: Vec<Value>| {
+            let mut signal =
+                Message::signal(&path_of(id), "org.a11y.atspi.Event.Object", member, body);
+            let _ = self.sender.send(&mut signal);
+        };
+        let nothing = || Value::Array("{sv}".into(), Vec::new());
+        let event = |kind: &str, one: usize, two: usize, data: Value| {
+            vec![
+                Value::str(kind),
+                Value::I32(one as i32),
+                Value::I32(two as i32),
+                Value::Variant(Box::new(data)),
+                nothing(),
+            ]
+        };
+        for change in published.changes {
+            match change {
+                Change::Name(id, name) => send(
+                    id,
+                    "PropertyChange",
+                    event("accessible-name", 0, 0, Value::Str(name)),
+                ),
+                Change::Child {
+                    parent,
+                    child,
+                    index,
+                    added,
+                } => send(
+                    parent,
+                    "ChildrenChanged",
+                    event(
+                        if added { "add" } else { "remove" },
+                        index,
+                        0,
+                        self.shared.reference(&path_of(child)),
+                    ),
+                ),
+                Change::Text {
+                    id,
+                    offset,
+                    removed,
+                    inserted,
+                } => {
+                    if !removed.is_empty() {
+                        let length = removed.chars().count();
+                        send(
+                            id,
+                            "TextChanged",
+                            event("delete", offset, length, Value::Str(removed)),
+                        );
+                    }
+                    if !inserted.is_empty() {
+                        let length = inserted.chars().count();
+                        send(
+                            id,
+                            "TextChanged",
+                            event("insert", offset, length, Value::Str(inserted)),
+                        );
+                    }
+                }
+                Change::Caret(id, caret) => {
+                    send(id, "TextCaretMoved", event("", caret, 0, Value::I32(0)));
+                }
+                Change::State(id, name, on) => send(
+                    id,
+                    "StateChanged",
+                    event(name, usize::from(on), 0, Value::I32(0)),
+                ),
+            }
+        }
+        let (_, now) = published.focus;
         let mut focused = self
             .focused
             .lock()
@@ -781,28 +1064,19 @@ impl Service {
         if *focused == now {
             return;
         }
-        let emit = |id: usize, gained: bool| {
-            let mut signal = Message::signal(
-                &path_of(id),
-                "org.a11y.atspi.Event.Object",
-                "StateChanged",
-                vec![
-                    Value::str("focused"),
-                    Value::I32(i32::from(gained)),
-                    Value::I32(0),
-                    Value::Variant(Box::new(Value::I32(0))),
-                    Value::Array("{sv}".into(), Vec::new()),
-                ],
-            );
-            let _ = self.sender.send(&mut signal);
-        };
         if let Some(old) = *focused {
-            emit(old, false);
+            send(old, "StateChanged", event("focused", 0, 0, Value::I32(0)));
         }
         if let Some(new) = now {
-            emit(new, true);
+            send(new, "StateChanged", event("focused", 1, 0, Value::I32(0)));
         }
         *focused = now;
+    }
+
+    /// The texts that assistive technology set in text fields since the last call, by node.
+    #[must_use]
+    pub fn take_edits(&self) -> Vec<(usize, String)> {
+        self.shared.take_edits()
     }
 
     /// The actions assistive technology asked for since the last call.

@@ -2,8 +2,9 @@
 //! shared memory the window sends, and sends events.
 use quench_desktop_wayland::client::Client;
 use quench_desktop_wayland::proto::{
-    buffer, callback, display, keyboard, pointer, registry, seat, shm, shm_pool, surface,
-    text_input, text_input_manager, xdg_surface, xdg_toplevel, xdg_wm_base,
+    buffer, callback, data_device, data_device_manager, data_offer, data_source, display, keyboard,
+    pointer, registry, seat, shm, shm_pool, surface, text_input, text_input_manager, xdg_surface,
+    xdg_toplevel, xdg_wm_base,
 };
 use quench_desktop_wayland::sys::{Mapping, Socket};
 use quench_desktop_wayland::wire::{Args, Decoder, Message, Reader, encode};
@@ -51,6 +52,15 @@ impl Fake {
         let m = self.read();
         assert_eq!((m.object, m.opcode), (object, opcode), "{m:?}");
         m
+    }
+
+    fn send_with_fd(&self, object: u32, opcode: u16, args: Args, fd: &OwnedFd) {
+        self.socket
+            .send(
+                &encode(object, opcode, &args.build()).unwrap(),
+                &[fd.as_fd()],
+            )
+            .unwrap();
     }
 
     fn send(&self, object: u32, opcode: u16, args: Args) {
@@ -221,6 +231,8 @@ enum Cmd {
     ImeEnable(String, i32, i32, (i32, i32, i32, i32)),
     ImeUpdate(String, i32, i32, (i32, i32, i32, i32)),
     ImeDisable,
+    SetClipboard(String),
+    GetClipboard,
 }
 
 enum Out {
@@ -229,6 +241,7 @@ enum Out {
     Presented,
     Event(Option<WindowEvent>),
     Size((usize, usize)),
+    Text(Option<String>),
     Failed(String),
 }
 
@@ -283,6 +296,14 @@ impl App {
                             Err(e) => Out::Failed(e.to_string()),
                         }
                     }
+                    Cmd::SetClipboard(text) => match window.set_clipboard(&text) {
+                        Ok(()) => Out::Drawn,
+                        Err(e) => Out::Failed(e.to_string()),
+                    },
+                    Cmd::GetClipboard => match window.clipboard() {
+                        Ok(text) => Out::Text(text),
+                        Err(e) => Out::Failed(e.to_string()),
+                    },
                     Cmd::ImeDisable => match window.ime_disable() {
                         Ok(()) => Out::Drawn,
                         Err(e) => Out::Failed(e.to_string()),
@@ -933,4 +954,82 @@ fn an_input_method_composes_text_and_commits_it() {
     fake.expect(input, text_input::COMMIT);
     fake.send(input, text_input::LEAVE, Args::new().object(setup.surface));
     app.quiet();
+}
+
+#[quench_test::test]
+fn the_clipboard_is_read_from_another_program_and_offered_to_others() {
+    let mut globals = GLOBALS.to_vec();
+    globals.push(("wl_data_device_manager", 3));
+    let (mut fake, setup, app) = open_with(&globals, 100, 100);
+    let seat_id = setup.seat.unwrap();
+    let manager = {
+        // The manager was bound in the handshake: find it through the request that uses it.
+        fake.send(
+            seat_id,
+            seat::CAPABILITIES,
+            Args::new().uint(seat::KEYBOARD),
+        );
+        app.quiet();
+        fake.expect(seat_id, seat::GET_KEYBOARD);
+        fake.read()
+    };
+    assert_eq!(manager.opcode, data_device_manager::GET_DATA_DEVICE);
+    let manager_id = manager.object;
+    let device = ids(&manager)[0];
+    assert_eq!(ids(&manager)[1], seat_id);
+    // Nothing is on it yet.
+    assert!(matches!(app.ask(Cmd::GetClipboard), Out::Text(None)));
+    // Another program copied: the offer, its types, then the selection.
+    let offer = 0xff00_0001;
+    fake.send(device, data_device::DATA_OFFER, Args::new().object(offer));
+    fake.send(offer, data_offer::OFFER, Args::new().string("image/png"));
+    fake.send(
+        offer,
+        data_offer::OFFER,
+        Args::new().string("text/plain;charset=utf-8"),
+    );
+    fake.send(device, data_device::SELECTION, Args::new().object(offer));
+    app.quiet();
+    app.tx.send(Cmd::GetClipboard).unwrap();
+    let receive = fake.expect(offer, data_offer::RECEIVE);
+    assert_eq!(
+        Reader::new(&receive.args).string().unwrap(),
+        "text/plain;charset=utf-8"
+    );
+    let fd = fake.fds.pop_front().expect("the descriptor to write to");
+    std::io::Write::write_all(&mut std::fs::File::from(fd), b"from elsewhere").unwrap();
+    let Out::Text(text) = app.rx.recv_timeout(LONG).unwrap() else {
+        panic!()
+    };
+    assert_eq!(text.as_deref(), Some("from elsewhere"));
+    // This program copies: a source offering text, set as the selection.
+    app.ask(Cmd::SetClipboard("mine".into()));
+    let create = fake.expect(manager_id, data_device_manager::CREATE_DATA_SOURCE);
+    let source = ids(&create)[0];
+    for _ in 0..3 {
+        fake.expect(source, data_source::OFFER);
+    }
+    let set = fake.expect(device, data_device::SET_SELECTION);
+    assert_eq!(ids(&set)[0], source);
+    // Another program pastes: the window writes the text to the descriptor.
+    let (mut reader, writer) = std::io::pipe().unwrap();
+    fake.send_with_fd(
+        source,
+        data_source::SEND,
+        Args::new().string("text/plain"),
+        &OwnedFd::from(writer),
+    );
+    app.quiet();
+    let mut got = String::new();
+    std::io::Read::read_to_string(&mut reader, &mut got).unwrap();
+    assert_eq!(got, "mine");
+    // And the clipboard it reads back is its own.
+    let Out::Text(text) = app.ask(Cmd::GetClipboard) else {
+        panic!()
+    };
+    assert_eq!(text.as_deref(), Some("mine"));
+    // Another program took the clipboard over.
+    fake.send(source, data_source::CANCELLED, Args::new());
+    app.quiet();
+    fake.expect(source, data_source::DESTROY);
 }

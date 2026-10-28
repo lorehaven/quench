@@ -8,6 +8,9 @@ use quench_css::MediaEnv;
 use quench_layout::{Fonts, LayoutBox};
 use quench_ui::{EventKind, Handler, Renderer};
 
+/// Fetches the bytes of an image by its `src` (a file, an asset, something already downloaded).
+pub type ImageLoader = Rc<dyn Fn(&str) -> Option<Vec<u8>>>;
+
 /// A node of a [`NativeRenderer`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeId(pub(crate) usize);
@@ -29,6 +32,30 @@ pub(crate) enum Kind {
     },
     Text(String),
     Anchor,
+}
+
+/// A decoded image whose pixels are shared, so a frame does not copy them.
+#[derive(Debug, Clone)]
+pub struct Picture {
+    pub width: u32,
+    pub height: u32,
+    pub rgba: Rc<Vec<u8>>,
+    /// Device pixels per CSS pixel the picture was made at: 1 for a bitmap, the page's density for a drawing.
+    pub scale: f32,
+    /// Made from a vector drawing, so it is made again when the density changes.
+    pub svg: bool,
+}
+
+impl From<quench_image::Image> for Picture {
+    fn from(image: quench_image::Image) -> Self {
+        Self {
+            width: image.width,
+            height: image.height,
+            rgba: Rc::new(image.rgba),
+            scale: 1.0,
+            svg: false,
+        }
+    }
 }
 
 pub(crate) struct DomNode {
@@ -56,6 +83,8 @@ pub(crate) struct Interaction {
     pub caret: usize,
     pub anchor: usize,
     pub clipboard: String,
+    /// Set when text was copied or cut here and the host has not yet put it on the system clipboard.
+    pub clipboard_out: bool,
     /// An input method's composition in the focused field: its text and the cursor in it (characters).
     pub preedit: Option<(String, usize)>,
     /// Set when what is on screen is out of date.
@@ -77,6 +106,12 @@ pub(crate) struct Dom {
     /// Device pixels per CSS pixel.
     pub zoom: f32,
     pub fonts: Fonts,
+    /// Decoded images by the `src` they were asked for; `None` for one that could not be loaded.
+    pub images: HashMap<String, Option<Picture>>,
+    /// Transitions under way and the styles they started from (changed while styles are computed).
+    pub anim: std::cell::RefCell<crate::anim::Anim>,
+    /// How a `src` that is not a `data:` URL is fetched.
+    pub loader: Option<ImageLoader>,
 }
 
 impl Dom {
@@ -126,6 +161,10 @@ pub struct NativeRenderer {
     pub(crate) dom: RefCell<Dom>,
     /// The rules of the browser's sheet and the page's, ready to compute styles; dropped when they change.
     pub(crate) cascade: RefCell<Option<std::rc::Rc<quench_css::Cascade>>>,
+    /// The clock and timers of the views.
+    pub(crate) platform: Rc<crate::timers::NativePlatform>,
+    /// What looks at the channels other threads send through.
+    pub(crate) pollers: RefCell<Vec<Rc<dyn Fn() -> bool>>>,
 }
 
 impl std::fmt::Debug for NativeRenderer {
@@ -159,6 +198,9 @@ impl NativeRenderer {
             safe_area: [0.0; 4],
             viewport: (1280.0, 800.0),
             zoom: 1.0,
+            images: HashMap::new(),
+            anim: std::cell::RefCell::new(crate::anim::Anim::default()),
+            loader: None,
             fonts: Fonts::system(),
         };
         let html = dom.push(Kind::Element {
@@ -175,9 +217,13 @@ impl NativeRenderer {
         });
         dom.nodes[html].children.push(body);
         dom.nodes[body].parent = Some(html);
+        let platform = Rc::new(crate::timers::NativePlatform::new());
+        quench_ui::platform::install(Rc::clone(&platform) as Rc<dyn quench_ui::platform::Platform>);
         Self {
             dom: RefCell::new(dom),
             cascade: RefCell::new(None),
+            platform,
+            pollers: RefCell::new(Vec::new()),
         }
     }
 
@@ -219,6 +265,8 @@ impl NativeRenderer {
     pub fn set_scale(&self, scale: f32) {
         let mut dom = self.dom.borrow_mut();
         dom.zoom = scale.max(0.1);
+        // Drawings are made at the density: they are drawn again.
+        dom.images.retain(|_, v| !v.as_ref().is_some_and(|p| p.svg));
         let (width, height) = dom.viewport;
         dom.media.width = width / dom.zoom;
         dom.media.height = height / dom.zoom;
@@ -237,9 +285,11 @@ impl NativeRenderer {
         }
         let mut dom = self.dom.borrow_mut();
         let (width, height) = dom.viewport;
+        let zoom = dom.zoom;
+        self.platform.set_reduced_motion(media.reduced_motion);
         dom.media = MediaEnv {
-            width,
-            height,
+            width: width / zoom,
+            height: height / zoom,
             ..media
         };
         drop(dom);
@@ -276,6 +326,29 @@ impl NativeRenderer {
             .iter()
             .map(|c| NodeId(*c))
             .collect()
+    }
+
+    /// Teaches the renderer how to get the image a `src` names (anything but a `data:` URL, which it reads itself).
+    pub fn set_image_loader(&self, loader: impl Fn(&str) -> Option<Vec<u8>> + 'static) {
+        let mut dom = self.dom.borrow_mut();
+        dom.loader = Some(Rc::new(loader));
+        dom.images.retain(|_, v| v.is_some());
+        dom.ui.dirty = true;
+        dom.ui.stale = true;
+    }
+
+    /// Gives the renderer the bytes of the image a `src` names (a PNG), so no loader is needed for it.
+    ///
+    /// # Errors
+    /// The image cannot be read.
+    pub fn add_image(&self, src: &str, bytes: &[u8]) -> Result<(), quench_image::Error> {
+        let zoom = self.dom.borrow().zoom;
+        let picture = crate::pipeline::picture(bytes, zoom)?;
+        let mut dom = self.dom.borrow_mut();
+        dom.images.insert(src.to_string(), Some(picture));
+        dom.ui.dirty = true;
+        dom.ui.stale = true;
+        Ok(())
     }
 
     /// What a node is.

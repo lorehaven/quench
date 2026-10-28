@@ -5,7 +5,8 @@
     clippy::float_cmp,
     clippy::use_self,
     clippy::field_reassign_with_default,
-    clippy::cast_precision_loss
+    clippy::cast_precision_loss,
+    clippy::similar_names
 )]
 
 use std::rc::Rc;
@@ -434,7 +435,11 @@ fn decorations_are_drawn_on_the_box_they_are_for() {
         let mut canvas = Canvas::new(40, 40);
         canvas.clear(WHITE);
         paint(&mut canvas, &boxes, &fonts, &|_| (0.0, 0.0), &|key| {
-            if key == 2 { vec![d] } else { Vec::new() }
+            if key == 2 {
+                vec![d.clone()]
+            } else {
+                Vec::new()
+            }
         });
         canvas
     };
@@ -677,6 +682,113 @@ fn rounded_shadows_inset_shadows_and_clipped_rounded_boxes() {
         c.pixel(20, 5).b > 200 && c.pixel(20, 5).r > 100,
         "the child outside the box is part of the layer: {:?}",
         c.pixel(20, 5)
+    );
+}
+
+#[quench_test::test]
+fn a_background_image_is_sized_placed_tiled_and_kept_inside_the_padding_box() {
+    use quench_css::BackgroundSize;
+    use quench_paint::Decoration;
+    let fonts = Fonts::embedded();
+    let mut root = ComputedStyle::default();
+    root.display = Display::Block;
+    // A 20x20 box with a 2px border: the padding box is 16x16 at (7, 7) inside a 5px margin.
+    let tree = E(
+        "",
+        vec![E(
+            "width: 16px; height: 16px; margin: 5px; border: 2px solid rgb(0, 0, 255)",
+            vec![],
+        )],
+    );
+    let node = build(&tree, &root, &mut 0);
+    let boxes = layout(&node, (40.0, 40.0), &fonts);
+    // Two pixels side by side: red, then green.
+    let rgba: Rc<Vec<u8>> = Rc::new(vec![255, 0, 0, 255, 0, 255, 0, 255]);
+    let draw = |size: BackgroundSize, repeat: bool, position: (f32, f32), scale: f32| {
+        let mut canvas = Canvas::new(40, 40);
+        canvas.clear(WHITE);
+        paint(&mut canvas, &boxes, &fonts, &|_| (0.0, 0.0), &|key| {
+            if key == 2 {
+                vec![Decoration::Background {
+                    rgba: Rc::clone(&rgba),
+                    width: 2,
+                    height: 1,
+                    size,
+                    repeat,
+                    position,
+                    scale,
+                }]
+            } else {
+                Vec::new()
+            }
+        });
+        canvas
+    };
+    let red = Color::rgb(255, 0, 0);
+    let green = Color::rgb(0, 255, 0);
+    // Natural size at scale 4: each tile is 8x4, so the padding box shows 2 tiles across and 4 down.
+    let tiled = draw(BackgroundSize::Auto, true, (0.0, 0.0), 4.0);
+    assert_eq!(tiled.pixel(8, 8), red);
+    assert_eq!(tiled.pixel(7 + 7, 8), green);
+    assert_eq!(
+        tiled.pixel(7 + 8, 7 + 4),
+        red,
+        "the next tile, down and across"
+    );
+    assert_eq!(
+        tiled.pixel(5, 5),
+        Color::rgb(0, 0, 255),
+        "the border is over it, not covered"
+    );
+    // Once, placed at the bottom right.
+    let once = draw(BackgroundSize::Auto, false, (1.0, 1.0), 4.0);
+    assert_eq!(once.pixel(8, 8), WHITE, "nothing at the top left");
+    assert_eq!(
+        once.pixel(7 + 15, 7 + 15),
+        green,
+        "the picture ends at the corner"
+    );
+    // Contain fits the width (2:1 in a square), cover fills it.
+    let contain = draw(BackgroundSize::Contain, false, (0.0, 0.0), 1.0);
+    assert_eq!(contain.pixel(9, 9), red);
+    assert_eq!(
+        contain.pixel(9, 7 + 12),
+        WHITE,
+        "below a picture that is 16x8"
+    );
+    let cover = draw(BackgroundSize::Cover, false, (0.0, 0.0), 1.0);
+    assert_eq!(
+        cover.pixel(9, 7 + 14),
+        red,
+        "16 high, 32 wide: the red half shows"
+    );
+    // An empty picture or box draws nothing.
+    let none = draw(BackgroundSize::Auto, true, (0.0, 0.0), 0.0);
+    assert_eq!(none.pixel(10, 10), WHITE);
+}
+
+#[quench_test::test]
+fn italic_text_leans_to_the_right_without_changing_its_width() {
+    let ink = |decls: &'static str| {
+        let tree = E(decls, vec![Text("lllll")]);
+        let c = render(&tree, 60, 30);
+        // The ink's rows: where the leftmost non-white pixel is on the top row with ink and on the bottom row.
+        let rows: Vec<Option<usize>> = (0..30)
+            .map(|y| (0..60).find(|x| c.pixel(*x, y) != WHITE))
+            .collect();
+        let first = rows.iter().position(Option::is_some).unwrap();
+        let last = rows.iter().rposition(Option::is_some).unwrap();
+        (rows[first].unwrap(), rows[last].unwrap())
+    };
+    let (top_upright, bottom_upright) = ink("font-size: 20px; color: black");
+    let (top_italic, bottom_italic) = ink("font-size: 20px; color: black; font-style: italic");
+    assert!(
+        top_upright.abs_diff(bottom_upright) <= 1,
+        "upright letters are straight"
+    );
+    assert!(
+        top_italic > bottom_italic + 2,
+        "the top leans right of the bottom: {top_italic} {bottom_italic}"
     );
 }
 

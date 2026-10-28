@@ -101,6 +101,8 @@ struct Ids {
     keyboard: Option<u32>,
     text_manager: Option<u32>,
     text_input: Option<u32>,
+    data_manager: Option<u32>,
+    data_device: Option<u32>,
 }
 
 /// A window on the compositor.
@@ -114,6 +116,13 @@ pub struct Window {
     pending: Option<(usize, usize)>,
     events: VecDeque<WindowEvent>,
     pointer: (f64, f64),
+    /// The serial of the last input event (a clipboard change must name one).
+    serial: u32,
+    /// The types each offer of data has, and the one that is the clipboard now.
+    offers: HashMap<u32, Vec<String>>,
+    selection: Option<u32>,
+    /// What this program put on the clipboard, and the source that offers it.
+    clipboard: Option<(u32, String)>,
     ime: ImeEvent,
     keymap: Keymap,
     modifiers: Modifiers,
@@ -200,6 +209,12 @@ impl Window {
         let wm_base = bind(&mut client, "xdg_wm_base", 1, Interface::XdgWmBase)?
             .ok_or_else(|| unsupported("xdg_wm_base"))?;
         let seat = bind(&mut client, "wl_seat", 5, Interface::Seat)?;
+        let data_manager = bind(
+            &mut client,
+            "wl_data_device_manager",
+            3,
+            Interface::DataDeviceManager,
+        )?;
         let text_manager = bind(
             &mut client,
             "zwp_text_input_manager_v3",
@@ -295,12 +310,18 @@ impl Window {
                 pointer: None,
                 keyboard: None,
                 text_manager,
+                data_manager,
+                data_device: None,
                 text_input: None,
             },
             buffers,
             back: 0,
             pending: None,
             events: VecDeque::new(),
+            serial: 0,
+            offers: HashMap::new(),
+            selection: None,
+            clipboard: None,
             ime: ImeEvent::default(),
             keymap: Keymap::us(),
             modifiers: Modifiers::default(),
@@ -343,6 +364,83 @@ impl Window {
     #[must_use]
     pub const fn key_repeat(&self) -> (i32, i32) {
         self.repeat
+    }
+
+    /// Puts `text` on the clipboard (the system's: other programs can paste it).
+    ///
+    /// # Errors
+    /// The connection's.
+    pub fn set_clipboard(&mut self, text: &str) -> io::Result<()> {
+        let (Some(manager), Some(device)) = (self.ids.data_manager, self.ids.data_device) else {
+            return Ok(());
+        };
+        if let Some((old, _)) = self.clipboard.take() {
+            self.client
+                .send(old, proto::data_source::DESTROY, Args::new(), &[])?;
+        }
+        let source = self.client.new_id(Interface::DataSource);
+        self.client.send(
+            manager,
+            proto::data_device_manager::CREATE_DATA_SOURCE,
+            Args::new().object(source),
+            &[],
+        )?;
+        for mime in ["text/plain;charset=utf-8", "text/plain", "UTF8_STRING"] {
+            self.client.send(
+                source,
+                proto::data_source::OFFER,
+                Args::new().string(mime),
+                &[],
+            )?;
+        }
+        self.client.send(
+            device,
+            proto::data_device::SET_SELECTION,
+            Args::new().object(source).uint(self.serial),
+            &[],
+        )?;
+        self.clipboard = Some((source, text.to_string()));
+        Ok(())
+    }
+
+    /// The text on the clipboard, if there is some (what another program put there, or this one). Waits up to a
+    /// second for the other program to write it.
+    ///
+    /// # Errors
+    /// The connection's.
+    pub fn clipboard(&mut self) -> io::Result<Option<String>> {
+        if let Some((_, text)) = &self.clipboard {
+            return Ok(Some(text.clone()));
+        }
+        let Some(offer) = self.selection else {
+            return Ok(None);
+        };
+        let Some(mime) = self
+            .offers
+            .get(&offer)
+            .and_then(|types| types.iter().find(|t| is_text(t)))
+            .cloned()
+        else {
+            return Ok(None);
+        };
+        let (reader, writer) = io::pipe()?;
+        self.client.send(
+            offer,
+            proto::data_offer::RECEIVE,
+            Args::new().string(&mime),
+            &[OwnedFd::from(writer).as_fd()],
+        )?;
+        // Only the other program holds the write end now: the read ends when it is done.
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let mut text = Vec::new();
+            let _ = io::Read::take(reader, 1 << 24).read_to_end(&mut text);
+            let _ = tx.send(text);
+        });
+        Ok(rx
+            .recv_timeout(Duration::from_secs(1))
+            .ok()
+            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned()))
     }
 
     /// Whether the compositor offers input methods (text-input-v3).
@@ -581,6 +679,18 @@ impl Window {
                     )?;
                     self.ids.text_input = Some(input);
                 }
+                if let (Some(manager), Some(seat), None) =
+                    (self.ids.data_manager, self.ids.seat, self.ids.data_device)
+                {
+                    let device = self.client.new_id(Interface::DataDevice);
+                    self.client.send(
+                        manager,
+                        proto::data_device_manager::GET_DATA_DEVICE,
+                        Args::new().object(device).object(seat),
+                        &[],
+                    )?;
+                    self.ids.data_device = Some(device);
+                }
             }
             Event::PointerEnter { x, y, .. } => {
                 self.pointer = (x, y);
@@ -592,8 +702,11 @@ impl Window {
                 self.events.push_back(WindowEvent::PointerMoved { x, y });
             }
             Event::PointerButton {
-                button, pressed, ..
+                serial,
+                button,
+                pressed,
             } => {
+                self.serial = serial;
                 let (x, y) = self.pointer;
                 self.events.push_back(WindowEvent::PointerButton {
                     x,
@@ -634,7 +747,45 @@ impl Window {
                 latched,
                 locked,
             } => self.modifiers = Modifiers::from_masks(depressed, latched, locked),
-            Event::KeyboardKey { key: code, pressed } => {
+            Event::KeyboardEnter { serial } => self.serial = serial,
+            Event::DataOffer(id) => {
+                self.offers.insert(id, Vec::new());
+            }
+            Event::OfferType(mime) => {
+                if let Some(types) = self.offers.get_mut(&id) {
+                    types.push(mime);
+                }
+            }
+            Event::Selection(offer) => {
+                // The previous offer is no longer needed.
+                if let Some(old) = self.selection.take() {
+                    self.offers.remove(&old);
+                    self.client
+                        .send(old, proto::data_offer::DESTROY, Args::new(), &[])?;
+                }
+                self.selection = offer;
+            }
+            Event::SourceSend { mime } => {
+                if let (Some((source, text)), Some(fd)) = (&self.clipboard, self.client.take_fd())
+                    && *source == id
+                    && is_text(&mime)
+                {
+                    let _ = io::Write::write_all(&mut std::fs::File::from(fd), text.as_bytes());
+                }
+            }
+            Event::SourceCancelled => {
+                if self.clipboard.as_ref().is_some_and(|(s, _)| *s == id) {
+                    self.clipboard = None;
+                    self.client
+                        .send(id, proto::data_source::DESTROY, Args::new(), &[])?;
+                }
+            }
+            Event::KeyboardKey {
+                serial,
+                key: code,
+                pressed,
+            } => {
+                self.serial = serial;
                 if let Some(key) = self.keymap.key(code, self.modifiers) {
                     self.events.push_back(WindowEvent::Key {
                         code,
@@ -730,4 +881,11 @@ fn surrounding_window(text: &str, cursor: usize) -> (&str, usize) {
         end -= 1;
     }
     (&text[start..end], start)
+}
+
+fn is_text(mime: &str) -> bool {
+    matches!(
+        mime,
+        "text/plain;charset=utf-8" | "text/plain" | "UTF8_STRING" | "TEXT" | "STRING"
+    )
 }

@@ -5,16 +5,21 @@
 
 use std::rc::Rc;
 
+use quench_android_surface::{Bridge, Value};
 use quench_style::theme::Theme;
 use quench_ui::prelude::*;
 use quench_ui_native::NativeRenderer;
 
 /// The app: replace this with your own views.
-fn app() -> View {
-    View::lazy(|| {
+fn app(bridge: Bridge) -> View {
+    View::lazy(move || {
         let count = create_signal(0_i64);
         let shown = count.clone();
         let agreed = create_signal(false);
+        // A plugin of the Kotlin host (`EchoPlugin` here; see `plugins()` in Plugins.kt) answers with the device.
+        let model = create_signal(String::from("host: not asked"));
+        let shown_model = model.clone();
+        let bridge = bridge.clone();
         div()
             .attr("id", "app")
             .child(h1().text("{{ name }}"))
@@ -22,6 +27,16 @@ fn app() -> View {
             .child(button().attr("id", "press").attr("type", "button").text("Press").on_click(move || count.update(|c| *c += 1)))
             .child(input().attr("id", "name").attr("type", "text").attr("placeholder", "Your name"))
             .child(quench_ui::kit::checkbox("I agree", &agreed))
+            .child(p().attr("id", "host").text_fn(move || shown_model.get()))
+            .child(button().attr("id", "ask").attr("type", "button").text("Ask the host").on_click(move || {
+                let model = model.clone();
+                bridge.call("echo", "device", Value::Null, move |answer| {
+                    model.set(match answer {
+                        Ok(device) => format!("host: {}", device.get("model").and_then(Value::as_str).unwrap_or("?")),
+                        Err(e) => format!("host failed: {e}"),
+                    });
+                });
+            }))
             .into_view()
     })
 }
@@ -41,6 +56,7 @@ fn main() -> std::io::Result<()> {
          input { display: block; box-sizing: border-box; width: 100% }",
     );
     // Held so the views stay mounted for as long as the program runs.
-    let _mounted = mount(&renderer, &renderer.root(), app());
-    quench_android_surface::run(&renderer)
+    let bridge = Bridge::new();
+    let _mounted = mount(&renderer, &renderer.root(), app(bridge.clone()));
+    quench_android_surface::run_with(&renderer, &bridge)
 }

@@ -225,6 +225,7 @@ fn node(
         required: false,
         read_only: false,
         caret: None,
+        range: None,
         actions: Vec::new(),
         children,
     }
@@ -1008,6 +1009,198 @@ fn every_role_has_a_role_number_and_a_name_and_states_are_complete() {
     );
     let window = states(&mut c, usize::MAX);
     let _ = window;
+}
+
+#[quench_test::test]
+fn sliders_answer_the_value_interface() {
+    let (mut c, service) = start();
+    let mut tree = page();
+    let mut slider = node(
+        10,
+        Role::Slider,
+        "Volume",
+        (0.0, 200.0, 100.0, 20.0),
+        Vec::new(),
+    );
+    slider.range = Some((0.0, 10.0, Some(4.0)));
+    tree.children.push(slider);
+    service.publish(tree);
+    let path = "/org/a11y/atspi/accessible/10";
+    let value = "org.a11y.atspi.Value";
+    assert_eq!(c.get(path, value, "MinimumValue"), Value::F64(0.0));
+    assert_eq!(c.get(path, value, "MaximumValue"), Value::F64(10.0));
+    assert_eq!(c.get(path, value, "CurrentValue"), Value::F64(4.0));
+    assert_eq!(c.get(path, value, "MinimumIncrement"), Value::F64(0.1));
+    assert_eq!(
+        c.call(path, A, "GetRole", vec![]).unwrap(),
+        [Value::U32(51)]
+    );
+    let Value::Array(_, list) = c.call(path, A, "GetInterfaces", vec![]).unwrap().remove(0) else {
+        panic!()
+    };
+    assert!(list.contains(&Value::str(value)), "{list:?}");
+    // A node without a range has no Value interface.
+    let Value::Array(_, others) = c
+        .call("/org/a11y/atspi/accessible/5", A, "GetInterfaces", vec![])
+        .unwrap()
+        .remove(0)
+    else {
+        panic!()
+    };
+    assert!(!others.contains(&Value::str(value)));
+}
+
+#[quench_test::test]
+fn text_fields_can_be_edited_through_assistive_technology() {
+    let (mut c, service) = start();
+    service.publish(page());
+    let path = "/org/a11y/atspi/accessible/7";
+    let editable = "org.a11y.atspi.EditableText";
+    assert_eq!(
+        c.call(
+            path,
+            editable,
+            "SetTextContents",
+            vec![Value::str("new@x.org")]
+        )
+        .unwrap(),
+        [Value::Bool(true)]
+    );
+    assert_eq!(
+        c.call(
+            path,
+            editable,
+            "InsertText",
+            vec![Value::I32(3), Value::str("XY"), Value::I32(2)]
+        )
+        .unwrap(),
+        [Value::Bool(true)]
+    );
+    assert_eq!(
+        c.call(
+            path,
+            editable,
+            "DeleteText",
+            vec![Value::I32(0), Value::I32(4)]
+        )
+        .unwrap(),
+        [Value::Bool(true)]
+    );
+    assert_eq!(
+        service.take_edits(),
+        [
+            (7, "new@x.org".to_string()),
+            (7, "annXY@example.org".to_string()),
+            (7, "example.org".to_string())
+        ]
+    );
+    assert!(service.take_edits().is_empty());
+    // The clipboard is not theirs to use.
+    assert_eq!(
+        c.call(path, editable, "PasteText", vec![Value::I32(0)])
+            .unwrap(),
+        [Value::Bool(false)]
+    );
+    // Only fields that can be edited say they can.
+    let Value::Array(_, list) = c.call(path, A, "GetInterfaces", vec![]).unwrap().remove(0) else {
+        panic!()
+    };
+    assert!(list.contains(&Value::str(editable)));
+    let Value::Array(_, heading) = c
+        .call("/org/a11y/atspi/accessible/4", A, "GetInterfaces", vec![])
+        .unwrap()
+        .remove(0)
+    else {
+        panic!()
+    };
+    assert!(!heading.contains(&Value::str(editable)));
+}
+
+#[quench_test::test]
+fn names_text_children_state_and_caret_changes_are_announced() {
+    let (mut c, service) = start();
+    service.publish(page());
+    // The first page puts focus on the field: that is announced, and is not what this is about.
+    assert_eq!(
+        c.connection.recv().unwrap().member.as_deref(),
+        Some("StateChanged")
+    );
+    let mut next = page();
+    next.children[1].name = "Saved".into();
+    next.children[2].checked = Some(false);
+    next.children[3].value = Some("anXn@example.org".into());
+    next.children[3].caret = Some((4, 4));
+    next.children.push(node(
+        10,
+        Role::Button,
+        "More",
+        (0.0, 0.0, 10.0, 10.0),
+        Vec::new(),
+    ));
+    service.publish(next);
+    let mut signals = Vec::new();
+    while signals.len() < 5 {
+        let m = c.connection.recv().unwrap();
+        if m.kind == Kind::Signal {
+            signals.push(m);
+        }
+    }
+    let seen: Vec<(String, String, Value, Value)> = signals
+        .iter()
+        .map(|m| {
+            (
+                m.member.clone().unwrap(),
+                m.path.clone().unwrap(),
+                m.body[0].clone(),
+                m.body[1].clone(),
+            )
+        })
+        .collect();
+    let at = |id: u32| format!("/org/a11y/atspi/accessible/{id}");
+    assert_eq!(
+        seen,
+        [
+            (
+                "ChildrenChanged".into(),
+                at(0),
+                Value::str("add"),
+                Value::I32(6)
+            ),
+            (
+                "PropertyChange".into(),
+                at(5),
+                Value::str("accessible-name"),
+                Value::I32(0)
+            ),
+            (
+                "StateChanged".into(),
+                at(6),
+                Value::str("checked"),
+                Value::I32(0)
+            ),
+            (
+                "TextChanged".into(),
+                at(7),
+                Value::str("insert"),
+                Value::I32(2)
+            ),
+            (
+                "TextCaretMoved".into(),
+                at(7),
+                Value::str(""),
+                Value::I32(4)
+            ),
+        ]
+    );
+    assert_eq!(
+        signals[1].body[3],
+        Value::Variant(Box::new(Value::str("Saved")))
+    );
+    assert_eq!(signals[3].body[2], Value::I32(1), "one character");
+    assert_eq!(
+        signals[3].body[3],
+        Value::Variant(Box::new(Value::str("X")))
+    );
 }
 
 quench_test::main!();

@@ -117,6 +117,7 @@ fn command(
                 AndroidCmd::Keystore { out: path, alias } => {
                     android::keystore(sys, out, &project, &path, &alias)?;
                 }
+                AndroidCmd::Launcher { which } => android::launcher(out, &project, which)?,
                 AndroidCmd::BuildNative { release, abi } => {
                     android::build_native(sys, out, &project, release, abi.as_deref())?;
                 }

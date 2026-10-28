@@ -32,6 +32,7 @@ A message is `object id, size << 16 | opcode, arguments`, in the machine's byte 
 | `wl_shm`, `wl_shm_pool`, `wl_buffer` | two buffers of one memfd-backed pool, `ARGB8888` (premultiplied BGRA, the layout of `quench-raster`) |
 | `xdg_wm_base`, `xdg_surface`, `xdg_toplevel` | the window: title, app id, configure and acknowledge, close, ping and pong |
 | `wl_seat`, `wl_pointer` | enter, leave, motion, button (with the position of the last motion), axis |
+| `wl_data_device_manager`, `wl_data_device`, `wl_data_source`, `wl_data_offer` | the **clipboard** (text only): `Window::set_clipboard(text)` offers `text/plain;charset=utf-8`, `text/plain` and `UTF8_STRING` as the selection, named by the serial of the last key or button, and answers other programs' `send` by writing to the descriptor they gave; `Window::clipboard()` returns this window's own text or reads the selection another program offers through a pipe (waiting up to a second for it to write) |
 
 A compositor without `wl_compositor`, `wl_shm` or `xdg_wm_base` is refused by name; a missing seat is fine (no pointer).
 
