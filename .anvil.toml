@@ -1,3 +1,7 @@
+[install]
+# Installed on this machine when released, like forge's command-line tools.
+packages = ["quench-tool"]
+
 [release]
 registry = "ennor"
 packages = [

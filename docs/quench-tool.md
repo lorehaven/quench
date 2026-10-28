@@ -11,7 +11,7 @@ quench build --release     # dist/: the module and one server binary with the mo
 quench doctor              # what this machine has and lacks
 ```
 
-Install it with `cargo install quench-tool --registry ennor`; the binary is `quench`.
+Install it with `cargo install quench-tool --registry ennor`; the binary is `quench`. `anvil release` installs it on the machine that releases it (`quench-tool` is under `[install]` in `.anvil.toml`, as forge's own tools are), and `forge-toolbox` lists it with the other installables, so it shows installed against latest and updates with a keypress.
 
 ## `quench new <name>`
 
