@@ -1,6 +1,6 @@
 [package]
 name = "quench-fullstack"
-version = "0.1.5"
+version = "0.1.6"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - serves quench-ui apps from quench-http and lets them call server functions: server-side rendering, hashed assets, typed calls, sessions"

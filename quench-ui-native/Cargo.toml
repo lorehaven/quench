@@ -1,6 +1,6 @@
 [package]
 name = "quench-ui-native"
-version = "0.1.0"
+version = "0.1.1"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - a quench-ui renderer that draws itself: a DOM in memory, styled by quench-css, laid out by quench-layout and painted by quench-paint, with no WebView"

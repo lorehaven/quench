@@ -1,6 +1,6 @@
 [package]
 name = "quench-desktop-native"
-version = "0.1.0"
+version = "0.1.1"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - runs a quench-ui-native renderer in a Wayland window: draws frames when something changed, turns pointer, wheel and keyboard input into the events views listen for, blinks the caret and repeats held keys"
