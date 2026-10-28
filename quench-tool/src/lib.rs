@@ -12,6 +12,7 @@ pub mod cli;
 pub mod dev;
 pub mod doctor;
 pub mod error;
+pub mod linux;
 pub mod plugins;
 pub mod project;
 pub mod publish;
@@ -29,7 +30,7 @@ use std::time::Duration;
 
 use quench_args::{ErrorKind, Parser};
 
-use crate::cli::{AndroidCmd, BuildTarget, Cli, Cmd, PluginCmd};
+use crate::cli::{AndroidCmd, BuildTarget, Cli, Cmd, LinuxCmd, PluginCmd, RunTarget};
 use crate::error::Result;
 use crate::project::Project;
 use crate::system::{Cmd as Command, System};
@@ -122,9 +123,21 @@ fn command(
             }
             Ok(0)
         }
-        Cmd::Run { target: _, abi } => {
+        Cmd::Run { target, abi } => {
             let project = Project::find(cwd)?;
-            android::run(sys, out, &project, abi.as_deref())?;
+            match target {
+                RunTarget::Android => android::run(sys, out, &project, abi.as_deref())?,
+                RunTarget::Linux => linux::run(sys, out, &project)?,
+            }
+            Ok(0)
+        }
+        Cmd::Linux { cmd } => {
+            let project = Project::find(cwd)?;
+            match cmd {
+                LinuxCmd::Init { id, quench_path } => {
+                    linux::init(out, &project, id.as_deref(), quench_path.as_deref())?;
+                }
+            }
             Ok(0)
         }
         Cmd::Publish {
@@ -161,6 +174,7 @@ fn command(
             port,
             open,
             android,
+            linux,
         } => {
             let project = Project::find(cwd)?;
             let mut watch = watcher(&project.root);
@@ -172,6 +186,7 @@ fn command(
                     port,
                     open,
                     android,
+                    linux,
                 },
                 &mut *watch,
             )?;
@@ -185,7 +200,11 @@ fn command(
             abi,
         } => {
             let project = Project::find(cwd)?;
-            if let Some(target) = target {
+            if target == Some(BuildTarget::Linux) {
+                linux::build(sys, out, &project, release)?;
+            } else if target == Some(BuildTarget::Deb) {
+                linux::deb(sys, out, &project)?;
+            } else if let Some(target) = target {
                 let aab = target == BuildTarget::Aab;
                 android::build_apk(sys, out, &project, release || aab, aab, abi.as_deref())?;
             } else if bundle {

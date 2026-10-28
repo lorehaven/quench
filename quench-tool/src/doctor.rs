@@ -164,6 +164,27 @@ fn webkit(sys: &dyn System) -> Status {
     missing("install webkit2gtk (Arch: webkit2gtk-4.1, Debian: libwebkit2gtk-4.1-dev)")
 }
 
+/// The programs the desktop host's plugins run: the keyring, notifications, and opening links.
+fn desktop_helpers(sys: &dyn System) -> Status {
+    let absent: Vec<&str> = [
+        ("secret-tool", "libsecret"),
+        ("notify-send", "libnotify"),
+        ("xdg-open", "xdg-utils"),
+    ]
+    .into_iter()
+    .filter(|(program, _)| !sys.on_path(program))
+    .map(|(_, package)| package)
+    .collect();
+    if absent.is_empty() {
+        ok("secret-tool, notify-send, xdg-open")
+    } else {
+        missing(format!(
+            "optional, for the desktop plugins: install {}",
+            absent.join(", ")
+        ))
+    }
+}
+
 fn on_path(sys: &dyn System, programs: &[&str], fix: &str) -> Status {
     programs
         .iter()
@@ -264,6 +285,7 @@ pub fn checks(sys: &dyn System) -> Vec<Check> {
             false,
         ),
         check("webkit2gtk (linux desktop)", webkit(sys), false),
+        check("desktop helpers", desktop_helpers(sys), false),
     ]
 }
 

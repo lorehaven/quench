@@ -57,7 +57,15 @@ fn complete() -> Fake {
     f.vars.insert("ANDROID_NDK_HOME".into(), "/ndk".into());
     f.existing.insert("/sdk".into());
     f.existing.insert("/ndk".into());
-    for p in ["wasm-opt", "chromium", "adb", "gradle"] {
+    for p in [
+        "wasm-opt",
+        "chromium",
+        "adb",
+        "gradle",
+        "secret-tool",
+        "notify-send",
+        "xdg-open",
+    ] {
         f.programs.insert(p.into());
     }
     f
@@ -176,5 +184,31 @@ fn the_second_webkit_name_is_accepted() {
     assert_eq!(
         status(&checks(&f), "webkit2gtk"),
         &Status::Ok("webkitgtk-6.0".into())
+    );
+}
+
+#[quench_test::test]
+fn the_desktop_helpers_are_named_when_they_are_missing() {
+    let all = checks(&complete());
+    assert_eq!(
+        status(&all, "desktop helpers"),
+        &Status::Ok("secret-tool, notify-send, xdg-open".into())
+    );
+    let mut f = complete();
+    f.programs.remove("secret-tool");
+    f.programs.remove("xdg-open");
+    let all = checks(&f);
+    let Status::Missing(fix) = status(&all, "desktop helpers") else {
+        panic!("not missing");
+    };
+    assert!(
+        fix.contains("libsecret") && fix.contains("xdg-utils") && !fix.contains("libnotify"),
+        "{fix}"
+    );
+    assert!(
+        !all.iter()
+            .find(|c| c.name == "desktop helpers")
+            .unwrap()
+            .required
     );
 }

@@ -30,6 +30,7 @@ docs/
 ├── quench-fullstack-macros.md
 ├── quench-tool.md
 ├── quench-android.md
+├── quench-desktop.md
 ├── quench-ui.md
 ├── quench-ui-web.md
 ├── quench-ui-web-macros.md
@@ -68,6 +69,7 @@ Each page lives at the same path as the crate it documents (e.g. `quench-auth` �
 - [Quench Style](./quench-style.md) — shared design tokens, themes, base CSS and i18n for web, mobile and desktop
 - [Quench TZ](./quench-tz.md) — IANA time zones with the database built in
 - [Quench Android host](./quench-android.md) — the WebView app that runs a Quench UI bundle on Android, with a dev-server mode
+- [Quench desktop host](./quench-desktop.md) — a GTK window around webkit2gtk that runs a Quench UI bundle on Linux, with the same plugin bridge
 - [Quench Tool](./quench-tool.md) — the `quench` command: new projects, a dev loop with live reload, release builds, doctor
 - [Quench UI](./quench-ui.md) — UI core: signals, views, events and the renderer interface
 - [Quench Fullstack](./quench-fullstack.md) — serves Quench UI apps from Quench HTTP: server rendering, hashed assets, strict CSP, typed server functions, sessions
@@ -173,6 +175,7 @@ the cluster ones want `CACHE_TEST_REDIS_CLUSTER_URL` with comma-separated seeds.
 ├── quench-fullstack/       # serves quench-ui apps from quench-http: SSR, hashed assets, CSP, server functions, sessions
 ├── quench-fullstack-macros/ # #[server]
 ├── quench-android/         # native code for the Android host: the program protocol, tz.next
+├── quench-desktop/         # the Linux desktop host: GTK + webkit2gtk window, bundle origin, bridge, plugins
 ├── quench-tool/            # the `quench` command: new, dev, build, doctor, test
 ├── quench-ui/              # UI core: signals, views, events, renderer interface
 ├── quench-ui-web-macros/   # #[plugin]

@@ -260,6 +260,8 @@ export async function start(url, options = {}) {
 
   // --- the host app's bridge: calls are fetches of `quench-bridge:call` (body: the JSON envelope), events
   // are an event source on `quench-bridge:events`; a call made before the host's port arrives waits 3 s.
+  // Android hands the page a MessagePort; the desktop host gives it `webkit.messageHandlers.quench` and
+  // answers by calling `__quenchBridge(text)` (see docs/quench-desktop.md).
   const BRIDGE = "quench-bridge:", hosted = /QuenchHost\//.test(navigator.userAgent);
   let bridgePort = null, bridgeEvents = null;
   const bridgeWaiting = new Map(), bridgeQueue = []; // envelope id -> the waiting fetch
@@ -287,6 +289,11 @@ export async function start(url, options = {}) {
     bridgePort.onmessage = bridgeAnswer;
     for (const entry of bridgeQueue.splice(0)) { clearTimeout(entry.timer); bridgePort.postMessage(entry.message); }
   });
+  const desktop = hosted && globalThis.webkit?.messageHandlers?.quench;
+  if (desktop) {
+    bridgePort = { postMessage: (message) => desktop.postMessage(message), close() {} };
+    Object.defineProperty(globalThis, "__quenchBridge", { value: (data) => bridgeAnswer({ data }) });
+  }
 
   const env = {
     q_create_el: guarded((p, n) => createElement(text(p, n))),
@@ -300,17 +307,8 @@ export async function start(url, options = {}) {
     q_insert: guarded(insert),
     q_root_has_content: guarded(() => (root.firstChild ? 1 : 0)),
     q_hydrate_begin: guarded(() => { hydrating = { frames: [{ parent: root, cursor: root.firstChild, fresh: false }], mismatches: 0 }; }),
-    q_hydrate_end: guarded(() => {
-      trim(hydrating.frames[0]);
-      const { mismatches } = hydrating;
-      hydrating = null;
-      origin.clear();
-      return mismatches;
-    }),
-    q_remove: guarded((parent, child) => {
-      const node = get(child);
-      if (node && node.parentNode === get(parent)) node.remove();
-    }),
+    q_hydrate_end: guarded(() => { trim(hydrating.frames[0]); const { mismatches } = hydrating; hydrating = null; origin.clear(); return mismatches; }),
+    q_remove: guarded((parent, child) => { const node = get(child); if (node && node.parentNode === get(parent)) node.remove(); }),
     q_listen: guarded(listen),
     q_set_style: guarded((h, np, nl, vp, vl) => {
       const value = text(vp, vl);

@@ -21,6 +21,7 @@ name = "quench"
 path = "src/main.rs"
 
 [dependencies]
+quench-archive = { workspace = true }
 quench-args = { workspace = true }
 quench-client = { workspace = true, features = ["blocking", "tls"] }
 quench-serde = { workspace = true }

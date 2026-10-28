@@ -259,6 +259,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-desktop"
+version = "0.1.0"
+dependencies = [
+ "quench-core",
+ "quench-serde",
+ "quench-test",
+]
+
+[[package]]
 name = "quench-example-basic"
 version = "0.1.0"
 dependencies = [
@@ -600,6 +609,7 @@ dependencies = [
 name = "quench-tool"
 version = "0.1.1"
 dependencies = [
+ "quench-archive",
  "quench-args",
  "quench-client",
  "quench-serde",

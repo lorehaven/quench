@@ -67,6 +67,9 @@ pub enum Cmd {
         /// Also start the app on the attached Android device, loading this server
         #[arg(long)]
         android: bool,
+        /// Also open the desktop window (`desktop/`) on this server
+        #[arg(long)]
+        linux: bool,
     },
     /// Build the app and the server
     Build {
@@ -79,7 +82,8 @@ pub enum Cmd {
         /// Instead: write the app as a static bundle in `dist/www`, for the Android host to serve
         #[arg(long)]
         bundle: bool,
-        /// Build an Android package instead: `apk` (debug, or signed with --release) or `aab`
+        /// Build a package instead: `apk` (debug, or signed with --release) or `aab` for Android, `linux`
+        /// for the desktop binary, `deb` for its Debian package
         #[arg(value_enum)]
         target: Option<BuildTarget>,
         /// With `apk` or `aab`: only this ABI's native library (`arm64-v8a` or `x86_64`)
@@ -105,6 +109,11 @@ pub enum Cmd {
         /// Publish with uncommitted changes in the tree
         #[arg(long)]
         allow_dirty: bool,
+    },
+    /// The Linux desktop host of the project
+    Linux {
+        #[command(subcommand)]
+        cmd: LinuxCmd,
     },
     /// The Android host of the project
     Android {
@@ -135,12 +144,30 @@ pub enum BuildTarget {
     Apk,
     /// An Android App Bundle, for a store that wants one
     Aab,
+    /// The Linux desktop binary, in `dist/`
+    Linux,
+    /// A Debian package of the Linux desktop binary, in `dist/`
+    Deb,
 }
 
 /// Where `quench run` runs the app.
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RunTarget {
     Android,
+    Linux,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum LinuxCmd {
+    /// Create `desktop/`: the crate whose binary shows this project's bundle in a window
+    Init {
+        /// The application id (default: com.example.<name>)
+        #[arg(long, value_name = "ID")]
+        id: Option<String>,
+        /// Take the quench crates from a checkout of the repository (default: the registry)
+        #[arg(long, value_name = "DIR")]
+        quench_path: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]

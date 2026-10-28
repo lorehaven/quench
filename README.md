@@ -36,6 +36,8 @@ See [docs/](./docs/) for per-crate reference.
 - [Quench Regex](./docs/quench-regex.md) — regular expressions with Unicode classes, no dependencies
 - [Quench Style](./docs/quench-style.md) — shared design tokens, themes, base CSS and i18n for web, mobile and desktop
 - [Quench TZ](./docs/quench-tz.md) — IANA time zones with the database built in
+- [Quench Android host](./docs/quench-android.md) — the WebView app that runs a Quench UI bundle on Android, with a plugin bridge
+- [Quench desktop host](./docs/quench-desktop.md) — a GTK window around webkit2gtk that runs a Quench UI bundle on Linux, with the same bridge
 - [Quench Tool](./docs/quench-tool.md) — the `quench` command: new projects, a dev loop with live reload, release builds, doctor
 - [Quench UI](./docs/quench-ui.md) — UI core: signals, views, events and the renderer interface
 - [Quench Fullstack](./docs/quench-fullstack.md) — serves Quench UI apps from Quench HTTP: server rendering, hashed assets, strict CSP, typed server functions, sessions

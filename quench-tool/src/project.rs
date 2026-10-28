@@ -27,11 +27,21 @@ pub struct AndroidConfig {
     pub registry: Option<String>,
 }
 
+/// The `[linux]` table of `quench.toml`.
+#[derive(Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+pub struct LinuxConfig {
+    /// The application id the keyring, notifications and the menu entry know the app by.
+    pub id: Option<String>,
+    /// The window's title (default: the project's name).
+    pub title: Option<String>,
+}
+
 #[derive(Deserialize)]
 struct Manifest {
     name: String,
     template: String,
     android: Option<AndroidConfig>,
+    linux: Option<LinuxConfig>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,6 +50,7 @@ pub struct Project {
     pub name: String,
     pub template: Template,
     pub android: AndroidConfig,
+    pub linux: LinuxConfig,
 }
 
 /// Whether `name` can be a project name: it becomes a directory and the prefix of four crate names.
@@ -108,6 +119,7 @@ impl Project {
             name: manifest.name,
             template,
             android: manifest.android.unwrap_or_default(),
+            linux: manifest.linux.unwrap_or_default(),
         })
     }
 

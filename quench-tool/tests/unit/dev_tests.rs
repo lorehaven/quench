@@ -27,6 +27,7 @@ fn it_builds_starts_the_server_in_dev_mode_and_stops_it_at_the_end() {
             port: 3456,
             open: false,
             android: false,
+            linux: false,
         },
         &mut Script(vec![Event::Quiet]),
     )
@@ -66,6 +67,7 @@ fn a_change_rebuilds_and_restarts() {
             port: 3000,
             open: false,
             android: false,
+            linux: false,
         },
         &mut Script(vec![Event::Quiet, Event::Changed, Event::Quiet]),
     )
@@ -94,6 +96,7 @@ fn a_failed_build_waits_for_the_next_change() {
             port: 3000,
             open: false,
             android: false,
+            linux: false,
         },
         &mut Script(vec![Event::Quiet, Event::Changed]),
     )
@@ -120,6 +123,7 @@ fn a_server_that_exits_is_reported_once() {
             port: 3000,
             open: false,
             android: false,
+            linux: false,
         },
         &mut Script(vec![Event::Quiet, Event::Quiet, Event::Quiet]),
     )
@@ -140,6 +144,7 @@ fn a_server_that_cannot_start_is_an_error_to_wait_out() {
             port: 3000,
             open: false,
             android: false,
+            linux: false,
         },
         &mut Script(vec![]),
     )
@@ -157,6 +162,7 @@ fn dev_open(sys: &Fake, p: &quench_tool::project::Project, events: Vec<Event>) -
             port: 3000,
             open: true,
             android: false,
+            linux: false,
         },
         &mut Script(events),
     )
@@ -236,6 +242,7 @@ fn android_starts_the_app_on_the_device_once_the_server_is_up() {
             port: 3000,
             open: false,
             android: true,
+            linux: false,
         },
         &mut Script(vec![Event::Changed, Event::Quiet]),
     )
@@ -270,6 +277,7 @@ fn a_device_that_is_not_there_is_said_and_the_server_still_runs() {
             port: 3000,
             open: false,
             android: true,
+            linux: false,
         },
         &mut Script(vec![]),
     )
@@ -292,6 +300,7 @@ fn the_device_is_not_started_before_the_server_listens() {
             port: 3000,
             open: false,
             android: true,
+            linux: false,
         },
         &mut Script(vec![]),
     )

@@ -8,6 +8,7 @@ packages = [
     "quench-auth",
     "quench-cache",
     "quench-cli",
+    "quench-desktop",
     "quench-client",
     "quench-config",
     "quench-convert",

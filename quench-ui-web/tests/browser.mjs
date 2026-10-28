@@ -466,6 +466,29 @@ try {
   check("a forged port never received a call", await ev(`window.__got.length`) === 0);
   await send("Emulation.setUserAgentOverride", { userAgent: ua });
 
+  // ---- the desktop transport: `webkit.messageHandlers.quench` to the host, `__quenchBridge(text)` back ----
+  const fake = (await send("Page.addScriptToEvaluateOnNewDocument", { source: `window.__posted = [];
+    window.webkit = { messageHandlers: { quench: { postMessage: (text) => {
+      window.__posted.push(text);
+      const call = JSON.parse(text);
+      setTimeout(() => window.__quenchBridge(JSON.stringify({ id: call.id, ok: call.args.text })), 10);
+    } } } };` })).result.identifier;
+  await load("/gallery");
+  await tab(5);
+  const unclaimed = await say();
+  check("a handler without the host's user agent is not used", await until(async () => (await unclaimed()) === "say: error unavailable", "the answer", 1500) && await ev(`window.__posted.length`) === 0, await unclaimed());
+  await send("Emulation.setUserAgentOverride", { userAgent: `${ua} QuenchHost/1` });
+  await load("/gallery");
+  await tab(5);
+  const desktop = await say();
+  check("on a desktop host a call goes through the message handler and its answer comes back", await until(async () => (await desktop()) === "say: hi", "the answer", 3000), await desktop());
+  const posted = JSON.parse(await ev(`window.__posted[0]`));
+  check("the envelope the host receives is the contract's", posted.plugin === "echo" && posted.method === "say" && posted.args.text === "hi" && typeof posted.id === "number", JSON.stringify(posted));
+  const descriptor = await ev(`(({ writable, configurable }) => ({ writable, configurable }))(Object.getOwnPropertyDescriptor(window, "__quenchBridge"))`);
+  check("the page cannot replace `__quenchBridge`", descriptor.writable === false && descriptor.configurable === false, JSON.stringify(descriptor));
+  await send("Page.removeScriptToEvaluateOnNewDocument", { identifier: fake });
+  await send("Emulation.setUserAgentOverride", { userAgent: ua });
+
   // ---- a server page that does not match: the result is the client's page ---------------------
   for (const kind of ["tag", "text", "drop", "extra", "attr"]) {
     await load(`/?corrupt=${kind}`);

@@ -12,3 +12,7 @@
 # `unsafe extern` block that declares the imports (host/wasm.rs). Neither can be written without the keyword.
 ./quench-ui-web/src/ffi.rs
 ./quench-ui-web/src/host/wasm.rs
+# The Linux desktop host's calls into GTK 3, webkit2gtk and GLib (a C API: there is no safe way to call it, and a process
+# boundary would only move the same calls). Every unsafe of the crate is in this one file, behind safe `!Send` types with
+# the contract written at the top of it and in docs/quench-desktop.md; the window tests exercise each call.
+./quench-desktop/src/ffi.rs

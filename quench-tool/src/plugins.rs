@@ -342,7 +342,7 @@ fn edit(path: &Path, change: impl FnOnce(String) -> Result<String>) -> Result<()
 
 /// Makes sure the workspace depends on `name` the way it depends on the other quench crates: from
 /// the same checkout, or from the registry.
-fn ensure_dependency(cargo: &str, name: &str) -> Result<String> {
+pub(crate) fn ensure_dependency(cargo: &str, name: &str) -> Result<String> {
     if cargo.contains(&format!("\n{name} = ")) {
         return Ok(cargo.to_string());
     }

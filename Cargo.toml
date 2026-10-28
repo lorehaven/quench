@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "quench-android",
+  "quench-desktop",
   "quench-args",
   "quench-args-macros",
   "quench-auth",
@@ -64,6 +65,7 @@ readme = "README.md"
 getrandom = { version = "0.4" }
 proc-macro2 = { version = "1.0" }
 quench-android = { path = "quench-android", registry = "ennor", version = "0.1.0" }
+quench-desktop = { path = "quench-desktop", registry = "ennor", version = "0.1.0" }
 quench-args = { path = "quench-args", registry = "ennor", version = "0.1.0" }
 quench-args-macros = { path = "quench-args-macros", registry = "ennor", version = "0.1.0" }
 quench-auth = { path = "quench-auth", registry = "ennor", version = "0.4.0", default-features = false }

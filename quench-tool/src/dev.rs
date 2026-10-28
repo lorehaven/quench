@@ -33,6 +33,8 @@ pub struct Options {
     pub open: bool,
     /// Also start the app on the attached device.
     pub android: bool,
+    /// Also open the desktop window on the server.
+    pub linux: bool,
 }
 
 /// Runs until `watch` says to stop (the real one never does: the person interrupts the process).
@@ -50,10 +52,12 @@ pub fn dev(
         port,
         open,
         android,
+        linux,
     } = options;
     // The browser is opened once: later restarts reload the page it already shows.
     let mut opened = false;
     let mut launched = false;
+    let mut window: Option<Box<dyn crate::system::Process>> = None;
     loop {
         let mut server = match start(sys, out, project, port) {
             Ok(child) => {
@@ -64,6 +68,9 @@ pub fn dev(
                 if android && !launched {
                     launched = true;
                     crate::android::launch_dev(sys, out, project, port)?;
+                }
+                if linux && window.is_none() {
+                    window = crate::linux::launch_dev(sys, out, project, port)?;
                 }
                 if open && !opened {
                     opened = true;
@@ -98,6 +105,9 @@ pub fn dev(
             child.kill();
         }
         if stopped {
+            if let Some(mut window) = window {
+                window.kill();
+            }
             return Ok(());
         }
         writeln!(out, "change detected, rebuilding")?;

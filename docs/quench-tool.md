@@ -72,6 +72,14 @@ Adds a native capability to the project's Android host (`quench android init` fi
 
 Builds the program in `native/` (made by `quench plugin add native`) for arm64-v8a and x86_64 with the NDK's clang as the linker and copies it into `android/app/src/main/jniLibs/<abi>/` as `libquench_native.so`: the host runs it as a separate process, so there is no JNI and no unsafe code in the path. The NDK is `ANDROID_NDK_HOME`, or the newest under the SDK; the Rust targets come from `rustup target add aarch64-linux-android x86_64-linux-android` (`quench doctor` checks them).
 
+## `quench linux init [--id ID] [--quench-path DIR]`
+
+Writes `desktop/`, the host crate of the [Linux desktop host](./quench-desktop.md): a `Cargo.toml`, a `main.rs` that shows the bundle with the standard plugins, and a `build.rs` that embeds `dist/www`. In a project with a workspace it joins it (a member, and `quench-desktop` among the workspace dependencies, from the same checkout or registry as the other quench crates); in a directory with no `Cargo.toml` it is a crate of its own, depending on the checkout named by `--quench-path` or on the registry. The application id (`--id`, default `com.example.<name>`) is written to a `[linux]` table in `quench.toml` with an optional `title`; it names the app to the keyring, the notification service and the menu entry. It refuses to overwrite an existing `desktop/`.
+
+## `quench build linux [--release]`, `quench build deb`, `quench run linux`, `quench dev --linux`
+
+`build linux` makes the bundle (as `build --bundle` does), builds the host crate and copies the binary to `dist/<name>-linux`; with `--release` it is optimised. The bundle is embedded, so the binary runs from an empty directory with no network. `build deb` builds the release host and writes `dist/<name>_<version>_amd64.deb` (the binary in `/usr/bin`, a menu entry; the version is the workspace's). `run linux` builds the debug host and runs it. `dev --linux` is the live version: once the dev server listens it opens the window on it (`QUENCH_DEV_URL`, debug builds only) and keeps the window across server restarts, so an edit reloads the page in it.
+
 ## `quench run android [--abi ABI]`
 
 Builds the bundle (and the native program for the device's ABI, found with `adb shell getprop ro.product.cpu.abi`, when the project has one), installs the debug APK with Gradle and starts it on the attached device or emulator. `quench dev --android` is the live version: it starts the app on the device pointing at the dev server (`adb reverse` and `dev_url`, once the server is listening), so an edit reloads the page on the device.
