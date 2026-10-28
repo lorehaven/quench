@@ -1,6 +1,6 @@
 [package]
 name = "quench-proto"
-version = "0.1.9"
+version = "0.1.10"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - HTTP types, an HTTP/1.1 codec, cookies, WebSocket framing and a thin rustls glue, shared by quench-http and quench-client"

@@ -1,6 +1,6 @@
 [package]
 name = "quench-args"
-version = "0.1.1"
+version = "0.1.2"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - command-line argument parsing with derive macros, no dependencies beyond its own macros"

@@ -1,6 +1,6 @@
 [package]
 name = "quench-html"
-version = "0.1.1"
+version = "0.1.2"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - HTML without dependencies: a tolerant parser with CSS selectors for extraction, and a CommonMark to HTML renderer"

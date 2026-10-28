@@ -1,6 +1,6 @@
 [package]
 name = "quench-pg"
-version = "0.1.8"
+version = "0.1.9"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - a PostgreSQL client: the v3 wire protocol with SCRAM-SHA-256 and TLS, typed rows through quench-serde, transactions and a connection pool"
