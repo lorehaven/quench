@@ -51,6 +51,8 @@ class SurfaceHost(private val context: Context, private val listener: Listener) 
                 .directory(context.filesDir)
                 .apply {
                     environment()["HOME"] = context.filesDir.absolutePath
+                    // The program reads the time zone from here (an app that shows or computes local times needs it).
+                    environment()["TZ"] = java.util.TimeZone.getDefault().id
                     // Where frames spend their time, in the log once a second (debug builds only).
                     if (BuildConfig.DEBUG) environment()["QUENCH_FRAME_STATS"] = "1"
                 }

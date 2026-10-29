@@ -20,7 +20,7 @@ quench_android_surface::run(&renderer)?;
 
 **Selecting text**: a finger that stays put for half a second on a text field selects the word under it (`select_word_at`), and a handle appears at each end of the selection (a stem along the caret and a knob below it, drawn by the program into the frame); a finger that comes down on a knob drags that end (`move_selection_end`), and may cross the other. A selection press is not a click. There is no floating menu: copy, cut and paste go through the hardware keyboard's Ctrl+C, X and V and the system clipboard.
 
-**Accessibility ranges**: the tree carries, for a slider or progress bar, its smallest, largest and current value (NaN while indeterminate), which the host gives TalkBack as `RangeInfo`. **The program's home**: the host starts the program with the app's files directory as its working directory and `HOME`, so what it keeps (a session, a database) is in the app's own storage.
+**Accessibility ranges**: the tree carries, for a slider or progress bar, its smallest, largest and current value (NaN while indeterminate), which the host gives TalkBack as `RangeInfo`. **The program's home**: the host starts the program with the app's files directory as its working directory and `HOME`, so what it keeps (a session, a database) is in the app's own storage. `TZ` is the device's time zone (`java.util.TimeZone` id), which `quench_tz::Zone::local()` reads.
 
 **The launcher**: `quench android launcher surface` makes `.SurfaceActivity` the activity the home screen starts (the intent filter moves out of `.MainActivity`); `quench android launcher web` puts it back.
 
