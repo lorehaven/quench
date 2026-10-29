@@ -734,7 +734,7 @@ dependencies = [
 
 [[package]]
 name = "quench-tool"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "quench-archive",
  "quench-args",
