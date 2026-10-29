@@ -66,11 +66,15 @@ const HANDLE_KNOB: f32 = 9.0;
 const FLING_STEP: Duration = Duration::from_millis(16);
 
 /// A finger on the screen.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 struct Touch {
     start: (f32, f32),
     last: (f32, f32),
     scrolling: bool,
+    /// The page owns this gesture: its `touch-action` does not leave the direction the finger took to the platform, so
+    /// the page gets the movement (a swipe on a row, a pull to refresh) instead of a scroll.
+    owned: bool,
     /// When the finger came down, and whether it has been held long enough to select a word.
     started: Instant,
     long: bool,
@@ -336,6 +340,7 @@ impl<W: Write> Surface<W> {
                     start: (x, y),
                     last: (x, y),
                     scrolling: false,
+                    owned: false,
                     started: Instant::now(),
                     long: false,
                     pressed: false,
@@ -354,12 +359,34 @@ impl<W: Write> Surface<W> {
                     return;
                 }
                 let slop = SLOP * self.density;
-                if !t.scrolling && !t.long && (x - t.start.0).hypot(y - t.start.1) > slop {
-                    // Moved too far to be a tap: the finger scrolls what is under it, and nothing is clicked.
-                    t.scrolling = true;
-                    if t.pressed {
-                        self.renderer.pointer_cancel();
+                if !t.scrolling
+                    && !t.owned
+                    && !t.long
+                    && (x - t.start.0).hypot(y - t.start.1) > slop
+                {
+                    // Moved too far to be a tap. Which way it went decides who takes it, as `touch-action` says: the
+                    // platform scrolls what is under the finger (nothing is clicked), or the page, which asked for
+                    // that direction, is given the movement.
+                    let (dx, dy) = (x - t.start.0, y - t.start.1);
+                    if self
+                        .renderer
+                        .touch_action_at(t.start.0, t.start.1)
+                        .allows(dx, dy)
+                    {
+                        t.scrolling = true;
+                        if t.pressed {
+                            self.renderer.pointer_cancel();
+                        }
+                    } else {
+                        t.owned = true;
+                        if !t.pressed {
+                            t.pressed = true;
+                            self.renderer.pointer_down(t.start.0, t.start.1);
+                        }
                     }
+                }
+                if t.owned {
+                    self.renderer.pointer_drag(x, y);
                 }
                 if t.scrolling {
                     self.renderer.wheel(x, y, t.last.0 - x, t.last.1 - y);
@@ -373,7 +400,10 @@ impl<W: Write> Surface<W> {
             }
             2 => {
                 if let Some(t) = self.touch.take() {
-                    if t.scrolling {
+                    if t.owned {
+                        // The page had the gesture: it hears the release, and nothing is clicked.
+                        self.renderer.pointer_release(x, y);
+                    } else if t.scrolling {
                         self.start_fling(&t, x, y);
                     } else if t.long || t.handle.is_some() {
                         // The press was a selection, not a click.
@@ -433,6 +463,7 @@ impl<W: Write> Surface<W> {
         if let Some(t) = &self.touch
             && !t.long
             && !t.scrolling
+            && !t.owned
             && t.handle.is_none()
         {
             next = next.min(t.started + LONG_PRESS);
@@ -483,6 +514,7 @@ impl<W: Write> Surface<W> {
             && !t.pressed
             && !t.long
             && !t.scrolling
+            && !t.owned
             && t.handle.is_none()
             && now >= t.started + PRESS_DELAY
         {
@@ -494,6 +526,7 @@ impl<W: Write> Surface<W> {
         if let Some(t) = &mut self.touch
             && !t.long
             && !t.scrolling
+            && !t.owned
             && t.handle.is_none()
             && now >= t.started + LONG_PRESS
         {

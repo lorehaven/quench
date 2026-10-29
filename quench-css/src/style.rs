@@ -234,6 +234,56 @@ pub struct Shadow {
     pub inset: bool,
 }
 
+/// The directions of finger movement the platform may take for itself, as `touch-action` says (the finger's direction:
+/// `up` is a finger moving up the screen, which scrolls content down).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TouchAction {
+    pub left: bool,
+    pub right: bool,
+    pub up: bool,
+    pub down: bool,
+}
+
+impl TouchAction {
+    /// Every direction: the platform scrolls and zooms as it likes.
+    pub const AUTO: Self = Self {
+        left: true,
+        right: true,
+        up: true,
+        down: true,
+    };
+    /// No direction: the page takes every gesture.
+    pub const NONE: Self = Self {
+        left: false,
+        right: false,
+        up: false,
+        down: false,
+    };
+
+    /// What both allow: an element is as free as it and all its ancestors say.
+    #[must_use]
+    pub const fn and(self, other: Self) -> Self {
+        Self {
+            left: self.left && other.left,
+            right: self.right && other.right,
+            up: self.up && other.up,
+            down: self.down && other.down,
+        }
+    }
+
+    /// Whether the platform may take a movement of `(dx, dy)` (the finger's, in pixels; the larger axis decides).
+    #[must_use]
+    pub fn allows(self, dx: f32, dy: f32) -> bool {
+        if dx.abs() > dy.abs() {
+            if dx < 0.0 { self.left } else { self.right }
+        } else if dy < 0.0 {
+            self.up
+        } else {
+            self.down
+        }
+    }
+}
+
 /// `transform` and `rotate` folded into one: translations add, scales multiply, angles add.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Transform {
@@ -331,6 +381,9 @@ pub struct ComputedStyle {
     pub text_transform: TextTransform,
     pub list_style: ListStyle,
     pub visible: bool,
+    /// Which directions of finger movement the platform may take for itself (scrolling): the rest belongs to the page.
+    /// Not inherited; a touch is judged by the element under the finger and every ancestor together.
+    pub touch_action: TouchAction,
     pub transform: Transform,
     /// The custom properties in effect, resolved.
     pub custom: Rc<HashMap<String, Vec<Value>>>,
@@ -403,6 +456,7 @@ impl Default for ComputedStyle {
             text_transform: TextTransform::None,
             list_style: ListStyle::None,
             visible: true,
+            touch_action: TouchAction::AUTO,
             transform: Transform::default(),
             custom: Rc::new(HashMap::new()),
         }
@@ -955,6 +1009,31 @@ fn ident(values: &[Value]) -> Option<String> {
         [Value::Ident(s)] => Some(s.to_ascii_lowercase()),
         _ => None,
     }
+}
+
+/// The directions a finger may move for the platform to take the gesture: `touch-action`'s `pan-*` values name them (the
+/// finger's direction), `none` takes none, `auto` and `manipulation` all. `pinch-zoom` is about two fingers and means
+/// nothing here.
+fn touch_action_of(values: &[Value]) -> Option<TouchAction> {
+    let mut out = TouchAction::NONE;
+    let mut any = false;
+    for v in values {
+        let Value::Ident(word) = v else { return None };
+        match word.to_ascii_lowercase().as_str() {
+            "auto" | "manipulation" => return Some(TouchAction::AUTO),
+            "none" => return Some(TouchAction::NONE),
+            "pan-x" => (out.left, out.right) = (true, true),
+            "pan-y" => (out.up, out.down) = (true, true),
+            "pan-left" => out.left = true,
+            "pan-right" => out.right = true,
+            "pan-up" => out.up = true,
+            "pan-down" => out.down = true,
+            "pinch-zoom" => continue,
+            _ => return None,
+        }
+        any = true;
+    }
+    any.then_some(out)
 }
 
 fn is_auto(v: &Value) -> bool {
@@ -1798,6 +1877,7 @@ fn try_apply(
             };
         }
         "visibility" => style.visible = !matches!(word?.as_str(), "hidden" | "collapse"),
+        "touch-action" => style.touch_action = touch_action_of(values)?,
         "transform" => {
             let t = transform_of(values, units)?;
             style.transform = t;

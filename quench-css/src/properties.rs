@@ -118,6 +118,7 @@ pub const SUPPORTED: &[&str] = &[
     "text-transform",
     "list-style",
     "visibility",
+    "touch-action",
     "transform",
     "rotate",
 ];
@@ -127,7 +128,6 @@ pub const SUPPORTED: &[&str] = &[
 pub const IGNORED: &[&str] = &[
     "cursor",
     "user-select",
-    "touch-action",
     "will-change",
     "overscroll-behavior",
     "overscroll-behavior-x",

@@ -1359,6 +1359,75 @@ fn timers_channels_and_motion_preference_follow_the_hosts_ticks() {
     assert_eq!(canvas.pixel(5, 5), Color::rgb(0, 0, 255));
 }
 
+#[quench_test::test]
+fn the_page_owns_the_directions_touch_action_leaves_it() {
+    use quench_css::TouchAction;
+    let view = div()
+        .class("outer")
+        .child(button().class("row").text("row"));
+    let (r, _m) = live(
+        &format!("{FLAT} .outer {{ touch-action: pan-y }} .row {{ touch-action: pan-x pan-up }}"),
+        view,
+        200,
+        100,
+    );
+    // The row and its surroundings together: what both allow is up.
+    let t = r.touch_action_at(10.0, 10.0);
+    assert_eq!(
+        t,
+        TouchAction {
+            left: false,
+            right: false,
+            up: true,
+            down: false
+        }
+    );
+    assert!(t.allows(0.0, -20.0) && !t.allows(0.0, 20.0) && !t.allows(20.0, 0.0));
+    // Nothing there: the platform's.
+    assert_eq!(r.touch_action_at(150.0, 90.0), TouchAction::AUTO);
+}
+
+#[quench_test::test]
+fn a_cancelled_touch_is_told_to_the_page_and_a_released_drag_is_no_click() {
+    let log = Rc::new(RefCell::new(Vec::new()));
+    let (c, d, e, f) = (log.clone(), log.clone(), log.clone(), log.clone());
+    let view = button()
+        .text("one")
+        .on_click(move || c.borrow_mut().push("click"))
+        .on(quench_ui::EventKind::PointerDown, move |_| {
+            d.borrow_mut().push("down");
+        })
+        .on(quench_ui::EventKind::PointerUp, move |_| {
+            e.borrow_mut().push("up");
+        })
+        .on(quench_ui::EventKind::PointerCancel, move |_| {
+            f.borrow_mut().push("cancel");
+        });
+    let (r, _m) = live(FLAT, view, 200, 100);
+    r.pointer_down(10.0, 10.0);
+    r.pointer_cancel();
+    r.pointer_up(10.0, 10.0);
+    assert_eq!(
+        *log.borrow(),
+        ["down", "cancel", "up"],
+        "a cancel reaches the page and nothing is clicked"
+    );
+    log.borrow_mut().clear();
+    r.pointer_down(10.0, 10.0);
+    r.pointer_release(10.0, 10.0);
+    assert_eq!(
+        *log.borrow(),
+        ["down", "up"],
+        "a drag that ends on what it began on is not a click"
+    );
+    log.borrow_mut().clear();
+    // The finger that has wandered off still reaches the element it began on, and a drag is no click.
+    r.pointer_down(10.0, 10.0);
+    r.pointer_drag(150.0, 90.0);
+    r.pointer_release(150.0, 90.0);
+    assert_eq!(*log.borrow(), ["down", "up"]);
+}
+
 quench_test::main!();
 
 #[quench_test::test]

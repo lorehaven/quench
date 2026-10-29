@@ -4,7 +4,9 @@
     clippy::too_many_lines,
     clippy::float_cmp,
     clippy::cast_possible_truncation,
-    clippy::cast_precision_loss
+    clippy::cast_precision_loss,
+    clippy::many_single_char_names,
+    clippy::semicolon_if_nothing_returned
 )]
 
 use std::cell::Cell;
@@ -215,6 +217,64 @@ fn a_tap_clicks_and_a_drag_scrolls_and_does_not() {
     touch(&mut surface, 3, 10.0, 10.0);
     touch(&mut surface, 1, 5.0, 5.0);
     assert_eq!(taps.get(), 1);
+}
+
+#[quench_test::test]
+fn a_direction_the_page_asked_for_reaches_it_and_the_rest_still_scrolls() {
+    use quench_ui::EventKind;
+    let moves = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let (m, d, c, u) = (moves.clone(), moves.clone(), moves.clone(), moves.clone());
+    let taps = Rc::new(Cell::new(0));
+    let t = taps.clone();
+    // A row that wants left and right (`pan-y` is what the platform keeps), under a page that is taller than the window.
+    let row = button()
+        .text("row")
+        .class("row")
+        .on_click(move || t.set(t.get() + 1))
+        .on(EventKind::PointerDown, move |_| {
+            d.borrow_mut().push("down".to_string())
+        })
+        .on(EventKind::PointerMove, move |e| {
+            if let quench_ui::Event::PointerMove(p) = e {
+                m.borrow_mut().push(format!("move {}", p.x));
+            }
+        })
+        .on(EventKind::PointerCancel, move |_| {
+            c.borrow_mut().push("cancel".to_string())
+        })
+        .on(EventKind::PointerUp, move |_| {
+            u.borrow_mut().push("up".to_string())
+        });
+    let r = page(div().child(row).child(div().style("height", "800px")));
+    r.add_stylesheet(".row { touch-action: pan-y; display: block; width: 100px; height: 30px }");
+    let mut surface = Surface::new(&r, Vec::new());
+    surface.handle(resize(200, 100, 1.0));
+    let touch = |s: &mut Surface<Vec<u8>>, a: u8, x: f32, y: f32| {
+        s.handle(Event::Touch { action: a, x, y });
+    };
+    // Sideways: not the platform's, so the page hears the whole movement, and nothing is clicked.
+    touch(&mut surface, 0, 20.0, 10.0);
+    touch(&mut surface, 1, 35.0, 10.0);
+    touch(&mut surface, 1, 60.0, 10.0);
+    touch(&mut surface, 2, 60.0, 10.0);
+    let heard = moves.borrow().clone();
+    assert!(heard.iter().any(|h| h == "down"), "{heard:?}");
+    assert!(heard.iter().any(|h| h == "move 60"), "{heard:?}");
+    assert_eq!(heard.last().map(String::as_str), Some("up"), "{heard:?}");
+    assert_eq!(taps.get(), 0, "a drag is no click");
+    assert!(r.scroll_of(0).1 <= 0.0, "and nothing scrolled");
+    // Up and down: the platform's, so the page scrolls and the row is told nothing more.
+    moves.borrow_mut().clear();
+    touch(&mut surface, 0, 20.0, 80.0);
+    touch(&mut surface, 1, 20.0, 40.0);
+    touch(&mut surface, 1, 20.0, 20.0);
+    touch(&mut surface, 2, 20.0, 20.0);
+    assert!(
+        r.scroll_of(0).1 > 20.0,
+        "dragging up scrolls down: {:?}",
+        r.scroll_of(0)
+    );
+    assert!(!moves.borrow().iter().any(|h| h.starts_with("move")));
 }
 
 #[quench_test::test]

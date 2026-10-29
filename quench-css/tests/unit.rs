@@ -1920,4 +1920,36 @@ fn animations_parse_as_a_shorthand_and_as_lists_and_keyframes_are_kept() {
     assert!(cascade.keyframes("nope").is_none());
 }
 
+#[quench_test::test]
+fn touch_action_says_which_finger_movements_the_platform_may_take() {
+    use quench_css::TouchAction;
+    let of = |css: &str| style(&format!("div {{ {css} }}"), 2).touch_action;
+    assert_eq!(of(""), TouchAction::AUTO);
+    assert_eq!(of("touch-action: auto"), TouchAction::AUTO);
+    assert_eq!(of("touch-action: manipulation"), TouchAction::AUTO);
+    assert_eq!(of("touch-action: none"), TouchAction::NONE);
+    let y = of("touch-action: pan-y");
+    assert!(y.up && y.down && !y.left && !y.right);
+    let up = of("touch-action: pan-x pan-up");
+    assert!(up.left && up.right && up.up && !up.down);
+    // Not inherited: a child of a `none` element is free again (the touch is judged by all of them together).
+    let child = style("div { touch-action: none }", 3).touch_action;
+    assert_eq!(child, TouchAction::AUTO);
+    // What both allow.
+    assert_eq!(
+        y.and(up),
+        TouchAction {
+            left: false,
+            right: false,
+            up: true,
+            down: false
+        }
+    );
+    // The finger's movement decides by its larger axis.
+    assert!(y.allows(2.0, -30.0) && y.allows(0.0, 30.0) && !y.allows(30.0, 2.0));
+    assert!(up.allows(0.0, -5.0) && !up.allows(0.0, 5.0));
+    // A value that is not one is ignored, as any invalid declaration is.
+    assert_eq!(of("touch-action: sideways"), TouchAction::AUTO);
+}
+
 quench_test::main!();

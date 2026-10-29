@@ -71,4 +71,4 @@ The web build needs a decision on how the service serves the wasm bundle (look a
 
 - [x] 5.1 `.anvil/daybook.toml` (apk, deb, rpm, arch, source; the version is `desktop/Cargo.toml`'s), `anvil config check` valid, Dockerfile excludes for `daybook-desktop` and `daybook-surface`.
 - [ ] 5.2 The release keystore: `.quench.toml` names `release.keystore` in `services/daybook` (ignored by git). Copy a keystore there (any one signs any number of apps; the password is the one in `.anvil/secret.toml`) or make a new one with `quench android keystore`. Then `anvil artifact release daybook`.
-- [ ] 5.3 The Flutter app is retired when you say; uninstall it once before installing this one (it was signed with the debug key).
+- [x] 5.3 The Flutter app (`mobile-apps/daybook`) is retired: its README says so and points here (the code stays for reference). Uninstall it once before installing the new one (it was signed with the debug key).

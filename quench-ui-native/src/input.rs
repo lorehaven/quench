@@ -144,12 +144,71 @@ impl NativeRenderer {
     }
 
     /// The pointer gesture that went down is not a click after all (a touch turned into a scroll, or was
-    /// taken over): nothing is clicked when it ends.
+    /// taken over): nothing is clicked when it ends, and the page is told, so that a gesture it had begun is
+    /// given up (a browser sends `pointercancel` for the same).
     pub fn pointer_cancel(&self) {
-        let mut dom = self.dom.borrow_mut();
-        dom.ui.pressed = None;
-        dom.ui.active = None;
-        dom.ui.touch();
+        let pressed = {
+            let mut dom = self.dom.borrow_mut();
+            let pressed = dom.ui.pressed.take();
+            dom.ui.active = None;
+            dom.ui.touch();
+            pressed
+        };
+        if let Some(target) = pressed {
+            self.dispatch(target, &Event::PointerCancel(pointer(-1.0, -1.0)), true);
+        }
+    }
+
+    /// The directions of finger movement the platform may take for itself when a touch begins at `(x, y)`, from the
+    /// `touch-action` of the element there and of every element around it (the page owns the rest of the directions:
+    /// a swipe it listens for, a pull to refresh). A touch on nothing is the platform's.
+    #[must_use]
+    pub fn touch_action_at(&self, x: f32, y: f32) -> quench_css::TouchAction {
+        self.ensure_layout();
+        let dom = self.dom.borrow();
+        let (Some(target), Some(root)) = (hit(&dom, x, y), dom.layout.as_ref()) else {
+            return quench_css::TouchAction::AUTO;
+        };
+        let mut around = vec![target];
+        let mut at = target;
+        while let Some(parent) = dom.nodes[at].parent {
+            around.push(parent);
+            at = parent;
+        }
+        let mut allowed = quench_css::TouchAction::AUTO;
+        let mut walk: Vec<&LayoutBox> = vec![&**root];
+        while let Some(b) = walk.pop() {
+            if around.contains(&b.key) {
+                allowed = allowed.and(b.style.touch_action);
+            }
+            walk.extend(b.children.iter());
+        }
+        allowed
+    }
+
+    /// The finger that the page owns (see [`touch_action_at`](Self::touch_action_at)) moved to `(x, y)`. As with a
+    /// browser's touch, the movement goes to the element the touch began on, wherever the finger is now.
+    pub fn pointer_drag(&self, x: f32, y: f32) {
+        let pressed = self.dom.borrow().ui.pressed;
+        if let Some(t) = pressed {
+            self.dispatch(t, &Event::PointerMove(pointer(x, y)), true);
+        }
+    }
+
+    /// The finger that the page owns came up at `(x, y)`: the element the touch began on hears the release (not
+    /// whatever is under the finger now) and nothing is clicked, as the gesture was a drag.
+    pub fn pointer_release(&self, x: f32, y: f32) {
+        self.ensure_layout();
+        let target = {
+            let mut dom = self.dom.borrow_mut();
+            dom.ui.active = None;
+            let began = dom.ui.pressed.take();
+            dom.ui.touch();
+            began
+        };
+        if let Some(t) = target {
+            self.dispatch(t, &Event::PointerUp(pointer(x, y)), true);
+        }
     }
 
     /// The primary button went down at `(x, y)`.

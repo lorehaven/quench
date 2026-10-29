@@ -37,7 +37,8 @@ pub use sheet::{Declaration, Keyframes, Rule, Stylesheet, parse, parse_declarati
 pub use style::{
     Align, Animation, BackgroundSize, BorderStyle, Cascade, ComputedStyle, Direction, Display,
     FillMode, FlexDirection, GridLine, Justify, LineHeight, ListStyle, Overflow, Position, Shadow,
-    TextAlign, TextTransform, Timing, Track, TrackList, Transform, Transition, accepts,
+    TextAlign, TextTransform, Timing, TouchAction, Track, TrackList, Transform, Transition,
+    accepts,
 };
 pub use token::{Token, tokenize};
 pub use value::{Value, parse_values, split_commas};

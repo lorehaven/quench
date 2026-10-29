@@ -1,6 +1,6 @@
 # Quench Auth
 
-`quench-auth` (crate `quench_auth`) is the relying-party half of Forge's realm authentication. It gives every service the pieces needed to *verify* a token or session that gatehouse issued — JWT decode/verify, permission checks, session-revocation lookups, and the middleware and UI helpers that wire those into a service's request pipeline, for either of Forge's two HTTP stacks. It deliberately does not include a login form, a token-issuing API, or user administration: those live in gatehouse (`docker/gatehouse-service`), the one service in the realm allowed to mint tokens and manage accounts. Relying parties that depend on it include gatehouse itself (which also uses it to verify its own tokens), sage-service, switchboard-service, warehouse-service, and conveyor-service.
+`quench-auth` (crate `quench_auth`) is the relying-party half of Forge's realm authentication. It gives every service the pieces needed to *verify* a token or session that gatehouse issued — JWT decode/verify, permission checks, session-revocation lookups, and the middleware and UI helpers that wire those into a service's request pipeline, for either of Forge's two HTTP stacks. It deliberately does not include a login form, a token-issuing API, or user administration: those live in gatehouse (`services/gatehouse/service`), the one service in the realm allowed to mint tokens and manage accounts. Relying parties that depend on it include gatehouse itself (which also uses it to verify its own tokens), sage-service, switchboard-service, warehouse-service, and conveyor-service.
 
 ## Features
 
@@ -73,7 +73,7 @@ It reads the cookie and its signature, not the session store — whether the ses
 
 ## What is not here, and why
 
-The token API (`/api/v1/auth/login`, `refresh`, `logout`, `userinfo`, `sessions`), the login form, user seeding, and the user administration API (`/api/v1/users`) live in gatehouse (`docker/gatehouse-service/src/api/`, `src/ui/pages/auth.rs`, `src/bootstrap.rs`). A relying party verifies tokens; it never issues them, never renders a login form, and never creates or edits a user — keeping that code in the library is what made every service look like it could authenticate on its own.
+The token API (`/api/v1/auth/login`, `refresh`, `logout`, `userinfo`, `sessions`), the login form, user seeding, and the user administration API (`/api/v1/users`) live in gatehouse (`services/gatehouse/service/src/api/`, `src/ui/pages/auth.rs`, `src/bootstrap.rs`). A relying party verifies tokens; it never issues them, never renders a login form, and never creates or edits a user — keeping that code in the library is what made every service look like it could authenticate on its own.
 
 `Access` and `Claims::can` are here because *checking* a permission is a relying party's job. Deciding one is not: there is no way to write a grant through this crate, and `UserDb` remains read-only.
 
@@ -81,7 +81,7 @@ The token API (`/api/v1/auth/login`, `refresh`, `logout`, `userinfo`, `sessions`
 
 `UserDb::validate` and `SessionDb::is_active` are the two read paths that keep a relying party talking to a store directly rather than trusting the token alone:
 
-- `UserDb::validate` — no longer used for sage → switchboard (that moved to the `client_credentials` grant, verified via JWKS like everything else), but still backs warehouse's Docker Registry v2 token endpoint (`docker/warehouse-service/src/routers/docker/token.rs`), which authenticates with HTTP Basic because the registry protocol requires it, not by the estate's own choice.
+- `UserDb::validate` — no longer used for sage → switchboard (that moved to the `client_credentials` grant, verified via JWKS like everything else), but still backs warehouse's Docker Registry v2 token endpoint (`services/warehouse/service/src/routers/docker/token.rs`), which authenticates with HTTP Basic because the registry protocol requires it, not by the estate's own choice.
 - `SessionDb::is_active` — per-request revocation, a Redis read rather than a database one. Would go away with token introspection, or with access tokens short enough not to need it — neither is planned.
 
 ## Configuration
