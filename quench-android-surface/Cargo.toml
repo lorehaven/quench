@@ -1,6 +1,6 @@
 [package]
 name = "quench-android-surface"
-version = "0.1.2"
+version = "0.1.3"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - the program side of an Android app drawn by the native renderer: reads touch, key and text events from the Kotlin host, sends it frames, keyboard requests, the text field state and the accessibility tree"
