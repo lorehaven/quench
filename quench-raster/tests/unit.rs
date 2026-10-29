@@ -527,6 +527,29 @@ fn an_image_is_scaled_filtered_blended_and_clipped() {
     c.draw_image(&[9, 9, 9, 255], 1, 1, (0.0, 0.0, 0.0, 4.0), 1.0);
 }
 
+#[quench_test::test]
+fn a_layer_can_be_turned_and_scaled_around_a_point() {
+    // A wide bar, 8 by 2, centred on (10, 10): turned by 90 degrees it is tall.
+    let mut layer = Canvas::new(8, 2);
+    layer.clear(Color::rgb(255, 0, 0));
+    let mut base = Canvas::new(20, 20);
+    base.draw_layer_transformed(&layer, (6, 9), 1.0, (10.0, 10.0), 90.0, (1.0, 1.0));
+    assert_eq!(base.pixel(10, 7), Color::rgb(255, 0, 0), "above the middle");
+    assert_eq!(base.pixel(9, 13), Color::rgb(255, 0, 0), "below the middle");
+    assert_eq!(base.pixel(6, 10).a, 0, "where the bar was, nothing now");
+    // Scaled by two, and not turned, it is twice as long and as thick.
+    let mut base = Canvas::new(20, 20);
+    base.draw_layer_transformed(&layer, (6, 9), 1.0, (10.0, 10.0), 0.0, (2.0, 2.0));
+    assert_eq!(base.pixel(3, 10), Color::rgb(255, 0, 0));
+    assert_eq!(base.pixel(16, 10), Color::rgb(255, 0, 0));
+    assert_eq!(base.pixel(10, 7).a, 0);
+    // A half turn of a symmetric bar changes nothing, and an opacity still applies.
+    let mut base = Canvas::new(20, 20);
+    base.draw_layer_transformed(&layer, (6, 9), 0.5, (10.0, 10.0), 180.0, (1.0, 1.0));
+    let mixed = base.pixel(10, 10);
+    assert!((120..=135).contains(&mixed.a), "{mixed:?}");
+}
+
 quench_test::main!();
 
 #[quench_test::test]

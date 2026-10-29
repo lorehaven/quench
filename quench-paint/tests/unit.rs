@@ -792,6 +792,51 @@ fn italic_text_leans_to_the_right_without_changing_its_width() {
     );
 }
 
+#[quench_test::test]
+fn rotate_and_scale_turn_a_box_around_its_middle() {
+    // A bar 30 wide and 6 tall at the top left, turned a quarter: it stands, around its own middle (15, 3).
+    let c = render(
+        &E(
+            "",
+            vec![E(
+                "height: 6px; width: 30px; background: red; margin: 20px; rotate: 90deg",
+                vec![],
+            )],
+        ),
+        80,
+        80,
+    );
+    assert_eq!(
+        c.pixel(35, 10),
+        Color::rgb(255, 0, 0),
+        "now above the middle"
+    );
+    assert_eq!(c.pixel(35, 36), Color::rgb(255, 0, 0), "and below it");
+    assert_eq!(
+        c.pixel(22, 23),
+        WHITE,
+        "where it was, the end of it is gone"
+    );
+    // Scaled up it grows about the middle too.
+    let c = render(
+        &E(
+            "",
+            vec![E(
+                "height: 10px; width: 10px; background: blue; margin: 30px; transform: scale(2)",
+                vec![],
+            )],
+        ),
+        80,
+        80,
+    );
+    assert_eq!(
+        c.pixel(27, 35),
+        Color::rgb(0, 0, 255),
+        "grown to the left of where it was"
+    );
+    assert_eq!(c.pixel(43, 35), Color::rgb(0, 0, 255));
+}
+
 quench_test::main!();
 
 #[quench_test::test]

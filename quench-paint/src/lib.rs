@@ -197,7 +197,8 @@ impl Painter<'_> {
         {
             return;
         }
-        if style.opacity >= 1.0 {
+        let turned = style.transform.rotate != 0.0 || style.transform.scale != (1.0, 1.0);
+        if style.opacity >= 1.0 && !turned {
             self.paint_content(canvas, b, x, y);
             return;
         }
@@ -221,7 +222,20 @@ impl Painter<'_> {
         }
         let mut layer = Canvas::new((right - lx) as usize, (bottom - ly) as usize);
         self.paint_content(&mut layer, b, x - lx as f32, y - ly as f32);
-        canvas.draw_layer(&layer, lx, ly, style.opacity);
+        if turned {
+            // Turned and scaled about the middle of the box, as `transform-origin: 50% 50%` says.
+            let pivot = (x + b.width / 2.0, y + b.height / 2.0);
+            canvas.draw_layer_transformed(
+                &layer,
+                (lx, ly),
+                style.opacity,
+                pivot,
+                style.transform.rotate,
+                style.transform.scale,
+            );
+        } else {
+            canvas.draw_layer(&layer, lx, ly, style.opacity);
+        }
     }
 
     fn paint_content<S: AsRef<[u8]> + AsMut<[u8]>>(

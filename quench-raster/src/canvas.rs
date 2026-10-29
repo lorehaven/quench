@@ -482,6 +482,102 @@ impl<S: AsRef<[u8]> + AsMut<[u8]>> Canvas<S> {
         }
     }
 
+    /// Draws `layer`, with its top left corner at `(x, y)`, turned by `degrees` (clockwise) and scaled by `scale` around
+    /// `pivot` (in this canvas's pixels), scaled in opacity by `opacity`. Each destination pixel looks back into the
+    /// layer and mixes the four pixels around that point, so edges stay smooth. Both are premultiplied.
+    pub fn draw_layer_transformed<T: AsRef<[u8]> + AsMut<[u8]>>(
+        &mut self,
+        layer: &Canvas<T>,
+        (x, y): (i32, i32),
+        opacity: f32,
+        pivot: (f32, f32),
+        degrees: f32,
+        scale: (f32, f32),
+    ) {
+        if layer.width == 0 || layer.height == 0 || scale.0 == 0.0 || scale.1 == 0.0 {
+            return;
+        }
+        let (sin, cos) = degrees.to_radians().sin_cos();
+        let opacity = opacity.clamp(0.0, 1.0);
+        // Where the corners of the layer land: the box that holds them is all that can change.
+        let corners = [
+            (0.0, 0.0),
+            (layer.width as f32, 0.0),
+            (0.0, layer.height as f32),
+            (layer.width as f32, layer.height as f32),
+        ]
+        .map(|(cx, cy)| {
+            let (dx, dy) = (
+                (x as f32 + cx - pivot.0) * scale.0,
+                (y as f32 + cy - pivot.1) * scale.1,
+            );
+            (pivot.0 + dx * cos - dy * sin, pivot.1 + dx * sin + dy * cos)
+        });
+        let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+        for (cx, cy) in corners {
+            x0 = x0.min(cx);
+            y0 = y0.min(cy);
+            x1 = x1.max(cx);
+            y1 = y1.max(cy);
+        }
+        let (bx0, by0) = (
+            (x0.floor() as i32).max(self.clip.0),
+            (y0.floor() as i32).max(self.clip.1),
+        );
+        let (bx1, by1) = (
+            (x1.ceil() as i32).min(self.clip.2),
+            (y1.ceil() as i32).min(self.clip.3),
+        );
+        let (lw, lh) = (layer.width as i32, layer.height as i32);
+        let fetch = |lx: i32, ly: i32| -> [f32; 4] {
+            if lx < 0 || ly < 0 || lx >= lw || ly >= lh {
+                return [0.0; 4];
+            }
+            let i = (ly as usize * layer.width + lx as usize) * 4;
+            let p = &layer.px()[i..i + 4];
+            [
+                f32::from(p[0]),
+                f32::from(p[1]),
+                f32::from(p[2]),
+                f32::from(p[3]),
+            ]
+        };
+        for dy in by0..by1 {
+            for dx in bx0..bx1 {
+                // The point of the layer this pixel's centre comes from: undo the scale, then the turn.
+                let (rx, ry) = (dx as f32 + 0.5 - pivot.0, dy as f32 + 0.5 - pivot.1);
+                let (ux, uy) = (rx * cos + ry * sin, -rx * sin + ry * cos);
+                let sx = pivot.0 + ux / scale.0 - x as f32 - 0.5;
+                let sy = pivot.1 + uy / scale.1 - y as f32 - 0.5;
+                let (fx, fy) = (sx.floor(), sy.floor());
+                let (tx, ty) = (sx - fx, sy - fy);
+                let (ix, iy) = (fx as i32, fy as i32);
+                let (a, b, c, d) = (
+                    fetch(ix, iy),
+                    fetch(ix + 1, iy),
+                    fetch(ix, iy + 1),
+                    fetch(ix + 1, iy + 1),
+                );
+                let mut mix = [0.0_f32; 4];
+                for k in 0..4 {
+                    mix[k] = (a[k] * (1.0 - tx) + b[k] * tx) * (1.0 - ty)
+                        + (c[k] * (1.0 - tx) + d[k] * tx) * ty;
+                }
+                if mix[3] <= 0.5 {
+                    continue;
+                }
+                let sa = (mix[3] * opacity).round() as u32;
+                let inv = 255 - sa.min(255);
+                let di = (dy as usize * self.width + dx as usize) * 4;
+                for (k, channel) in mix.iter().enumerate() {
+                    let s = (channel * opacity).round() as u32;
+                    let old = u32::from(self.px()[di + k]);
+                    self.px_mut()[di + k] = (s + mul255(old, inv)).min(255) as u8;
+                }
+            }
+        }
+    }
+
     /// Fills `path`, moved by `(dx, dy)`, anti-aliased, with non-zero winding.
     pub fn fill_path(&mut self, path: &Path, dx: f32, dy: f32, color: Color) {
         let Some((bx0, by0, bx1, by1)) = path.bounds() else {
