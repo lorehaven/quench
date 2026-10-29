@@ -1,6 +1,6 @@
 [package]
 name = "quench-css"
-version = "0.1.1"
+version = "0.1.2"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - a CSS engine with no dependencies: parser with nesting, selectors, the cascade, custom properties, calc() and media queries, computing the styles of a tree"
