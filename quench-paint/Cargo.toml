@@ -1,6 +1,6 @@
 [package]
 name = "quench-paint"
-version = "0.1.4"
+version = "0.1.5"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - paints a laid out box tree into a pixel canvas: backgrounds, borders, radii, shadows, outlines, opacity, clipping and text"
