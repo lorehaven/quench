@@ -72,6 +72,8 @@ All text is UTF-8 in linear memory.
 | `q_prevent(h, kind, mode)` | for the listeners of `kind` on the node: `mode` `1` always calls `preventDefault`; `2` is for links: a plain left click is handled and prevented, while a ctrl-, shift-, alt-, meta- or non-primary click is neither handled nor prevented, so the browser opens the link as it normally would. Called after `q_listen` |
 | `q_set_style(h, name_ptr, name_len, val_ptr, val_len)` | `node.style.setProperty` (an empty value removes the property). Through the style object, not the `style` attribute, so it works under `style-src 'self'` |
 | `q_now() -> f64` | `performance.now()`, milliseconds |
+| `q_wall_ms() -> f64` | `Date.now()`, milliseconds since 1970 (`q_now` is only a stopwatch: it starts at 0 when the page does) |
+| `q_storage_set(key_ptr, key_len, val_ptr, val_len)` | `localStorage.setItem("q:" + key, value)`; an empty value removes the entry. A blocked storage is ignored |
 | `q_reduced_motion() -> u32` | `1` if `prefers-reduced-motion: reduce` matches |
 | `q_focus(h)` | focuses the node once the current call ends (it is attached by then) |
 | `q_trap_focus(h)` | Tab and Shift+Tab move between the focusable things inside the node and wrap around, until the handle is released |
@@ -85,6 +87,7 @@ All text is UTF-8 in linear memory.
 | `memory` | the instance's linear memory |
 | `q_alloc(len) -> ptr`, `q_dealloc(ptr, len)` | buffers for text going in (see above) |
 | `q_set_state(ptr, len)` | the page's embedded JSON, called before `q_main` when there is any |
+| `q_set_env(ptr, len)` | what the page knows of its browser, as JSON `{"time_zone": "Europe/Warsaw", "storage": {key: value}}` (the zone from `Intl`, the entries `q_storage_set` kept), called before `q_main` (see `quench_ui_web::browser`) |
 | `q_set_location(ptr, len)` | the page's URL (path, query, hash), called before `q_main` |
 | `q_popstate(ptr, len)` | the browser moved through its history; the URL it is at now. JS then restores the scroll position saved in that entry (`history.scrollRestoration` is `"manual"`) |
 | `q_main()` | called once after instantiation |

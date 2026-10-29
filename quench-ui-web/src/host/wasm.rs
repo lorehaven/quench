@@ -42,6 +42,8 @@ unsafe extern "C" {
     safe fn q_prevent(h: u32, kind: u32, mode: u32);
     safe fn q_set_style(h: u32, name_ptr: usize, name_len: usize, val_ptr: usize, val_len: usize);
     safe fn q_now() -> f64;
+    safe fn q_wall_ms() -> f64;
+    safe fn q_storage_set(key_ptr: usize, key_len: usize, val_ptr: usize, val_len: usize);
     safe fn q_reduced_motion() -> u32;
     safe fn q_focus(h: u32);
     safe fn q_trap_focus(h: u32);
@@ -184,6 +186,20 @@ pub fn set_style(h: u32, name: &str, value: &str) {
 
 pub fn now() -> f64 {
     q_now()
+}
+
+#[allow(clippy::cast_possible_truncation)] // milliseconds since 1970 fit an `i64` for the next 292 million years
+pub fn wall_ms() -> i64 {
+    q_wall_ms() as i64
+}
+
+pub fn storage_set(key: &str, value: &str) {
+    q_storage_set(
+        key.as_ptr().addr(),
+        key.len(),
+        value.as_ptr().addr(),
+        value.len(),
+    );
 }
 
 pub fn prefers_reduced_motion() -> bool {

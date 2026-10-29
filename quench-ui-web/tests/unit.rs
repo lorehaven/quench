@@ -5,6 +5,8 @@
 mod async_tests;
 #[path = "unit/bridge_tests.rs"]
 mod bridge_tests;
+#[path = "unit/browser_tests.rs"]
+mod browser_tests;
 #[path = "unit/dom_tests.rs"]
 mod dom_tests;
 #[path = "unit/ffi_tests.rs"]

@@ -315,7 +315,8 @@ export async function start(url, options = {}) {
       if (value === "") get(h)?.style?.removeProperty(text(np, nl));
       else get(h)?.style?.setProperty(text(np, nl), value); // the style object, which a strict CSP allows
     }),
-    q_now: () => performance.now(),
+    q_now: () => performance.now(), q_wall_ms: () => Date.now(),
+    q_storage_set: guarded((kp, kl, vp, vl) => { try { localStorage[vl === 0 ? "removeItem" : "setItem"](`q:${text(kp, kl)}`, text(vp, vl)); } catch { /* blocked */ } }), // the page's own entries, under `q:`
     q_reduced_motion: () => (matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0),
     q_prevent: guarded((h, kind, mode) => prevents.set(`${h}:${EVENTS[kind]}`, mode)),
     q_focus: guarded(focusNode),
@@ -385,6 +386,7 @@ export async function start(url, options = {}) {
   const state = document.getElementById("__q_state"); // JSON the server embedded for the app
   call(() => ex.q_set_location(...put(encoder.encode(here()))));
   if (state) call(() => ex.q_set_state(...put(encoder.encode(state.textContent))));
+  call(() => ex.q_set_env(...put(encoder.encode(JSON.stringify({ time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", storage: (() => { try { return Object.fromEntries(Object.keys(localStorage).filter((k) => k.startsWith("q:")).map((k) => [k.slice(2), localStorage.getItem(k)])); } catch { return {}; } })() })))));
   call(() => ex.q_main?.());
   performance.mark("quench:ready");
   const api = { exports: ex, handles: () => nodes.filter(Boolean).length - 1 };

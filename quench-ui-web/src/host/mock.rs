@@ -93,6 +93,9 @@ struct State {
     entry: usize,
     styles: BTreeMap<(usize, String), String>,
     now: f64,
+    wall_ms: i64,
+    /// What `q_storage_set` was called with, newest last (an empty value forgets the key).
+    storage_sets: Vec<(String, String)>,
     reduced_motion: bool,
     bridge_sent: Vec<String>,
 }
@@ -124,6 +127,8 @@ impl State {
             entry: 0,
             styles: BTreeMap::new(),
             now: 0.0,
+            wall_ms: 0,
+            storage_sets: Vec::new(),
             reduced_motion: false,
             bridge_sent: Vec::new(),
         }
@@ -174,6 +179,7 @@ pub fn reset() {
     // The runtime first: dropping what the last test left (an open event source) calls the host, and
     // that must not land in the state the next test starts with.
     crate::reset_runtime();
+    crate::browser::reset();
     with(|s| *s = State::new());
 }
 
@@ -473,6 +479,17 @@ pub fn set_now(ms: f64) {
     with(|s| s.now = ms);
 }
 
+/// Sets the wall clock `q_wall_ms` reads, in milliseconds since 1970.
+pub fn set_wall_ms(ms: i64) {
+    with(|s| s.wall_ms = ms);
+}
+
+/// What the module asked the page to keep, in order: `(key, value)`, an empty value meaning forget.
+#[must_use]
+pub fn storage_sets() -> Vec<(String, String)> {
+    with(|s| s.storage_sets.clone())
+}
+
 /// Sets what `prefers-reduced-motion` reports.
 pub fn set_reduced_motion(on: bool) {
     with(|s| s.reduced_motion = on);
@@ -735,6 +752,14 @@ pub(crate) mod imports {
 
     pub fn now() -> f64 {
         with(|s| s.now)
+    }
+
+    pub fn wall_ms() -> i64 {
+        with(|s| s.wall_ms)
+    }
+
+    pub fn storage_set(key: &str, value: &str) {
+        with(|s| s.storage_sets.push((key.to_string(), value.to_string())));
     }
 
     pub fn prefers_reduced_motion() -> bool {

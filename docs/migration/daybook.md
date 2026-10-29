@@ -48,11 +48,15 @@ Lacks: a **date picker and a time picker** on the native renderer (an `<input ty
 ### Phase 2: the API and the controller (`daybook-net`, `daybook-host`)
 
 - [x] 2.1 `daybook-net`: `Session` over `gatehouse-client` (open/completed tasks, create/replace/delete task, lists, labels; statuses mapped: 400 invalid, 403, 404 gone, 409 name taken), `Store` (session 0600, settings: server, user, open view, show completed). 7 tests against a stand-in server, clippy clean.
-- [ ] 2.2 `daybook-host`: the controller over a `Platform`, the worker, optimistic changes with rollback, reminders sync.
+- [x] 2.2 What the app and its host say to each other is plain data in `daybook-core` (`Request`, `Msg`, `Data`), so the host does not depend on the screens and the web client can use the same. `daybook-host`: the `Controller` over a `Platform` (loads everything; checking off and deleting show at once and are undone with a message if refused; a repeating task waits for the service and says "Done — next: …"; saving reports back to the open form; reminders are replaced 2 s after the last change and at every load; a session that ended signs out and cancels them), `Remote` (the calls against a real session) and a `Worker` that runs calls one after another on one thread. 11 controller tests with a fake platform, clippy clean. `Remote::execute` is not covered by a test yet (it is by the first run against a stand-in server).
 
 ### Phase 3: the screens, the Linux window and the web client (`daybook-app`, `daybook-desktop`, wasm build served by the service)
 
-Not started. The web build needs a decision on how the service serves the wasm bundle (look at how other forge services ship theirs) and on the browser's session (token in memory + refresh).
+- [x] 3.1 `daybook-app`: sign-in; the inbox, lists and labels (a sidebar from 840 px by CSS, a sheet below); tasks with due text in the urgency colours, the repeat and the labels; check off, swipe to delete (asked first), pull to refresh, "Show completed"; the task form (title, notes, due, repeat, reminder, list, labels, *Mark occurrence done*, *Stop repeating*, Delete) whose pickers (a month calendar, a time picker with +/- and usual times, the reminder and repeat menus, a custom repeat, a new label) replace the dialog's content instead of stacking modals; naming/renaming lists and labels. 11 screen tests, clippy clean. Drawn offscreen with sample data (`cargo run -p daybook-desktop --example shots -- <dir>`): the phone and the wide layout look right.
+- [x] 3.2 `daybook-desktop` (`daybook`, class `dev.lorehaven.daybook`): the Linux `Platform` (calls on the worker thread, reminders as timers shown with `notify-send` while the window is open: 3 tests). **Verified against a stand-in server** (no real service): a stored session refreshed and the token rotated into the 0600 session file, then the lists, labels and open tasks loaded; the window opened with the right class and title. Not driven by hand (typing a password, creating a task from the window).
+- [ ] 3.3 The web build (see below).
+
+The web build needs a decision on how the service serves the wasm bundle (look at how other forge services ship theirs) and on the browser's session (token in memory + refresh).
 
 ### Phase 4: Android (`daybook-surface`, `android/`)
 

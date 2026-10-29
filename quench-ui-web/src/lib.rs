@@ -23,6 +23,7 @@
 extern crate self as quench_ui_web;
 
 pub mod bridge;
+pub mod browser;
 mod dom;
 mod events;
 mod exec;
@@ -44,8 +45,8 @@ pub use events::{decode as decode_event, kind_code};
 pub use exec::{Sleep, pending_tasks, sleep, spawn};
 pub use fetch::{AbortHandle, Fetch, FetchError, Request, Response, pending_fetches};
 pub use ffi::{
-    q_alloc, q_dealloc, q_dispatch_event, q_fetch_done, q_popstate, q_set_location, q_set_state,
-    q_sse_event, q_tick, q_timer_fire,
+    q_alloc, q_dealloc, q_dispatch_event, q_fetch_done, q_popstate, q_set_env, q_set_location,
+    q_set_state, q_sse_event, q_tick, q_timer_fire,
 };
 pub use history::BrowserHistory;
 #[cfg(not(target_arch = "wasm32"))]

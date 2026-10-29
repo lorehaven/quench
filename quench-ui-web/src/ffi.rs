@@ -7,6 +7,7 @@
 //! called unsafe is the `no_mangle` that makes each function an export.
 #![allow(unsafe_code)] // `#[unsafe(no_mangle)]`: the export attribute is the only unsafe left here
 
+use crate::browser;
 use crate::{dom, events, exec, fetch, history, sse, state};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -81,6 +82,12 @@ pub extern "C" fn q_dispatch_event(
 #[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
 pub extern "C" fn q_set_state(address: usize, len: usize) {
     state::set(lossy(&take(address, len)));
+}
+
+/// What the page knows of its browser (`{"time_zone": "...", "storage": {key: value}}`), read before `q_main`.
+#[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
+pub extern "C" fn q_set_env(address: usize, len: usize) {
+    browser::set_env(&lossy(&take(address, len)));
 }
 
 /// The URL (path, query and hash) the page was loaded at, read before `q_main`.
