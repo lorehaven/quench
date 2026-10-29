@@ -1,5 +1,7 @@
 use super::support::*;
-use quench_tool::linux::{app_id, build, deb, init, launch_dev, package, run, title, version_code};
+use quench_tool::linux::{
+    app_id, build, deb, init, launch_dev, package, run, title, version, version_code,
+};
 use quench_tool::project::Project;
 
 /// A project with a workspace `Cargo.toml` as `quench new` writes it.
@@ -330,6 +332,26 @@ fn odd_sized_members_are_padded_and_the_version_falls_back() {
         "the host crate's version"
     );
     assert_eq!(ar_members(&std::fs::read(&path).unwrap()).len(), 3);
+}
+
+#[quench_test::test]
+fn an_android_only_project_takes_its_version_from_the_surface_program() {
+    let p = project_named("version-surface", "gallery", "web");
+    std::fs::create_dir_all(p.root.join("surface")).unwrap();
+    std::fs::write(
+        p.root.join("surface/Cargo.toml"),
+        "[package]\nname = \"gallery-surface\"\nversion = \"0.3.2\"\n",
+    )
+    .unwrap();
+    assert_eq!(version(&p), "0.3.2");
+    // A desktop host, when there is one, wins.
+    std::fs::create_dir_all(p.root.join("desktop")).unwrap();
+    std::fs::write(
+        p.root.join("desktop/Cargo.toml"),
+        "[package]\nname = \"gallery-desktop\"\nversion = \"1.0.0\"\n",
+    )
+    .unwrap();
+    assert_eq!(version(&p), "1.0.0");
 }
 
 #[quench_test::test]

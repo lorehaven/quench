@@ -254,7 +254,7 @@ pub fn launch_dev(
     }
 }
 
-/// The version of the project: the workspace's, else the host crate's.
+/// The version of the project: the workspace's, else the desktop host crate's, else the Android surface program's.
 #[must_use]
 pub fn version(project: &Project) -> String {
     let find = |path: &Path, section: &str| -> Option<String> {
@@ -272,6 +272,8 @@ pub fn version(project: &Project) -> String {
     };
     find(&project.root.join("Cargo.toml"), "[workspace.package]")
         .or_else(|| find(&project.root.join("desktop/Cargo.toml"), "[package]"))
+        // An Android-only project has no desktop host: the surface program carries the version.
+        .or_else(|| find(&project.root.join("surface/Cargo.toml"), "[package]"))
         .unwrap_or_else(|| "0.1.0".to_string())
 }
 
