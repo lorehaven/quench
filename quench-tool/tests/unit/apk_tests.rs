@@ -366,3 +366,39 @@ fn the_version_is_the_cargo_version_unless_quench_toml_says_otherwise() {
     let p = Project::find(&p.root).unwrap();
     assert_eq!(version(&p), ("2.3.4".to_string(), 2_003_004));
 }
+
+#[quench_test::test]
+fn a_project_with_only_a_surface_still_builds_its_libraries_for_every_abi() {
+    // The screens-only app (no `native/`) has `surface/`; its library is built for both ABIs, so the APK is not
+    // left with whatever an earlier build put in jniLibs.
+    let (mut sys, p) = ready("apk-surface");
+    std::fs::create_dir_all(p.root.join("surface")).unwrap();
+    std::fs::write(p.root.join("surface/Cargo.toml"), "").unwrap();
+    sys.vars.insert("ANDROID_NDK_HOME".into(), "/ndk".into());
+    sys.existing.insert(PathBuf::from("/ndk"));
+    for target in ["aarch64-linux-android", "x86_64-linux-android"] {
+        let dir = p.target_dir().join(target).join("release");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("quench_surface"), b"ELF").unwrap();
+    }
+    build_apk(&sys, &mut Vec::new(), &p, true, false, None).unwrap();
+    let lines = sys.lines();
+    for abi in ["aarch64", "x86_64"] {
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.contains(&format!("my-app-surface --target {abi}"))),
+            "{abi} in {lines:?}"
+        );
+    }
+    for abi in ["arm64-v8a", "x86_64"] {
+        assert!(
+            p.root
+                .join(format!(
+                    "android/app/src/main/jniLibs/{abi}/libquench_surface.so"
+                ))
+                .is_file(),
+            "{abi}"
+        );
+    }
+}

@@ -313,14 +313,51 @@ fn ar_member(out: &mut Vec<u8>, name: &str, data: &[u8]) {
     }
 }
 
+/// The icon the packages install, if `[linux] icon` names one: `(install path, bytes)`, filed under the size the PNG
+/// says it is in the `hicolor` theme.
+///
+/// # Errors
+/// The file is missing, is not a PNG, or is not square.
+pub fn icon(project: &Project) -> Result<Option<(String, Vec<u8>)>> {
+    let Some(name) = &project.linux.icon else {
+        return Ok(None);
+    };
+    let path = project.root.join(name);
+    let bytes =
+        std::fs::read(&path).map_err(|e| Error(format!("[linux] icon {}: {e}", path.display())))?;
+    if bytes.len() < 24 || bytes[..8] != [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a] {
+        return fail(format!("[linux] icon {name} is not a PNG"));
+    }
+    let side =
+        |at: usize| u32::from_be_bytes([bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]]);
+    let (width, height) = (side(16), side(20));
+    if width != height {
+        return fail(format!(
+            "[linux] icon {name} is {width}x{height}: it must be square"
+        ));
+    }
+    Ok(Some((
+        format!(
+            "/usr/share/icons/hicolor/{width}x{width}/apps/{}.png",
+            app_id(project)
+        ),
+        bytes,
+    )))
+}
+
 /// The `.desktop` entry that puts the app in the menus.
 #[must_use]
 pub fn desktop_entry(project: &Project) -> String {
     format!(
-        "[Desktop Entry]\nType=Application\nName={}\nExec=/usr/bin/{}\nTerminal=false\nCategories=Utility;\nStartupWMClass={}\n",
+        "[Desktop Entry]\nType=Application\nName={}\nExec=/usr/bin/{}\nTerminal=false\nCategories=Utility;\nStartupWMClass={}\n{}",
         title(project),
         project.name,
-        project.linux.wm_class.as_deref().unwrap_or(&project.name)
+        project.linux.wm_class.as_deref().unwrap_or(&project.name),
+        if project.linux.icon.is_some() {
+            format!("Icon={}\n", app_id(project))
+        } else {
+            String::new()
+        }
     )
 }
 
@@ -357,6 +394,27 @@ pub fn deb(sys: &dyn System, out: &mut dyn Write, project: &Project) -> Result<P
         desktop_entry(project).as_bytes(),
     )
     .map_err(|e| Error(e.to_string()))?;
+    if let Some((path, bytes)) = icon(project)? {
+        // The directories above the icon, then the icon.
+        let relative = path.trim_start_matches('/');
+        let mut dir = String::from(".");
+        for part in relative.rsplit_once('/').map_or("", |p| p.0).split('/') {
+            dir = format!("{dir}/{part}");
+            if matches!(dir.as_str(), "./usr" | "./usr/share") {
+                continue;
+            }
+            data.append(
+                &quench_archive::tar::Header::directory(&format!("{dir}/")),
+                &[],
+            )
+            .map_err(|e| Error(e.to_string()))?;
+        }
+        data.append(
+            &quench_archive::tar::Header::file(&format!("./{relative}")),
+            &bytes,
+        )
+        .map_err(|e| Error(e.to_string()))?;
+    }
 
     let size_kib = binary.len().div_ceil(1024);
     let control_text = format!(

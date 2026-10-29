@@ -40,6 +40,8 @@ pub struct LinuxConfig {
     /// The window class the menu entry names (`StartupWMClass`), when it is not the project's name: a native
     /// window's is its application id.
     pub wm_class: Option<String>,
+    /// A square PNG (from the project root) the packages install as the app's icon and the menu entry names.
+    pub icon: Option<String>,
 }
 
 #[derive(Deserialize)]

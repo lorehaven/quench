@@ -96,6 +96,18 @@ fn host_tag() -> &'static str {
     }
 }
 
+/// Whether the project has a program to build for the device.
+///
+/// That is the native operations (`native/`) or the program that draws the screens (`surface/`). A project with only
+/// the second still needs its libraries built for every ABI: without them the APK carries whatever an earlier build
+/// left in `jniLibs`, or nothing.
+#[must_use]
+pub fn has_native_code(project: &Project) -> bool {
+    ["native", "surface"]
+        .iter()
+        .any(|dir| project.root.join(dir).join("Cargo.toml").is_file())
+}
+
 /// `quench android build-native`: builds the program in `native/` for each ABI with the NDK's linker
 /// and puts it where Gradle packages it: `android/app/src/main/jniLibs/<abi>/libquench_native.so`.
 ///
@@ -308,7 +320,7 @@ pub fn build_apk(
 ) -> Result<std::path::PathBuf> {
     package(project)?;
     crate::release::bundle(sys, out, project)?;
-    if project.root.join("native/Cargo.toml").is_file() {
+    if has_native_code(project) {
         build_native(sys, out, project, release, abi)?;
     }
     let (task, built) = match (release, aab) {
@@ -375,13 +387,13 @@ pub fn run(
         },
         str::to_string,
     );
-    if project.root.join("native/Cargo.toml").is_file() && !ABIS.iter().any(|(a, _)| *a == abi) {
+    if has_native_code(project) && !ABIS.iter().any(|(a, _)| *a == abi) {
         return fail(format!(
             "the device's ABI `{abi}` is not one this tool builds native code for"
         ));
     }
     crate::release::bundle(sys, out, project)?;
-    if project.root.join("native/Cargo.toml").is_file() {
+    if has_native_code(project) {
         build_native(sys, out, project, false, Some(&abi))?;
     }
     gradle(sys, out, project, &["installDebug"], false)?;

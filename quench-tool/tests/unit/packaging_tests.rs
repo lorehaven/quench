@@ -208,3 +208,93 @@ fn a_project_inside_a_workspace_brings_a_manifest_cut_down_to_its_crates() {
     assert_eq!(find("demo-0.2.0/Cargo.lock").data, b"# lock\n");
     find("demo-0.2.0/services/demo/app/Cargo.toml");
 }
+
+/// A PNG that is only its signature and the start of its header: enough to name its size.
+fn png(width: u32, height: u32) -> Vec<u8> {
+    let mut bytes = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13];
+    bytes.extend_from_slice(b"IHDR");
+    bytes.extend_from_slice(&width.to_be_bytes());
+    bytes.extend_from_slice(&height.to_be_bytes());
+    bytes
+}
+
+fn with_icon(label: &str, icon: &[u8]) -> Project {
+    let p = workspace_project(label);
+    put(&p.root.join("icon.png"), icon);
+    let manifest = p.root.join(".quench.toml");
+    let text = std::fs::read_to_string(&manifest).unwrap();
+    std::fs::write(
+        &manifest,
+        text.replacen("[linux]\n", "[linux]\nicon = \"icon.png\"\n", 1),
+    )
+    .unwrap();
+    let p = Project::find(&p.root).unwrap();
+    built(&p);
+    p
+}
+
+#[quench_test::test]
+fn an_icon_is_installed_in_the_theme_and_named_by_the_menu_entry() {
+    let p = with_icon("pkg-icon", &png(256, 256));
+    let icon_path = "usr/share/icons/hicolor/256x256/apps/dev.lorehaven.myapp.png";
+
+    let arch_pkg = arch(&Fake::default(), &mut Vec::new(), &p).unwrap();
+    let tar =
+        quench_archive::zstd::decompress(&std::fs::read(&arch_pkg).unwrap(), 1 << 20).unwrap();
+    let entries: Vec<_> = quench_archive::tar::Reader::new(&tar)
+        .map(Result::unwrap)
+        .collect();
+    assert!(entries.iter().any(|e| e.path == icon_path), "arch");
+    let entry = entries
+        .iter()
+        .find(|e| e.path.ends_with(".desktop"))
+        .unwrap();
+    assert!(
+        String::from_utf8_lossy(entry.data).contains("Icon=dev.lorehaven.myapp\n"),
+        "the menu entry names the icon"
+    );
+
+    let deb_pkg = quench_tool::linux::deb(&Fake::default(), &mut Vec::new(), &p).unwrap();
+    let ar = std::fs::read(&deb_pkg).unwrap();
+    let data = quench_archive::gzip::decompress(
+        // data.tar.gz is the last member: its bytes start 60 bytes (one header) after its name.
+        &ar[ar.windows(12).position(|w| w == b"data.tar.gz ").unwrap() + 60..],
+        1 << 20,
+    );
+    let data = data.unwrap();
+    let names: Vec<String> = quench_archive::tar::Reader::new(&data)
+        .map(|e| e.unwrap().path)
+        .collect();
+    assert!(
+        names.iter().any(|n| n == &format!("./{icon_path}")),
+        "deb: {names:?}"
+    );
+
+    let rpm_pkg = rpm(&Fake::default(), &mut Vec::new(), &p).unwrap();
+    let bytes = std::fs::read(&rpm_pkg).unwrap();
+    let sig_len = header_len(&bytes, 96).next_multiple_of(8);
+    let header_at = 96 + sig_len;
+    let payload = quench_archive::gzip::decompress(
+        &bytes[header_at + header_len(&bytes, header_at)..],
+        1 << 20,
+    )
+    .unwrap();
+    assert!(
+        String::from_utf8_lossy(&payload).contains(&format!("./{icon_path}")),
+        "rpm"
+    );
+}
+
+#[quench_test::test]
+fn an_icon_that_is_not_a_square_png_is_refused() {
+    let p = with_icon("pkg-icon-wide", &png(256, 128));
+    let e = arch(&Fake::default(), &mut Vec::new(), &p)
+        .unwrap_err()
+        .to_string();
+    assert!(e.contains("must be square"), "{e}");
+    let p = with_icon("pkg-icon-text", b"not a png at all, not at all");
+    let e = arch(&Fake::default(), &mut Vec::new(), &p)
+        .unwrap_err()
+        .to_string();
+    assert!(e.contains("not a PNG"), "{e}");
+}
