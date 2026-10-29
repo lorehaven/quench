@@ -115,6 +115,9 @@ impl<'a> Layers<'a> {
     }
 }
 
+/// How far outside the visible area a box may be and still be painted: its shadow or outline might reach in.
+const CULL_MARGIN: f32 = 160.0;
+
 /// The thickness of the scroll bar a scroll container shows.
 pub const SCROLLBAR: f32 = 6.0;
 
@@ -181,6 +184,18 @@ impl Painter<'_> {
         if !style.transform.is_identity() {
             x += style.transform.translate.0.resolve(b.width);
             y += style.transform.translate.1.resolve(b.height);
+        }
+        // A box that is nowhere near what can be seen is not painted, nor anything inside it: a long list in a
+        // scroll container costs the rows on screen, not all of them. The margin covers what can spill out of a
+        // box (shadows, outlines, glyphs that lean over their edge).
+        let (cx0, cy0, cx1, cy1) = canvas.clip();
+        let reach = (b.width.max(b.overflow.0), b.height.max(b.overflow.1));
+        if x > cx1 as f32 + CULL_MARGIN
+            || y > cy1 as f32 + CULL_MARGIN
+            || x + reach.0 < cx0 as f32 - CULL_MARGIN
+            || y + reach.1 < cy0 as f32 - CULL_MARGIN
+        {
+            return;
         }
         if style.opacity >= 1.0 {
             self.paint_content(canvas, b, x, y);

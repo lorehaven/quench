@@ -746,3 +746,22 @@ fn damaged_fonts_never_panic_whatever_is_asked_of_them() {
 }
 
 quench_test::main!();
+
+#[quench_test::test]
+fn a_text_laid_out_again_is_the_same_and_each_size_and_width_is_its_own() {
+    let fonts = FontSet::noto_sans();
+    let text = "Example app number 12 with a name long enough to wrap";
+    let first = fonts.layout(text, 16.0, None);
+    // The second call is answered from memory and is the very same layout.
+    assert_eq!(fonts.layout(text, 16.0, None), first);
+    // Another size, another width, another text: not mistaken for it.
+    let bigger = fonts.layout(text, 24.0, None);
+    assert!(bigger.width > first.width);
+    let wrapped = fonts.layout(text, 16.0, Some(120.0));
+    assert!(wrapped.lines.len() > first.lines.len());
+    assert_eq!(fonts.layout(text, 16.0, None), first, "still the first one");
+    assert_ne!(fonts.layout("Another text", 16.0, None), first);
+    // The empty text still has its line, cached or not.
+    assert_eq!(fonts.layout("", 16.0, None).lines.len(), 1);
+    assert_eq!(fonts.layout("", 16.0, None).lines.len(), 1);
+}

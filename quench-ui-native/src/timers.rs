@@ -114,7 +114,7 @@ impl NativeRenderer {
         ran |= animating;
         if ran {
             let mut dom = self.dom.borrow_mut();
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.stale = true;
         }
         ran

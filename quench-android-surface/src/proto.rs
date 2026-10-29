@@ -276,6 +276,20 @@ pub enum Out<'a> {
 /// # Errors
 /// The stream's.
 pub fn write_out(output: &mut impl Write, message: &Out<'_>) -> io::Result<()> {
+    // A frame is megabytes: its pixels go straight to the stream instead of being copied into a message first.
+    if let Out::Frame {
+        width,
+        height,
+        rgba,
+    } = message
+    {
+        output.write_all(&((1 + 4 + 4 + rgba.len()) as u32).to_be_bytes())?;
+        output.write_all(&[1])?;
+        output.write_all(&width.to_be_bytes())?;
+        output.write_all(&height.to_be_bytes())?;
+        output.write_all(rgba)?;
+        return output.flush();
+    }
     let mut body: Vec<u8> = Vec::new();
     match message {
         Out::Frame {

@@ -746,3 +746,36 @@ fn a_long_press_selects_a_word_and_handles_move_its_ends() {
 }
 
 quench_test::main!();
+
+#[quench_test::test]
+fn a_finger_that_starts_scrolling_never_presses_and_one_that_rests_does_after_a_moment() {
+    let view = div()
+        .child(button().text("go"))
+        .child(div().style("height", "800px"));
+    let r = page(view);
+    r.add_stylesheet("button:active { background: red }");
+    let mut surface = Surface::new(&r, Vec::new());
+    surface.handle(resize(200, 100, 1.0));
+    let mut canvas = quench_raster::Canvas::new(200, 100);
+    let first = r.render(&mut canvas);
+    let touch = |s: &mut Surface<Vec<u8>>, a: u8, x: f32, y: f32| {
+        s.handle(Event::Touch { action: a, x, y });
+    };
+    // A drag: the page is never told the finger is down, so nothing is restyled and the layout stands.
+    touch(&mut surface, 0, 10.0, 10.0);
+    touch(&mut surface, 1, 10.0, 60.0);
+    touch(&mut surface, 1, 10.0, 120.0);
+    let scrolled = r.render(&mut canvas);
+    assert!(
+        std::rc::Rc::ptr_eq(&first, &scrolled),
+        "a scroll does not lay the page out again"
+    );
+    touch(&mut surface, 2, 10.0, 120.0);
+    // A finger that rests is pressed once PRESS_DELAY has passed (and the button shows it).
+    touch(&mut surface, 0, 10.0, 10.0);
+    surface.timers(std::time::Instant::now() + std::time::Duration::from_millis(120));
+    let pressed = r.render(&mut canvas);
+    assert!(!std::rc::Rc::ptr_eq(&first, &pressed), "the press restyles");
+    assert_eq!(canvas.pixel(5, 5), quench_raster::Color::rgb(255, 0, 0));
+    touch(&mut surface, 2, 10.0, 10.0);
+}

@@ -528,3 +528,80 @@ fn an_image_is_scaled_filtered_blended_and_clipped() {
 }
 
 quench_test::main!();
+
+#[quench_test::test]
+fn a_rounded_rectangle_on_whole_pixels_is_the_same_by_the_fast_path_as_by_the_curve() {
+    let color = Color::rgb(30, 90, 160);
+    // `fill_rounded_rect` always takes the curve; `fill_rrect` takes the rows where it can.
+    for (radius, rect) in [
+        (0.0, (3.0, 2.0, 30.0, 20.0)),
+        (8.0, (3.0, 2.0, 30.0, 20.0)),
+        (10.0, (0.0, 0.0, 40.0, 20.0)),
+        (6.0, (5.0, 4.0, 12.0, 12.0)),
+    ] {
+        let mut slow = Canvas::new(48, 32);
+        slow.clear(Color::rgb(200, 200, 200));
+        slow.fill_rounded_rect(rect.0, rect.1, rect.2, rect.3, radius, color);
+        let mut fast = Canvas::new(48, 32);
+        fast.clear(Color::rgb(200, 200, 200));
+        fast.fill_rrect(rect, [radius; 4], color);
+        assert_eq!(slow.bytes(), fast.bytes(), "radius {radius} rect {rect:?}");
+    }
+}
+
+#[quench_test::test]
+fn a_box_with_different_corners_and_an_odd_size_keeps_its_shape_on_the_fast_path() {
+    let color = Color::rgb(255, 0, 0);
+    let mut c = Canvas::new(40, 30);
+    c.fill_rrect((4.0, 4.0, 30.0, 20.0), [10.0, 0.0, 6.0, 2.0], color);
+    // The square top right corner is filled to its very pixel; the round top left one is not.
+    assert_eq!(alpha_at(&c, 33, 4), 255);
+    assert!(alpha_at(&c, 4, 4) < 128);
+    // The straight middle is solid edge to edge.
+    assert_eq!((alpha_at(&c, 4, 14), alpha_at(&c, 33, 14)), (255, 255));
+    // Nothing leaks outside the box.
+    assert_eq!(
+        (
+            alpha_at(&c, 3, 14),
+            alpha_at(&c, 34, 14),
+            alpha_at(&c, 20, 3)
+        ),
+        (0, 0, 0)
+    );
+}
+
+#[quench_test::test]
+fn a_filled_rectangle_is_clipped_and_fast_filled_without_leaving_its_row() {
+    let mut c = Canvas::new(10, 6);
+    c.fill_rect(2.0, 1.0, 5.0, 3.0, Color::rgb(0, 255, 0));
+    assert_eq!(c.pixel(2, 1), Color::rgb(0, 255, 0));
+    assert_eq!(c.pixel(6, 3), Color::rgb(0, 255, 0));
+    assert_eq!(c.pixel(1, 1), Color::TRANSPARENT);
+    assert_eq!(c.pixel(7, 3), Color::TRANSPARENT);
+    assert_eq!(c.pixel(4, 4), Color::TRANSPARENT);
+    // A rectangle that runs off the canvas on every side stops at its edges.
+    c.fill_rect(-5.0, -5.0, 30.0, 30.0, Color::rgb(1, 2, 3));
+    assert_eq!(c.pixel(9, 5), Color::rgb(1, 2, 3));
+}
+
+#[quench_test::test]
+fn a_translucent_rectangle_blends_the_same_by_rows_as_by_the_curve() {
+    for color in [
+        Color::rgba(11, 11, 11, 153),
+        Color::rgba(255, 0, 0, 1),
+        Color::rgba(40, 200, 90, 254),
+    ] {
+        let mut by_rows = Canvas::new(20, 12);
+        by_rows.clear(Color::rgb(180, 120, 60));
+        by_rows.fill_rect(2.0, 3.0, 14.0, 6.0, color);
+        let mut by_curve = Canvas::new(20, 12);
+        by_curve.clear(Color::rgb(180, 120, 60));
+        by_curve.fill_rounded_rect(2.0, 3.0, 14.0, 6.0, 0.0, color);
+        assert_eq!(by_rows.bytes(), by_curve.bytes(), "{color:?}");
+    }
+    // Nothing for a fully transparent colour.
+    let mut c = Canvas::new(4, 4);
+    c.clear(Color::rgb(1, 2, 3));
+    c.fill_rect(0.0, 0.0, 4.0, 4.0, Color::rgba(255, 255, 255, 0));
+    assert_eq!(c.pixel(2, 2), Color::rgb(1, 2, 3));
+}

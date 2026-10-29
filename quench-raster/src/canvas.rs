@@ -108,6 +108,12 @@ impl<S: AsRef<[u8]> + AsMut<[u8]>> Canvas<S> {
         }
     }
 
+    /// What drawing is limited to now: `(x0, y0, x1, y1)` in pixels, the end excluded.
+    #[must_use]
+    pub const fn clip(&self) -> (i32, i32, i32, i32) {
+        self.clip
+    }
+
     /// Limits drawing to the rectangle (clipped to the canvas); returns the previous clip to restore.
     pub fn set_clip(&mut self, x: i32, y: i32, w: i32, h: i32) -> (i32, i32, i32, i32) {
         let before = self.clip;
@@ -175,17 +181,32 @@ impl<S: AsRef<[u8]> + AsMut<[u8]>> Canvas<S> {
             y1.min(self.clip.3),
         );
         if color.a == 255 {
+            // One slice per row, not a bounds-checked write per pixel.
             let p = premultiplied(color, 255);
-            for yy in cy0..cy1 {
-                for xx in cx0..cx1 {
-                    let i = (yy as usize * self.width + xx as usize) * 4;
-                    self.px_mut()[i..i + 4].copy_from_slice(&p);
+            if cx1 > cx0 {
+                let width = self.width;
+                for yy in cy0..cy1 {
+                    let start = (yy as usize * width + cx0 as usize) * 4;
+                    let end = (yy as usize * width + cx1 as usize) * 4;
+                    for pixel in self.px_mut()[start..end].as_chunks_mut::<4>().0 {
+                        *pixel = p;
+                    }
                 }
             }
-        } else {
+        } else if color.a > 0 && cx1 > cx0 {
+            // Source over, a row at a time: the colour is premultiplied once, and each pixel is the colour plus what
+            // shows through it. (A scrim over the whole screen is millions of pixels.)
+            let p = premultiplied(color, 255);
+            let inv = 255 - u32::from(p[3]);
+            let width = self.width;
             for yy in cy0..cy1 {
-                for xx in cx0..cx1 {
-                    self.blend(xx, yy, color, 255);
+                let start = (yy as usize * width + cx0 as usize) * 4;
+                let end = (yy as usize * width + cx1 as usize) * 4;
+                for pixel in self.px_mut()[start..end].as_chunks_mut::<4>().0 {
+                    for (channel, source) in pixel.iter_mut().zip(p) {
+                        *channel =
+                            (u32::from(source) + mul255(u32::from(*channel), inv)).min(255) as u8;
+                    }
                 }
             }
         }
@@ -222,6 +243,27 @@ impl<S: AsRef<[u8]> + AsMut<[u8]>> Canvas<S> {
 
     /// Fills a rectangle whose corners have their own radii: `[top-left, top-right, bottom-right, bottom-left]`.
     pub fn fill_rrect(&mut self, rect: (f32, f32, f32, f32), radii: [f32; 4], color: Color) {
+        let (x, y, w, h) = rect;
+        let whole = [x, y, w, h].iter().all(|v| v.fract() == 0.0);
+        if whole && w >= 1.0 && h >= 1.0 {
+            // On whole pixels the straight middle of the box is plain rows of the colour: only the bands the
+            // corners reach need the per-pixel curve (and with square corners there are none). This is what
+            // makes a full-screen background cost a memory fill instead of a distance calculation per pixel.
+            let top = radii[0].max(radii[1]).max(0.0).ceil();
+            let bottom = radii[2].max(radii[3]).max(0.0).ceil();
+            if top + bottom < h {
+                self.fill_rect(x, y + top, w, h - top - bottom, color);
+                for (band_y, band_h) in [(y, top), (y + h - bottom, bottom)] {
+                    if band_h > 0.0 {
+                        let before =
+                            self.clip_to(x as i32 - 1, band_y as i32, w as i32 + 2, band_h as i32);
+                        self.paint_sdf(rect, radii, color, coverage_of);
+                        self.restore_clip(before);
+                    }
+                }
+                return;
+            }
+        }
         self.paint_sdf(rect, radii, color, coverage_of);
     }
 

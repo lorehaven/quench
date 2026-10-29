@@ -1878,3 +1878,84 @@ fn a_long_press_selects_a_word_and_its_handles_can_be_moved() {
     r.move_selection_end(false, x - 50.0);
     assert_eq!(selection(&r).0, 0);
 }
+
+#[quench_test::test]
+fn a_scroll_or_a_blink_reuses_the_layout_but_a_hover_or_a_change_makes_a_new_one() {
+    let view = div()
+        .child(
+            div()
+                .attr("id", "scroller")
+                .child(div().style("height", "300px").text("tall")),
+        )
+        .child(button().class("b"));
+    let css = "body { margin: 0 } #scroller { height: 100px; width: 100px; overflow: auto } button { display: block; border: 0; padding: 0; width: 20px; height: 20px; background: white } button:hover { background: red }";
+    let (r, _m) = live(css, view, 200, 200);
+    let mut canvas = Canvas::new(200, 200);
+    let first = r.render(&mut canvas);
+    // Nothing changed at all: the same layout.
+    assert!(Rc::ptr_eq(&first, &r.render(&mut canvas)));
+    // A scroll changes where things are drawn, not where they are laid out.
+    r.wheel(10.0, 10.0, 0.0, 60.0);
+    assert!(r.take_dirty(), "the frame is redrawn");
+    let scrolled = r.render(&mut canvas);
+    assert!(Rc::ptr_eq(&first, &scrolled), "a scroll reuses the layout");
+    // So does the blink of the caret.
+    r.set_caret_visible(false);
+    assert!(Rc::ptr_eq(&first, &r.render(&mut canvas)));
+    // A pointer over a button with a :hover rule restyles, so the layout is new - and the button is red.
+    r.pointer_move(10.0, 110.0);
+    let hovered = r.render(&mut canvas);
+    assert!(!Rc::ptr_eq(&first, &hovered), "a hover is laid out again");
+    assert_eq!(canvas.pixel(5, 105), RED);
+}
+
+/// The rows of `canvas` that have any red in them (the caret and glyphs of a `color: red` field).
+fn red_rows(canvas: &Canvas) -> (usize, usize) {
+    let rows: Vec<usize> = (0..canvas.height())
+        .filter(|y| {
+            (0..canvas.width()).any(|x| canvas.pixel(x, *y).r > 200 && canvas.pixel(x, *y).g < 80)
+        })
+        .collect();
+    (*rows.first().unwrap(), *rows.last().unwrap())
+}
+
+#[quench_test::test]
+fn the_caret_of_an_empty_field_stands_where_the_text_will_be() {
+    // A field as an app draws it: the kit's own style (a touch target of 48 px at least), the text in the middle,
+    // on a screen of 1x and on a phone's 2.8x.
+    for scale in [1.0_f32, 2.8125] {
+        let view = div()
+            .class("q-textfield")
+            .child(input().attr("type", "text").class("q-textfield-input"));
+        let css = format!(
+            "{}{}{}body {{ margin: 0 }} .q-textfield .q-textfield-input {{ padding: 0; background: white; color: red; border: 0; border-bottom: 1px solid #525252; font-size: 16px }}",
+            quench_style::tokens::stylesheet(),
+            quench_style::mobile::stylesheet(),
+            quench_style::components::stylesheet()
+        );
+        let r = Rc::new(NativeRenderer::new());
+        r.add_stylesheet(&css);
+        r.set_scale(scale);
+        let (w, h) = ((220.0 * scale) as usize, (80.0 * scale) as usize);
+        r.set_viewport(w as f32, h as f32);
+        let _m = mount(&r, &r.root(), view);
+        let mut canvas = Canvas::new(w, h);
+        r.render(&mut canvas);
+        let field = r.children(r.children(r.root())[0])[0];
+        r.pointer_down(10.0 * scale, 20.0 * scale);
+        r.pointer_up(10.0 * scale, 20.0 * scale);
+        let mut empty = Canvas::new(w, h);
+        r.render(&mut empty);
+        let caret_empty = red_rows(&empty);
+        // A space has no ink, so what is red now is the caret after it: where it is once there is text.
+        r.text(" ");
+        assert_eq!(r.attr(field, "value").as_deref(), Some(" "));
+        let mut typed = Canvas::new(w, h);
+        r.render(&mut typed);
+        let caret_typed = red_rows(&typed);
+        assert_eq!(
+            caret_empty, caret_typed,
+            "scale {scale}: the empty caret {caret_empty:?} and the one after text {caret_typed:?} are at the same height"
+        );
+    }
+}

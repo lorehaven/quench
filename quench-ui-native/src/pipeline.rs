@@ -534,13 +534,26 @@ impl NativeRenderer {
             let mut dom = self.dom.borrow_mut();
             dom.layout = Some(Rc::clone(&boxes));
             dom.ui.stale = false;
+            dom.ui.restyle = false;
         }
         boxes
     }
 
+    /// The layout for a frame: the last one when only the paint can have changed (a scroll, the blink of the
+    /// caret), else a new one. Laying out the whole document - the cascade, every box, every line - for each frame
+    /// of a scroll is what makes a long list crawl.
+    fn layout_for_frame(&self) -> Rc<LayoutBox> {
+        let cached = {
+            let dom = self.dom.borrow();
+            let fresh = !dom.ui.stale && !dom.ui.restyle && !dom.anim.borrow().active();
+            dom.layout.clone().filter(|_| fresh)
+        };
+        cached.unwrap_or_else(|| self.layout())
+    }
+
     /// Draws the document into `canvas` (laid out for the viewport that was set, not for the canvas).
     pub fn render<S: AsRef<[u8]> + AsMut<[u8]>>(&self, canvas: &mut Canvas<S>) -> Rc<LayoutBox> {
-        let boxes = self.layout();
+        let boxes = self.layout_for_frame();
         // The pictures that boxes ask for with `background-image`.
         let mut backgrounds: Vec<(usize, String)> = Vec::new();
         collect_backgrounds(&boxes, &mut backgrounds);
@@ -634,14 +647,22 @@ fn field_decorations(dom: &Dom, boxes: &LayoutBox, f: usize) -> Vec<Decoration> 
     let color = field.style.color;
     let mut out = Vec::new();
     if frags.is_empty() {
-        let (cx, cy, _, _) = field.content_rect();
+        let (cx, cy, _, ch) = field.content_rect();
         let m = dom.fonts.metrics(&field.style);
+        let height = m.ascent + m.descent;
+        // A one-line field is as tall as its touch target and the text stands in the middle of it, so the caret of
+        // an empty one does too (a text area starts at the top).
+        let top = if dom.tag(f) == Some("textarea") {
+            cy
+        } else {
+            cy + ((ch - height) / 2.0).max(0.0)
+        };
         if dom.ui.caret_on {
             out.push(Decoration::Bar {
                 x: cx,
-                y: cy,
+                y: top,
                 width: 1.0,
-                height: m.ascent + m.descent,
+                height,
                 color,
             });
         }

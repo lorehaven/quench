@@ -56,6 +56,8 @@ const FLING_STOP_SPEED: f32 = 25.0;
 /// How long a finger must stay before it selects a word, and how far from a handle's centre it takes hold of it
 /// (in CSS pixels).
 const LONG_PRESS: Duration = Duration::from_millis(500);
+/// How long a finger rests before the page is told it is pressed (a scroll that starts sooner never presses).
+const PRESS_DELAY: Duration = Duration::from_millis(80);
 const HANDLE_REACH: f32 = 28.0;
 /// The size of a handle's knob, in CSS pixels.
 const HANDLE_KNOB: f32 = 9.0;
@@ -72,6 +74,10 @@ struct Touch {
     /// When the finger came down, and whether it has been held long enough to select a word.
     started: Instant,
     long: bool,
+    /// Whether the page has been told the finger is down. It is told after a moment, or at the end of a tap, and
+    /// never when the finger starts scrolling: a press restyles the page, and doing that before every scroll
+    /// delays the first movement by a layout.
+    pressed: bool,
     /// A selection handle the finger took hold of: `false` for the start of the selection, `true` for its end.
     handle: Option<bool>,
     /// Where the finger was and when, over the last moments (to know how fast it left).
@@ -104,6 +110,53 @@ pub struct Surface<W: Write> {
     blink_at: Instant,
     exit: bool,
     bridge: Bridge,
+    /// The canvas of the last frame, drawn over again while the size stays (no new megabytes every frame).
+    canvas: Option<Canvas>,
+    /// Where frames spend their time, kept and printed once a second when `QUENCH_FRAME_STATS` is set.
+    stats: Option<FrameStats>,
+}
+
+/// How long frames took, summed over the last second.
+#[derive(Debug)]
+struct FrameStats {
+    since: Instant,
+    frames: u32,
+    render: Duration,
+    convert: Duration,
+    send: Duration,
+}
+
+impl FrameStats {
+    fn new() -> Self {
+        Self {
+            since: Instant::now(),
+            frames: 0,
+            render: Duration::ZERO,
+            convert: Duration::ZERO,
+            send: Duration::ZERO,
+        }
+    }
+
+    /// Adds a frame; prints and starts over when a second has passed.
+    fn add(&mut self, render: Duration, convert: Duration, send: Duration, size: (u32, u32)) {
+        self.frames += 1;
+        self.render += render;
+        self.convert += convert;
+        self.send += send;
+        if self.since.elapsed() >= Duration::from_secs(1) {
+            let n = self.frames;
+            let ms = |d: Duration| d.as_secs_f64() * 1000.0 / f64::from(n);
+            eprintln!(
+                "frames: {n}/s {}x{}  render {:.1} ms  convert {:.1} ms  send {:.1} ms  (per frame)",
+                size.0,
+                size.1,
+                ms(self.render),
+                ms(self.convert),
+                ms(self.send)
+            );
+            *self = Self::new();
+        }
+    }
 }
 
 impl<W: Write> std::fmt::Debug for Surface<W> {
@@ -167,6 +220,8 @@ impl<W: Write> Surface<W> {
             blink_at: Instant::now() + BLINK,
             exit: false,
             bridge,
+            canvas: None,
+            stats: std::env::var_os("QUENCH_FRAME_STATS").map(|_| FrameStats::new()),
         }
     }
 
@@ -283,12 +338,10 @@ impl<W: Write> Surface<W> {
                     scrolling: false,
                     started: Instant::now(),
                     long: false,
+                    pressed: false,
                     handle,
                     samples: vec![(Instant::now(), x, y)],
                 });
-                if handle.is_none() {
-                    self.renderer.pointer_down(x, y);
-                }
             }
             1 => {
                 let Some(mut t) = self.touch.take() else {
@@ -304,7 +357,9 @@ impl<W: Write> Surface<W> {
                 if !t.scrolling && !t.long && (x - t.start.0).hypot(y - t.start.1) > slop {
                     // Moved too far to be a tap: the finger scrolls what is under it, and nothing is clicked.
                     t.scrolling = true;
-                    self.renderer.pointer_cancel();
+                    if t.pressed {
+                        self.renderer.pointer_cancel();
+                    }
                 }
                 if t.scrolling {
                     self.renderer.wheel(x, y, t.last.0 - x, t.last.1 - y);
@@ -322,8 +377,14 @@ impl<W: Write> Surface<W> {
                         self.start_fling(&t, x, y);
                     } else if t.long || t.handle.is_some() {
                         // The press was a selection, not a click.
-                        self.renderer.pointer_cancel();
+                        if t.pressed {
+                            self.renderer.pointer_cancel();
+                        }
                     } else {
+                        // A quick tap: the page hears the press and the release together.
+                        if !t.pressed {
+                            self.renderer.pointer_down(t.start.0, t.start.1);
+                        }
                         self.renderer.pointer_up(x, y);
                     }
                 }
@@ -375,6 +436,9 @@ impl<W: Write> Surface<W> {
             && t.handle.is_none()
         {
             next = next.min(t.started + LONG_PRESS);
+            if !t.pressed {
+                next = next.min(t.started + PRESS_DELAY);
+            }
         }
         next
     }
@@ -414,6 +478,18 @@ impl<W: Write> Surface<W> {
 
     /// Runs the timers that are due.
     pub fn timers(&mut self, now: Instant) {
+        // A finger that has stayed where it came down presses what is under it (the page shows it is pressed).
+        if let Some(t) = &mut self.touch
+            && !t.pressed
+            && !t.long
+            && !t.scrolling
+            && t.handle.is_none()
+            && now >= t.started + PRESS_DELAY
+        {
+            t.pressed = true;
+            let (x, y) = t.start;
+            self.renderer.pointer_down(x, y);
+        }
         // A finger that has stayed where it came down selects the word there.
         if let Some(t) = &mut self.touch
             && !t.long
@@ -423,7 +499,9 @@ impl<W: Write> Surface<W> {
         {
             t.long = true;
             let (x, y) = t.start;
-            self.renderer.pointer_cancel();
+            if t.pressed {
+                self.renderer.pointer_cancel();
+            }
             self.renderer.select_word_at(x, y);
         }
         if let Some(mut fling) = self.fling
@@ -471,22 +549,37 @@ impl<W: Write> Surface<W> {
         if !self.visible || !self.renderer.take_dirty() {
             return Ok(());
         }
-        let mut canvas = Canvas::new(w as usize, h as usize);
+        let started = Instant::now();
+        let mut canvas = match self.canvas.take() {
+            Some(canvas) if canvas.width() == w as usize && canvas.height() == h as usize => canvas,
+            _ => Canvas::new(w as usize, h as usize),
+        };
         self.renderer.render(&mut canvas);
         self.draw_handles(&mut canvas);
-        // The frame goes as RGBA, the byte order of an Android bitmap; the canvas is BGRA.
-        let mut rgba = canvas.bytes().to_vec();
-        for px in rgba.as_chunks_mut::<4>().0 {
+        let rendered = Instant::now();
+        // The frame goes as RGBA, the byte order of an Android bitmap; the canvas is BGRA. The swap is done in
+        // place: the next frame clears the canvas anyway.
+        for px in canvas.bytes_mut().as_chunks_mut::<4>().0 {
             px.swap(0, 2);
         }
+        let converted = Instant::now();
         write_out(
             &mut self.out,
             &Out::Frame {
                 width: w,
                 height: h,
-                rgba: &rgba,
+                rgba: canvas.bytes(),
             },
         )?;
+        if let Some(stats) = &mut self.stats {
+            stats.add(
+                rendered - started,
+                converted - rendered,
+                converted.elapsed(),
+                (w, h),
+            );
+        }
+        self.canvas = Some(canvas);
         let state = self.renderer.ime_state();
         if state != self.ime {
             match &state {

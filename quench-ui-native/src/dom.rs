@@ -91,8 +91,19 @@ pub(crate) struct Interaction {
     pub dirty: bool,
     /// Set when the document or its style changed since the last layout (hover and focus do not count).
     pub stale: bool,
+    /// Set by everything that can change a style or a size - the document, hover, focus, a press, a key - and
+    /// cleared by a layout. Scrolling and the blink of the caret do not set it: those frames reuse the last layout.
+    pub restyle: bool,
     /// Whether the caret is drawn (the host blinks it).
     pub caret_on: bool,
+}
+
+impl Interaction {
+    /// Something that may change a style or a size happened: the screen is out of date and needs a new layout.
+    pub(crate) const fn touch(&mut self) {
+        self.dirty = true;
+        self.restyle = true;
+    }
 }
 
 pub(crate) struct Dom {
@@ -237,7 +248,7 @@ impl NativeRenderer {
     pub fn add_stylesheet(&self, css: &str) {
         {
             let mut dom = self.dom.borrow_mut();
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.stale = true;
         }
         self.dom.borrow_mut().sheets.push(css.to_string());
@@ -248,7 +259,7 @@ impl NativeRenderer {
     pub fn set_viewport(&self, width: f32, height: f32) {
         {
             let mut dom = self.dom.borrow_mut();
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.stale = true;
         }
         let mut dom = self.dom.borrow_mut();
@@ -270,7 +281,7 @@ impl NativeRenderer {
         let (width, height) = dom.viewport;
         dom.media.width = width / dom.zoom;
         dom.media.height = height / dom.zoom;
-        dom.ui.dirty = true;
+        dom.ui.touch();
         dom.ui.stale = true;
         drop(dom);
         *self.cascade.borrow_mut() = None;
@@ -280,7 +291,7 @@ impl NativeRenderer {
     pub fn set_media(&self, media: MediaEnv) {
         {
             let mut dom = self.dom.borrow_mut();
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.stale = true;
         }
         let mut dom = self.dom.borrow_mut();
@@ -300,7 +311,7 @@ impl NativeRenderer {
     pub fn set_safe_area(&self, insets: [f32; 4]) {
         {
             let mut dom = self.dom.borrow_mut();
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.stale = true;
         }
         self.dom.borrow_mut().safe_area = insets;
@@ -333,7 +344,7 @@ impl NativeRenderer {
         let mut dom = self.dom.borrow_mut();
         dom.loader = Some(Rc::new(loader));
         dom.images.retain(|_, v| v.is_some());
-        dom.ui.dirty = true;
+        dom.ui.touch();
         dom.ui.stale = true;
     }
 
@@ -346,7 +357,7 @@ impl NativeRenderer {
         let picture = crate::pipeline::picture(bytes, zoom)?;
         let mut dom = self.dom.borrow_mut();
         dom.images.insert(src.to_string(), Some(picture));
-        dom.ui.dirty = true;
+        dom.ui.touch();
         dom.ui.stale = true;
         Ok(())
     }
@@ -404,7 +415,7 @@ impl Renderer for NativeRenderer {
     fn create_element(&self, tag: &str) -> NodeId {
         {
             let mut dom = self.dom.borrow_mut();
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.stale = true;
         }
         NodeId(self.dom.borrow_mut().push(Kind::Element {
@@ -418,7 +429,7 @@ impl Renderer for NativeRenderer {
     fn create_text(&self, text: &str) -> NodeId {
         {
             let mut dom = self.dom.borrow_mut();
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.stale = true;
         }
         NodeId(self.dom.borrow_mut().push(Kind::Text(text.to_string())))
@@ -427,7 +438,7 @@ impl Renderer for NativeRenderer {
     fn create_anchor(&self) -> NodeId {
         {
             let mut dom = self.dom.borrow_mut();
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.stale = true;
         }
         NodeId(self.dom.borrow_mut().push(Kind::Anchor))
@@ -436,7 +447,7 @@ impl Renderer for NativeRenderer {
     fn set_text(&self, node: &NodeId, text: &str) {
         {
             let mut dom = self.dom.borrow_mut();
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.stale = true;
         }
         if let Kind::Text(t) = &mut self.dom.borrow_mut().nodes[node.0].kind {
@@ -447,7 +458,7 @@ impl Renderer for NativeRenderer {
     fn set_attr(&self, node: &NodeId, name: &str, value: &str) {
         {
             let mut dom = self.dom.borrow_mut();
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.stale = true;
         }
         if let Kind::Element { attrs, .. } = &mut self.dom.borrow_mut().nodes[node.0].kind {
@@ -462,7 +473,7 @@ impl Renderer for NativeRenderer {
     fn remove_attr(&self, node: &NodeId, name: &str) {
         {
             let mut dom = self.dom.borrow_mut();
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.stale = true;
         }
         if let Kind::Element { attrs, .. } = &mut self.dom.borrow_mut().nodes[node.0].kind {
@@ -473,7 +484,7 @@ impl Renderer for NativeRenderer {
     fn insert(&self, parent: &NodeId, child: &NodeId, before: Option<&NodeId>) {
         {
             let mut dom = self.dom.borrow_mut();
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.stale = true;
         }
         let mut dom = self.dom.borrow_mut();
@@ -493,7 +504,7 @@ impl Renderer for NativeRenderer {
     fn remove(&self, parent: &NodeId, child: &NodeId) {
         {
             let mut dom = self.dom.borrow_mut();
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.stale = true;
         }
         let mut dom = self.dom.borrow_mut();
@@ -519,7 +530,7 @@ impl Renderer for NativeRenderer {
     fn set_style(&self, node: &NodeId, property: &str, value: &str) {
         {
             let mut dom = self.dom.borrow_mut();
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.stale = true;
         }
         if let Kind::Element { styles, .. } = &mut self.dom.borrow_mut().nodes[node.0].kind {

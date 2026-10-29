@@ -47,6 +47,7 @@ impl NativeRenderer {
     pub fn set_caret_visible(&self, on: bool) {
         let mut dom = self.dom.borrow_mut();
         dom.ui.caret_on = on;
+        // Only the paint changes: the layout stands.
         dom.ui.dirty = true;
     }
 
@@ -109,7 +110,12 @@ impl NativeRenderer {
                 h(event);
             }
         }
-        self.dom.borrow_mut().ui.dirty = true;
+        if matches!(event, Event::Scroll(_)) {
+            // Only the paint changes: the layout stands (a handler that changes the document marks it itself).
+            self.dom.borrow_mut().ui.dirty = true;
+        } else {
+            self.dom.borrow_mut().ui.touch();
+        }
         take_prevent_request()
     }
 
@@ -121,7 +127,7 @@ impl NativeRenderer {
             let mut dom = self.dom.borrow_mut();
             if dom.ui.hovered != target {
                 dom.ui.hovered = target;
-                dom.ui.dirty = true;
+                dom.ui.touch();
             }
         }
         // A slider follows a finger or a button held down on it.
@@ -143,7 +149,7 @@ impl NativeRenderer {
         let mut dom = self.dom.borrow_mut();
         dom.ui.pressed = None;
         dom.ui.active = None;
-        dom.ui.dirty = true;
+        dom.ui.touch();
     }
 
     /// The primary button went down at `(x, y)`.
@@ -159,7 +165,7 @@ impl NativeRenderer {
             let mut dom = self.dom.borrow_mut();
             dom.ui.pressed = Some(t);
             dom.ui.active = Some(t);
-            dom.ui.dirty = true;
+            dom.ui.touch();
         }
         let prevented = self.dispatch(t, &Event::PointerDown(pointer(x, y)), true);
         if prevented {
@@ -189,7 +195,7 @@ impl NativeRenderer {
         let pressed = {
             let mut dom = self.dom.borrow_mut();
             dom.ui.active = None;
-            dom.ui.dirty = true;
+            dom.ui.touch();
             dom.ui.pressed.take()
         };
         let Some(t) = target else { return };
@@ -280,7 +286,7 @@ impl NativeRenderer {
                 if checked { None } else { Some("") },
             );
         }
-        dom.ui.dirty = true;
+        dom.ui.touch();
     }
 
     /// The wheel turned at `(x, y)`: `dy` positive is down, in pixels.
@@ -334,6 +340,7 @@ impl NativeRenderer {
                     let (nx, ny) = ((cx + dx).clamp(0.0, max_x), (cy + dy).clamp(0.0, max_y));
                     if (nx, ny) != (cx, cy) {
                         dom.ui.scroll.insert(id, (nx, ny));
+                        // Only the paint changes: the layout stands.
                         dom.ui.dirty = true;
                         moved = Some((id, nx, ny));
                         break;
@@ -371,7 +378,7 @@ impl NativeRenderer {
             let len = field_value(&dom, id).chars().count();
             dom.ui.caret = len;
             dom.ui.anchor = len;
-            dom.ui.dirty = true;
+            dom.ui.touch();
         }
         self.dispatch(id, &Event::Focus, false);
     }
@@ -381,7 +388,7 @@ impl NativeRenderer {
         if let Some(p) = previous {
             self.dispatch(p, &Event::Blur, false);
         }
-        self.dom.borrow_mut().ui.dirty = true;
+        self.dom.borrow_mut().ui.touch();
     }
 
     /// Focus moves to the next (or previous) focusable element, staying inside a trapped node.
@@ -551,7 +558,7 @@ impl NativeRenderer {
         }
         dom.ui.anchor = lo;
         dom.ui.caret = hi;
-        dom.ui.dirty = true;
+        dom.ui.touch();
         true
     }
 
@@ -592,7 +599,7 @@ impl NativeRenderer {
         } else {
             dom.ui.anchor = index;
         }
-        dom.ui.dirty = true;
+        dom.ui.touch();
     }
 
     /// Replaces the whole text of a text field (what an assistive technology asks for): the field takes focus, the
@@ -633,7 +640,7 @@ impl NativeRenderer {
             dom.ui.caret = caret;
             dom.ui.anchor = caret;
             set_attr_raw(&mut dom, f, "value", Some(&out));
-            dom.ui.dirty = true;
+            dom.ui.touch();
             out
         };
         self.dispatch(f, &Event::Input(value), true);
@@ -654,7 +661,7 @@ impl NativeRenderer {
             if !key.shift {
                 dom.ui.anchor = dom.ui.caret;
             }
-            dom.ui.dirty = true;
+            dom.ui.touch();
         };
         let word_left = |from: usize| {
             let mut i = from;
@@ -749,7 +756,7 @@ impl NativeRenderer {
                 let mut dom = self.dom.borrow_mut();
                 dom.ui.anchor = 0;
                 dom.ui.caret = len;
-                dom.ui.dirty = true;
+                dom.ui.touch();
             }
             "c" | "C" if key.ctrl => {
                 let selected: String = chars[lo..hi].iter().collect();
@@ -855,7 +862,7 @@ impl NativeRenderer {
                 }
             }
         }
-        self.dom.borrow_mut().ui.dirty = true;
+        self.dom.borrow_mut().ui.touch();
     }
 
     /// Puts the caret of field `f` where the click at `(x, y)` landed.
@@ -929,7 +936,7 @@ impl NativeRenderer {
                 return;
             }
             set_attr_raw(&mut dom, f, "value", Some(&text));
-            dom.ui.dirty = true;
+            dom.ui.touch();
         }
         self.dispatch(f, &Event::Input(text), true);
     }
@@ -943,7 +950,7 @@ impl NativeRenderer {
         let index = caret_index(&dom, &root, f, &value, x);
         dom.ui.caret = index;
         dom.ui.anchor = index;
-        dom.ui.dirty = true;
+        dom.ui.touch();
     }
 }
 

@@ -120,8 +120,17 @@ pub struct FontSet {
     faces: Mutex<Vec<Arc<Font>>>,
     /// The face index that has each character (`None`: no face has it), so a miss is searched once.
     resolved: Mutex<HashMap<char, Option<usize>>>,
+    /// Finished layouts by text, size and width: a page is laid out again whenever anything on it changes, and
+    /// almost all of its text is what it was. Shaping (the glyphs, the kerning pairs) is most of the cost of that.
+    shaped: Mutex<HashMap<ShapeKey, Layout>>,
     system: Option<SystemFonts>,
 }
+
+/// What a layout depends on besides the fonts: the text, the size and the width it wraps to (as bits).
+type ShapeKey = (String, u32, Option<u32>);
+
+/// How many layouts are kept before the memory is let go (a page has a few hundred distinct texts).
+const SHAPED_LIMIT: usize = 4096;
 
 impl std::fmt::Debug for FontSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -138,6 +147,7 @@ impl FontSet {
         Self {
             faces: Mutex::new(vec![primary]),
             resolved: Mutex::new(HashMap::new()),
+            shaped: Mutex::new(HashMap::new()),
             system: None,
         }
     }
@@ -251,8 +261,33 @@ impl FontSet {
     }
 
     /// Positions `text` at `size` pixels per em, wrapping to `max_width` when given.
+    ///
+    /// The same text at the same size and width is shaped once.
     #[must_use]
     pub fn layout(&self, text: &str, size: f32, max_width: Option<f32>) -> Layout {
+        let key = (
+            text.to_string(),
+            size.to_bits(),
+            max_width.map(f32::to_bits),
+        );
+        if let Some(found) = self
+            .shaped
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&key)
+        {
+            return found.clone();
+        }
+        let laid = self.layout_uncached(text, size, max_width);
+        let mut shaped = self.shaped.lock().unwrap_or_else(PoisonError::into_inner);
+        if shaped.len() >= SHAPED_LIMIT {
+            shaped.clear();
+        }
+        shaped.insert(key, laid.clone());
+        laid
+    }
+
+    fn layout_uncached(&self, text: &str, size: f32, max_width: Option<f32>) -> Layout {
         let primary = self.face(0);
         let scale = size / f32::from(primary.units_per_em());
         let ascent = f32::from(primary.ascent()) * scale;

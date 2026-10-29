@@ -793,3 +793,31 @@ fn italic_text_leans_to_the_right_without_changing_its_width() {
 }
 
 quench_test::main!();
+
+#[quench_test::test]
+fn boxes_far_outside_the_canvas_are_not_painted_but_the_ones_near_it_are() {
+    // A column of 200 blocks of 100 px in a 120 px canvas: only the first few can be seen or reach in.
+    let rows: Vec<T> = (0..200)
+        .map(|_| E("height:100px;background:#f00", vec![]))
+        .collect();
+    let tree = E("", rows);
+    let fonts = Fonts::embedded();
+    let mut root = ComputedStyle::default();
+    root.display = Display::Block;
+    let node = build(&tree, &root, &mut 0);
+    let boxes = layout(&node, (120.0, 120.0), &fonts);
+    let mut canvas = Canvas::new(120, 120);
+    canvas.clear(Color::WHITE);
+    let asked = std::cell::RefCell::new(Vec::new());
+    paint(&mut canvas, &boxes, &fonts, &|_| (0.0, 0.0), &|key| {
+        asked.borrow_mut().push(key);
+        Vec::new()
+    });
+    // The first block is on screen, the second half on it.
+    assert_eq!(canvas.pixel(10, 50), RED);
+    assert_eq!(canvas.pixel(10, 110), RED);
+    // Far fewer than the 200 blocks were visited: those within the margin of the canvas and no more.
+    let visited = asked.borrow().len();
+    assert!(visited < 12, "{visited} boxes were visited");
+    assert!(visited >= 2, "the visible ones were: {visited}");
+}
