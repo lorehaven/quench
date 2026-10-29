@@ -94,6 +94,46 @@ fn each_abi_is_built_with_the_ndk_linker_and_collected_for_gradle() {
 }
 
 #[quench_test::test]
+fn a_program_named_after_its_project_is_collected_as_the_one_the_host_starts() {
+    // Two projects in one workspace cannot both build a `quench_surface`: the program may carry the project's name.
+    let p = project_named("surface-own", "my-app", "web");
+    std::fs::create_dir_all(p.root.join("surface")).unwrap();
+    std::fs::write(p.root.join("surface/Cargo.toml"), "").unwrap();
+    let dir = p.target_dir().join("x86_64-linux-android/debug");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("my_app_surface"), b"OWN").unwrap();
+    std::fs::write(dir.join("quench_surface"), b"OLD").unwrap();
+    build_native(&fake_with_ndk(), &mut Vec::new(), &p, false, Some("x86_64")).unwrap();
+    let so = p
+        .root
+        .join("android/app/src/main/jniLibs/x86_64/libquench_surface.so");
+    assert_eq!(
+        std::fs::read(so).unwrap(),
+        b"OWN",
+        "the program's own name wins, under the name the host expects"
+    );
+    // A project whose program still has the old name builds as before.
+    let old = project_named("surface-old", "my-app", "web");
+    std::fs::create_dir_all(old.root.join("surface")).unwrap();
+    std::fs::write(old.root.join("surface/Cargo.toml"), "").unwrap();
+    let dir = old.target_dir().join("x86_64-linux-android/debug");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("quench_surface"), b"OLD").unwrap();
+    build_native(
+        &fake_with_ndk(),
+        &mut Vec::new(),
+        &old,
+        false,
+        Some("x86_64"),
+    )
+    .unwrap();
+    let so = old
+        .root
+        .join("android/app/src/main/jniLibs/x86_64/libquench_surface.so");
+    assert_eq!(std::fs::read(so).unwrap(), b"OLD");
+}
+
+#[quench_test::test]
 fn one_abi_and_release_are_options() {
     let p = with_native("native-one");
     built(&p, "x86_64-linux-android", "release");

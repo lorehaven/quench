@@ -172,7 +172,15 @@ pub fn build_native(
             crate::release::step(sys, out, &cmd)?;
             // The program the host starts. Android only extracts files named lib*.so from the APK, so it
             // is packaged under that name.
-            let built = project.target_dir().join(target).join(profile).join(binary);
+            // The program's own name first (`my_app_surface`: two projects built in one workspace cannot both leave a
+            // `quench_surface`, cargo warns of the collision), then the fixed name every project used to have.
+            let dir_of_target = project.target_dir().join(target).join(profile);
+            let own = format!("{}_{dir}", project.name.replace('-', "_"));
+            let built = [own.as_str(), binary]
+                .iter()
+                .map(|name| dir_of_target.join(name))
+                .find(|path| path.is_file())
+                .unwrap_or_else(|| dir_of_target.join(binary));
             let dest_dir = project.root.join("android/app/src/main/jniLibs").join(abi);
             std::fs::create_dir_all(&dest_dir)?;
             let dest = dest_dir.join(format!("lib{binary}.so"));
