@@ -24,6 +24,7 @@ path = "src/main.rs"
 quench-archive = { workspace = true }
 quench-args = { workspace = true }
 quench-client = { workspace = true, features = ["blocking", "tls"] }
+quench-crypto = { workspace = true }
 quench-serde = { workspace = true }
 quench-template = { workspace = true }
 

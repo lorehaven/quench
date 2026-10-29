@@ -13,6 +13,7 @@ pub mod dev;
 pub mod doctor;
 pub mod error;
 pub mod linux;
+pub mod packaging;
 pub mod plugins;
 pub mod project;
 pub mod release;
@@ -187,6 +188,12 @@ fn command(
                 linux::build(sys, out, &project, release)?;
             } else if target == Some(BuildTarget::Deb) {
                 linux::deb(sys, out, &project)?;
+            } else if target == Some(BuildTarget::Rpm) {
+                packaging::rpm(sys, out, &project)?;
+            } else if target == Some(BuildTarget::Arch) {
+                packaging::arch(sys, out, &project)?;
+            } else if target == Some(BuildTarget::Source) {
+                packaging::source(out, &project)?;
             } else if let Some(target) = target {
                 let aab = target == BuildTarget::Aab;
                 android::build_apk(sys, out, &project, release || aab, aab, abi.as_deref())?;

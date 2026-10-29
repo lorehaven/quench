@@ -393,3 +393,34 @@ fn a_host_whose_binary_has_another_name_than_its_crate_says_so_in_quench_toml() 
     let target = build(&Fake::default(), &mut Vec::new(), &p, true).unwrap();
     assert_eq!(std::fs::read(target).unwrap(), b"ELF-binary");
 }
+
+#[quench_test::test]
+fn a_native_app_declares_its_own_dependencies_or_none() {
+    for (depends, want, not) in [
+        ("depends = \"\"\n", "Section: utils", "Depends:"),
+        ("depends = \"libc6\"\n", "Depends: libc6\n", "libwebkit"),
+    ] {
+        let p = workspace_project("linux-deb-depends");
+        init(&mut Vec::new(), &p, Some("dev.lorehaven.myapp"), None).unwrap();
+        let manifest = p.root.join(".quench.toml");
+        let text = std::fs::read_to_string(&manifest).unwrap();
+        std::fs::write(
+            &manifest,
+            text.replacen("[linux]\n", &format!("[linux]\n{depends}"), 1),
+        )
+        .unwrap();
+        let p = Project::find(&p.root).unwrap();
+        built(&p, true);
+        let path = deb(&Fake::default(), &mut Vec::new(), &p).unwrap();
+        let members = ar_members(&std::fs::read(&path).unwrap());
+        let control = quench_archive::gzip::decompress(&members[1].1, 1 << 20).unwrap();
+        let control: Vec<_> = quench_archive::tar::Reader::new(&control)
+            .map(Result::unwrap)
+            .collect();
+        let text = String::from_utf8(control[0].data.to_vec()).unwrap();
+        assert!(
+            text.contains(want) && !text.contains(not),
+            "{depends}: {text}"
+        );
+    }
+}

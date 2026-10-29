@@ -35,6 +35,11 @@ pub struct LinuxConfig {
     pub title: Option<String>,
     /// The name of the host's binary when it is not the crate's (`[[bin]] name` in `desktop/Cargo.toml`).
     pub bin: Option<String>,
+    /// The `.deb`'s `Depends:` (default: what a web host needs); empty for none, as a native app has.
+    pub depends: Option<String>,
+    /// The window class the menu entry names (`StartupWMClass`), when it is not the project's name: a native
+    /// window's is its application id.
+    pub wm_class: Option<String>,
 }
 
 #[derive(Deserialize)]

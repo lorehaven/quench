@@ -131,11 +131,21 @@ pub fn build(
 /// `quench build --bundle`: the app as a static bundle in `dist/www`, which the Android host serves.
 ///
 /// The bundle is the page and the hashed assets. The project's server writes it: it is the one
-/// place that knows the page and its stylesheets.
+/// place that knows the page and its stylesheets. A project without a `server/` crate is a native app and has
+/// none: this does nothing.
 ///
 /// # Errors
 /// The first step that fails.
 pub fn bundle(sys: &dyn System, out: &mut dyn Write, project: &Project) -> Result<()> {
+    // A project drawn by the native renderer has no page to bundle (no `server/` crate writes one), and the hosts
+    // draw the screens themselves.
+    if !project.root.join("server/Cargo.toml").is_file() {
+        writeln!(
+            out,
+            "no server/ in this project: nothing to bundle (a native app)"
+        )?;
+        return Ok(());
+    }
     build_wasm(sys, out, project, true)?;
     build_server(sys, out, project, false, false)?;
     let target = project.dist().join("www");

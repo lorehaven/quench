@@ -153,5 +153,8 @@ pub fn project_named(label: &str, name: &str, template: &str) -> quench_tool::pr
         format!("name = \"{name}\"\ntemplate = \"{template}\"\n"),
     )
     .unwrap();
+    // A web project has a server that writes its page.
+    std::fs::create_dir_all(dir.join("server")).unwrap();
+    std::fs::write(dir.join("server/Cargo.toml"), "").unwrap();
     quench_tool::project::Project::find(&dir).unwrap()
 }

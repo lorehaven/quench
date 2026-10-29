@@ -35,6 +35,8 @@ mod doctor_tests;
 mod linux_tests;
 #[path = "unit/native_tests.rs"]
 mod native_tests;
+#[path = "unit/packaging_tests.rs"]
+mod packaging_tests;
 #[path = "unit/plugins_tests.rs"]
 mod plugins_tests;
 #[path = "unit/project_tests.rs"]

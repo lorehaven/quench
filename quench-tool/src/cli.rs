@@ -83,7 +83,7 @@ pub enum Cmd {
         #[arg(long)]
         bundle: bool,
         /// Build a package instead: `apk` (debug, or signed with --release) or `aab` for Android, `linux`
-        /// for the desktop binary, `deb` for its Debian package
+        /// for the desktop binary, `deb`, `rpm` and `arch` for its packages, `source` for a tarball of the sources
         #[arg(value_enum)]
         target: Option<BuildTarget>,
         /// With `apk` or `aab`: only this ABI's native library (`arm64-v8a` or `x86_64`)
@@ -143,6 +143,12 @@ pub enum BuildTarget {
     Linux,
     /// A Debian package of the Linux desktop binary, in `dist/`
     Deb,
+    /// An RPM package of the same
+    Rpm,
+    /// An Arch Linux package (`.pkg.tar.zst`) of the same
+    Arch,
+    /// The project's sources as a `.tar.gz` to build from
+    Source,
 }
 
 /// Where `quench run` runs the app.

@@ -152,3 +152,18 @@ fn a_failing_export_fails_the_bundle() {
     let e = bundle(&sys, &mut Vec::new(), &p).unwrap_err().to_string();
     assert!(e.contains("demo-server"), "{e}");
 }
+
+#[quench_test::test]
+fn a_native_app_has_no_bundle_to_make() {
+    let p = project("bundle-native", "web");
+    std::fs::remove_dir_all(p.root.join("server")).unwrap();
+    let sys = Fake::default();
+    let mut out = Vec::new();
+    bundle(&sys, &mut out, &p).unwrap();
+    assert!(
+        sys.lines().is_empty(),
+        "nothing is built: {:?}",
+        sys.lines()
+    );
+    assert!(text(out).contains("nothing to bundle"));
+}

@@ -314,12 +314,13 @@ fn ar_member(out: &mut Vec<u8>, name: &str, data: &[u8]) {
 }
 
 /// The `.desktop` entry that puts the app in the menus.
-fn desktop_entry(project: &Project) -> String {
+#[must_use]
+pub fn desktop_entry(project: &Project) -> String {
     format!(
         "[Desktop Entry]\nType=Application\nName={}\nExec=/usr/bin/{}\nTerminal=false\nCategories=Utility;\nStartupWMClass={}\n",
         title(project),
         project.name,
-        project.name
+        project.linux.wm_class.as_deref().unwrap_or(&project.name)
     )
 }
 
@@ -359,7 +360,12 @@ pub fn deb(sys: &dyn System, out: &mut dyn Write, project: &Project) -> Result<P
 
     let size_kib = binary.len().div_ceil(1024);
     let control_text = format!(
-        "Package: {name}\nVersion: {version}\nArchitecture: amd64\nMaintainer: {name} <noreply@example.com>\nInstalled-Size: {size_kib}\nDepends: libwebkit2gtk-4.1-0, libgtk-3-0\nSection: utils\nPriority: optional\nDescription: {}\n",
+        "Package: {name}\nVersion: {version}\nArchitecture: amd64\nMaintainer: {name} <noreply@example.com>\nInstalled-Size: {size_kib}\n{}Section: utils\nPriority: optional\nDescription: {}\n",
+        match project.linux.depends.as_deref() {
+            None => "Depends: libwebkit2gtk-4.1-0, libgtk-3-0\n".to_string(),
+            Some("") => String::new(),
+            Some(depends) => format!("Depends: {depends}\n"),
+        },
         title(project)
     );
     let mut control = quench_archive::tar::Builder::new();

@@ -739,6 +739,7 @@ dependencies = [
  "quench-archive",
  "quench-args",
  "quench-client",
+ "quench-crypto",
  "quench-serde",
  "quench-template",
  "quench-test",
