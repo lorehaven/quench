@@ -205,13 +205,16 @@ const PLUGINS: &[Plugin] = &[
     },
     Plugin {
         name: "packages",
-        about: "installing and updating apps from a downloaded APK (see the Play policy note)",
+        about: "installing and updating apps from a downloaded APK, and listing and opening the apps on the device (see the Play policy note)",
         needs: &[],
         files: &[file!(
             "android/app/src/main/kotlin/@package_path@/PackagesPlugin.kt",
             "packages/PackagesPlugin.kt.tpl"
         )],
-        permissions: &[("android.permission.REQUEST_INSTALL_PACKAGES", "")],
+        permissions: &[
+            ("android.permission.REQUEST_INSTALL_PACKAGES", ""),
+            ("android.permission.QUERY_ALL_PACKAGES", ""),
+        ],
         top: "",
         components: "<receiver android:name=\".InstallReceiver\" android:exported=\"false\">\n            <intent-filter>\n                <action android:name=\"{{ package }}.INSTALL_RESULT\" />\n            </intent-filter>\n        </receiver>",
         activity: "",

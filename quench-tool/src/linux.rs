@@ -162,7 +162,13 @@ fn binary(project: &Project, profile: &str) -> PathBuf {
     } else {
         project.target_dir()
     };
-    target.join(profile).join(package(project))
+    target.join(profile).join(
+        project
+            .linux
+            .bin
+            .clone()
+            .unwrap_or_else(|| package(project)),
+    )
 }
 
 /// `quench build linux`: the bundle, then the host. Returns the binary, copied to `dist/`.
@@ -248,7 +254,8 @@ pub fn launch_dev(
 }
 
 /// The version of the project: the workspace's, else the host crate's.
-fn version(project: &Project) -> String {
+#[must_use]
+pub fn version(project: &Project) -> String {
     let find = |path: &Path, section: &str| -> Option<String> {
         let text = std::fs::read_to_string(path).ok()?;
         let after = &text[text.find(section)? + section.len()..];
@@ -265,6 +272,26 @@ fn version(project: &Project) -> String {
     find(&project.root.join("Cargo.toml"), "[workspace.package]")
         .or_else(|| find(&project.root.join("desktop/Cargo.toml"), "[package]"))
         .unwrap_or_else(|| "0.1.0".to_string())
+}
+
+/// The integer a store wants for a release: `0.1.3` is `1003`, `1.2.3` is `1002003`.
+///
+/// Every platform's build of one version gets the same number, so the tool that publishes them can derive it too.
+/// A part over 999 is capped (a version that big has no room in the scheme); anything that is not `major.minor.patch`
+/// counts as `0.0.0`.
+#[must_use]
+pub fn version_code(version: &str) -> u32 {
+    let mut parts = version
+        .split(['.', '-', '+'])
+        .map(|p| p.parse::<u32>().unwrap_or(0));
+    let (major, minor, patch) = (
+        parts.next().unwrap_or(0),
+        parts.next().unwrap_or(0).min(999),
+        parts.next().unwrap_or(0).min(999),
+    );
+    major
+        .saturating_mul(1_000_000)
+        .saturating_add(minor * 1_000 + patch)
 }
 
 /// One member of an `ar` archive (what a `.deb` is made of).

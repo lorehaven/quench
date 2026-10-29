@@ -98,18 +98,6 @@ pub enum Cmd {
         #[arg(long, value_name = "ABI")]
         abi: Option<String>,
     },
-    /// Build the signed release APK and send it to the registry apps are installed from
-    Publish {
-        /// Build and check, but send nothing
-        #[arg(long)]
-        dry_run: bool,
-        /// Publish this APK instead of building one
-        #[arg(long, value_name = "FILE")]
-        apk: Option<String>,
-        /// Publish with uncommitted changes in the tree
-        #[arg(long)]
-        allow_dirty: bool,
-    },
     /// The Linux desktop host of the project
     Linux {
         #[command(subcommand)]

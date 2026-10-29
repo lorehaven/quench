@@ -9,22 +9,21 @@ use crate::error::{Result, fail};
 
 pub const MANIFEST: &str = "quench.toml";
 
-/// The `[android]` table of `quench.toml`: what the build and `quench publish` need to know.
+/// The `[android]` table of `quench.toml`: what the build needs to know.
 #[derive(Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct AndroidConfig {
     /// The application id (`quench android init --package` writes it).
     pub package: Option<String>,
-    /// What people see, `0.1.0` by default.
+    /// What people see. Left out, it is the project's Cargo version (see [`crate::linux::version`]).
     pub version_name: Option<String>,
-    /// Must go up with every release; the registry refuses a version code twice.
+    /// Must go up with every release. Left out, it is derived from the version: `major * 1_000_000 + minor * 1_000 + patch`
+    /// (see [`crate::linux::version_code`]), so one number to bump gives every platform the same release.
     pub version_code: Option<u32>,
     /// The release keystore (a path from the project root). The passwords are never here: they are
     /// read from `QUENCH_KEYSTORE_PASSWORD` and `QUENCH_KEY_PASSWORD`.
     pub keystore: Option<String>,
     /// The key in the keystore.
     pub key_alias: Option<String>,
-    /// Where `quench publish` sends the build (the warehouse), unless `WAREHOUSE_URL` says otherwise.
-    pub registry: Option<String>,
 }
 
 /// The `[linux]` table of `quench.toml`.
@@ -34,6 +33,8 @@ pub struct LinuxConfig {
     pub id: Option<String>,
     /// The window's title (default: the project's name).
     pub title: Option<String>,
+    /// The name of the host's binary when it is not the crate's (`[[bin]] name` in `desktop/Cargo.toml`).
+    pub bin: Option<String>,
 }
 
 #[derive(Deserialize)]

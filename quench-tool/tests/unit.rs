@@ -39,8 +39,6 @@ mod native_tests;
 mod plugins_tests;
 #[path = "unit/project_tests.rs"]
 mod project_tests;
-#[path = "unit/publish_tests.rs"]
-mod publish_tests;
 #[path = "unit/release_tests.rs"]
 mod release_tests;
 #[path = "unit/scaffold_tests.rs"]

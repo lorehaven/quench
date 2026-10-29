@@ -15,7 +15,6 @@ pub mod error;
 pub mod linux;
 pub mod plugins;
 pub mod project;
-pub mod publish;
 pub mod release;
 pub mod scaffold;
 pub mod system;
@@ -139,24 +138,6 @@ fn command(
                     linux::init(out, &project, id.as_deref(), quench_path.as_deref())?;
                 }
             }
-            Ok(0)
-        }
-        Cmd::Publish {
-            dry_run,
-            apk,
-            allow_dirty,
-        } => {
-            let project = Project::find(cwd)?;
-            publish::run(
-                sys,
-                out,
-                &project,
-                &publish::Options {
-                    dry_run,
-                    apk,
-                    allow_dirty,
-                },
-            )?;
             Ok(0)
         }
         Cmd::Plugin { cmd } => {

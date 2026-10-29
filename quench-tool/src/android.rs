@@ -36,7 +36,7 @@ pub fn init(out: &mut dyn Write, project: &Project, package: Option<&str>) -> Re
             std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o755))?;
         }
     }
-    // What the build and `quench publish` read.
+    // What the build reads.
     let manifest = project.root.join(crate::project::MANIFEST);
     let text = std::fs::read_to_string(&manifest)?;
     if !text.contains("[android]") {
@@ -199,14 +199,17 @@ pub fn package(project: &Project) -> Result<String> {
 /// `(versionName, versionCode)` as the build and the registry see them.
 #[must_use]
 pub fn version(project: &Project) -> (String, u32) {
-    (
-        project
-            .android
-            .version_name
-            .clone()
-            .unwrap_or_else(|| "0.1.0".to_string()),
-        project.android.version_code.unwrap_or(1),
-    )
+    // What `quench.toml` does not say comes from the project's Cargo version, the one the `.deb` carries too.
+    let name = project
+        .android
+        .version_name
+        .clone()
+        .unwrap_or_else(|| crate::linux::version(project));
+    let code = project
+        .android
+        .version_code
+        .unwrap_or_else(|| crate::linux::version_code(&name));
+    (name, code)
 }
 
 /// Runs Gradle in `android/` for `tasks`. A release build signs with the key `quench.toml` names;

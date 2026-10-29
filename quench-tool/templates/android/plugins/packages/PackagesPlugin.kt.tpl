@@ -5,11 +5,13 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -19,7 +21,8 @@ import java.net.URL
  * Installing and updating an app from an APK the app has downloaded (the way a store client does).
  * It needs the person's permission to install from this app (`can_install`, `open_install_settings`)
  * and the system asks them to confirm each install. Methods: `can_install`, `open_install_settings`,
- * `installed {package}`, `install_from_url {url, headers}` (events `download {sent, total}`), and
+ * `installed {package}`, `list` (the apps on the device that have a screen of their own: `{apps: [{package, label,
+ * version_name, version_code, system}]}`), `launch {package}` (opens one), `install_from_url {url, headers}` (events `download {sent, total}`), and
  * `install {uri}` for an APK the person picked. The outcome arrives as an `install {status, package,
  * message}` event, `status` being `success`, `failure`, `cancelled` or `pending`.
  *
@@ -37,6 +40,8 @@ class PackagesPlugin(private val activity: Activity) : Plugin("packages") {
                 call.resolve()
             }
             "installed" -> call.resolve(installed(args.getString("package")))
+            "list" -> call.resolve(list())
+            "launch" -> call.resolve(JSONObject().put("launched", launch(args.getString("package"))))
             "install_from_url" -> installFromUrl(args, call)
             "install" -> {
                 call.resolve()
@@ -55,6 +60,28 @@ class PackagesPlugin(private val activity: Activity) : Plugin("packages") {
         JSONObject().put("installed", true).put("version_name", info.versionName).put("version_code", info.longVersionCode)
     } catch (_: PackageManager.NameNotFoundException) {
         JSONObject().put("installed", false)
+    }
+
+    private fun list(): JSONObject {
+        val manager = context.packageManager
+        val apps = JSONArray()
+        for (info in manager.getInstalledPackages(0)) {
+            val app = info.applicationInfo ?: continue
+            // What cannot be opened is not an app to the person.
+            if (manager.getLaunchIntentForPackage(info.packageName) == null) continue
+            val system = app.flags and ApplicationInfo.FLAG_SYSTEM != 0 && app.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP == 0
+            apps.put(
+                JSONObject().put("package", info.packageName).put("label", manager.getApplicationLabel(app).toString())
+                    .put("version_name", info.versionName ?: "").put("version_code", info.longVersionCode).put("system", system)
+            )
+        }
+        return JSONObject().put("apps", apps)
+    }
+
+    private fun launch(name: String): Boolean {
+        val intent = context.packageManager.getLaunchIntentForPackage(name) ?: return false
+        activity.startActivity(intent)
+        return true
     }
 
     private fun installFromUrl(args: JSONObject, call: Call) {

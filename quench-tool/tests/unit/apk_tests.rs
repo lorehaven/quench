@@ -11,7 +11,10 @@ fn ready(label: &str) -> (Fake, Project) {
     let text = std::fs::read_to_string(&manifest).unwrap();
     std::fs::write(
         &manifest,
-        text.replace("version_code = 1", "version_code = 7\nkeystore = \"release.keystore\"\nkey_alias = \"release\"\nregistry = \"https://warehouse.example\""),
+        text.replace(
+            "version_code = 1",
+            "version_code = 7\nkeystore = \"release.keystore\"\nkey_alias = \"release\"",
+        ),
     )
     .unwrap();
     let p = Project::find(&p.root).unwrap();
@@ -52,7 +55,11 @@ fn the_package_and_version_come_from_quench_toml() {
     assert_eq!(package(&p).unwrap(), "dev.lorehaven.myapp");
     assert_eq!(version(&p), ("0.1.0".to_string(), 7));
     let bare = project("apk-bare", "web");
-    assert_eq!(version(&bare), ("0.1.0".to_string(), 1), "defaults");
+    assert_eq!(
+        version(&bare),
+        ("0.1.0".to_string(), 1_000),
+        "defaults: the Cargo version, as one number"
+    );
     assert!(
         package(&bare)
             .unwrap_err()
@@ -334,4 +341,28 @@ fn a_keystore_is_made_once_and_needs_a_password() {
             .args
             .contains(&"-keypass:env".to_string())
     );
+}
+
+#[quench_test::test]
+fn the_version_is_the_cargo_version_unless_quench_toml_says_otherwise() {
+    let (_, p) = ready("apk-version-derived");
+    // `ready` writes version_code = 7 into quench.toml: that wins for the code, the name is `quench.toml`'s too.
+    assert_eq!(version(&p).1, 7);
+    let manifest = p.root.join("quench.toml");
+    let text = std::fs::read_to_string(&manifest).unwrap();
+    std::fs::write(
+        &manifest,
+        text.lines()
+            .filter(|l| !l.starts_with("version_code") && !l.starts_with("version_name"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+    )
+    .unwrap();
+    std::fs::write(
+        p.root.join("Cargo.toml"),
+        "[workspace]\nmembers = []\n\n[workspace.package]\nversion = \"2.3.4\"\n",
+    )
+    .unwrap();
+    let p = Project::find(&p.root).unwrap();
+    assert_eq!(version(&p), ("2.3.4".to_string(), 2_003_004));
 }

@@ -95,14 +95,13 @@ version_name = "0.1.0"
 version_code = 1                   # must go up with every release
 keystore = "release.keystore"      # from the project root; keep it out of git
 key_alias = "release"
-registry = "https://warehouse.example"   # where `quench publish` sends the build
 ```
 
 `quench android keystore` makes the key with `keytool` and writes `keystore` and `key_alias` into the file. **The passwords are never in a file or on a command line**: `QUENCH_KEYSTORE_PASSWORD` (and `QUENCH_KEY_PASSWORD` if the key has its own) are read from the environment by `keytool`, by `quench`, and by the Gradle build. The result is copied to `dist/<name>-<version_name>-<version_code>.apk` (or `.aab`), and a signed APK is verified with the SDK's `apksigner` (the signer is printed). Measured on this machine: a signed release APK of the counter app is 725 KiB.
 
-## `quench publish [--dry-run] [--apk FILE] [--allow-dirty]`
+## Publishing
 
-Builds the signed release APK (or takes `--apk`) and sends it to the warehouse apps are installed and updated from, with the protocol the old per-app scripts used: `PUT <registry>/warehouse/api/v1/artifacts/<package>/android/<version_code>` with a bearer token and the APK as the body; `201` is published, `409` means that version code exists (they are immutable: raise `version_code`). The registry is `WAREHOUSE_URL` or `registry` under `[android]` (there is no built-in default); the token is `WAREHOUSE_TOKEN`, or `WAREHOUSE_USER` and `WAREHOUSE_PASS` to log in through gatehouse. Before anything is sent it checks that the tree is clean (the published build must be traceable to a commit; `--allow-dirty` skips it and the commit is reported with `-dirty`), and that the APK is signed. `--dry-run` does all of that and sends nothing; the tests and the acceptance run publish to a local stand-in server (`scripts/android-fixtures.mjs warehouse`), never the real one.
+The tool builds and never publishes: it has no idea where a release goes. `quench build apk --release` (signed), `quench build aab --release`, `quench build linux` and `quench build deb` make the packages in `dist/`; **`anvil artifact release`** (in the forge repository) builds them and sends them to the warehouse. A project's version is its Cargo version (`[workspace.package]`, else the desktop crate's); the Android `versionName` is that, and the `versionCode` is `major * 1_000_000 + minor * 1_000 + patch`, so `0.1.3` is `1003` on every platform. `version_name` and `version_code` under `[android]` in `quench.toml` still override it.
 
 ## `quench doctor`
 

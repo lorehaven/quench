@@ -1,5 +1,5 @@
 use super::support::*;
-use quench_tool::linux::{app_id, build, deb, init, launch_dev, package, run, title};
+use quench_tool::linux::{app_id, build, deb, init, launch_dev, package, run, title, version_code};
 use quench_tool::project::Project;
 
 /// A project with a workspace `Cargo.toml` as `quench new` writes it.
@@ -349,4 +349,47 @@ fn the_names_come_from_the_project_and_its_linux_table() {
         (app_id(&p).as_str(), title(&p).as_str()),
         ("org.x.app", "My App")
     );
+}
+
+#[quench_test::test]
+fn a_version_code_is_the_semver_as_one_number() {
+    assert_eq!(version_code("0.1.0"), 1_000);
+    assert_eq!(version_code("0.1.3"), 1_003);
+    assert_eq!(version_code("1.2.3"), 1_002_003);
+    assert_eq!(version_code("12.0.7"), 12_000_007);
+    // A pre-release or build suffix does not change it, a missing part is zero, and a part too big for its place is capped.
+    assert_eq!(version_code("1.2.3-rc.1"), 1_002_003);
+    assert_eq!(version_code("2"), 2_000_000);
+    assert_eq!(version_code("1.5000.0"), 1_999_000);
+    assert_eq!(version_code("nonsense"), 0);
+    // It only goes up as the version does.
+    assert!(version_code("0.1.9") < version_code("0.2.0"));
+    assert!(version_code("0.9.9") < version_code("1.0.0"));
+}
+
+#[quench_test::test]
+fn a_host_whose_binary_has_another_name_than_its_crate_says_so_in_quench_toml() {
+    let p = workspace_project("linux-bin-name");
+    init(&mut Vec::new(), &p, None, None).unwrap();
+    // The crate is `my-app-desktop`, its binary `my-app`: cargo leaves `target/release/my-app`.
+    let dir = p.target_dir().join("release");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("my-app"), b"ELF-binary").unwrap();
+    let e = build(&Fake::default(), &mut Vec::new(), &p, true)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        e.contains("my-app-desktop"),
+        "without it the crate's name is looked for: {e}"
+    );
+    let manifest = p.root.join("quench.toml");
+    let text = std::fs::read_to_string(&manifest).unwrap();
+    std::fs::write(
+        &manifest,
+        text.replacen("[linux]", "[linux]\nbin = \"my-app\"", 1),
+    )
+    .unwrap();
+    let p = Project::find(&p.root).unwrap();
+    let target = build(&Fake::default(), &mut Vec::new(), &p, true).unwrap();
+    assert_eq!(std::fs::read(target).unwrap(), b"ELF-binary");
 }
