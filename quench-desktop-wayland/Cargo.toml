@@ -1,6 +1,6 @@
 [package]
 name = "quench-desktop-wayland"
-version = "0.1.2"
+version = "0.1.3"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - a Wayland client written against the wire protocol: a window with shared-memory buffers and pointer input, for the native renderer"
