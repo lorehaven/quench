@@ -196,7 +196,7 @@ impl Keymap {
             if xkb < 8 {
                 continue;
             }
-            let levels: Vec<String> = list.split(',').map(|s| s.trim().to_string()).collect();
+            let levels: Vec<String> = list.split(',').map(|s| symbol_name(s.trim())).collect();
             keys.insert(xkb - 8, levels);
         }
         (!keys.is_empty()).then_some(Self { keys })
@@ -340,6 +340,91 @@ fn describe(sym: &str) -> Key {
                 modifier: false,
             },
         ),
+    }
+}
+
+/// A key symbol as this module names it.
+///
+/// A compositor may write the symbols of a keymap as numbers (`0x6c`, `0xff0d`: what a newer xkbcommon does when it
+/// is not asked for names) instead of names (`l`, `Return`). The number is turned into the name or the character it
+/// stands for, and anything else is left as it is.
+fn symbol_name(symbol: &str) -> String {
+    let Some(hex) = symbol
+        .strip_prefix("0x")
+        .or_else(|| symbol.strip_prefix("0X"))
+    else {
+        return symbol.to_string();
+    };
+    let Ok(value) = u32::from_str_radix(hex, 16) else {
+        return symbol.to_string();
+    };
+    let named = |name: &str| name.to_string();
+    match value {
+        0 => named("NoSymbol"),
+        // Latin-1: the number is the character.
+        0x20..=0x7e | 0xa0..=0xff => {
+            char::from_u32(value).map_or_else(|| symbol.to_string(), String::from)
+        }
+        // A Unicode character past Latin-1: the number is the character plus 0x1000000.
+        0x0100_0100..=0x0110_ffff => {
+            char::from_u32(value - 0x0100_0000).map_or_else(|| symbol.to_string(), String::from)
+        }
+        // The Latin-2 letters (Polish, Czech, ...) that are not Unicode keysyms.
+        0x1a1 => "Ą".into(),
+        0x1b1 => "ą".into(),
+        0x1a3 => "Ł".into(),
+        0x1b3 => "ł".into(),
+        0x1a6 => "Ś".into(),
+        0x1b6 => "ś".into(),
+        0x1ac => "Ź".into(),
+        0x1bc => "ź".into(),
+        0x1af => "Ż".into(),
+        0x1bf => "ż".into(),
+        0x1c6 => "Ć".into(),
+        0x1e6 => "ć".into(),
+        0x1ca => "Ę".into(),
+        0x1ea => "ę".into(),
+        0x1d1 => "Ń".into(),
+        0x1f1 => "ń".into(),
+        0xff08 => named("BackSpace"),
+        0xff09 => named("Tab"),
+        0xfe20 => named("ISO_Left_Tab"),
+        0xff0d => named("Return"),
+        0xff8d => named("KP_Enter"),
+        0xff1b => named("Escape"),
+        0xffff => named("Delete"),
+        0xff63 => named("Insert"),
+        0xff50 => named("Home"),
+        0xff57 => named("End"),
+        0xff51 => named("Left"),
+        0xff52 => named("Up"),
+        0xff53 => named("Right"),
+        0xff54 => named("Down"),
+        0xff55 => named("Page_Up"),
+        0xff56 => named("Page_Down"),
+        0xffe1 => named("Shift_L"),
+        0xffe2 => named("Shift_R"),
+        0xffe3 => named("Control_L"),
+        0xffe4 => named("Control_R"),
+        0xffe9 => named("Alt_L"),
+        0xffea => named("Alt_R"),
+        0xfe03 => named("ISO_Level3_Shift"),
+        0xffeb => named("Super_L"),
+        0xffec => named("Super_R"),
+        0xffe7 => named("Meta_L"),
+        0xffe8 => named("Meta_R"),
+        0xffe5 => named("Caps_Lock"),
+        0xff7f => named("Num_Lock"),
+        // The keypad's digits and operators type what they show.
+        0xffb0..=0xffb9 => char::from_u32(u32::from(b'0') + (value - 0xffb0))
+            .map_or_else(String::new, String::from),
+        0xffaa => "*".into(),
+        0xffab => "+".into(),
+        0xffad => "-".into(),
+        0xffae => ".".into(),
+        0xffaf => "/".into(),
+        0xffbe..=0xffc9 => format!("F{}", value - 0xffbd),
+        _ => symbol.to_string(),
     }
 }
 
