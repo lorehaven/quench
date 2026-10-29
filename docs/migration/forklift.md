@@ -60,9 +60,14 @@
 
 Limits: a restored file's name is the sanitised stored name (letters, digits, `. _ -`), not the original; the folder tree and original dates are not restored (the file gets today's date); a stopped restore starts over (what was fetched is recognised, so only the rest is fetched again).
 
-### Phase 4: polish and desktop
+### Phase 4: the Linux host
 
-Settings, quota display, Linux host (folders only).
+- [x] 4.1 `forklift-desktop` (`forge/services/forklift/desktop`): the same screens in a Wayland window (`forklift`), the backup's controller shared with Android (moved into `forklift-host`; the worker gained `spawn` for blocking work such as a folder dialog). A computer backs up **folders only**: the photo/video switches and the charging rule are hidden (`Setup.phone`), `Linux` answers the platform's questions (folders walked with `std::fs`, links not followed, `.DS_Store`/`Thumbs.db`/`desktop.ini` and `.part` files left out; always online and on power; the folder dialog is `zenity`, `kdialog` or `yad`).
+- [x] 4.2 `forklift --backup` for a systemd user timer (`desktop/systemd/forklift-backup.{service,timer}`, every 15 minutes): one backup with no window, a desktop notification when something was sent; it yields to the window through the same lock file.
+- [x] 4.3 Restore on Linux: a folder's files back into the folder (a name that is free: `name (2).ext`), everything else under `~/Forklift Restore/{photos,videos,<folder>}`; written through a `.part` file; the server's names are made safe first.
+- [x] 4.4 Packaging and release: `quench build deb|rpm|arch|source` all build (checked), and `.anvil.toml` has the four Linux targets next to the APK; the version of every build is `desktop/Cargo.toml`'s.
+- **Tests:** 7 (folder walk, names and destinations, send/fetch against a stand-in server, a whole background run: new files sent, nothing the second time, a changed file again, and the "off / not signed in / no storage chosen" cases). **Verified on this machine:** the window opens (class `dev.lorehaven.forklift`, title Forklift) and keeps running with its own data directory; `forklift --backup` with an empty store says what it did not do. **Not verified:** a login and backup from the window against a real server, the folder dialog, a restore from the window, the systemd timer.
+- **Limits:** a file over 512 MiB is not sent or fetched (the HTTP client reads a whole body; streaming needs a change in `quench-client`); no status notification and no foreground service (a timer does the work); the restore does not recreate the original folder tree or dates.
 
 ## Security
 
