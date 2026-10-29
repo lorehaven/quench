@@ -29,6 +29,25 @@
 
 pub mod client;
 pub mod keymap;
+
+/// Whether `QUENCH_WAYLAND_TRACE` is set. Off by default.
+///
+/// The window then says on stderr what the compositor sent and what it made of it (the seat, the keymap, the pointer
+/// and key events), for finding out why input does not arrive. Pointer motion is thinned out.
+#[must_use]
+pub fn trace_enabled() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("QUENCH_WAYLAND_TRACE").is_some())
+}
+
+/// Counts motion events, so a trace can show the first few and then every few hundred.
+#[must_use]
+pub fn trace_motion() -> bool {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNT: AtomicU64 = AtomicU64::new(0);
+    let n = COUNT.fetch_add(1, Ordering::Relaxed);
+    n < 3 || n.is_multiple_of(300)
+}
 pub mod proto;
 pub mod sys;
 mod window;

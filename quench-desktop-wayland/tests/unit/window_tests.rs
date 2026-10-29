@@ -147,6 +147,18 @@ fn read_pool(fake: &mut Fake, shm_id: u32) -> Pool {
 
 /// Answers the handshake of a window with these globals, and configures it to `width` x `height`.
 fn handshake(fake: &mut Fake, globals: &[(&str, u32)], width: i32, height: i32) -> Setup {
+    handshake_with(fake, globals, width, height, None)
+}
+
+/// As [`handshake`], and when `early_capabilities` is given the seat announces them *before* the configuration, as a
+/// real compositor does.
+fn handshake_with(
+    fake: &mut Fake,
+    globals: &[(&str, u32)],
+    width: i32,
+    height: i32,
+    early_capabilities: Option<u32>,
+) -> Setup {
     let reg = fake.expect(1, display::GET_REGISTRY);
     let registry_id = ids(&reg)[0];
     let sync = fake.expect(1, display::SYNC);
@@ -197,6 +209,9 @@ fn handshake(fake: &mut Fake, globals: &[(&str, u32)], width: i32, height: i32) 
         .string()
         .unwrap();
     fake.expect(surface_id, surface::COMMIT);
+    if let (Some(capabilities), Some(seat_id)) = (early_capabilities, bound.get("wl_seat")) {
+        fake.send(*seat_id, seat::CAPABILITIES, Args::new().uint(capabilities));
+    }
     fake.send(
         toplevel,
         xdg_toplevel::CONFIGURE,
@@ -352,6 +367,15 @@ fn open(width: i32, height: i32) -> (Fake, Setup, App) {
 }
 
 fn open_with(globals: &[(&str, u32)], width: i32, height: i32) -> (Fake, Setup, App) {
+    open_early(globals, width, height, None)
+}
+
+fn open_early(
+    globals: &[(&str, u32)],
+    width: i32,
+    height: i32,
+    early_capabilities: Option<u32>,
+) -> (Fake, Setup, App) {
     let (a, b) = UnixStream::pair().unwrap();
     let app = App::start(Socket::from_stream(a), 640, 480);
     let mut fake = Fake {
@@ -359,7 +383,7 @@ fn open_with(globals: &[(&str, u32)], width: i32, height: i32) -> (Fake, Setup, 
         decoder: Decoder::new(),
         fds: VecDeque::new(),
     };
-    let setup = handshake(&mut fake, globals, width, height);
+    let setup = handshake_with(&mut fake, globals, width, height, early_capabilities);
     assert_eq!(app.opened().unwrap(), (width as usize, height as usize));
     (fake, setup, app)
 }
@@ -751,18 +775,22 @@ xkb_symbols "pc+pl+us" {
 };"#;
 
 /// A file with `text` in it, to send as the keymap.
-fn keymap_file(text: &str) -> OwnedFd {
+/// The keymap as a compositor sends it: the very descriptor it wrote through, so its offset is at the end.
+fn keymap_file_written_through(text: &str) -> OwnedFd {
     use std::io::Write as _;
     let path = std::env::temp_dir().join(format!(
-        "quench-keymap-{}-{:?}",
+        "quench-keymap-end-{}-{:?}",
         std::process::id(),
         std::thread::current().id()
     ));
-    std::fs::File::create(&path)
-        .unwrap()
-        .write_all(text.as_bytes())
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&path)
         .unwrap();
-    let file = std::fs::File::open(&path).unwrap();
+    file.write_all(text.as_bytes()).unwrap();
     std::fs::remove_file(&path).unwrap();
     file.into()
 }
@@ -779,7 +807,7 @@ fn the_keyboard_sends_keys_read_through_the_layout_it_announced() {
     app.quiet();
     let keyboard_id = ids(&fake.expect(seat_id, seat::GET_KEYBOARD))[0];
     // The layout arrives in a file; the window reads it.
-    let fd = keymap_file(POLISH);
+    let fd = keymap_file_written_through(POLISH);
     fake.socket
         .send(
             &encode(
@@ -1032,4 +1060,16 @@ fn the_clipboard_is_read_from_another_program_and_offered_to_others() {
     fake.send(source, data_source::CANCELLED, Args::new());
     app.quiet();
     fake.expect(source, data_source::DESTROY);
+}
+
+#[quench_test::test]
+fn a_seat_that_announces_its_pointer_and_keyboard_before_the_first_configuration_is_heard() {
+    // A real compositor sends the capabilities right after the seat is bound, ahead of the window's configuration.
+    // Dropping them there left the window with no pointer and no keyboard: nothing could be clicked or typed.
+    let (mut fake, setup, _app) =
+        open_early(&GLOBALS, 100, 100, Some(seat::POINTER | seat::KEYBOARD));
+    let seat_id = setup.seat.unwrap();
+    let pointer_id = ids(&fake.expect(seat_id, seat::GET_POINTER))[0];
+    fake.expect(seat_id, seat::GET_KEYBOARD);
+    assert_ne!(pointer_id, 0);
 }

@@ -258,7 +258,10 @@ impl Window {
         // The first commit has no buffer: it asks the compositor for the window's configuration.
         client.send(surface, proto::surface::COMMIT, Args::new(), &[])?;
 
-        // Wait for the first complete configuration, answering what must be answered.
+        // Wait for the first complete configuration, answering what must be answered. What else arrives meanwhile is
+        // kept, not dropped: a compositor tells a new seat what it has (a pointer, a keyboard) at once, before it
+        // configures the window, and a window that never hears it never asks for either - no input, ever.
+        let mut early: Vec<(u32, Event)> = Vec::new();
         let mut size = (width, height);
         let serial = loop {
             match client.next_event(Some(Duration::from_secs(5)))? {
@@ -283,7 +286,7 @@ impl Window {
                         &[],
                     )?;
                 }
-                Some(_) => {}
+                Some(other) => early.push(other),
                 None => {
                     return Err(io::Error::new(
                         io::ErrorKind::TimedOut,
@@ -299,7 +302,7 @@ impl Window {
             &[],
         )?;
         let buffers = Buffers::create(&mut client, shm, size.0, size.1)?;
-        Ok(Self {
+        let mut window = Self {
             client,
             ids: Ids {
                 shm,
@@ -328,7 +331,12 @@ impl Window {
             repeat: (25, 600),
             pointer: (0.0, 0.0),
             frames: HashSet::new(),
-        })
+        };
+        // What came before the window was ready is handled now, in the order it came.
+        for (id, event) in early {
+            window.handle(id, event)?;
+        }
+        Ok(window)
     }
 
     /// The size of a frame, in pixels.
@@ -605,6 +613,21 @@ impl Window {
         reason = "one arm per event the window reacts to"
     )]
     fn handle(&mut self, id: u32, event: Event) -> io::Result<()> {
+        if crate::trace_enabled() {
+            match &event {
+                Event::PointerMotion { .. } => {
+                    if crate::trace_motion() {
+                        eprintln!("quench-wayland: {event:?}");
+                    }
+                }
+                // Per-frame noise.
+                Event::CallbackDone
+                | Event::BufferRelease
+                | Event::XdgPing { .. }
+                | Event::Ignored => {}
+                other => eprintln!("quench-wayland: {other:?}"),
+            }
+        }
         match event {
             Event::XdgPing { serial } => {
                 self.client.send(
@@ -717,12 +740,37 @@ impl Window {
             }
             Event::KeyboardKeymap { size } => {
                 if let Some(fd) = self.client.take_fd() {
-                    let mut text = String::new();
-                    let read = std::io::Read::take(std::fs::File::from(fd), u64::from(size))
-                        .read_to_string(&mut text);
-                    if read.is_ok()
-                        && let Some(map) = Keymap::parse(&text)
-                    {
+                    // Read from offset 0, not from wherever the descriptor's offset is: it is the very file the
+                    // compositor has just written, and the offset is shared with it, so at the end. A plain read
+                    // there finds nothing, and the layout would stay the US one.
+                    let file = std::fs::File::from(fd);
+                    let mut bytes = vec![0_u8; size as usize];
+                    let read = read_from_start(&file, &mut bytes);
+                    let text = String::from_utf8_lossy(&bytes)
+                        .trim_end_matches('\0')
+                        .to_string();
+                    let parsed = read.is_ok().then(|| Keymap::parse(&text)).flatten();
+                    if crate::trace_enabled() && parsed.is_none() {
+                        // What could not be read, kept for a look.
+                        let path = std::env::temp_dir().join("quench-keymap.xkb");
+                        let _ = std::fs::write(&path, &text);
+                        eprintln!(
+                            "quench-wayland: the keymap was written to {}",
+                            path.display()
+                        );
+                    }
+                    if crate::trace_enabled() {
+                        eprintln!(
+                            "quench-wayland: keymap of {size} bytes: read {}, {}",
+                            if read.is_ok() { "ok" } else { "FAILED" },
+                            if parsed.is_some() {
+                                "parsed"
+                            } else {
+                                "NOT parsed (US layout used)"
+                            }
+                        );
+                    }
+                    if let Some(map) = parsed {
                         self.keymap = map;
                     }
                 }
@@ -820,6 +868,21 @@ impl Window {
             .push_back(WindowEvent::Resized { width, height });
         Ok(())
     }
+}
+
+/// Fills `buffer` from the start of `file`, whatever its offset is, and cuts it to what was there.
+fn read_from_start(file: &std::fs::File, buffer: &mut Vec<u8>) -> io::Result<()> {
+    use std::os::unix::fs::FileExt as _;
+    let mut done = 0;
+    while done < buffer.len() {
+        let n = file.read_at(&mut buffer[done..], done as u64)?;
+        if n == 0 {
+            break;
+        }
+        done += n;
+    }
+    buffer.truncate(done);
+    Ok(())
 }
 
 /// A size the compositor suggested, if it is one we will take (0 means "your choice").

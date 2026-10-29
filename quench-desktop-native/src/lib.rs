@@ -176,6 +176,13 @@ impl Controller {
 
     /// Does what `event` asks of the renderer.
     pub fn handle(&mut self, event: WindowEvent) {
+        if quench_desktop_wayland::trace_enabled() && !matches!(event, WindowEvent::Frame) {
+            let thin = matches!(event, WindowEvent::PointerMoved { .. })
+                && !quench_desktop_wayland::trace_motion();
+            if !thin {
+                eprintln!("quench-host: {event:?}");
+            }
+        }
         match event {
             WindowEvent::CloseRequested => self.closing = true,
             WindowEvent::Resized { width, height } => {
