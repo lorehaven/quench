@@ -78,7 +78,7 @@ pub fn init(
     if root.exists() {
         return fail(format!("{} exists already", root.display()));
     }
-    let cargo = project.root.join("Cargo.toml");
+    let cargo = project.workspace_manifest();
     let workspace = std::fs::read_to_string(&cargo).ok();
     let standalone = workspace.is_none();
     let dependency = versions::dependency_lines(quench_path);
@@ -90,7 +90,7 @@ pub fn init(
         .replacen(" }", ", features = [\"window\"] }", 1);
     let context = json!({
         "name": project.name, "title": title(project), "id": id,
-        "standalone": standalone, "quench_desktop": quench_desktop,
+        "standalone": standalone, "flat": project.flat(), "quench_desktop": quench_desktop,
     });
     let mut env = Environment::new();
     for (name, text) in [("Cargo.toml", CARGO), ("src/main.rs", MAIN)] {
@@ -107,10 +107,11 @@ pub fn init(
     std::fs::write(root.join("build.rs"), BUILD)?;
     if let Some(text) = workspace {
         let text = crate::plugins::ensure_dependency(&text, "quench-desktop")?;
-        let text = if text.contains("\"desktop\"") {
+        let member = project.member_path("desktop");
+        let text = if text.contains(&format!("\"{member}\"")) {
             text
         } else {
-            text.replacen("members = [", "members = [\"desktop\", ", 1)
+            text.replacen("members = [", &format!("members = [\"{member}\", "), 1)
         };
         std::fs::write(&cargo, text)?;
     }

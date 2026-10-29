@@ -473,15 +473,16 @@ fn apply(out: &mut dyn Write, project: &Project, package: &str, p: &Plugin) -> R
         }
         Ok(text)
     })?;
-    let cargo = project.root.join("Cargo.toml");
+    let cargo = project.workspace_manifest();
     edit(&cargo, |mut text| {
         for name in p.crates {
             text = ensure_dependency(&text, name)?;
         }
-        if let Some(member) = p.member
-            && !text.contains(&format!("\"{member}\""))
-        {
-            text = text.replacen("members = [", &format!("members = [\"{member}\", "), 1);
+        if let Some(member) = p.member {
+            let member = project.member_path(member);
+            if !text.contains(&format!("\"{member}\"")) {
+                text = text.replacen("members = [", &format!("members = [\"{member}\", "), 1);
+            }
         }
         Ok(text)
     })?;

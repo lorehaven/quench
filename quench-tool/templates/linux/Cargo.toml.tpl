@@ -1,6 +1,6 @@
 [package]
 name = "{{ name }}-desktop"
-{% if standalone %}version = "0.1.0"
+{% if standalone or flat %}version = "0.1.0"
 edition = "2024"
 {% else %}version.workspace = true
 edition.workspace = true

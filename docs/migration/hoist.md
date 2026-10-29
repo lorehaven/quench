@@ -1,6 +1,6 @@
 # Hoist (formerly Pedlar): the migration checklist
 
-**Where it lives:** `forge/services/hoist` (a project made by `quench new hoist --template web`, its own workspace, quench crates from the registry). The Flutter scaffold in `mobile-apps/pedlar` stays untouched until the replacement reaches parity and you approve retiring it. **There is no server of its own:** hoist is a client of gatehouse and warehouse. The project's `server` crate only renders the page at build time and serves the dev loop; nothing from it ships.
+**Where it lives:** `forge/services/hoist` (a project made by `quench new hoist --template web`, now a member of forge's workspace in the flat layout, quench crates from the registry). The Flutter scaffold in `mobile-apps/pedlar` stays untouched until the replacement reaches parity and you approve retiring it. **There is no server of its own:** hoist is a client of gatehouse and warehouse. The project's `server` crate only renders the page at build time and serves the dev loop; nothing from it ships.
 
 **The spec** is `mobile-apps/pedlar/plans/PEDLAR.html` (blueprint) and `ROADMAP.html` (28 tasks). The Flutter app is an empty scaffold, so there is no behaviour to match beyond those two documents. Two things have changed since they were written, and this checklist follows the code, not the plan:
 

@@ -199,7 +199,15 @@ fn command(
         }
         Cmd::Test { browser, args } => {
             let project = Project::find(cwd)?;
-            let mut cargo = vec!["test".to_string(), "--workspace".to_string()];
+            // A project inside a larger workspace tests its own crates, not the repository's.
+            let mut cargo = vec!["test".to_string()];
+            if project.flat() {
+                for package in project.packages() {
+                    cargo.extend(["-p".to_string(), package]);
+                }
+            } else {
+                cargo.push("--workspace".to_string());
+            }
             cargo.extend(args);
             let refs: Vec<&str> = cargo.iter().map(String::as_str).collect();
             release::step(sys, out, &Command::new("cargo", &refs, &project.root))?;

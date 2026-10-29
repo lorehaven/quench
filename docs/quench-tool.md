@@ -35,6 +35,8 @@ The name is a lowercase letter followed by letters, digits, `-` and `_`, at most
 
 The root `.quench.toml` (`name`, `template`) is how the other commands recognise a project; they find it from any directory below. The workspace defines two wasm profiles: `wasm-dev` (quick to compile, used by `dev` and a plain `build`) and `wasm` (size-optimised: `opt-level = "z"`, LTO, `panic = "abort"`, stripped). Without `--quench-path` the project depends on the registry `ennor` and gets a `.cargo/config.toml` naming it.
 
+**Two layouts.** By default a project is a cargo workspace of its own (`quench new` writes the root `Cargo.toml`). A project can also sit *inside* a larger workspace, as a service among a repository's others (the **flat** layout): leave the project's own `Cargo.toml` out, list its crates (`app`, `core`, `desktop`, ...) among the repository workspace's `members`, give each its own `version`, and keep `.quench.toml` in the project's directory. The tool finds the enclosing workspace by itself (the nearest `Cargo.toml` above with a `[workspace]`) and then builds into *its* `target/`, tests the project's own crates by name instead of `--workspace`, and edits that workspace's `members` and `[workspace.dependencies]` (with the project's directory in the path) when `quench linux init` or `quench plugin add` adds a crate. The version of a project with no root manifest comes from `desktop/Cargo.toml`.
+
 ## `quench dev [--port N] [--open]`
 
 Builds the module (`cargo build --target wasm32-unknown-unknown --profile wasm-dev`) and the server, starts the server with `PORT`, `WASM` (the module's path) and `QUENCH_DEV=1`, then watches the project. When a source file changes it stops the server, rebuilds and starts it again.

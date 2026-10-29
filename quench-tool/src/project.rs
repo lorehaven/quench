@@ -155,10 +155,79 @@ impl Project {
         self.target_dir().join(profile).join(self.server_package())
     }
 
+    /// The cargo workspace the project's crates belong to: the project's own root (the default: `quench new` makes
+    /// a workspace of its own), else the nearest enclosing workspace, for a project that lives inside a larger one
+    /// (a service among a repository's other services: the *flat* layout).
+    #[must_use]
+    pub fn workspace_root(&self) -> PathBuf {
+        let declares = |dir: &Path| {
+            std::fs::read_to_string(dir.join("Cargo.toml"))
+                .is_ok_and(|text| text.lines().any(|l| l.trim_end() == "[workspace]"))
+        };
+        if declares(&self.root) {
+            return self.root.clone();
+        }
+        self.root
+            .ancestors()
+            .skip(1)
+            .find(|dir| declares(dir))
+            .map_or_else(|| self.root.clone(), Path::to_path_buf)
+    }
+
+    /// Whether the project's crates are members of a workspace that is not the project's own.
+    #[must_use]
+    pub fn flat(&self) -> bool {
+        self.workspace_root() != self.root
+    }
+
+    /// The manifest that lists the workspace's members and dependencies.
+    #[must_use]
+    pub fn workspace_manifest(&self) -> PathBuf {
+        self.workspace_root().join("Cargo.toml")
+    }
+
+    /// How the workspace's `members` names the project's directory `dir` (`desktop`, or `services/x/desktop` when
+    /// the workspace is above the project).
+    #[must_use]
+    pub fn member_path(&self, dir: &str) -> String {
+        let root = self.workspace_root();
+        self.root
+            .strip_prefix(&root)
+            .ok()
+            .filter(|rel| !rel.as_os_str().is_empty())
+            .map_or_else(|| dir.to_string(), |rel| format!("{}/{dir}", rel.display()))
+    }
+
+    /// The names of the crates directly below the project's root: what a flat project tests and checks instead of
+    /// `--workspace`, which would take in every other crate of the repository.
+    #[must_use]
+    pub fn packages(&self) -> Vec<String> {
+        let mut names: Vec<String> = std::fs::read_dir(&self.root)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|entry| std::fs::read_to_string(entry.path().join("Cargo.toml")).ok())
+            .filter_map(|text| {
+                let after = &text[text.find("[package]")? + "[package]".len()..];
+                let line = after
+                    .lines()
+                    .take_while(|l| !l.starts_with('['))
+                    .find(|l| l.starts_with("name = "))?;
+                Some(
+                    line.trim_start_matches("name = ")
+                        .trim_matches('"')
+                        .to_string(),
+                )
+            })
+            .collect();
+        names.sort();
+        names
+    }
+
     #[must_use]
     pub fn target_dir(&self) -> PathBuf {
         std::env::var_os("CARGO_TARGET_DIR").map_or_else(
-            || self.root.join("target"),
+            || self.workspace_root().join("target"),
             |dir| {
                 let dir = PathBuf::from(dir);
                 if dir.is_absolute() {
