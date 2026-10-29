@@ -19,7 +19,7 @@ fn a_fullstack_project_has_all_four_crates() {
     let f = files(Template::Fullstack, Some("/q"));
     let paths: Vec<&str> = f.iter().map(|(p, _)| p.as_str()).collect();
     for want in [
-        "quench.toml",
+        ".quench.toml",
         "Cargo.toml",
         ".gitignore",
         "README.md",
@@ -39,7 +39,7 @@ fn a_fullstack_project_has_all_four_crates() {
         get(&f, "Cargo.toml").contains("members = [\"shared\", \"core\", \"app\", \"server\"]")
     );
     assert!(get(&f, "app/src/lib.rs").contains("greet"));
-    assert!(get(&f, "quench.toml").contains("template = \"fullstack\""));
+    assert!(get(&f, ".quench.toml").contains("template = \"fullstack\""));
 }
 
 #[quench_test::test]
@@ -74,7 +74,7 @@ fn nothing_of_the_template_syntax_is_left_over() {
             );
             assert!(
                 !body.contains("my-app-core{")
-                    && body.contains(if path == "quench.toml" { "my-app" } else { "" })
+                    && body.contains(if path == ".quench.toml" { "my-app" } else { "" })
             );
         }
     }
@@ -146,7 +146,7 @@ fn create_writes_the_files_and_refuses_to_overwrite() {
         Some(q),
     )
     .unwrap();
-    assert!(cwd.join("elsewhere/quench.toml").is_file());
+    assert!(cwd.join("elsewhere/.quench.toml").is_file());
 }
 
 #[quench_test::test]

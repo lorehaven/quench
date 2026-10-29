@@ -1,4 +1,4 @@
-//! A quench project: a workspace whose root holds `quench.toml`.
+//! A quench project: a workspace whose root holds `.quench.toml`.
 
 use std::path::{Path, PathBuf};
 
@@ -7,9 +7,9 @@ use quench_serde::Deserialize;
 use crate::cli::Template;
 use crate::error::{Result, fail};
 
-pub const MANIFEST: &str = "quench.toml";
+pub const MANIFEST: &str = ".quench.toml";
 
-/// The `[android]` table of `quench.toml`: what the build needs to know.
+/// The `[android]` table of `.quench.toml`: what the build needs to know.
 #[derive(Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct AndroidConfig {
     /// The application id (`quench android init --package` writes it).
@@ -26,7 +26,7 @@ pub struct AndroidConfig {
     pub key_alias: Option<String>,
 }
 
-/// The `[linux]` table of `quench.toml`.
+/// The `[linux]` table of `.quench.toml`.
 #[derive(Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct LinuxConfig {
     /// The application id the keyring, notifications and the menu entry know the app by.
@@ -85,7 +85,7 @@ pub fn check_name(name: &str) -> Result<()> {
 }
 
 impl Project {
-    /// The project that contains `start`, found by looking for `quench.toml` upwards.
+    /// The project that contains `start`, found by looking for `.quench.toml` upwards.
     ///
     /// # Errors
     /// When there is none, or its manifest cannot be read.

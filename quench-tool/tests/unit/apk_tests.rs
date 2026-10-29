@@ -7,7 +7,7 @@ use std::path::PathBuf;
 fn ready(label: &str) -> (Fake, Project) {
     let p = project_named(label, "my-app", "web");
     quench_tool::android::init(&mut Vec::new(), &p, Some("dev.lorehaven.myapp")).unwrap();
-    let manifest = p.root.join("quench.toml");
+    let manifest = p.root.join(".quench.toml");
     let text = std::fs::read_to_string(&manifest).unwrap();
     std::fs::write(
         &manifest,
@@ -297,8 +297,8 @@ fn a_keystore_is_made_by_keytool_with_passwords_from_the_environment() {
         !cmd.args.contains(&"-keypass:env".to_string()),
         "no separate key password was given"
     );
-    assert!(text(out).contains("named it in quench.toml"));
-    let manifest = std::fs::read_to_string(p.root.join("quench.toml")).unwrap();
+    assert!(text(out).contains("named it in .quench.toml"));
+    let manifest = std::fs::read_to_string(p.root.join(".quench.toml")).unwrap();
     assert!(
         manifest.contains("keystore = \"release.keystore\"")
             && manifest.contains("key_alias = \"release\""),
@@ -346,9 +346,9 @@ fn a_keystore_is_made_once_and_needs_a_password() {
 #[quench_test::test]
 fn the_version_is_the_cargo_version_unless_quench_toml_says_otherwise() {
     let (_, p) = ready("apk-version-derived");
-    // `ready` writes version_code = 7 into quench.toml: that wins for the code, the name is `quench.toml`'s too.
+    // `ready` writes version_code = 7 into .quench.toml: that wins for the code, the name is `.quench.toml`'s too.
     assert_eq!(version(&p).1, 7);
-    let manifest = p.root.join("quench.toml");
+    let manifest = p.root.join(".quench.toml");
     let text = std::fs::read_to_string(&manifest).unwrap();
     std::fs::write(
         &manifest,

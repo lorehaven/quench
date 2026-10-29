@@ -55,7 +55,7 @@ fn init_joins_the_workspace_and_writes_the_host() {
         root.contains("quench-desktop = { path = \"/q/quench-desktop\" }"),
         "from the same checkout: {root}"
     );
-    assert!(read(&p, "quench.toml").contains("[linux]\nid = \"dev.lorehaven.myapp\""));
+    assert!(read(&p, ".quench.toml").contains("[linux]\nid = \"dev.lorehaven.myapp\""));
     assert!(
         !p.root.join(".gitignore").exists(),
         "a workspace's own target/ is the project's already"
@@ -343,7 +343,7 @@ fn the_names_come_from_the_project_and_its_linux_table() {
         ),
         ("com.example.my_app", "my-app", "my-app-desktop")
     );
-    std::fs::write(p.root.join("quench.toml"), "name = \"my-app\"\ntemplate = \"web\"\n\n[linux]\nid = \"org.x.app\"\ntitle = \"My App\"\n").unwrap();
+    std::fs::write(p.root.join(".quench.toml"), "name = \"my-app\"\ntemplate = \"web\"\n\n[linux]\nid = \"org.x.app\"\ntitle = \"My App\"\n").unwrap();
     let p = Project::find(&p.root).unwrap();
     assert_eq!(
         (app_id(&p).as_str(), title(&p).as_str()),
@@ -382,7 +382,7 @@ fn a_host_whose_binary_has_another_name_than_its_crate_says_so_in_quench_toml() 
         e.contains("my-app-desktop"),
         "without it the crate's name is looked for: {e}"
     );
-    let manifest = p.root.join("quench.toml");
+    let manifest = p.root.join(".quench.toml");
     let text = std::fs::read_to_string(&manifest).unwrap();
     std::fs::write(
         &manifest,

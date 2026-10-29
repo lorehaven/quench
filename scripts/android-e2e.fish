@@ -43,7 +43,7 @@ end
 cargo build -p quench-tool -p quench-example-ui-web-server; or exit 1
 cargo build --target wasm32-unknown-unknown --profile wasm -p quench-example-ui-web-app; or exit 1
 mkdir -p $work/gallery
-printf 'name = "gallery"\ntemplate = "web"\n' >$work/gallery/quench.toml
+printf 'name = "gallery"\ntemplate = "web"\n' >$work/gallery/.quench.toml
 QUENCH_EXPORT=$work/gallery/dist/www target/debug/quench-example-ui-web-server >/dev/null; or exit 1
 cd $work/gallery
 $root/target/debug/quench android init --package $pkg >/dev/null; or exit 1

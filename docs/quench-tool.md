@@ -33,7 +33,7 @@ The name is a lowercase letter followed by letters, digits, `-` and `_`, at most
 | `android/` | after `quench android init`: the Android host |
 | `server/` | a `quench-http` server using `quench-fullstack`: the page, the hashed assets, the server functions. Feature `embed` builds the module in |
 
-The root `quench.toml` (`name`, `template`) is how the other commands recognise a project; they find it from any directory below. The workspace defines two wasm profiles: `wasm-dev` (quick to compile, used by `dev` and a plain `build`) and `wasm` (size-optimised: `opt-level = "z"`, LTO, `panic = "abort"`, stripped). Without `--quench-path` the project depends on the registry `ennor` and gets a `.cargo/config.toml` naming it.
+The root `.quench.toml` (`name`, `template`) is how the other commands recognise a project; they find it from any directory below. The workspace defines two wasm profiles: `wasm-dev` (quick to compile, used by `dev` and a plain `build`) and `wasm` (size-optimised: `opt-level = "z"`, LTO, `panic = "abort"`, stripped). Without `--quench-path` the project depends on the registry `ennor` and gets a `.cargo/config.toml` naming it.
 
 ## `quench dev [--port N] [--open]`
 
@@ -74,7 +74,7 @@ Builds the program in `native/` (made by `quench plugin add native`) for arm64-v
 
 ## `quench linux init [--id ID] [--quench-path DIR]`
 
-Writes `desktop/`, the host crate of the [Linux desktop host](./quench-desktop.md): a `Cargo.toml`, a `main.rs` that shows the bundle with the standard plugins, and a `build.rs` that embeds `dist/www`. In a project with a workspace it joins it (a member, and `quench-desktop` among the workspace dependencies, from the same checkout or registry as the other quench crates); in a directory with no `Cargo.toml` it is a crate of its own, depending on the checkout named by `--quench-path` or on the registry. The application id (`--id`, default `com.example.<name>`) is written to a `[linux]` table in `quench.toml` with an optional `title`; it names the app to the keyring, the notification service and the menu entry. It refuses to overwrite an existing `desktop/`.
+Writes `desktop/`, the host crate of the [Linux desktop host](./quench-desktop.md): a `Cargo.toml`, a `main.rs` that shows the bundle with the standard plugins, and a `build.rs` that embeds `dist/www`. In a project with a workspace it joins it (a member, and `quench-desktop` among the workspace dependencies, from the same checkout or registry as the other quench crates); in a directory with no `Cargo.toml` it is a crate of its own, depending on the checkout named by `--quench-path` or on the registry. The application id (`--id`, default `com.example.<name>`) is written to a `[linux]` table in `.quench.toml` with an optional `title`; it names the app to the keyring, the notification service and the menu entry. It refuses to overwrite an existing `desktop/`.
 
 ## `quench build linux [--release]`, `quench build deb`, `quench run linux`, `quench dev --linux`
 
@@ -86,7 +86,7 @@ Builds the bundle (and the native program for the device's ABI, found with `adb 
 
 ## `quench build apk|aab [--release] [--abi ABI]` and signing
 
-`quench build apk` builds the bundle, the native program if there is one, and a debug APK; `--release` (and always for `aab`) signs with the key `quench.toml` names:
+`quench build apk` builds the bundle, the native program if there is one, and a debug APK; `--release` (and always for `aab`) signs with the key `.quench.toml` names:
 
 ```toml
 [android]
@@ -101,7 +101,7 @@ key_alias = "release"
 
 ## Publishing
 
-The tool builds and never publishes: it has no idea where a release goes. `quench build apk --release` (signed), `quench build aab --release`, `quench build linux` and `quench build deb` make the packages in `dist/`; **`anvil artifact release`** (in the forge repository) builds them and sends them to the warehouse. A project's version is its Cargo version (`[workspace.package]`, else the desktop crate's); the Android `versionName` is that, and the `versionCode` is `major * 1_000_000 + minor * 1_000 + patch`, so `0.1.3` is `1003` on every platform. `version_name` and `version_code` under `[android]` in `quench.toml` still override it.
+The tool builds and never publishes: it has no idea where a release goes. `quench build apk --release` (signed), `quench build aab --release`, `quench build linux` and `quench build deb` make the packages in `dist/`; **`anvil artifact release`** (in the forge repository) builds them and sends them to the warehouse. A project's version is its Cargo version (`[workspace.package]`, else the desktop crate's); the Android `versionName` is that, and the `versionCode` is `major * 1_000_000 + minor * 1_000 + patch`, so `0.1.3` is `1003` on every platform. `version_name` and `version_code` under `[android]` in `.quench.toml` still override it.
 
 ## `quench doctor`
 

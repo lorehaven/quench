@@ -174,7 +174,7 @@ pub fn build_native(
 
 const MAIN_ACTIVITY: &str = ".MainActivity";
 
-/// The application id of the project's host: from `quench.toml`, else what `android/` was made with.
+/// The application id of the project's host: from `.quench.toml`, else what `android/` was made with.
 ///
 /// # Errors
 /// When there is no Android host.
@@ -199,7 +199,7 @@ pub fn package(project: &Project) -> Result<String> {
 /// `(versionName, versionCode)` as the build and the registry see them.
 #[must_use]
 pub fn version(project: &Project) -> (String, u32) {
-    // What `quench.toml` does not say comes from the project's Cargo version, the one the `.deb` carries too.
+    // What `.quench.toml` does not say comes from the project's Cargo version, the one the `.deb` carries too.
     let name = project
         .android
         .version_name
@@ -212,7 +212,7 @@ pub fn version(project: &Project) -> (String, u32) {
     (name, code)
 }
 
-/// Runs Gradle in `android/` for `tasks`. A release build signs with the key `quench.toml` names;
+/// Runs Gradle in `android/` for `tasks`. A release build signs with the key `.quench.toml` names;
 /// its passwords come from the environment, never from a file.
 fn gradle(
     sys: &dyn System,
@@ -234,7 +234,7 @@ fn gradle(
         let (Some(keystore), Some(alias)) = (&project.android.keystore, &project.android.key_alias)
         else {
             return fail(
-                "a release build is signed: set `keystore` and `key_alias` under [android] in quench.toml (`quench android keystore` makes a key)",
+                "a release build is signed: set `keystore` and `key_alias` under [android] in .quench.toml (`quench android keystore` makes a key)",
             );
         };
         if sys.var("QUENCH_KEYSTORE_PASSWORD").is_none() {
@@ -489,7 +489,7 @@ pub fn keystore(
         args.extend(["-keypass:env", "QUENCH_KEY_PASSWORD"]);
     }
     crate::release::step(sys, out, &Cmd::new("keytool", &args, &project.root))?;
-    // Where the build looks for it: under [android] in quench.toml.
+    // Where the build looks for it: under [android] in .quench.toml.
     let manifest = project.root.join(crate::project::MANIFEST);
     let text = std::fs::read_to_string(&manifest)?;
     if !text.contains("keystore =") {
@@ -505,7 +505,7 @@ pub fn keystore(
     }
     writeln!(
         out,
-        "made {path_arg} and named it in quench.toml.\nKeep the keystore and its password safe, and out of git: a lost key means a new app."
+        "made {path_arg} and named it in .quench.toml.\nKeep the keystore and its password safe, and out of git: a lost key means a new app."
     )?;
     Ok(())
 }

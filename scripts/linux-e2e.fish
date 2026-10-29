@@ -76,7 +76,7 @@ set -e CARGO_TARGET_DIR
 
 # --- The gallery, as a Linux binary from the same UI code.
 mkdir -p $work/gallery
-printf 'name = "gallery"\ntemplate = "web"\n' >$work/gallery/quench.toml
+printf 'name = "gallery"\ntemplate = "web"\n' >$work/gallery/.quench.toml
 QUENCH_EXPORT=$work/gallery/dist/www target/debug/quench-example-ui-web-server >/dev/null; or exit 1
 cd $work/gallery
 $quench linux init --id dev.lorehaven.gallery --quench-path $root >/dev/null; or exit 1

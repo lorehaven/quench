@@ -1,7 +1,7 @@
 //! The `quench` command.
 //!
 //! ```text
-//! quench new demo            # app/, core/, server/, shared/ and a quench.toml
+//! quench new demo            # app/, core/, server/, shared/ and a .quench.toml
 //! cd demo && quench dev      # build, serve, reload the browser when a file changes
 //! quench build --release     # dist/: one server binary with the app inside
 //! ```

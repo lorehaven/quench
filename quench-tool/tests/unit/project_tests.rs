@@ -42,28 +42,31 @@ fn a_project_is_found_from_a_directory_below_it() {
 #[quench_test::test]
 fn no_manifest_is_explained() {
     let e = Project::find(&tmp("nothing")).unwrap_err().to_string();
-    assert!(e.contains("quench.toml") && e.contains("quench new"), "{e}");
+    assert!(
+        e.contains(".quench.toml") && e.contains("quench new"),
+        "{e}"
+    );
 }
 
 #[quench_test::test]
 fn a_broken_manifest_is_explained() {
     let dir = tmp("broken");
     std::fs::write(
-        dir.join("quench.toml"),
+        dir.join(".quench.toml"),
         "name = \"demo\"\ntemplate = \"mobile\"\n",
     )
     .unwrap();
     let e = Project::find(&dir).unwrap_err().to_string();
     assert!(e.contains("unknown template `mobile`"), "{e}");
-    std::fs::write(dir.join("quench.toml"), "name = [").unwrap();
+    std::fs::write(dir.join(".quench.toml"), "name = [").unwrap();
     assert!(
         Project::find(&dir)
             .unwrap_err()
             .to_string()
-            .starts_with("quench.toml")
+            .starts_with(".quench.toml")
     );
     std::fs::write(
-        dir.join("quench.toml"),
+        dir.join(".quench.toml"),
         "name = \"Bad Name\"\ntemplate = \"web\"\n",
     )
     .unwrap();
@@ -71,7 +74,7 @@ fn a_broken_manifest_is_explained() {
         Project::find(&dir)
             .unwrap_err()
             .to_string()
-            .contains("quench.toml")
+            .contains(".quench.toml")
     );
 }
 

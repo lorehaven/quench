@@ -27,7 +27,7 @@ const fn file(path: &'static str, body: &'static str, only: For) -> File {
 
 const FILES: &[File] = &[
     file(
-        "quench.toml",
+        ".quench.toml",
         include_str!("../templates/quench.toml.tpl"),
         For::All,
     ),

@@ -75,7 +75,7 @@ A plugin is a Kotlin class (`Plugin`, see above), so changing one is editing a f
 
 ## Building and running
 
-`quench run android` installs and starts the app on the attached device; `quench dev --android` does that against the dev server; `quench build apk|aab [--release]` makes the package, signed with the key under `[android]` in `quench.toml`; `anvil artifact release` (forge) sends the signed release to the warehouse; the tool itself never publishes. The build commands and the signing environment variables are in [`quench-tool`](./quench-tool.md#quench-run-android---abi-abi).
+`quench run android` installs and starts the app on the attached device; `quench dev --android` does that against the dev server; `quench build apk|aab [--release]` makes the package, signed with the key under `[android]` in `.quench.toml`; `anvil artifact release` (forge) sends the signed release to the warehouse; the tool itself never publishes. The build commands and the signing environment variables are in [`quench-tool`](./quench-tool.md#quench-run-android---abi-abi).
 
 ## Measurements
 

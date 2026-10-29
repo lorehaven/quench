@@ -149,7 +149,7 @@ pub fn project(label: &str, template: &str) -> quench_tool::project::Project {
 pub fn project_named(label: &str, name: &str, template: &str) -> quench_tool::project::Project {
     let dir = tmp(label);
     std::fs::write(
-        dir.join("quench.toml"),
+        dir.join(".quench.toml"),
         format!("name = \"{name}\"\ntemplate = \"{template}\"\n"),
     )
     .unwrap();

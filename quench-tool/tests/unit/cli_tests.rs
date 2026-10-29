@@ -72,7 +72,7 @@ fn new_makes_the_project() {
         &dir,
     );
     assert_eq!(code, 0, "{out}");
-    assert!(dir.join("demo/quench.toml").is_file());
+    assert!(dir.join("demo/.quench.toml").is_file());
     assert!(out.contains("quench dev"), "{out}");
     let (again, _) = go(&["new", "demo"], &Fake::default(), &dir);
     assert_eq!(again, 1, "a second `new` must not overwrite the first");
