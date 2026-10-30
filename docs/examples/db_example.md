@@ -1,3 +1,9 @@
+---
+title: Example - Db example
+parent: Guides
+nav_order: 31
+---
+
 # Example: Db
 
 `db_example` (`examples/db_example`, package `quench-db-example`) demonstrates `quench-db`'s migration runner and CRUD repository against a real Postgres database. It exists as the workspace's runnable reference for how a service is expected to define a model, load Liquibase-style migrations from a directory, and perform create/list/update/delete through `PostgresRepository`.
@@ -29,4 +35,4 @@ Because the migration path (`examples/db_example/migrations`) is relative, run t
 - A reachable Postgres instance at `DATABASE_URL` (the example degrades gracefully and exits cleanly if none is found).
 - Dependencies: `quench-db`, `tokio`, `serde`, `sqlx`, `anyhow`, `tracing-subscriber` (all workspace-managed). `Cargo.toml` sets `publish = false`.
 
-[Home](../README.md)
+[Home](../index.md)

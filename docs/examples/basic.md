@@ -1,3 +1,9 @@
+---
+title: Example - Basic
+parent: Guides
+nav_order: 30
+---
+
 # Example: Basic
 
 `quench-example-basic` (`examples/basic`) is the smallest possible Quench web application — a minimal `quench-http` server that builds its pages with `quench-web`'s `AppShellBuilder`. It exists in the workspace as a smoke test for the Quench UI framework: a quick way to confirm the shell, theming, and static-asset pipeline still work end to end after a change to `quench-web`, and a copy-pasteable starting point for a new service's UI.
@@ -24,4 +30,4 @@ The root workspace README also lists this as one of its "Quench UI Smoke Tests" 
 
 - Just the Rust toolchain — no database, no external services. Dependencies are `quench-http`, `quench-starter`, `quench-web`, `async-trait` and `tokio` (all workspace-managed).
 
-[Home](../README.md)
+[Home](../index.md)

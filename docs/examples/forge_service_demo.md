@@ -1,3 +1,9 @@
+---
+title: Example - Forge service demo
+parent: Guides
+nav_order: 32
+---
+
 # Example: Forge Service Demo
 
 `quench-example-forge-service` (`examples/forge_service_demo`) is a minimal forge-service-shaped app: `quench-starter`'s bootstrap (health/readiness, base-path scoping, graceful shutdown) plus `quench-auth`'s `Auth`/`RequireWrite` middleware wrapped around it. Where `http_demo` is a tour of `quench-http` alone, this is the template for what a real service's `main.rs` looks like once it's migrated onto the quench-http stack - distilled to the parts that matter for that (no database, no TLS, no real gatehouse).
@@ -9,7 +15,7 @@
 - `Extension<Claims>` reading the identity `Auth` decoded, in both a read-only route (`/api/whoami`) and a write-gated one (`/api/notes`, which `RequireWrite` 403s without a `write`-scoped token).
 - The DI container seeded with `provide`/`provide_arc`: a `JwtConfig` (bare value), a `SessionDb` (already behind an `Arc` from `SessionDb::init`, hence `provide_arc`), and a `HealthState`.
 
-**Self-contained by design**: `JwtConfig::for_tests_with_signing()` mints its own in-process signing key instead of fetching gatehouse's JWKS, and `POST /login` issues a token directly instead of redirecting to gatehouse's login form - stand-ins so this runs with nothing else started. A real service uses `JwtConfig::init()` (verifies against `GATEHOUSE_URL`) and never issues its own tokens; see [Quench Auth](../quench-auth.md) for what it does instead.
+**Self-contained by design**: `JwtConfig::for_tests_with_signing()` mints its own in-process signing key instead of fetching gatehouse's JWKS, and `POST /login` issues a token directly instead of redirecting to gatehouse's login form - stand-ins so this runs with nothing else started. A real service uses `JwtConfig::init()` (verifies against `GATEHOUSE_URL`) and never issues its own tokens; see [Quench Auth](../crates/quench-auth/index.md) for what it does instead.
 
 ## How to run it
 
@@ -43,4 +49,4 @@ curl -H "Authorization: Bearer $WRITE_TOKEN" -X POST http://localhost:8080/api/n
 
 Just the Rust toolchain - no database, no gatehouse, no TLS certs. Dependencies are `quench-http`, `quench-starter`, `quench-auth`, `quench-cache` (for an in-memory session store), and the usual `tokio`/`serde`/`tracing` set (all workspace-managed).
 
-[Home](../README.md)
+[Home](../index.md)

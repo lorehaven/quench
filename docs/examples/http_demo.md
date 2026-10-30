@@ -1,6 +1,12 @@
+---
+title: Example - Http demo
+parent: Guides
+nav_order: 33
+---
+
 # Example: Http Demo
 
-`quench-example-http` (`examples/http_demo`) is a runnable tour of `quench-http` on its own — no `quench-starter` or `quench-auth` involved, just the framework. It's the companion to [`docs/quench-http.md`](../quench-http.md): every section of that guide has a working route or component here, and it's the fastest way to poke at the framework interactively rather than read about it.
+`quench-example-http` (`examples/http_demo`) is a runnable tour of `quench-http` on its own — no `quench-starter` or `quench-auth` involved, just the framework. It's the companion to [`docs/crates/quench-http`](../crates/quench-http/index.md): every section of that guide has a working route or component here, and it's the fastest way to poke at the framework interactively rather than read about it.
 
 ## What it covers
 
@@ -34,4 +40,4 @@ curl -i -X POST http://localhost:8080/big -H 'content-type: application/json' \
 
 Just the Rust toolchain - no database, no external services. Dependencies are `quench-http`, `async-trait`, `serde`/`serde_json`, `tokio`, and `tracing`/`tracing-subscriber` (all workspace-managed).
 
-[Home](../README.md)
+[Home](../index.md)
