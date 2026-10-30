@@ -1,6 +1,6 @@
 [package]
 name = "quench-desktop"
-version = "0.1.0"
+version = "0.1.1"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - the Linux desktop host: a GTK window around webkit2gtk that serves an app's embedded assets and carries its plugin bridge"

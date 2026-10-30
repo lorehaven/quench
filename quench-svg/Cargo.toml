@@ -1,6 +1,6 @@
 [package]
 name = "quench-svg"
-version = "0.1.3"
+version = "0.1.4"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - an SVG renderer with no dependencies: shapes, paths with curves and arcs, transforms, fills and strokes into RGBA, through quench-raster"

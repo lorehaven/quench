@@ -1,6 +1,6 @@
 [package]
 name = "quench-pdf"
-version = "0.1.2"
+version = "0.1.3"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - a PDF reader that extracts text page by page: cross-reference tables and streams, object streams, fonts and encodings"
