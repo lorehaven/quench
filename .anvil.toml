@@ -66,3 +66,14 @@ packages = [
     "quench-web",
     "quench-web-components",
 ]
+
+# `anvil docs check|build|release`: this repository's book (a Jekyll site of Markdown files). The warehouse is
+# the one forge's `.anvil/artifacts.toml` names; the `docs` files storage is declared in homecloud.
+[docs]
+out = "target/docs"
+warehouse_url = "https://ennor.ddns.net/warehouse"
+storage = "docs"
+
+[docs.books.quench]
+dir = "docs"
+title = "Quench"
