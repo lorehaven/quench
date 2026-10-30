@@ -92,7 +92,7 @@ let container = ContainerBuilder::new()
     .await?;                      // DiError on a missing dependency or a cycle
 ```
 
-`build()` fails before the server binds, with `DiError::MissingDependency` or `DiError::Cycle`. Pitfalls: `provide(arc)` keys the value as `Arc<T>`, not `T`: use `provide_arc`. Two `#[injectable]` functions returning the same type make `build()` fail with a misleading empty `Cycle` error (see the report).
+`build()` fails before the server binds, with `DiError::MissingDependency` or `DiError::Cycle`. Pitfalls: `provide(arc)` keys the value as `Arc<T>`, not `T`: use `provide_arc`. Two `#[injectable]` functions returning the same type make `build()` fail with `DiError::Duplicate`.
 
 ## 4. Middleware
 

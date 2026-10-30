@@ -461,6 +461,21 @@ fn environment_hooks() {
 }
 
 #[quench_test::test]
+fn an_unterminated_block_names_the_keyword_that_would_close_it() {
+    for (source, closer) in [
+        ("{% if a %}x", "endif"),
+        ("{% for i in a %}x", "endfor"),
+        ("{% if a %}x{% else %}y", "endif"),
+    ] {
+        let e = fails(source, &json!({}));
+        assert!(
+            e.to_string().contains(&format!("missing `{closer}`")),
+            "{e}"
+        );
+    }
+}
+
+#[quench_test::test]
 fn errors_say_what_and_where() {
     let e = fails("a\n{{ 1 + }}", &json!({}));
     assert_eq!(e.kind(), ErrorKind::Syntax);

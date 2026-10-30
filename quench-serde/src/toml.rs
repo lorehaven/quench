@@ -30,6 +30,7 @@ pub fn parse(text: &str) -> Result<Value> {
         text,
         bytes: text.as_bytes(),
         pos: 0,
+        depth: 0,
     };
     let mut root = Table::new(State::Explicit);
     parser.document(&mut root)?;
@@ -93,7 +94,13 @@ struct Parser<'a> {
     text: &'a str,
     bytes: &'a [u8],
     pos: usize,
+    /// Arrays and inline tables currently open.
+    depth: usize,
 }
+
+/// How deeply arrays and inline tables may nest, so hostile input cannot exhaust the stack
+/// (the same cap as `json::MAX_DEPTH`).
+const MAX_DEPTH: usize = 128;
 
 /// Why a statement could not be placed (turned into an error with a position).
 type Placed<T> = std::result::Result<T, String>;
@@ -257,10 +264,21 @@ impl Parser<'_> {
                 let multi = self.bytes[self.pos..].starts_with(b"'''");
                 self.literal_string(multi).map(Value::String)
             }
-            Some(b'[') => self.array(),
-            Some(b'{') => self.inline_table(),
+            Some(b'[') => self.nested(Self::array),
+            Some(b'{') => self.nested(Self::inline_table),
             Some(_) => self.scalar(),
         }
+    }
+
+    /// Runs a collection parser one level deeper, refusing past [`MAX_DEPTH`].
+    fn nested(&mut self, parse: fn(&mut Self) -> Result<Value>) -> Result<Value> {
+        if self.depth >= MAX_DEPTH {
+            return Err(self.error("recursion limit exceeded"));
+        }
+        self.depth += 1;
+        let value = parse(self);
+        self.depth -= 1;
+        value
     }
 
     fn array(&mut self) -> Result<Value> {
@@ -998,6 +1016,21 @@ fn write_inline(out: &mut String, value: &Value, pretty: bool, depth: usize) -> 
 
 #[cfg(test)]
 mod tests {
+    #[quench_test::test]
+    fn nesting_is_capped_instead_of_overflowing_the_stack() {
+        let deep = format!("a = {}{}", "[".repeat(100_000), "]".repeat(100_000));
+        assert!(
+            parse(&deep)
+                .unwrap_err()
+                .to_string()
+                .contains("recursion limit")
+        );
+        let tables = format!("a = {}1{}", "{ b = ".repeat(100_000), " }".repeat(100_000));
+        assert!(parse(&tables).is_err());
+        let fine = format!("a = {}{}", "[".repeat(100), "]".repeat(100));
+        assert!(parse(&fine).is_ok());
+    }
+
     use super::*;
     use crate::json;
 

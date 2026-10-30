@@ -57,6 +57,6 @@ pub async fn build(self) -> Result<Container, DiError>
 * `provide` stores `Arc::new(value)` under `TypeId::of::<T>()`; calling it twice with the same type replaces the earlier value. `provide(arc)` keys the value as `Arc<T>`: use `provide_arc`.
 * `build` resolves every component in `COMPONENTS` (see algorithm in [internals](internals.md#di-resolution)) and returns the container.
 
-Errors from `build`: `MissingDependency` (a dependency is neither provided nor an `#[injectable]` return type), `ConstructionFailed` (a fallible constructor returned `Err`; `reason` is `e.to_string()`), `Cycle(names)` (some components never became constructible), and `NotFound` propagated from a constructor's dependency lookup.
+Errors from `build`: `MissingDependency` (a dependency is neither provided nor an `#[injectable]` return type), `ConstructionFailed` (a fallible constructor returned `Err`; `reason` is `e.to_string()`), `Duplicate(name)` (two `#[injectable]` functions return the same type), `Cycle(names)` (some components never became constructible), and `NotFound` propagated from a constructor's dependency lookup.
 
 Provided values satisfy dependencies. An `#[injectable]` whose return type was also provided is still run and its result overwrites the provided value.

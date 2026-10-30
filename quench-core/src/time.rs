@@ -286,7 +286,7 @@ pub struct Time {
     nanos: i128,
 }
 
-/// Text that is not valid RFC 3339.
+/// Text that is not a valid time or date; the message says which.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseTimeError(String);
 
@@ -298,7 +298,7 @@ impl ParseTimeError {
 
 impl fmt::Display for ParseTimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "invalid RFC 3339 time: {}", self.0)
+        f.write_str(&self.0)
     }
 }
 
@@ -556,7 +556,7 @@ impl Time {
     /// lower case or a space, `Z` may be lower case; digits past nanoseconds
     /// are dropped; a leap second (`:60`) rolls into the next minute.
     pub fn parse_rfc3339(text: &str) -> Result<Self, ParseTimeError> {
-        parse_rfc3339(text).ok_or_else(|| ParseTimeError(text.to_string()))
+        parse_rfc3339(text).ok_or_else(|| ParseTimeError(format!("invalid RFC 3339 time: {text}")))
     }
 }
 

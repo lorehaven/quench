@@ -642,7 +642,7 @@ async fn exchange(
                 .await
                 && let Ok(conn) = result.reuse.await
             {
-                client.put_idle(origin, conn);
+                client.put_idle(origin.clone(), conn);
             }
             let location = response_headers
                 .get("location")
@@ -650,9 +650,16 @@ async fn exchange(
                 .ok_or_else(|| {
                     Error::Transport("redirect with an unreadable Location".to_string())
                 })?;
-            url = url
+            let next = url
                 .resolve(location)
                 .map_err(|e| Error::Transport(format!("bad redirect target `{location}`: {e}")))?;
+            // Credentials belong to the origin they were given for; never carry them to another one.
+            if origin_of(&next)? != origin {
+                for name in ["authorization", "cookie", "proxy-authorization"] {
+                    headers.remove(name);
+                }
+            }
+            url = next;
             // 301/302/303 turn a write into a GET; 307/308 replay it as is.
             if matches!(
                 status,

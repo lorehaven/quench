@@ -1,5 +1,10 @@
 # Gap report: format and algorithm crates
 
+> **Fixed 2026-10-30** (the pages of the book describe the fixed behaviour; the text below is the original finding):
+> * `argon2::verify_password` refuses hashes asking for more than 1 GiB, 16 passes or 16 lanes.
+> * `QrCode::capacity` returns 0 for a version outside 1 to 40.
+
+
 Crates: quench-proto, quench-crypto, quench-archive, quench-html, quench-style, quench-image, quench-pdf, quench-qr, quench-svg. Written against the source of 2026-10-30. Example snippets in the new pages were compiled and run in a scratch crate (outside the repository) with the exceptions marked *Unverified:* in the pages.
 
 ## 1. Stale or wrong statements found

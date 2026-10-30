@@ -58,7 +58,7 @@ impl QrCode {
 
 * `new(data)`: `with_level(data, EcLevel::M)`.
 * `with_level(data, level)`: picks the smallest version 1..=40 whose byte capacity at `level` holds `data.len()`; `Error::TooLong` if none does. Empty data is valid (version 1). Deterministic: same input, same symbol.
-* `capacity(version, level)`: the number of data bytes of a version in byte mode: `(data_codewords * 8 - 4 - count_bits) / 8` with `count_bits` 8 for versions below 10, else 16. Valid for `version` 1 to 40; **other values are not checked**: version 0 returns a meaningless `6` (checked while writing this page) and any version above 40 panics with an index out of bounds. Version 40: L 2953, M 2331, Q 1663, H 1273. Version 1: L 17, M 14, H 7.
+* `capacity(version, level)`: the number of data bytes of a version in byte mode: `(data_codewords * 8 - 4 - count_bits) / 8` with `count_bits` 8 for versions below 10, else 16. Valid for `version` 1 to 40; any other value returns `0`. Version 40: L 2953, M 2331, Q 1663, H 1273. Version 1: L 17, M 14, H 7.
 * `size()`: modules per side, `4 * version + 17` (21 to 177).
 * `version()`: 1 to 40. `level()`: the level used. `mask()`: the chosen mask pattern 0 to 7.
 * `is_dark(x, y)`: column `x`, row `y`, origin top-left; `false` outside the symbol (no panic).

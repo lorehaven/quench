@@ -52,6 +52,7 @@ Raised by `verify_password`. Display is `invalid Argon2 hash string: <reason>` w
 | `a parameter is not name=value` / `a parameter is not a number` / `unknown parameter` / `a parameter is repeated` | bad parameter list (only `m`, `t`, `p`; each once; `u32`) |
 | `the salt is not base64` / `the hash is not base64` | unpadded standard base64 expected |
 | `m is missing` / `t is missing` / `p is missing` | a required parameter absent |
+| `the parameters are too costly to verify` | `verify_password` only: the stored hash asks for more than 1 GiB of memory, 16 passes or 16 lanes |
 | `the parameters are out of range` | the parsed values fail the `ParamsError` checks (for example salt under 8 bytes, hash under 4 bytes) |
 
 ## jwt errors

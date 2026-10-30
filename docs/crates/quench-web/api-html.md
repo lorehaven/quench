@@ -199,7 +199,7 @@ The document skeleton before pretty-printing is:
 </html>
 ```
 
-Links come before scripts, and both come before the title. The title is inserted **verbatim** (see [Internals](internals.md#escaping)). The result is passed through `pretty_print_html`, which **drops the `<!DOCTYPE html>` line** (the parser skips `<!...>` declarations) and writes void elements with an explicit closing tag; the string returned by `build` therefore starts with `<html>`. The golden files `tests/fixtures/baseline/pages/*.html` show the exact output.
+Links come before scripts, and both come before the title. The title is HTML-escaped (`&`, `<`, `>`). The result is passed through `pretty_print_html`, which writes void elements with an explicit closing tag; `build` puts `<!DOCTYPE html>` and a newline in front of the printed text (the printer itself drops `<!...>` declarations), so the string starts with `<!DOCTYPE html>`. The golden files `tests/fixtures/baseline/pages/*.html` show the exact output.
 
 ### `pretty_print_html`
 

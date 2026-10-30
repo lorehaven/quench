@@ -280,6 +280,23 @@ async fn the_status_endpoint_always_answers_200() {
         "{known}"
     );
 
+    let spaced = config
+        .issue_access_token("bob".into(), "user sage:read".into(), None)
+        .await
+        .unwrap();
+    let known = body_of(
+        auth_status(
+            &request("/", &[("cookie", &cookie_header(&spaced))]).await,
+            &config,
+        )
+        .await,
+    )
+    .await;
+    assert!(
+        known.contains("\"roles\":[\"user\",\"sage:read\"]"),
+        "{known}"
+    );
+
     let junk = body_of(
         auth_status(
             &request("/", &[("cookie", &cookie_header("junk"))]).await,

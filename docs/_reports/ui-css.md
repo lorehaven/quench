@@ -1,5 +1,9 @@
 # Gap report: quench-css
 
+> **Fixed 2026-10-30** (the pages of the book describe the fixed behaviour; the text below is the original finding):
+> * `Cascade::add` order across sheets (first item).
+
+
 ## 1. Stale or wrong statements in the old docs (docs/quench-css.md, now deleted)
 
 * "Not supported: ... `:is()`/`:where()`/`:has()`, container queries": `@container` is not rejected; its body is inlined unconditionally with the condition ignored (sheet.rs:270). `:is`/`:where` are parsed as `Unknown` and never match.

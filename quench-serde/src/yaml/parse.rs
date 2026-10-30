@@ -32,6 +32,7 @@ pub fn parse_all(text: &str) -> Result<Vec<Value>> {
         pos: skip,
         anchors: HashMap::new(),
         first_key: None,
+        depth: 0,
     };
     parser.stream()
 }
@@ -44,7 +45,13 @@ struct Parser<'a> {
     /// The key that opened the block mapping just parsed, so that properties
     /// written before `key: value` on one line can attach to the key.
     first_key: Option<String>,
+    /// Nodes currently open, block or flow.
+    depth: usize,
 }
+
+/// How deeply nodes may nest, so hostile input cannot exhaust the stack (the same cap as
+/// `json::MAX_DEPTH`).
+const MAX_DEPTH: usize = 128;
 
 /// How a scalar ended.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -234,6 +241,26 @@ impl Parser<'_> {
     /// that contains it; `inline` forbids block collections (a mapping value
     /// written on its key's line).
     fn node_at(
+        &mut self,
+        parent: isize,
+        inline: bool,
+        sequence_at_parent_column: bool,
+    ) -> Result<Value> {
+        self.nested(|this| this.node_at_inner(parent, inline, sequence_at_parent_column))
+    }
+
+    /// Runs a node parser one level deeper, refusing past [`MAX_DEPTH`].
+    fn nested<T>(&mut self, parse: impl FnOnce(&mut Self) -> Result<T>) -> Result<T> {
+        if self.depth >= MAX_DEPTH {
+            return Err(self.error("recursion limit exceeded"));
+        }
+        self.depth += 1;
+        let value = parse(self);
+        self.depth -= 1;
+        value
+    }
+
+    fn node_at_inner(
         &mut self,
         parent: isize,
         inline: bool,
@@ -872,6 +899,10 @@ impl Parser<'_> {
     }
 
     fn flow_node(&mut self, parent: isize) -> Result<Value> {
+        self.nested(|this| this.flow_node_inner(parent))
+    }
+
+    fn flow_node_inner(&mut self, parent: isize) -> Result<Value> {
         self.skip_flow_space()?;
         let mut anchor = None;
         let mut tag = None;

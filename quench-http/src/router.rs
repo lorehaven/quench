@@ -74,11 +74,12 @@ struct Mount {
 #[async_trait]
 impl Endpoint for Mount {
     async fn call(&self, mut req: Request) -> Response {
-        if self.prefix.is_empty() || self.prefix == "/" {
+        if self.prefix.is_empty() {
             return self.inner.call(req).await;
         }
 
-        let path = req.uri().path();
+        // The routed path, not the full one, so mounts nest: `mount("/a", mount("/b", r))`.
+        let path = req.routed_path();
         let Some(rest) = path.strip_prefix(self.prefix.as_str()) else {
             return Response::not_found();
         };
@@ -99,8 +100,10 @@ impl Endpoint for Mount {
 /// `inner` ever sees it, and one inside it is dispatched with the prefix
 /// stripped, so `inner`'s own routes are written as if it owned the root.
 pub fn mount(prefix: impl Into<String>, inner: Arc<dyn Endpoint>) -> Arc<dyn Endpoint> {
+    // `/api/` means `/api`; `/` means the root.
+    let prefix: String = prefix.into();
     Arc::new(Mount {
-        prefix: prefix.into(),
+        prefix: prefix.trim_end_matches('/').to_string(),
         inner,
     })
 }

@@ -67,6 +67,18 @@ fn the_js_macro_builds_an_inline_script_with_format_arguments() {
 }
 
 #[quench_test::test]
+fn page_builder_keeps_the_doctype_and_escapes_the_title() {
+    let html = PageBuilder::new()
+        .title("a </title><script>x</script> & b")
+        .content(div().text("hi"))
+        .build();
+
+    assert!(html.starts_with("<!DOCTYPE html>\n<html>"), "{html}");
+    assert!(!html.contains("<script>x</script>"), "{html}");
+    assert!(html.contains("a &lt;/title&gt;&lt;script&gt;x&lt;/script&gt; &amp; b"));
+}
+
+#[quench_test::test]
 fn page_builder_assembles_title_links_scripts_and_content() {
     let html = PageBuilder::new()
         .title("My Page")

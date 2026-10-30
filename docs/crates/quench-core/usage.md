@@ -60,7 +60,7 @@ assert_eq!(later.to_rfc3339(), "2026-09-29T11:30:00Z");
 assert_eq!(later.format("%a %d %b %Y"), "Tue 29 Sep 2026");
 ```
 
-Pitfall: everything is UTC; for named zones use [quench-tz](../quench-tz/index.md). A `Date` parse failure reports `invalid RFC 3339 time: ...` because it shares `ParseTimeError`.
+Pitfall: everything is UTC; for named zones use [quench-tz](../quench-tz/index.md). A `Date` parse failure reports `invalid date: ...`; both it and a bad time are a `ParseTimeError`.
 
 ## 4. Dates and calendar arithmetic
 

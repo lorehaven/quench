@@ -225,5 +225,5 @@ Renders the named template inline with the **current** variables (a copy of the 
 | `loop.cycle`, `loop.changed`, recursive `loop(...)` | undefined / not callable |
 | `namespace()`, `cycler()`, `joiner()` | `no function named ...` |
 | autoescape, `|safe` semantics | not implemented: `escape`, `e`, `safe`, `forceescape` return the input unchanged |
-| missing `endif`/`endfor`/`endmacro`... | `` syntax error: missing `elif` `` for an `if` (the message names the first expected closer, see the [report](errors.md#known-quirks)); `` missing `else` `` for a `for`; `` missing `endmacro` ``, `` missing `endset` ``, `` missing `endwith` `` |
+| missing `endif`/`endfor`/`endmacro`... | `` syntax error: missing `endif` `` for an `if`; `` missing `endfor` `` for a `for`; `` missing `endmacro` ``, `` missing `endset` ``, `` missing `endwith` `` |
 {% endraw %}

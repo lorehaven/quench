@@ -21,7 +21,7 @@ Every format parses text into `Value`; every type converts to/from `Value`. Type
 
 ## Limits
 
-* JSON nesting is capped at `json::MAX_DEPTH` (128). The TOML and YAML readers have no such cap: in a scratch program, `toml::parse("a = " + "[" * 100000 + "]" * 100000)` and `yaml::parse("[" * 100000 + "]" * 100000)` abort the process with `fatal runtime error: stack overflow` (1000 levels parse fine), while `json::parse` of the same depth returns `recursion limit exceeded`. Do not feed untrusted text to the TOML or YAML parser without bounding its size or nesting yourself.
+* JSON nesting is capped at `json::MAX_DEPTH` (128). The TOML reader (arrays and inline tables) and the YAML reader (block and flow nodes) are capped at the same depth of 128; deeper input fails with `recursion limit exceeded` instead of overflowing the stack.
 * JSON float output is the shortest round-trip text laid out like `serde_json`. The old page records one known difference from `serde_json` (a last-digit tie in about 3 of 10,000 random floats; both read back equal) -- not re-measured here.
 
 ## Derive support code

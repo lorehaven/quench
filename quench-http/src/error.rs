@@ -11,6 +11,8 @@ pub enum DiError {
         component: &'static str,
         dependency: &'static str,
     },
+    #[error("component `{0}` is produced by more than one #[injectable]")]
+    Duplicate(&'static str),
     #[error("dependency cycle detected among: {}", .0.join(" -> "))]
     Cycle(Vec<&'static str>),
     #[error("constructing `{component}` failed: {reason}")]

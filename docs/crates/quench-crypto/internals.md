@@ -34,7 +34,7 @@ Only these are claimed by the source:
 * Version 0x13, type `id` (2) only. PHC format: `$argon2id$v=19$m=<KiB>,t=<passes>,p=<lanes>$<salt>$<hash>`, unpadded standard base64 for salt and hash.
 * Seed hash H0 = BLAKE2b-64 over `lanes, output_len, memory_kib, iterations, 0x13, 2` (each u32 LE) followed by length-prefixed (u32 LE) password, salt, secret, associated data. 4 sync points per pass. Lanes are computed sequentially (no threads); the result does not depend on that.
 * Memory actually allocated: `4 * lanes * floor(memory_kib / (4 * lanes))` blocks of 1 KiB (128 u64 words).
-* **Resource note:** `verify_password` takes `m`, `t`, `p` from the stored text. `m` can be up to `u32::MAX` KiB (about 4 TiB) and `t` up to `u32::MAX`; the code has no upper bound check. Only verify hashes you stored yourself.
+* **Resource limits:** `verify_password` takes `m`, `t`, `p` from the stored text, so it refuses a hash that asks for more than 1 GiB of memory (`m` above 1,048,576 KiB), more than 16 passes or more than 16 lanes with `PhcError("the parameters are too costly to verify")`, before doing any work.
 * Default `Params`: 19456 KiB, 2 passes, 1 lane, 32-byte output (the OWASP minimum for Argon2id).
 * Tested against the RFC 9106 section 5.3 vector (4 lanes, secret and associated data) and against hashes made by the `argon2` crate.
 

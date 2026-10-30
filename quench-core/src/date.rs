@@ -133,7 +133,11 @@ impl Date {
     ///
     /// [`ParseTimeError`] when the text does not match or names no real date.
     pub fn parse_from_str(text: &str, pattern: &str) -> Result<Self, ParseTimeError> {
-        let bad = || ParseTimeError::new(format!("`{text}` is not a date like `{pattern}`"));
+        let bad = || {
+            ParseTimeError::new(format!(
+                "invalid date: `{text}` is not a date like `{pattern}`"
+            ))
+        };
         let (mut year, mut month, mut day) = (None, None, None);
         let mut rest = text;
         let mut spec = pattern.chars();

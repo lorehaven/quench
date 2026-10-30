@@ -75,7 +75,7 @@ pub mod pages;   // pages::auth
 ```rust
 pub async fn auth_status(request: &Request, config: &JwtConfig) -> Response
 ```
-Always `200` with JSON `{"authenticated":bool,"username":string|null,"roles":[..]}`. Auth disabled: `true`, username `"dev"`, roles `["admin"]`. No cookie, or a cookie that does not decode: anonymous. Valid cookie: `true`, `sub`, and `roles` = the scope split **on commas only** (empty items dropped). Reads the cookie and its signature only, not the session store and not the audience.
+Always `200` with JSON `{"authenticated":bool,"username":string|null,"roles":[..]}`. Auth disabled: `true`, username `"dev"`, roles `["admin"]`. No cookie, or a cookie that does not decode: anonymous. Valid cookie: `true`, `sub`, and `roles` = the scope split on spaces and commas (empty items dropped). Reads the cookie and its signature only, not the session store and not the audience.
 
 The page shell's session watcher (`quench-web`, `session_script(resources_prefix, interval_secs)` in `quench-web/src/framework/app/scripts.rs`) calls `<prefix>/status`, and only when it gets a well-formed `authenticated:false` it POSTs `<prefix>/refresh` (the route a service maps to `refresh_delegation`) and navigates to `<prefix>/login` only if that fails. A 404, a network error or an unparsable body are ignored. The service mounts these routes itself.
 

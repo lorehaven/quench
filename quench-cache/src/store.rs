@@ -393,6 +393,11 @@ impl RedisStore {
     /// the keyspace of the node that answers it, and a cursor from one node
     /// means nothing to another.
     pub async fn clear(&self) -> Result<(), CacheError> {
+        if self.prefix.is_empty() {
+            return Err(CacheError::Backend(
+                "refusing to clear a Redis store without a key prefix".to_string(),
+            ));
+        }
         let pattern = self.qualified("*");
 
         if self.redis.is_cluster() {

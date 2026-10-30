@@ -1,5 +1,10 @@
 # Gap report: foundations (quench-core, -core-macros, -serde, -serde-macros, -log, -log-macros, -config, -tz, -security)
 
+> **Fixed 2026-10-30** (the pages of the book describe the fixed behaviour; the text below is the original finding):
+> * Open question 1: TOML and YAML nesting is capped at 128 (`recursion limit exceeded`).
+> * Open question 3: a `Date` parse failure now says `invalid date: ...`.
+
+
 Written 2026-10-30 while replacing the flat pages with `docs/crates/<crate>/` directories and writing the guides `getting-started`, `architecture`, `dependency-policy`, `conventions`. Everything below was checked against the source; examples were built and run in a scratch crate with path dependencies (outside the repository). `cargo test --offline` of all nine crates passes (the `gate` and `fuzz` tests of quench-security were not run: they need the network and extra tools).
 
 ## 1. Stale or wrong statements in the old docs

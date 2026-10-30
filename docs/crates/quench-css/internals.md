@@ -22,7 +22,7 @@ Every rule block (including empty ones and `@media`) takes the next number of a 
 
 ## Order across sheets
 
-`Cascade::add` adds `self.rules.len()` (the number of `Rule`s so far) to every incoming `order`. The counter of the earlier sheet counts blocks, not `Rule`s. When the earlier sheet has blocks that produce no `Rule` (no declarations, or invalid selectors), the highest earlier `order` exceeds `rules.len()`, so the first rules of the later sheet get an order that is not larger than some earlier rules. At equal specificity and importance the earlier sheet's rule then wins. Observed with `a{} b{} p{color:red}` added before `p{color:blue}`: `p` is red. Selector lists have the opposite effect (more `Rule`s than blocks) and are harmless. See the gap report.
+`Cascade::add` starts each sheet's source order past the highest `order` added so far (a `next_order` counter), so a later sheet's rules win ties however many blocks of an earlier sheet produced no `Rule`.
 
 ## The compute pipeline
 

@@ -55,6 +55,11 @@ path = "tests/di_cycle.rs"
 harness = false
 
 [[test]]
+name = "di_duplicate"
+path = "tests/di_duplicate.rs"
+harness = false
+
+[[test]]
 name = "di_missing_dependency"
 path = "tests/di_missing_dependency.rs"
 harness = false

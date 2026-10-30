@@ -61,7 +61,7 @@ pub async fn auth_status(request: &Request, config: &JwtConfig) -> Response {
             username: Some(claims.sub),
             roles: claims
                 .scope
-                .split(',')
+                .split([' ', ','])
                 .filter(|role| !role.is_empty())
                 .map(str::to_string)
                 .collect(),

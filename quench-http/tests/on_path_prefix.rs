@@ -65,4 +65,20 @@ async fn middleware_is_skipped_outside_the_prefix() {
     assert_eq!(resp.status(), StatusCode::OK);
 }
 
+#[quench_test::test]
+async fn a_prefix_without_a_slash_stops_at_a_segment_boundary() {
+    let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
+    let app: Arc<dyn Endpoint> = Arc::new(AlwaysOk);
+    let app = wrap(app, OnPathPrefix::new("/api", RejectEverything));
+
+    for (path, status) in [
+        ("/api", StatusCode::FORBIDDEN),
+        ("/api/x", StatusCode::FORBIDDEN),
+        ("/apix", StatusCode::OK),
+    ] {
+        let resp = app.call(get(path, &container)).await;
+        assert_eq!(resp.status(), status, "{path}");
+    }
+}
+
 quench_test::main!();

@@ -247,7 +247,7 @@ pub struct Civil {
 pub struct ParseTimeError(String);   // Debug, Clone, PartialEq, Eq; Display, Error
 ```
 
-`Display` is `invalid RFC 3339 time: {detail}`. The same type is returned by `Date::parse_from_str`, so a date error also begins with that prefix.
+`Display` is `invalid RFC 3339 time: {text}` for a time and `invalid date: {detail}` for `Date::parse_from_str` and `Date::from_str`; the same type carries both.
 
 ### `struct Time`
 

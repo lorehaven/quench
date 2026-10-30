@@ -1,5 +1,15 @@
 # Network and data crates: gap report
 
+> **Fixed 2026-10-30** (the pages of the book describe the fixed behaviour; the text below is the original finding):
+> * http 1 and 2: `mount` uses the routed path, so mounts nest, and ignores a trailing slash of the prefix.
+> * http 3: two `#[injectable]` for one type fail with `DiError::Duplicate`.
+> * http 7: `OnPathPrefix` stops at a segment boundary when the prefix has no trailing slash.
+> * web 1 and 2: `PageBuilder::build` keeps `<!DOCTYPE html>` and escapes the title.
+> * client 19: `Authorization`, `Cookie` and `Proxy-Authorization` are dropped on a redirect to another origin.
+> * cache: `RedisStore::clear` refuses an empty key prefix.
+> * auth: `/ui/status` splits the scope on spaces as well as commas.
+
+
 ---
 
 ## Area: http

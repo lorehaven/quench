@@ -1,5 +1,9 @@
 # Gap report: quench-ui-native
 
+> **Fixed 2026-10-30** (the pages of the book describe the fixed behaviour; the text below is the original finding):
+> * A `password` field's value is exposed as bullets, never as text (`access.rs`).
+
+
 ## 1. Stale or wrong statements in the old docs (`docs/quench-ui-native.md`, `src/anim.rs`)
 
 * `src/anim.rs:7` (module doc): "Keyframe animations are not played." Wrong: `Anim::play` plays them (and the old page and tests say so).

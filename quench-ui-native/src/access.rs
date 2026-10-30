@@ -540,7 +540,13 @@ fn collect(
                 node.range = Some(range);
             }
             if field {
-                node.value = Some(field_value(dom, id));
+                let value = field_value(dom, id);
+                // A password is never read out: one bullet per character, as on screen.
+                node.value = Some(if dom.attr(id, "type") == Some("password") {
+                    "\u{2022}".repeat(value.chars().count())
+                } else {
+                    value
+                });
                 if node.focused {
                     node.caret = Some((dom.ui.caret, dom.ui.anchor));
                 }

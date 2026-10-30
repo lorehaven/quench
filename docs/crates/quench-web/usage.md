@@ -46,7 +46,7 @@ let html = PageBuilder::new()
     .build();
 ```
 
-The output is pretty-printed, four spaces per level, and starts with `<html>`: **the `<!DOCTYPE html>` line is dropped** by the pretty printer, so browsers render the page in quirks mode (see [Internals](internals.md#the-pretty-printer)). Void elements are written with a closing tag (`<meta ...>` then `</meta>`). `build()` panics when `.content(..)` was not called.
+The output is pretty-printed, four spaces per level, and starts with `<!DOCTYPE html>` (the pretty printer drops declarations, so `build` adds the line back; see [Internals](internals.md#the-pretty-printer)). Void elements are written with a closing tag (`<meta ...>` then `</meta>`). `build()` panics when `.content(..)` was not called.
 
 ## 4. The app shell for a service
 

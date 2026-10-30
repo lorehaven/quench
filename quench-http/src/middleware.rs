@@ -45,6 +45,12 @@ pub struct OnPathPrefix<M> {
     inner: M,
 }
 
+/// `path` is `prefix` or lies below it: `/api` covers `/api` and `/api/x`, not `/apix`.
+fn under_prefix(path: &str, prefix: &str) -> bool {
+    path.strip_prefix(prefix)
+        .is_some_and(|rest| rest.is_empty() || prefix.ends_with('/') || rest.starts_with('/'))
+}
+
 impl<M> OnPathPrefix<M> {
     pub const fn new(prefix: &'static str, inner: M) -> Self {
         Self { prefix, inner }
@@ -54,7 +60,7 @@ impl<M> OnPathPrefix<M> {
 #[async_trait]
 impl<M: Middleware> Middleware for OnPathPrefix<M> {
     async fn handle(&self, req: Request, next: &dyn Endpoint) -> Response {
-        if req.uri().path().starts_with(self.prefix) {
+        if under_prefix(req.uri().path(), self.prefix) {
             self.inner.handle(req, next).await
         } else {
             next.call(req).await

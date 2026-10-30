@@ -87,4 +87,21 @@ async fn empty_or_root_prefix_mounts_at_the_root_unchanged() {
     assert_eq!(resp.status(), StatusCode::OK);
 }
 
+#[quench_test::test]
+async fn mounts_nest_and_a_trailing_slash_on_the_prefix_is_ignored() {
+    let container = Arc::new(ContainerBuilder::new().build().await.unwrap());
+
+    let mut builder = RouterBuilder::default();
+    builder.route(Method::GET, "/x", Arc::new(Echo));
+    let router: Arc<dyn Endpoint> = Arc::new(builder.finish());
+
+    let nested = mount("/a", mount("/b", router.clone()));
+    let resp = nested.call(get("/a/b/x", &container)).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let slashed = mount("/api/", router);
+    let resp = slashed.call(get("/api/x", &container)).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
 quench_test::main!();

@@ -437,10 +437,24 @@ fn parse_phc(text: &str) -> Result<(Params, Vec<u8>, Vec<u8>), PhcError> {
     Ok((params, salt, hash))
 }
 
-/// Whether `password` produces the stored `phc` hash. `Ok(false)` means a
-/// wrong password; `Err` means the stored text is not a hash this can read.
+/// The most a stored hash may ask of [`verify_password`]: 1 GiB of memory, 16 passes, 16 lanes.
+/// The stored text is read before the work is done, so a hostile value must not choose the cost.
+const MAX_VERIFY_MEMORY_KIB: u32 = 1024 * 1024;
+const MAX_VERIFY_ITERATIONS: u32 = 16;
+const MAX_VERIFY_LANES: u32 = 16;
+
+/// Whether `password` produces the stored `phc` hash.
+///
+/// `Ok(false)` means a wrong password; `Err` means the stored text is not a hash this can read, or
+/// asks for more memory, passes or lanes than 1 GiB / 16 / 16.
 pub fn verify_password(password: &str, phc: &str) -> Result<bool, PhcError> {
     let (params, salt, expected) = parse_phc(phc)?;
+    if params.memory_kib > MAX_VERIFY_MEMORY_KIB
+        || params.iterations > MAX_VERIFY_ITERATIONS
+        || params.lanes > MAX_VERIFY_LANES
+    {
+        return Err(PhcError("the parameters are too costly to verify"));
+    }
     let actual = hash_raw(password.as_bytes(), &salt, &params)
         .map_err(|_| PhcError("the parameters are out of range"))?;
     Ok(ct::eq(&actual, &expected))
@@ -450,6 +464,26 @@ pub fn verify_password(password: &str, phc: &str) -> Result<bool, PhcError> {
 mod tests {
     use super::*;
     use quench_core::hex;
+
+    #[quench_test::test]
+    fn verify_refuses_a_hash_that_asks_for_too_much() {
+        let params = Params {
+            memory_kib: 8,
+            iterations: 1,
+            lanes: 1,
+            output_len: 32,
+        };
+        let real = hash_password("pw", &params).unwrap();
+        assert_eq!(verify_password("pw", &real), Ok(true));
+        for costly in [
+            "m=4294967295,t=1,p=1",
+            "m=8,t=1000000,p=1",
+            "m=8,t=1,p=1000",
+        ] {
+            let hostile = real.replacen("m=8,t=1,p=1", costly, 1);
+            assert!(verify_password("pw", &hostile).is_err(), "{costly}");
+        }
+    }
 
     // RFC 9106 section 5.3: Argon2id, 4 lanes, with a secret and associated data.
     #[quench_test::test]

@@ -592,6 +592,18 @@ fn broken_css_is_skipped_not_fatal() {
 }
 
 #[quench_test::test]
+fn a_later_sheet_wins_a_tie_however_many_rules_an_earlier_one_has() {
+    let nodes = sample();
+    let mut cascade = Cascade::new(MediaEnv::default());
+    cascade.add(&parse("a {} b {} p { color: red }"));
+    cascade.add(&parse("p { color: blue }"));
+    let blue = cascade.compute(&nodes[3], None, 16.0).color;
+    let mut only_blue = Cascade::new(MediaEnv::default());
+    only_blue.add(&parse("p { color: blue }"));
+    assert_eq!(blue, only_blue.compute(&nodes[3], None, 16.0).color);
+}
+
+#[quench_test::test]
 fn env_is_the_safe_area() {
     let nodes = sample();
     let mut cascade = Cascade::new(MediaEnv::default());

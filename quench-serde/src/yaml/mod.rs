@@ -35,6 +35,20 @@ pub fn to_value<T: Serialize + ?Sized>(value: &T) -> Value {
 mod tests {
     use super::*;
 
+    #[quench_test::test]
+    fn yaml_nesting_is_capped_instead_of_overflowing_the_stack() {
+        let flow = format!("{}{}", "[".repeat(100_000), "]".repeat(100_000));
+        assert!(
+            parse(&flow)
+                .unwrap_err()
+                .to_string()
+                .contains("recursion limit")
+        );
+        assert!(parse(&"- ".repeat(100_000)).is_err());
+        let fine = format!("{}{}", "[".repeat(100), "]".repeat(100));
+        assert!(parse(&fine).is_ok());
+    }
+
     #[derive(Debug, PartialEq, quench_serde::Serialize, quench_serde::Deserialize)]
     struct Deployment {
         name: String,

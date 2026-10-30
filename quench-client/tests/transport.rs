@@ -25,8 +25,17 @@ impl Endpoint for App {
     async fn call(&self, mut req: Request) -> Response {
         let path = req.uri().path().to_string();
         match path.as_str() {
-            "/redirect-get" => return redirect(StatusCode::FOUND, "/echo"),
+            "/redirect-get" | "/same-origin" => return redirect(StatusCode::FOUND, "/echo"),
             "/redirect-keep" => return redirect(StatusCode::TEMPORARY_REDIRECT, "/echo"),
+            "/cross-origin" => {
+                let host = req
+                    .headers()
+                    .get("host")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or_default()
+                    .replace("127.0.0.1", "localhost");
+                return redirect(StatusCode::FOUND, &format!("http://{host}/echo"));
+            }
             "/loop" => return redirect(StatusCode::FOUND, "/loop"),
             "/cookies" => {
                 return Response::ok()
@@ -194,6 +203,27 @@ async fn redirects_are_followed_with_the_right_method() {
         .unwrap();
     assert_eq!(kept["method"], "POST");
     assert_eq!(kept["body"], r#"{"x":1}"#);
+}
+
+#[quench_test::test]
+async fn credentials_follow_a_redirect_only_within_the_same_origin() {
+    let base = plain_server().await;
+    let client = Client::new();
+
+    for (path, kept) in [("same-origin", true), ("cross-origin", false)] {
+        let got: Value = client
+            .get(format!("{base}/{path}"))
+            .header("authorization", "Bearer secret")
+            .header("cookie", "session=abc")
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(got["authorization"].is_string(), kept, "{path}: {got}");
+        assert_eq!(got["cookie"].is_string(), kept, "{path}: {got}");
+    }
 }
 
 #[quench_test::test]

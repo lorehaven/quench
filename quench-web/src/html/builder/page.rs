@@ -202,8 +202,7 @@ impl PageBuilder {
             .join("\n");
 
         let html_string = format!(
-            r#"<!DOCTYPE html>
-<html>
+            r#"<html>
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -213,11 +212,15 @@ impl PageBuilder {
     </head>
     <body>{}</body>
 </html>"#,
-            self.title,
+            self.title
+                .replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;"),
             self.content.unwrap().render()
         );
 
-        pretty_print_html(&html_string)
+        // The pretty printer drops declarations, so the doctype is put back in front.
+        format!("<!DOCTYPE html>\n{}", pretty_print_html(&html_string))
     }
 }
 

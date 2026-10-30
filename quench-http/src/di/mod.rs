@@ -137,8 +137,12 @@ impl ContainerBuilder {
 
     pub async fn build(self) -> Result<Container, DiError> {
         let factories: Vec<&'static ComponentFactory> = COMPONENTS.iter().collect();
-        let by_id: HashMap<TypeId, &'static ComponentFactory> =
-            factories.iter().map(|f| ((f.type_id)(), *f)).collect();
+        let mut by_id: HashMap<TypeId, &'static ComponentFactory> = HashMap::new();
+        for factory in &factories {
+            if by_id.insert((factory.type_id)(), factory).is_some() {
+                return Err(DiError::Duplicate((factory.type_name)()));
+            }
+        }
 
         let mut in_degree: HashMap<TypeId, usize> = HashMap::new();
         let mut dependents: HashMap<TypeId, Vec<TypeId>> = HashMap::new();

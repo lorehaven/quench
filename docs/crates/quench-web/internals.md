@@ -19,7 +19,7 @@ Design notes that affect how pages behave. Source files are named so each claim 
 | `Element` text | yes, unless `.raw()` |
 | Tag names | no |
 | `Script::render` (`src`, `crossorigin`, content) | no |
-| `PageBuilder` title | no (inserted into a `format!` string, then parsed by the pretty printer) |
+| `PageBuilder` title | yes (`& < >`) |
 | `Link` `rel`, `href`, extra attributes | no, in `render_head_link` (the pretty printer re-escapes attribute values after parsing, which neutralises `<`, `&` but cannot repair a value containing `"`, because the quote has already ended the attribute when it is parsed) |
 | DOM snippet helpers (`dom::*`) | no |
 
@@ -31,7 +31,7 @@ Consequence: never pass untrusted data as a page title, a link/script URL, a DOM
 
 Reader:
 
-* Recognises start tags with quoted/unquoted/valueless attributes (attribute names lower-cased; the first of a duplicated attribute wins), end tags (lower-cased; an end tag with no matching open element is ignored; closing an outer element closes the inner ones that are still open), comments (dropped), and `<!...>` / `<?...>` declarations (dropped, so `<!DOCTYPE html>` is lost).
+* Recognises start tags with quoted/unquoted/valueless attributes (attribute names lower-cased; the first of a duplicated attribute wins), end tags (lower-cased; an end tag with no matching open element is ignored; closing an outer element closes the inner ones that are still open), comments (dropped), and `<!...>` / `<?...>` declarations (dropped; `PageBuilder::build` writes the doctype itself after printing).
 * Void elements (`area base br col embed hr img input link meta param source track wbr`) and `<x/>` forms have no children.
 * `script`, `style` bodies are read verbatim up to the next `</script` / `</style` (case-insensitive); `textarea` and `title` bodies are read up to their end tag and character references are decoded. A leading newline in `textarea` and `pre` is dropped.
 * Character references: `&amp; &lt; &gt; &quot; &apos; &nbsp;` and numeric `&#N;` / `&#xH;` (the `;` must be within 10 characters); anything else is kept literally.

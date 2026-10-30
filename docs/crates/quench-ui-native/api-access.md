@@ -168,7 +168,7 @@ If the element has a `role` attribute it decides, else the tag:
 | `checked` | `Checkbox`, `Radio`: `Some(checked attribute present \|\| aria-checked="true")`; `Switch`: `Some(aria-checked == "true")`; else `None` |
 | `selected` | `Some(v != "false")` of `aria-pressed`, else of `aria-selected`; `None` if neither present |
 | `expanded` | `Some(v != "false")` of `aria-expanded`, `None` if absent |
-| `value` | text field: the field's value (`password` values are *not* masked); `Slider`/`ProgressBar`: the current value as text (whole numbers without decimals) |
+| `value` | text field: the field's value (a `password` field gives one `U+2022` per character, never the text); `Slider`/`ProgressBar`: the current value as text (whole numbers without decimals) |
 | `caret` | text field that is focused: `Some((caret, anchor))` in characters |
 | `range` | `Slider`/`ProgressBar`: see below |
 | `actions` | `Click` for roles `Button, Link, Checkbox, Radio, Switch, Tab` when not disabled; `Focus` when focusable and not disabled; `ScrollIntoView` always |

@@ -955,6 +955,24 @@ fn flat(n: &AccessNode) -> Vec<&AccessNode> {
 }
 
 #[quench_test::test]
+fn a_password_is_never_read_out_by_the_accessibility_tree() {
+    let view = div()
+        .child(input().attr("type", "password").attr("value", "hunter2"))
+        .child(input().attr("type", "text").attr("value", "visible"));
+    let (r, _m) = live(
+        "body { margin: 0 } input { display: block; height: 20px; width: 100px }",
+        view,
+        300,
+        100,
+    );
+    let tree = r.accessibility_tree();
+    let values: Vec<String> = flat(&tree).iter().filter_map(|n| n.value.clone()).collect();
+    assert!(values.contains(&"\u{2022}".repeat(7)), "{values:?}");
+    assert!(values.contains(&"visible".to_string()), "{values:?}");
+    assert!(!values.iter().any(|v| v.contains("hunter2")), "{values:?}");
+}
+
+#[quench_test::test]
 fn the_accessibility_tree_has_roles_names_states_and_places() {
     let clicked = Rc::new(Cell::new(0));
     let c = clicked.clone();

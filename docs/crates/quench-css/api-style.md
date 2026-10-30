@@ -221,7 +221,7 @@ Empty cascade; `safe_area = [0.0; 4]`, `zoom = 1.0`.
 pub fn add(&mut self, sheet: &Stylesheet)
 ```
 
-Appends the sheet's rules (cloned) after the existing ones and stores its keyframes by name (a later keyframes of the same name replaces the earlier). See the [order quirk](internals.md#order-across-sheets).
+Appends the sheet's rules (cloned) after the existing ones and stores its keyframes by name (a later keyframes of the same name replaces the earlier). A later sheet always wins ties ([order across sheets](internals.md#order-across-sheets)).
 
 ### `Cascade::keyframes`
 

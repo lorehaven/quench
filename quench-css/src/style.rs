@@ -504,6 +504,8 @@ impl ComputedStyle {
 #[derive(Debug, Clone)]
 pub struct Cascade {
     rules: Vec<Rule>,
+    /// Where the next sheet's source order starts: past the highest order added so far.
+    next_order: usize,
     keyframes: HashMap<String, crate::sheet::Keyframes>,
     pub media: MediaEnv,
     /// `env(safe-area-inset-*)`: top, right, bottom, left, in device pixels.
@@ -517,6 +519,7 @@ impl Cascade {
     pub fn new(media: MediaEnv) -> Self {
         Self {
             rules: Vec::new(),
+            next_order: 0,
             keyframes: HashMap::new(),
             media,
             safe_area: [0.0; 4],
@@ -526,10 +529,11 @@ impl Cascade {
 
     /// Adds a sheet; its rules come after (and win ties against) every sheet added before.
     pub fn add(&mut self, sheet: &Stylesheet) {
-        let base = self.rules.len();
+        let base = self.next_order;
         for rule in &sheet.rules {
             let mut rule = rule.clone();
             rule.order += base;
+            self.next_order = self.next_order.max(rule.order + 1);
             self.rules.push(rule);
         }
         for k in &sheet.keyframes {

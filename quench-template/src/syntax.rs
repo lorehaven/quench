@@ -738,7 +738,9 @@ impl Parser {
         if ends.is_empty() {
             Ok((out, None))
         } else {
-            Err(Error::syntax(format!("missing `{}`", ends[0]), 0))
+            // The last keyword is the one that really closes the block (`endif`, not `elif`).
+            let closer = ends.last().copied().unwrap_or_default();
+            Err(Error::syntax(format!("missing `{closer}`"), 0))
         }
     }
 

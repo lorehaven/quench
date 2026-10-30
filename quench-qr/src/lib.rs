@@ -88,9 +88,12 @@ impl QrCode {
         Ok(layout::build(data, version, level))
     }
 
-    /// How many bytes version `version` (1 to 40) holds at `level`.
+    /// How many bytes version `version` (1 to 40) holds at `level`; 0 for a version outside that range.
     #[must_use]
     pub const fn capacity(version: u8, level: EcLevel) -> usize {
+        if version == 0 || version > 40 {
+            return 0;
+        }
         layout::capacity(version, level)
     }
 

@@ -1,5 +1,9 @@
 # Gap report: tooling crates
 
+> **Fixed 2026-10-30** (the pages of the book describe the fixed behaviour; the text below is the original finding):
+> * Item 3: an unterminated block names its real closer (`endif`, `endfor`).
+
+
 Crates: quench-args, quench-args-macros, quench-cli, quench-convert, quench-regex, quench-template, quench-schema, quench-test, quench-test-macros, quench-test-bdd, quench-test-bdd-macros. Guides: `docs/guides/testing.md`, `docs/guides/building-cli-tools.md`.
 
 How things were verified: every Rust example in the new pages was compiled as a doctest in a scratch crate outside the repository (path dependencies on the crates, nothing in the repository was built or changed); filter, test, method, operator and statement outputs of quench-template, the messages of quench-schema and quench-convert, the mock server, the command runner, the BDD runner and the complete `notes` tool of the CLI guide were produced by running real code. Not verified: the Jekyll rendering of the site (only the Liquid escaping of the template pages was checked with the installed Liquid 4.0.4), anything that needs a real terminal (the pty test of quench-cli was not run; the REPL was driven through a pipe).

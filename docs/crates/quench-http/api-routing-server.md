@@ -51,11 +51,11 @@ A second `route` call with the **same pattern string** appends a method handler 
 
 ### `pub fn mount(prefix: impl Into<String>, inner: Arc<dyn Endpoint>) -> Arc<dyn Endpoint>`
 
-* `prefix` empty or `"/"`: `inner` unchanged.
-* Otherwise the request's full `uri().path()` must start with `prefix` and the remainder must be empty or start with `/`; otherwise `404` (`not found`). `/api-legacy/x` does not match a `/api` mount.
-* On a match, `skip_prefix(prefix.len())` and `inner.call(req)`.
+* Trailing slashes of `prefix` are dropped (`"/api/"` is `"/api"`); then empty or `"/"` means `inner` unchanged.
+* Otherwise the request's routed path (the path with the prefixes of enclosing mounts already skipped) must start with `prefix` and the remainder must be empty or start with `/`; otherwise `404` (`not found`). `/api-legacy/x` does not match a `/api` mount.
+* On a match, `skip_prefix(prefix.len())` and `inner.call(req)`; mounts nest (`mount("/a", mount("/b", r))` serves `/a/b/x`).
 
-Caveats (verified against the code, see the report): the check uses the full URI path, so nesting `mount` in `mount` always yields `404` from the inner mount; a prefix with a trailing slash (`"/api/"`) makes every request `404` because the remainder never starts with `/`. Middleware wrapped around the mount (or inside) sees the original, unstripped `uri()`.
+Middleware wrapped around the mount (or inside) sees the original, unstripped `uri()`.
 
 ## `middleware`
 
@@ -80,7 +80,7 @@ pub trait Middleware: Send + Sync + 'static {
 pub const fn new(prefix: &'static str, inner: M) -> Self
 ```
 
-`impl<M: Middleware> Middleware for OnPathPrefix<M>`: runs `inner` when `req.uri().path().starts_with(prefix)` (plain string prefix: `/api` also matches `/apix`), otherwise forwards to `next`. Fields are private.
+`impl<M: Middleware> Middleware for OnPathPrefix<M>`: runs `inner` when `req.uri().path()` is `prefix` or lies below it (a prefix without a trailing slash stops at a segment boundary: `/api` covers `/api` and `/api/x`, not `/apix`; one ending in `/` is a plain prefix), otherwise forwards to `next`. Fields are private.
 
 ## `server`
 

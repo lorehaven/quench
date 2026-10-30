@@ -104,6 +104,7 @@ Implemented for: `Response` (identity), `()` (`204`), `String` and `&'static str
 
 ```rust
 MissingDependency { component: &'static str, dependency: &'static str }
+Duplicate(&'static str)
 Cycle(Vec<&'static str>)
 ConstructionFailed { component: &'static str, reason: String }
 NotFound(&'static str)
@@ -114,6 +115,7 @@ Messages (the `#[error(...)]` texts):
 | Variant | Display |
 |---|---|
 | `MissingDependency` | ``component `{component}` depends on `{dependency}`, which is not registered (no #[injectable] or Container::provide for it)`` |
+| `Duplicate` | ``component `{0}` is produced by more than one #[injectable]`` |
 | `Cycle` | `dependency cycle detected among: ` + the names joined by ` -> ` |
 | `ConstructionFailed` | ``constructing `{component}` failed: {reason}`` |
 | `NotFound` | ``` `{0}` was requested from the container but is not registered``` |

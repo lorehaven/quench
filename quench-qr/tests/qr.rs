@@ -79,6 +79,13 @@ const fn level_bits(level: EcLevel) -> u32 {
 }
 
 #[quench_test::test]
+fn capacity_of_a_version_that_does_not_exist_is_zero() {
+    assert_eq!(QrCode::capacity(0, EcLevel::L), 0);
+    assert_eq!(QrCode::capacity(41, EcLevel::H), 0);
+    assert!(QrCode::capacity(40, EcLevel::L) > 2000);
+}
+
+#[quench_test::test]
 fn a_small_symbol_matches_the_reference_encoder() {
     let code = QrCode::new("Hello, World").unwrap();
     assert_eq!(

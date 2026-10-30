@@ -61,7 +61,7 @@ Set semantics for members written concurrently. `add_to_set` is idempotent; with
 ```rust
 pub async fn clear(&self) -> Result<(), CacheError>
 ```
-In-process: removes every entry. Redis: deletes the keys matching `<prefix>:*` (see `RedisStore::clear`).
+In-process: removes every entry. Redis: deletes the keys matching `<prefix>:*` (see `RedisStore::clear`); a store with an empty prefix refuses with `Backend("refusing to clear a Redis store without a key prefix")` rather than wipe the database.
 
 ```rust
 #[must_use] pub const fn is_shared(&self) -> bool
