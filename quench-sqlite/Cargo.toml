@@ -1,0 +1,24 @@
+[package]
+name = "quench-sqlite"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - SQLite database files read and written by our own code: pager, B-trees, records, no dependencies"
+keywords = ["sqlite", "database", "btree"]
+categories = ["database-implementations"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_sqlite"
+path = "src/lib.rs"
+harness = false
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+quench-core = { workspace = true }
+quench-test = { workspace = true }

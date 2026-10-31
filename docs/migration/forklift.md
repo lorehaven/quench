@@ -72,3 +72,5 @@ Limits: a restored file's name is the sanitised stored name (letters, digits, `.
 ## Security
 
 Password never stored; refresh token in the Keystore; access token in memory; no network calls except `{server}/gatehouse` and `{server}/warehouse`; tests use stand-in servers only, never the real warehouse.
+
+- [x] The manifest is a SQLite database (`manifest.db`, `quench-sqlite`): `forklift-net`'s `Store` writes only the changed records in one transaction; the old text file is imported once; `Backup.kt` reads `manifest.counts` (2026-10-31). Open: run it on the emulator/phone.

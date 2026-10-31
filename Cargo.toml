@@ -61,6 +61,7 @@ members = [
   "quench-pg",
   "quench-redis",
   "quench-regex",
+  "quench-sqlite",
   "examples/*",
 ]
 resolver = "2"
@@ -135,6 +136,7 @@ quench-template = { path = "quench-template", registry = "ennor", version = "0.1
 quench-archive = { path = "quench-archive", registry = "ennor", version = "0.1.0" }
 quench-pg = { path = "quench-pg", registry = "ennor", version = "0.1.0", default-features = false }
 quench-regex = { path = "quench-regex", registry = "ennor", version = "0.1.0" }
+quench-sqlite = { path = "quench-sqlite", registry = "ennor", version = "0.1.0" }
 quench-redis = { path = "quench-redis", registry = "ennor", version = "0.1.0", default-features = false }
 quench-web-components = { path = "quench-web-components", registry = "ennor", version = "0.1.5" }
 quote = { version = "1.0" }

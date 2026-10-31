@@ -31,6 +31,7 @@ quench-db = { version = "0.2", default-features = false }
 | Feature | Default | Adds |
 |---|---|---|
 | `postgres` | yes | `dep:quench-pg`; `Db::Postgres`, `Repository::Postgres`, `PostgresDb`, `PostgresRepository`, the whole `runner` module (`MigrationRunner`, reports), `From<quench_pg::Error> for DbError`. |
+| `sqlite` | no | `dep:quench-sqlite`; `Db::Sqlite`, `Repository::Sqlite`, `SqliteDb`, `SqliteRepository`, `From<quench_sqlite::Error> for DbError`; `Db::connect("sqlite:path")`. See [the SQLite backend](api-backends.md#backendssqlite-feature-sqlite). |
 | `tls` | yes | `quench-pg?/tls`: `sslmode=require` and `verify-full` work. No effect without `postgres`. |
 
 Without `postgres`, `Db::connect("")` returns an in-memory database and `Db::connect(url)` with a non-empty URL returns `DbError::ConnectionError("cannot connect to {url}: quench-db was built without its `postgres` feature")`.

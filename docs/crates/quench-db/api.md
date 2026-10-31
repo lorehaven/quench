@@ -44,7 +44,7 @@ pub trait Database: Send + Sync + Debug {
 }
 ```
 
-A connection-level handle. Implemented by `Db`, `PostgresDb`, `InMemoryDb`.
+A connection-level handle. Implemented by `Db`, `PostgresDb`, `SqliteDb` (feature `sqlite`), `InMemoryDb`.
 
 * `execute`: run SQL, ignoring any rows. Postgres: simple protocol, so a script with several statements is accepted. In-memory: always `Ok(())`, the query is ignored.
 * `migrate`: apply `Migration`s not yet recorded (the simple, ledger-table path; not the catalog runner). Postgres: see [backends](api-backends.md#database-for-postgresdb). In-memory: always `Ok(())`.
@@ -102,7 +102,7 @@ pub enum Db {
 }
 ```
 
-* `pub async fn connect(url: &str) -> Result<Self, DbError>`: an empty `url` returns `Db::InMemory(InMemoryDb::new())` (fresh, empty). A non-empty URL returns `Db::Postgres(PostgresDb::new(url).await?)` with feature `postgres` (the URL is parsed by `quench_pg::Config::from_url`; any scheme other than `postgres://`/`postgresql://` is `ConnectionError`). Without the feature: `DbError::ConnectionError("cannot connect to {url}: quench-db was built without its `postgres` feature")`.
+* `pub async fn connect(url: &str) -> Result<Self, DbError>`: an empty `url` returns `Db::InMemory(InMemoryDb::new())` (fresh, empty). A URL starting with `sqlite:` (`sqlite:path` or `sqlite://path`) returns `Db::Sqlite(SqliteDb::open(url)?)` with feature `sqlite`. Any other non-empty URL returns `Db::Postgres(PostgresDb::new(url).await?)` with feature `postgres` (the URL is parsed by `quench_pg::Config::from_url`; any scheme other than `postgres://`/`postgresql://` is `ConnectionError`). Without the feature: `DbError::ConnectionError("cannot connect to {url}: quench-db was built without its `postgres` feature")`.
 * `#[must_use] pub fn repository<T: Model>(&self) -> Repository<T>`: a repository dispatching to this backend. Cheap (clones the handle).
 * `impl Database for Db`: forwards `execute` and `migrate` to the variant.
 

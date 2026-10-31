@@ -33,6 +33,7 @@ impl DbWrapper {
 
         let db = match Db::connect(&db_url).await {
             Ok(db) => {
+                #[allow(clippy::match_wildcard_for_single_variants)]
                 match &db {
                     Db::Postgres(_) => print_status(Tone::Success, "db", "connected to Postgres"),
                     Db::InMemory(_) => print_status(
@@ -40,6 +41,9 @@ impl DbWrapper {
                         "db",
                         "ALLOW_IN_MEMORY_DB is set: data lives in memory and is lost on restart",
                     ),
+                    // Any other backend quench-db was built with (its `sqlite` feature, when something enables it).
+                    #[allow(unreachable_patterns)]
+                    _ => print_status(Tone::Success, "db", "connected"),
                 }
                 db
             }

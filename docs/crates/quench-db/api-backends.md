@@ -5,7 +5,7 @@ grand_parent: Crates
 nav_order: 3
 ---
 
-Module `quench_db::backends` (`src/backends/mod.rs`): `pub mod in_memory;` and, with feature `postgres`, `pub mod postgres;`.
+Module `quench_db::backends` (`src/backends/mod.rs`): `pub mod in_memory;`, with feature `postgres` `pub mod postgres;`, and with feature `sqlite` `pub mod sqlite;`.
 
 ## `backends::postgres` (feature `postgres`)
 
@@ -88,3 +88,46 @@ pub struct InMemoryRepository<T: Model> { db: InMemoryDb, _marker: PhantomData<T
 * `delete`: removes the key; absent is fine.
 * `list`: every stored row, in `HashMap` order.
 * `find_by`: allow-list check like Postgres, then rows whose field `column` is a JSON string equal to `value`. Non-string fields never match.
+
+## `backends::sqlite` (feature `sqlite`)
+
+A database file read and written by [quench-sqlite](../quench-sqlite/index.md); no server, no third-party code.
+
+### `struct SqliteDb`
+
+```rust
+#[derive(Clone)]
+pub struct SqliteDb { conn: Arc<Mutex<quench_sqlite::Connection>> }
+
+pub fn open(path: &str) -> Result<Self, DbError>
+```
+
+`open` takes a file path, with or without the prefix `sqlite://` or `sqlite:`, and makes the file if it is not there. The file is locked for writing as long as any clone lives (a second `open` of it, here or in another process, is `ConnectionError`). All clones share one connection behind a mutex: a call holds it for one statement or one migration and finishes before it returns, so the async methods never wait on I/O of their own; they block the thread for the length of the statement. `Debug` prints `SqliteDb` only. `From<quench_sqlite::Error> for DbError`: `Io`, `NotADatabase` and `Busy` are `ConnectionError`, everything else is `QueryError` (the text of the error).
+
+### `impl Database for SqliteDb`
+
+* `execute(query)`: runs the statements of `query` in order (`Connection::execute`, no parameters); rows are discarded.
+* `migrate(migrations)`: creates the ledger `{table}` (`id TEXT PRIMARY KEY, author TEXT NOT NULL`; `{table}` is `DB_MIGRATION_TABLE`, default `quench_migrations`) if it is missing. For each migration in order whose `id` is not in the ledger: logs `info!("Applying migration: {id}")` and, in one transaction, runs `ChangeSet::to_sql()` of each change and inserts `(id, author)`. A failure rolls that migration back (nothing of it stays, the ledger has no row for it) and returns the error; earlier migrations stay applied. `since` is ignored. `ChangeSet::CreateSchema` and `ChangeSet::CreateExtension` are **skipped** (SQLite has neither); the SQL of the other changes must be valid SQLite, which for `CreateTable` means the column types are free text and `TIMESTAMPTZ`, `JSONB` and the like are just type names.
+
+### `struct SqliteRepository<T: Model>`
+
+```rust
+pub struct SqliteRepository<T: Model> { db: SqliteDb, _marker: PhantomData<T> }
+pub const fn new(db: SqliteDb) -> Self
+```
+
+`impl<T: Model> Crud<T>` generates this SQL (`"{t}"` is `T::table_name()`, `"{pk}"` is `T::primary_key_name()`, both double-quoted; parameters are `?`):
+
+| Method | SQL | Parameters |
+|---|---|---|
+| `create` | `INSERT INTO "{t}" ("c1", ...) VALUES (?, ...) RETURNING *` (`DEFAULT VALUES` when the model has no column) | the model's fields that are in `T::columns()` |
+| `read` | `SELECT * FROM "{t}" WHERE "{pk}" = ?` | the id text |
+| `update` | `UPDATE "{t}" SET "c1" = ?, ... WHERE "{pk}" = ? RETURNING *` | the fields, then the key as text |
+| `delete` | `DELETE FROM "{t}" WHERE "{pk}" = ?` | the id text |
+| `list` | `SELECT * FROM "{t}"` | none |
+| `find_by` | `SELECT * FROM "{t}" WHERE "{column}" = ?` | the value text; `column` allow-listed against `T::columns()` |
+
+* A text parameter compared with an `INTEGER` column is converted to a number by the column's affinity, so an integer key is read by its decimal text.
+* Field mapping: booleans are `0`/`1`; `Option::None` is NULL; strings are text; integers and floats are numbers (an unsigned value above `i64::MAX` is stored as a real); arrays and objects (`Vec<_>`, `quench_serde::Value`) are stored as their **JSON text**.
+* Reading: a row becomes a model through its column names. A column declared `BOOL`/`BOOLEAN` is read as a boolean and a column declared `JSON`/`JSONB` is parsed as JSON; other columns come back as their stored class. Declare columns that way for models that have booleans or JSON.
+* `update` and `create` fail as `DbError::NotFound` when no row is returned (`update` of a missing key), `QueryError` for a constraint (the second `create` of a key). Errors for the key of the model are the same as Postgres's (`Primary key '{pk}' not found in model`).

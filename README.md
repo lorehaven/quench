@@ -1,6 +1,6 @@
 # Quench
 
-Quench is a Rust framework built from small crates that each do one job with as few dependencies as possible: serialization, regular expressions, HTTP, TLS-aware clients, Postgres and Redis clients, templates, PDF and image handling, a UI toolkit and the renderers and hosts that run it. Most of what a service or an app usually pulls in from the wider ecosystem is written here instead, so what you build on is readable, uniform and under one roof.
+Quench is a Rust framework built from small crates that each do one job with as few dependencies as possible: serialization, regular expressions, HTTP, TLS-aware clients, Postgres, Redis and SQLite (database files, with an SQL engine) clients, templates, PDF and image handling, a UI toolkit and the renderers and hosts that run it. Most of what a service or an app usually pulls in from the wider ecosystem is written here instead, so what you build on is readable, uniform and under one roof.
 
 **Documentation: <https://lorehaven.github.io/quench/>** (guides, per-crate reference, examples)
 
@@ -58,6 +58,7 @@ Every crate has a README in its directory. The book icon (📖) links to the cra
 
 | Crate | Description | Docs |
 | --- | --- | --- |
+| [`quench-sqlite`](./quench-sqlite/) | SQLite database files read and written by our own code: pager, b-trees, rollback journal, an SQL engine; no dependencies | [📖](https://lorehaven.github.io/quench/crates/quench-sqlite/) |
 | [`quench-db`](./quench-db/) | ORM/CRUD abstraction plus a migration catalog engine | [📖](https://lorehaven.github.io/quench/crates/quench-db/) |
 | [`quench-pg`](./quench-pg/) | PostgreSQL client: wire protocol, SCRAM-SHA-256, TLS, typed rows, pool | [📖](https://lorehaven.github.io/quench/crates/quench-pg/) |
 | [`quench-redis`](./quench-redis/) | Redis client: RESP2/3, pooled connections, cluster routing | [📖](https://lorehaven.github.io/quench/crates/quench-redis/) |

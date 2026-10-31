@@ -263,6 +263,7 @@ dependencies = [
  "quench-log",
  "quench-pg",
  "quench-serde",
+ "quench-sqlite",
  "quench-test",
  "tokio",
 ]
@@ -625,6 +626,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "quench-sqlite"
+version = "0.1.0"
+dependencies = [
+ "quench-core",
+ "quench-test",
 ]
 
 [[package]]

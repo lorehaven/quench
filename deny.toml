@@ -172,7 +172,7 @@ workspace-default-features = "allow"
 # members of the workspace. This can be overridden by allowing/denying `default`
 # on a crate-by-crate basis if desired.
 external-default-features = "allow"
-# DEPENDENCY ALLOWLIST (plans/FULLSTACK_ROADMAP.md, Stage 0).
+# DEPENDENCY ALLOWLIST (the dependency policy: docs/guides/dependency-policy.md).
 #
 # Everything not listed here is rejected, so a new third-party crate fails
 # `cargo deny check bans` until someone adds it on purpose.

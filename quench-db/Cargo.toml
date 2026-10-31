@@ -4,7 +4,7 @@ version = "0.2.15"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench DB - a simple ORM and database abstraction layer"
-keywords = ["database", "orm", "postgres"]
+keywords = ["database", "orm", "postgres", "sqlite"]
 categories = ["database"]
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -22,6 +22,7 @@ quench-core = { workspace = true }
 quench-crypto = { workspace = true }
 quench-serde = { workspace = true }
 quench-pg = { workspace = true, optional = true }
+quench-sqlite = { workspace = true, optional = true }
 
 [features]
 default = ["postgres", "tls"]
@@ -30,6 +31,8 @@ default = ["postgres", "tls"]
 postgres = ["dep:quench-pg"]
 # `sslmode=require|verify-full` for Postgres; has no effect without `postgres`.
 tls = ["quench-pg?/tls"]
+# The SQLite backend (`SqliteDb`, `Db::Sqlite`, `sqlite:path` URLs), on `quench-sqlite`.
+sqlite = ["dep:quench-sqlite"]
 
 
 
@@ -65,4 +68,10 @@ harness = false
 [[test]]
 name = "unit"
 path = "tests/unit.rs"
+harness = false
+
+[[test]]
+name = "sqlite_backend"
+path = "tests/sqlite_backend.rs"
+required-features = ["sqlite"]
 harness = false

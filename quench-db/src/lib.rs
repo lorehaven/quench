@@ -14,6 +14,8 @@ pub mod runner;
 pub use backends::in_memory::{InMemoryDb, InMemoryRepository};
 #[cfg(feature = "postgres")]
 pub use backends::postgres::{PostgresDb, PostgresRepository};
+#[cfg(feature = "sqlite")]
+pub use backends::sqlite::{SqliteDb, SqliteRepository};
 pub use catalog::{Catalog, CatalogError, CatalogModule, ModuleManifest, ModuleScope, Requirement};
 pub use error::DbError;
 pub use migrations::{ChangeSet, ColumnDef, Migration, MigrationFile, MigrationLoader};
@@ -70,6 +72,8 @@ pub(crate) fn checked_column<T: Model>(column: &str) -> Result<&'static str, DbE
 pub enum Db {
     #[cfg(feature = "postgres")]
     Postgres(PostgresDb),
+    #[cfg(feature = "sqlite")]
+    Sqlite(SqliteDb),
     InMemory(InMemoryDb),
 }
 
@@ -81,6 +85,10 @@ impl Db {
     pub async fn connect(url: &str) -> Result<Self, DbError> {
         if url.is_empty() {
             return Ok(Self::InMemory(InMemoryDb::new()));
+        }
+        #[cfg(feature = "sqlite")]
+        if url.starts_with("sqlite:") {
+            return Ok(Self::Sqlite(SqliteDb::open(url)?));
         }
         #[cfg(feature = "postgres")]
         return Ok(Self::Postgres(PostgresDb::new(url).await?));
@@ -95,6 +103,8 @@ impl Db {
         match self {
             #[cfg(feature = "postgres")]
             Self::Postgres(db) => Repository::Postgres(PostgresRepository::new(db.clone())),
+            #[cfg(feature = "sqlite")]
+            Self::Sqlite(db) => Repository::Sqlite(SqliteRepository::new(db.clone())),
             Self::InMemory(db) => Repository::InMemory(InMemoryRepository::new(db.clone())),
         }
     }
@@ -106,6 +116,8 @@ impl Database for Db {
         match self {
             #[cfg(feature = "postgres")]
             Self::Postgres(db) => db.execute(query).await,
+            #[cfg(feature = "sqlite")]
+            Self::Sqlite(db) => db.execute(query).await,
             Self::InMemory(db) => db.execute(query).await,
         }
     }
@@ -114,6 +126,8 @@ impl Database for Db {
         match self {
             #[cfg(feature = "postgres")]
             Self::Postgres(db) => db.migrate(migrations).await,
+            #[cfg(feature = "sqlite")]
+            Self::Sqlite(db) => db.migrate(migrations).await,
             Self::InMemory(db) => db.migrate(migrations).await,
         }
     }
@@ -124,6 +138,8 @@ impl<T: Model> std::fmt::Debug for Repository<T> {
         match self {
             #[cfg(feature = "postgres")]
             Self::Postgres(repo) => f.debug_tuple("Postgres").field(repo).finish(),
+            #[cfg(feature = "sqlite")]
+            Self::Sqlite(repo) => f.debug_tuple("Sqlite").field(repo).finish(),
             Self::InMemory(repo) => f.debug_tuple("InMemory").field(repo).finish(),
         }
     }
@@ -132,6 +148,8 @@ impl<T: Model> std::fmt::Debug for Repository<T> {
 pub enum Repository<T: Model> {
     #[cfg(feature = "postgres")]
     Postgres(PostgresRepository<T>),
+    #[cfg(feature = "sqlite")]
+    Sqlite(SqliteRepository<T>),
     InMemory(InMemoryRepository<T>),
 }
 
@@ -144,6 +162,8 @@ where
         match self {
             #[cfg(feature = "postgres")]
             Self::Postgres(repo) => repo.create(model).await,
+            #[cfg(feature = "sqlite")]
+            Self::Sqlite(repo) => repo.create(model).await,
             Self::InMemory(repo) => repo.create(model).await,
         }
     }
@@ -152,6 +172,8 @@ where
         match self {
             #[cfg(feature = "postgres")]
             Self::Postgres(repo) => repo.read(id).await,
+            #[cfg(feature = "sqlite")]
+            Self::Sqlite(repo) => repo.read(id).await,
             Self::InMemory(repo) => repo.read(id).await,
         }
     }
@@ -160,6 +182,8 @@ where
         match self {
             #[cfg(feature = "postgres")]
             Self::Postgres(repo) => repo.update(model).await,
+            #[cfg(feature = "sqlite")]
+            Self::Sqlite(repo) => repo.update(model).await,
             Self::InMemory(repo) => repo.update(model).await,
         }
     }
@@ -168,6 +192,8 @@ where
         match self {
             #[cfg(feature = "postgres")]
             Self::Postgres(repo) => repo.delete(id).await,
+            #[cfg(feature = "sqlite")]
+            Self::Sqlite(repo) => repo.delete(id).await,
             Self::InMemory(repo) => repo.delete(id).await,
         }
     }
@@ -176,6 +202,8 @@ where
         match self {
             #[cfg(feature = "postgres")]
             Self::Postgres(repo) => repo.list().await,
+            #[cfg(feature = "sqlite")]
+            Self::Sqlite(repo) => repo.list().await,
             Self::InMemory(repo) => repo.list().await,
         }
     }
@@ -184,6 +212,8 @@ where
         match self {
             #[cfg(feature = "postgres")]
             Self::Postgres(repo) => repo.find_by(column, value).await,
+            #[cfg(feature = "sqlite")]
+            Self::Sqlite(repo) => repo.find_by(column, value).await,
             Self::InMemory(repo) => repo.find_by(column, value).await,
         }
     }

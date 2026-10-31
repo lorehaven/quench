@@ -43,6 +43,7 @@ packages = [
     "quench-pg",
     "quench-proto",
     "quench-qr",
+    "quench-sqlite",
     "quench-raster",
     "quench-redis",
     "quench-regex",
