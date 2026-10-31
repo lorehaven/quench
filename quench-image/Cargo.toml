@@ -3,7 +3,7 @@ name = "quench-image"
 version = "0.1.1"
 edition = { workspace = true }
 authors = { workspace = true }
-description = "Quench - image decoding with no dependencies: PNG (all colour types and bit depths, interlaced or not) into RGBA, and a PNG encoder"
+description = "Quench - image decoding with one dependency (quench-archive): PNG, JPEG, GIF and WebP into RGBA, and a PNG encoder"
 keywords = ["image", "png", "decoder"]
 categories = ["multimedia::images", "encoding"]
 homepage = { workspace = true }

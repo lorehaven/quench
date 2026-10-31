@@ -1,70 +1,129 @@
 # Quench
 
-A modular Rust workspace of shared library crates: auth/session verification, an ORM/migration layer, a lightweight HTTP framework and its service bootstrap, a dependency-light HTML/CSS/JS page builder, caching, an authenticated HTTP client, and config loading. Split out of [Forge](https://github.com/lorehaven/forge), which remains the primary consumer alongside other services.
+Quench is a Rust framework built from small crates that each do one job with as few dependencies as possible: serialization, regular expressions, HTTP, TLS-aware clients, Postgres and Redis clients, templates, PDF and image handling, a UI toolkit and the renderers and hosts that run it. Most of what a service or an app usually pulls in from the wider ecosystem is written here instead, so what you build on is readable, uniform and under one roof.
 
-See [docs/](./docs/) for per-crate reference.
+**Documentation: <https://lorehaven.github.io/quench/>** (guides, per-crate reference, examples)
+
+## Purpose
+
+* Replace large, fast-moving dependency trees with a workspace you can read, audit and version together (see the [dependency policy](https://lorehaven.github.io/quench/guides/dependency-policy/)).
+* Give services, command-line tools and apps the same conventions: one config loader, one logger, one error style, one test harness.
+* Run one UI codebase in the browser (WebAssembly), in a WebView on Android and Linux, or drawn by a native renderer with no WebView at all.
+
+## General use cases
+
+* **HTTP services**: `quench-http` for routing and middleware, `quench-starter` for TLS, health and database wiring, `quench-auth` for session verification, `quench-db` and `quench-pg` for data.
+* **Full-stack web apps**: `quench-ui` views and signals served by `quench-fullstack` with server rendering and typed server functions, or compiled to WebAssembly with `quench-ui-web`.
+* **Mobile and desktop apps**: the same UI in `quench-android` or `quench-desktop`, or rendered natively with `quench-ui-native`.
+* **Command-line tools**: `quench-args` for parsing, `quench-cli` for styling, `quench-tool` to scaffold, run and release projects.
+* **Libraries for everyday data work**: JSON/TOML/YAML (`quench-serde`), regex, templates, archives, PDF text, QR codes, PNG and SVG.
+* **Testing**: `quench-test` and `quench-test-bdd` produce JSON and HTML result pages; `quench-security` runs the security gate.
+
+New to Quench? Start with the [getting started guide](https://lorehaven.github.io/quench/guides/getting-started/).
 
 ## Crates
 
-- [Quench Auth](./docs/crates/quench-auth/index.md) — relying-party token/session verification
-- [Quench Http](./docs/crates/quench-http/index.md) — lightweight, `poem`-shaped HTTP framework: annotation-discovered routing, dependency injection, plain-async middleware
-- [Quench Starter](./docs/crates/quench-starter/index.md) — service bootstrap (TLS, base-path scoping, health, DB wiring)
-- [Quench Web](./docs/crates/quench-web/index.md) — dependency-light server-rendered HTML/CSS/JS page builder
-- [Quench Web Components](./docs/crates/quench-web-components/index.md) — higher-level UI builders on top of Quench Web
-- [Quench DB](./docs/crates/quench-db/index.md) — ORM/CRUD abstraction plus a migration catalog engine
-- [Quench Cache](./docs/crates/quench-cache/index.md) — shared in-process/Redis caching layer
-- [Quench Client](./docs/crates/quench-client/index.md) — shared authenticated HTTP client wrappers
-- [Quench Config](./docs/crates/quench-config/index.md) — typed config/env loading helper
-- [Quench Serde](./docs/crates/quench-serde/index.md) — JSON/TOML/urlencoded codecs and a dynamic `Value` model, without serde
-- [Quench Crypto](./docs/crates/quench-crypto/index.md) — hashing, HMAC, Ed25519, RSA verify, PBKDF2, Argon2id and JWT
-- [Quench Serde YAML](./docs/crates/quench-serde/api-formats.md) — the `yaml` feature of Quench Serde: YAML 1.2 on `Value`
-- [Quench Core Macros](./docs/crates/quench-core-macros/index.md) — `#[async_trait]` and `#[derive(Error)]` for Quench Core
-- [Quench Serde Macros](./docs/crates/quench-serde-macros/index.md) — `#[derive(Serialize, Deserialize)]` for Quench Serde
-- [Quench Core](./docs/crates/quench-core/index.md) — dependency-free foundations: time, uuid, base64/hex, errors, env, sharded map, versions, bytes
-- [Quench Proto](./docs/crates/quench-proto/index.md) — HTTP types, an HTTP/1.1 codec for servers and clients, multipart, cookies, WebSocket and SSE
-- [Quench QR](./docs/crates/quench-qr/index.md) — QR code encoder (ISO 18004, versions 1-40) with SVG output, no dependencies
-- [Quench desktop Wayland](./docs/crates/quench-desktop-wayland/index.md) — a Wayland client on the wire protocol: window, shared-memory frames, pointer input
-- [Quench CSS](./docs/crates/quench-css/index.md) — a CSS engine: parser with nesting, selectors, the cascade, custom properties, calc() and media queries
-- [Quench Layout](./docs/crates/quench-layout/index.md) — box layout: block and inline flow, flexbox, positioning, margin collapsing
-- [Quench Paint](./docs/crates/quench-paint/index.md) — paints a laid out box tree: backgrounds, borders, radii, shadows, clipping, opacity, text
-- [Quench Image](./docs/crates/quench-image/index.md) — PNG decoding (every colour type, Adam7) and encoding, no dependencies
-- [Quench SVG](./docs/crates/quench-svg/index.md) — an SVG renderer: shapes, paths with arcs, transforms, fills and strokes into RGBA
-- [Quench UI Native](./docs/crates/quench-ui-native/index.md) — a quench-ui renderer that draws itself: DOM, style, layout and paint with no WebView
-- [Quench Desktop Native](./docs/crates/quench-desktop-native/index.md) — runs a quench-ui-native renderer in a Wayland window: input, repeat, caret, input method, accessibility
-- [Quench Desktop AT-SPI](./docs/crates/quench-desktop-atspi/index.md) — screen-reader support on Linux: the D-Bus protocol by hand and the AT-SPI objects
-- [Quench Android Surface](./docs/crates/quench-android-surface/index.md) — an Android app drawn by the native renderer: the program side, the protocol, the Kotlin host plugin
-- [Quench Text](./docs/crates/quench-text/index.md) — a TrueType parser, kerning, line breaking and Noto Sans embedded, drawn through quench-raster
-- [Quench Raster](./docs/crates/quench-raster/index.md) — software rasteriser: anti-aliased paths, rounded rectangles, premultiplied BGRA canvas, no dependencies
-- [Quench HTML](./docs/crates/quench-html/index.md) — HTML parser with CSS selectors, and CommonMark to HTML
-- [Quench Test](./docs/crates/quench-test/index.md) — test harness with JSON/HTML result pages, command runner, predicates, mock HTTP server
-- [Quench Test BDD](./docs/crates/quench-test-bdd/index.md) — Gherkin runner with cucumber expressions, async steps, concurrent scenarios, JSON/HTML pages
-- [Quench Convert](./docs/crates/quench-convert/index.md) — CSV, XML, Android binary XML and GGUF as quench-serde values
-- [Quench PDF](./docs/crates/quench-pdf/index.md) — PDF text extraction (xref tables and streams, object streams, fonts, encodings)
-- [Quench Template](./docs/crates/quench-template/index.md) — Jinja-compatible templates over quench-serde values (filters, tests, macros, imports)
-- [Quench Archive](./docs/crates/quench-archive/index.md) — tar, zip, deflate, gzip and zstd (decoder and encoder), no dependencies
-- [Quench Args](./docs/crates/quench-args/index.md) — command-line parsing with clap-compatible derives, no clap
-- [Quench K8s](./docs/crates/quench-k8s/index.md) — generic Kubernetes API client (kubeconfig, dynamic resources, discovery, logs, watch)
-- [Quench Schema](./docs/crates/quench-schema/index.md) — JSON Schema validation over quench-serde values
-- [Quench Regex](./docs/crates/quench-regex/index.md) — regular expressions with Unicode classes, no dependencies
-- [Quench Style](./docs/crates/quench-style/index.md) — shared design tokens, themes, base CSS and i18n for web, mobile and desktop
-- [Quench TZ](./docs/crates/quench-tz/index.md) — IANA time zones with the database built in
-- [Quench Android host](./docs/crates/quench-android/index.md) — the WebView app that runs a Quench UI bundle on Android, with a plugin bridge
-- [Quench desktop host](./docs/crates/quench-desktop/index.md) — a GTK window around webkit2gtk that runs a Quench UI bundle on Linux, with the same bridge
-- [Quench Tool](./docs/crates/quench-tool/index.md) — the `quench` command: new projects, a dev loop with live reload, release builds, doctor
-- [Quench UI](./docs/crates/quench-ui/index.md) — UI core: signals, views, events and the renderer interface
-- [Quench Fullstack](./docs/crates/quench-fullstack/index.md) — serves Quench UI apps from Quench HTTP: server rendering, hashed assets, strict CSP, typed server functions, sessions
-- [Quench Fullstack Macros](./docs/crates/quench-fullstack-macros/index.md) — the `#[server]` attribute
-- [Quench UI Web Macros](./docs/crates/quench-ui-web-macros/index.md) — the `#[plugin]` attribute: a typed client for a native plugin of the host app
-- [Quench UI Web](./docs/crates/quench-ui-web/index.md) — runs a Quench UI app in the browser from WebAssembly, with a small JS bridge
-- [Quench TLS](./docs/crates/quench-tls/index.md) — async glue between tokio streams and rustls, with shared trust-store helpers
-- [Quench Log](./docs/crates/quench-log/index.md) — leveled events, spans, console and rolling-file output
-- [Quench Log Macros](./docs/crates/quench-log-macros/index.md) — `#[instrument]` for Quench Log
-- [Quench PG](./docs/crates/quench-pg/index.md) — PostgreSQL client: wire protocol, SCRAM-SHA-256, TLS, typed rows, pool
-- [Quench Redis](./docs/crates/quench-redis/index.md) — Redis client: RESP2/3, pooled connections, cluster routing
-- [Quench Mail](./docs/crates/quench-mail/index.md) — MIME message builder and async SMTP submission client
-- [Quench CLI](./docs/crates/quench-cli/index.md) — shared terminal UI styling for CLI tools
+Every crate has a README in its directory. The book icon (📖) links to the crate's documentation.
 
-Most crates have cargo features for the heavier optional parts (TLS, the Postgres backend, the HTTP layer of `quench-auth`, the REPL editor, ...); see each crate's feature table in the [crate reference](./docs/crates/index.md).
+### Foundations
+
+| Crate | Description | Docs |
+| --- | --- | --- |
+| [`quench-core`](./quench-core/) | Dependency-free foundations: time, uuid, base64/hex, errors, env, sharded map, versions, bytes | [📖](https://lorehaven.github.io/quench/crates/quench-core/) |
+| [`quench-core-macros`](./quench-core-macros/) | `#[async_trait]` and `#[derive(Error)]` for Quench Core | [📖](https://lorehaven.github.io/quench/crates/quench-core-macros/) |
+| [`quench-serde`](./quench-serde/) | JSON/TOML/urlencoded codecs and a dynamic `Value` model, without serde | [📖](https://lorehaven.github.io/quench/crates/quench-serde/) |
+| [`quench-serde-macros`](./quench-serde-macros/) | `#[derive(Serialize, Deserialize)]` for Quench Serde | [📖](https://lorehaven.github.io/quench/crates/quench-serde-macros/) |
+| [`quench-config`](./quench-config/) | Typed config/env loading helper | [📖](https://lorehaven.github.io/quench/crates/quench-config/) |
+| [`quench-log`](./quench-log/) | Leveled events, spans, console and rolling-file output | [📖](https://lorehaven.github.io/quench/crates/quench-log/) |
+| [`quench-log-macros`](./quench-log-macros/) | `#[instrument]` for Quench Log | [📖](https://lorehaven.github.io/quench/crates/quench-log-macros/) |
+| [`quench-regex`](./quench-regex/) | Regular expressions with Unicode classes, no dependencies | [📖](https://lorehaven.github.io/quench/crates/quench-regex/) |
+| [`quench-tz`](./quench-tz/) | IANA time zones with the database built in | [📖](https://lorehaven.github.io/quench/crates/quench-tz/) |
+| [`quench-template`](./quench-template/) | Jinja-compatible templates over quench-serde values (filters, tests, macros, imports) | [📖](https://lorehaven.github.io/quench/crates/quench-template/) |
+| [`quench-schema`](./quench-schema/) | JSON Schema validation over quench-serde values | [📖](https://lorehaven.github.io/quench/crates/quench-schema/) |
+
+### Web services
+
+| Crate | Description | Docs |
+| --- | --- | --- |
+| [`quench-proto`](./quench-proto/) | HTTP types, an HTTP/1.1 codec for servers and clients, multipart, cookies, WebSocket and SSE | [📖](https://lorehaven.github.io/quench/crates/quench-proto/) |
+| [`quench-http`](./quench-http/) | Lightweight, `poem`-shaped HTTP framework: annotation-discovered routing, dependency injection, plain-async middleware | [📖](https://lorehaven.github.io/quench/crates/quench-http/) |
+| [`quench-http-macros`](./quench-http-macros/) | Route and injectable discovery macros for Quench Http | [📖](https://lorehaven.github.io/quench/crates/quench-http-macros/) |
+| [`quench-starter`](./quench-starter/) | Service bootstrap (TLS, base-path scoping, health, DB wiring) | [📖](https://lorehaven.github.io/quench/crates/quench-starter/) |
+| [`quench-auth`](./quench-auth/) | Relying-party token/session verification | [📖](https://lorehaven.github.io/quench/crates/quench-auth/) |
+| [`quench-client`](./quench-client/) | Shared authenticated HTTP client wrappers | [📖](https://lorehaven.github.io/quench/crates/quench-client/) |
+| [`quench-tls`](./quench-tls/) | Async glue between tokio streams and rustls, with shared trust-store helpers | [📖](https://lorehaven.github.io/quench/crates/quench-tls/) |
+| [`quench-cache`](./quench-cache/) | Shared in-process/Redis caching layer | [📖](https://lorehaven.github.io/quench/crates/quench-cache/) |
+
+### Data and I/O
+
+| Crate | Description | Docs |
+| --- | --- | --- |
+| [`quench-db`](./quench-db/) | ORM/CRUD abstraction plus a migration catalog engine | [📖](https://lorehaven.github.io/quench/crates/quench-db/) |
+| [`quench-pg`](./quench-pg/) | PostgreSQL client: wire protocol, SCRAM-SHA-256, TLS, typed rows, pool | [📖](https://lorehaven.github.io/quench/crates/quench-pg/) |
+| [`quench-redis`](./quench-redis/) | Redis client: RESP2/3, pooled connections, cluster routing | [📖](https://lorehaven.github.io/quench/crates/quench-redis/) |
+| [`quench-mail`](./quench-mail/) | MIME message builder and async SMTP submission client | [📖](https://lorehaven.github.io/quench/crates/quench-mail/) |
+| [`quench-k8s`](./quench-k8s/) | Generic Kubernetes API client (kubeconfig, dynamic resources, discovery, logs, watch) | [📖](https://lorehaven.github.io/quench/crates/quench-k8s/) |
+| [`quench-archive`](./quench-archive/) | Tar, zip, deflate, gzip and zstd (decoder and encoder), no dependencies | [📖](https://lorehaven.github.io/quench/crates/quench-archive/) |
+| [`quench-convert`](./quench-convert/) | CSV, XML, Android binary XML and GGUF as quench-serde values | [📖](https://lorehaven.github.io/quench/crates/quench-convert/) |
+| [`quench-crypto`](./quench-crypto/) | Hashing, HMAC, Ed25519, RSA verify, PBKDF2, Argon2id and JWT | [📖](https://lorehaven.github.io/quench/crates/quench-crypto/) |
+
+### Documents, images and text
+
+| Crate | Description | Docs |
+| --- | --- | --- |
+| [`quench-html`](./quench-html/) | HTML parser with CSS selectors, and CommonMark to HTML | [📖](https://lorehaven.github.io/quench/crates/quench-html/) |
+| [`quench-pdf`](./quench-pdf/) | PDF text extraction (xref tables and streams, object streams, fonts, encodings) | [📖](https://lorehaven.github.io/quench/crates/quench-pdf/) |
+| [`quench-qr`](./quench-qr/) | QR code encoder (ISO 18004, versions 1-40) with SVG output, no dependencies | [📖](https://lorehaven.github.io/quench/crates/quench-qr/) |
+| [`quench-image`](./quench-image/) | PNG decoding (every colour type, Adam7) and encoding, no dependencies | [📖](https://lorehaven.github.io/quench/crates/quench-image/) |
+| [`quench-svg`](./quench-svg/) | An SVG renderer: shapes, paths with arcs, transforms, fills and strokes into RGBA | [📖](https://lorehaven.github.io/quench/crates/quench-svg/) |
+| [`quench-raster`](./quench-raster/) | Software rasteriser: anti-aliased paths, rounded rectangles, premultiplied BGRA canvas, no dependencies | [📖](https://lorehaven.github.io/quench/crates/quench-raster/) |
+| [`quench-text`](./quench-text/) | A TrueType parser, kerning, line breaking and Noto Sans embedded, drawn through quench-raster | [📖](https://lorehaven.github.io/quench/crates/quench-text/) |
+
+### User interfaces
+
+| Crate | Description | Docs |
+| --- | --- | --- |
+| [`quench-ui`](./quench-ui/) | UI core: signals, views, events and the renderer interface | [📖](https://lorehaven.github.io/quench/crates/quench-ui/) |
+| [`quench-ui-web`](./quench-ui-web/) | Runs a Quench UI app in the browser from WebAssembly, with a small JS bridge | [📖](https://lorehaven.github.io/quench/crates/quench-ui-web/) |
+| [`quench-ui-web-macros`](./quench-ui-web-macros/) | The `#[plugin]` attribute: a typed client for a native plugin of the host app | [📖](https://lorehaven.github.io/quench/crates/quench-ui-web-macros/) |
+| [`quench-web`](./quench-web/) | Dependency-light server-rendered HTML/CSS/JS page builder | [📖](https://lorehaven.github.io/quench/crates/quench-web/) |
+| [`quench-web-components`](./quench-web-components/) | Higher-level UI builders on top of Quench Web | [📖](https://lorehaven.github.io/quench/crates/quench-web-components/) |
+| [`quench-style`](./quench-style/) | Shared design tokens, themes, base CSS and i18n for web, mobile and desktop | [📖](https://lorehaven.github.io/quench/crates/quench-style/) |
+| [`quench-fullstack`](./quench-fullstack/) | Serves Quench UI apps from Quench HTTP: server rendering, hashed assets, strict CSP, typed server functions, sessions | [📖](https://lorehaven.github.io/quench/crates/quench-fullstack/) |
+| [`quench-fullstack-macros`](./quench-fullstack-macros/) | The `#[server]` attribute | [📖](https://lorehaven.github.io/quench/crates/quench-fullstack-macros/) |
+
+### Native rendering and hosts
+
+| Crate | Description | Docs |
+| --- | --- | --- |
+| [`quench-css`](./quench-css/) | A CSS engine: parser with nesting, selectors, the cascade, custom properties, calc() and media queries | [📖](https://lorehaven.github.io/quench/crates/quench-css/) |
+| [`quench-layout`](./quench-layout/) | Box layout: block and inline flow, flexbox, positioning, margin collapsing | [📖](https://lorehaven.github.io/quench/crates/quench-layout/) |
+| [`quench-paint`](./quench-paint/) | Paints a laid out box tree: backgrounds, borders, radii, shadows, clipping, opacity, text | [📖](https://lorehaven.github.io/quench/crates/quench-paint/) |
+| [`quench-ui-native`](./quench-ui-native/) | A quench-ui renderer that draws itself: DOM, style, layout and paint with no WebView | [📖](https://lorehaven.github.io/quench/crates/quench-ui-native/) |
+| [`quench-desktop`](./quench-desktop/) | A GTK window around webkit2gtk that runs a Quench UI bundle on Linux, with the same bridge | [📖](https://lorehaven.github.io/quench/crates/quench-desktop/) |
+| [`quench-desktop-native`](./quench-desktop-native/) | Runs a quench-ui-native renderer in a Wayland window: input, repeat, caret, input method, accessibility | [📖](https://lorehaven.github.io/quench/crates/quench-desktop-native/) |
+| [`quench-desktop-wayland`](./quench-desktop-wayland/) | A Wayland client on the wire protocol: window, shared-memory frames, pointer input | [📖](https://lorehaven.github.io/quench/crates/quench-desktop-wayland/) |
+| [`quench-desktop-atspi`](./quench-desktop-atspi/) | Screen-reader support on Linux: the D-Bus protocol by hand and the AT-SPI objects | [📖](https://lorehaven.github.io/quench/crates/quench-desktop-atspi/) |
+| [`quench-android`](./quench-android/) | The WebView app that runs a Quench UI bundle on Android, with a plugin bridge | [📖](https://lorehaven.github.io/quench/crates/quench-android/) |
+| [`quench-android-surface`](./quench-android-surface/) | An Android app drawn by the native renderer: the program side, the protocol, the Kotlin host plugin | [📖](https://lorehaven.github.io/quench/crates/quench-android-surface/) |
+
+### Command line and testing
+
+| Crate | Description | Docs |
+| --- | --- | --- |
+| [`quench-cli`](./quench-cli/) | Shared terminal UI styling for CLI tools | [📖](https://lorehaven.github.io/quench/crates/quench-cli/) |
+| [`quench-args`](./quench-args/) | Command-line parsing with clap-compatible derives, no clap | [📖](https://lorehaven.github.io/quench/crates/quench-args/) |
+| [`quench-args-macros`](./quench-args-macros/) | Derive macros for Quench Args (`Parser`, `Args`, `Subcommand`, `ValueEnum`) | [📖](https://lorehaven.github.io/quench/crates/quench-args-macros/) |
+| [`quench-tool`](./quench-tool/) | The `quench` command: new projects, a dev loop with live reload, release builds, doctor | [📖](https://lorehaven.github.io/quench/crates/quench-tool/) |
+| [`quench-test`](./quench-test/) | Test harness with JSON/HTML result pages, command runner, predicates, mock HTTP server | [📖](https://lorehaven.github.io/quench/crates/quench-test/) |
+| [`quench-test-macros`](./quench-test-macros/) | The `#[test]` attribute of Quench Test | [📖](https://lorehaven.github.io/quench/crates/quench-test-macros/) |
+| [`quench-test-bdd`](./quench-test-bdd/) | Gherkin runner with cucumber expressions, async steps, concurrent scenarios, JSON/HTML pages | [📖](https://lorehaven.github.io/quench/crates/quench-test-bdd/) |
+| [`quench-test-bdd-macros`](./quench-test-bdd-macros/) | The step attributes and `World` derive of Quench Test BDD | [📖](https://lorehaven.github.io/quench/crates/quench-test-bdd-macros/) |
+| [`quench-security`](./quench-security/) | The security gate: supply-chain, static and attack suites as one Quench Test report | [📖](https://lorehaven.github.io/quench/crates/quench-security/) |
+
+Most crates have cargo features for the heavier optional parts (TLS, the Postgres backend, the HTTP layer of `quench-auth`, the REPL editor, ...); see each crate's feature table in the [crate reference](https://lorehaven.github.io/quench/crates/).
+
+Quench was split out of [Forge](https://github.com/lorehaven/forge), which remains its primary consumer.
 
 ## Build
 

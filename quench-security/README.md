@@ -13,3 +13,7 @@ failure carries the reason, and conveyor shows it on the repository's scan page 
 
 `target/security/summary.json` + `index.html` are what the nightly pipeline keeps. The scanners themselves
 (`src/lib.rs`) are plain functions with their own always-on tests (`tests/scanners.rs`).
+
+## Documentation
+
+Full documentation: https://lorehaven.github.io/quench/crates/quench-security/
