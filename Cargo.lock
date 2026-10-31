@@ -108,7 +108,7 @@ dependencies = [
 
 [[package]]
 name = "quench-android"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "quench-core",
  "quench-serde",
@@ -118,7 +118,7 @@ dependencies = [
 
 [[package]]
 name = "quench-android-surface"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "quench-css",
  "quench-raster",
@@ -154,7 +154,7 @@ dependencies = [
 
 [[package]]
 name = "quench-auth"
-version = "0.4.17"
+version = "0.4.18"
 dependencies = [
  "quench-cache",
  "quench-client",
@@ -256,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "quench-db"
-version = "0.2.15"
+version = "0.2.16"
 dependencies = [
  "quench-core",
  "quench-crypto",
@@ -290,7 +290,7 @@ dependencies = [
 
 [[package]]
 name = "quench-desktop-atspi"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "quench-test",
  "quench-ui-native",
@@ -298,7 +298,7 @@ dependencies = [
 
 [[package]]
 name = "quench-desktop-native"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "quench-desktop-atspi",
  "quench-desktop-wayland",
@@ -406,7 +406,7 @@ dependencies = [
 
 [[package]]
 name = "quench-fullstack"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "quench-archive",
  "quench-auth",
@@ -464,7 +464,7 @@ dependencies = [
 
 [[package]]
 name = "quench-image"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "quench-archive",
  "quench-test",
@@ -638,7 +638,7 @@ dependencies = [
 
 [[package]]
 name = "quench-starter"
-version = "0.4.20"
+version = "0.4.21"
 dependencies = [
  "quench-auth",
  "quench-cli",
@@ -664,7 +664,7 @@ dependencies = [
 
 [[package]]
 name = "quench-svg"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "quench-css",
  "quench-image",
@@ -771,7 +771,7 @@ dependencies = [
 
 [[package]]
 name = "quench-ui-native"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "quench-core",
  "quench-css",

@@ -1,6 +1,6 @@
 [package]
 name = "quench-image"
-version = "0.1.1"
+version = "0.1.2"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - image decoding with one dependency (quench-archive): PNG, JPEG, GIF and WebP into RGBA, and a PNG encoder"
