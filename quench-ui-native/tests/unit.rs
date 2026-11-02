@@ -1446,8 +1446,6 @@ fn a_cancelled_touch_is_told_to_the_page_and_a_released_drag_is_no_click() {
     assert_eq!(*log.borrow(), ["down", "up"]);
 }
 
-quench_test::main!();
-
 #[quench_test::test]
 fn a_background_image_is_tiled_sized_and_placed_in_the_padding_box() {
     let side = |top_left: [u8; 4], rest: [u8; 4]| {
@@ -2046,3 +2044,127 @@ fn the_caret_of_an_empty_field_stands_where_the_text_will_be() {
         );
     }
 }
+
+#[quench_test::test]
+fn a_mask_shows_the_boxs_colour_only_where_the_picture_is_opaque() {
+    // A 2x2 picture: the top left pixel is opaque, the rest is clear.
+    let mut px = [0u8, 0, 0, 0].repeat(4);
+    px[..4].copy_from_slice(&[0, 0, 0, 255]);
+    let tile = quench_image::encode_png(2, 2, &px);
+    let drawn = |css: &str| {
+        let r = Rc::new(NativeRenderer::new());
+        r.add_image("tile.png", &tile).unwrap();
+        r.add_stylesheet(&format!(
+            "body {{ margin: 0; background: rgb(255, 255, 255) }} div {{ width: 8px; height: 8px; {css} }}"
+        ));
+        r.set_viewport(20.0, 20.0);
+        let _m = mount(&r, &r.root(), div());
+        let mut canvas = Canvas::new(20, 20);
+        r.render(&mut canvas);
+        canvas
+    };
+    let masked = drawn("background: rgb(9, 99, 199); -webkit-mask: url(tile.png) no-repeat");
+    assert_eq!(
+        masked.pixel(0, 0),
+        Color::rgb(9, 99, 199),
+        "where the picture is opaque"
+    );
+    assert_eq!(
+        masked.pixel(1, 1),
+        Color::rgb(255, 255, 255),
+        "where it is clear, the page"
+    );
+    assert_eq!(masked.pixel(5, 5), Color::rgb(255, 255, 255));
+    // The box's colour is the text colour here, as an icon's is.
+    let current = drawn(
+        "color: rgb(200, 0, 0); background: currentColor; mask-image: url(tile.png); background-repeat: no-repeat",
+    );
+    assert_eq!(current.pixel(0, 0), Color::rgb(200, 0, 0));
+    // Without the mask the box is filled.
+    assert_eq!(
+        drawn("background: rgb(9, 99, 199)").pixel(5, 5),
+        Color::rgb(9, 99, 199)
+    );
+}
+
+#[quench_test::test]
+fn a_drawing_in_a_data_url_can_be_a_mask() {
+    let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="black"><path d="M0 0h12v24H0z"/></svg>"#;
+    let escaped = svg
+        .replace('<', "%3C")
+        .replace('>', "%3E")
+        .replace('#', "%23")
+        .replace('"', "'");
+    let r = Rc::new(NativeRenderer::new());
+    r.add_stylesheet(&format!(
+        "body {{ margin: 0; background: rgb(255, 255, 255) }} div {{ width: 24px; height: 24px; background: rgb(0, 128, 0); mask: url(\"data:image/svg+xml,{escaped}\") center/contain no-repeat }}"
+    ));
+    r.set_viewport(40.0, 40.0);
+    let _m = mount(&r, &r.root(), div());
+    let mut canvas = Canvas::new(40, 40);
+    r.render(&mut canvas);
+    assert_eq!(
+        canvas.pixel(4, 12),
+        Color::rgb(0, 128, 0),
+        "inside the shape"
+    );
+    assert_eq!(
+        canvas.pixel(20, 12),
+        Color::rgb(255, 255, 255),
+        "outside it"
+    );
+}
+
+#[quench_test::test]
+fn a_mask_can_come_from_a_custom_property_as_icons_do() {
+    let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="black"><path d="M0 0h12v24H0z"/></svg>"#;
+    let escaped = svg
+        .replace('<', "%3C")
+        .replace('>', "%3E")
+        .replace('#', "%23")
+        .replace('"', "'");
+    let r = Rc::new(NativeRenderer::new());
+    r.add_stylesheet(&format!(
+        "body {{ margin: 0; background: rgb(255, 255, 255) }} .ico {{ display: inline-block; width: 1.15em; height: 1.15em; background: currentColor; -webkit-mask: var(--i) center/contain no-repeat; mask: var(--i) center/contain no-repeat }} .a {{ --i: url(\"data:image/svg+xml,{escaped}\") }} .big {{ width: 24px; height: 24px; color: rgb(0, 128, 0) }}"
+    ));
+    r.set_viewport(40.0, 40.0);
+    let _m = mount(&r, &r.root(), span().class("ico a big"));
+    let mut canvas = Canvas::new(40, 40);
+    r.render(&mut canvas);
+    assert_eq!(
+        canvas.pixel(4, 12),
+        Color::rgb(0, 128, 0),
+        "inside the shape"
+    );
+    assert_eq!(
+        canvas.pixel(20, 12),
+        Color::rgb(255, 255, 255),
+        "outside it"
+    );
+}
+
+#[quench_test::test]
+fn a_box_with_an_aspect_ratio_and_no_height_is_as_tall_as_its_width_allows() {
+    let r = Rc::new(NativeRenderer::new());
+    r.add_stylesheet("body { margin: 0 } div { width: 60px; aspect-ratio: 2; background: rgb(0, 128, 0) } .tall { height: 40px }");
+    r.set_viewport(100.0, 100.0);
+    let _m = mount(&r, &r.root(), div());
+    let mut canvas = Canvas::new(100, 100);
+    r.render(&mut canvas);
+    assert_eq!(
+        canvas.pixel(30, 29),
+        Color::rgb(0, 128, 0),
+        "60 wide, so 30 tall"
+    );
+    assert_ne!(canvas.pixel(30, 31), Color::rgb(0, 128, 0));
+    // A height that is set wins.
+    let r = Rc::new(NativeRenderer::new());
+    r.add_stylesheet("body { margin: 0 } div { width: 60px; height: 40px; aspect-ratio: 2; background: rgb(0, 128, 0) }");
+    r.set_viewport(100.0, 100.0);
+    let _m = mount(&r, &r.root(), div());
+    let mut canvas = Canvas::new(100, 100);
+    r.render(&mut canvas);
+    assert_eq!(canvas.pixel(30, 39), Color::rgb(0, 128, 0));
+}
+
+quench_test::main!();

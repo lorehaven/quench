@@ -262,7 +262,8 @@ impl Painter<'_> {
                 canvas.shadow_rrect(grown, rr, s.blur, to_raster(style.resolve(s.color)), None);
             }
             let bg = style.resolve(style.background);
-            if bg.a > 0 {
+            // A masked box is its colour seen through its picture: the picture comes already tinted, as a decoration.
+            if bg.a > 0 && style.mask_image.is_none() {
                 canvas.fill_rrect(rect, r, to_raster(bg));
             }
             let padding = (

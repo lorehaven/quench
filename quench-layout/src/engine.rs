@@ -280,6 +280,11 @@ impl Engine<'_> {
                 Some(content_w * h / w)
             }
             (None, _, Some((_, h))) => Some(h),
+            // A box with a ratio and no height is as tall as its width allows.
+            (None, None, None) => style
+                .aspect_ratio
+                .filter(|r| *r > 0.0 && content_w.is_finite())
+                .map(|r| content_w / r),
             _ => None,
         };
 

@@ -335,6 +335,10 @@ pub struct ComputedStyle {
     pub background_repeat: bool,
     /// Where the image sits in its box, as fractions of the free space: `(0.5, 0.5)` is `center`.
     pub background_position: (f32, f32),
+    /// The `url()` of `mask-image` (or the `mask` shorthand): the background colour shows only where the picture is opaque
+    /// (an icon drawn as a shape and painted in the text colour). The mask is sized, placed and tiled with the
+    /// `background-*` fields, which the `mask` shorthand sets as `background` does.
+    pub mask_image: Option<String>,
     pub display: Display,
     pub position: Position,
     pub inset: [Option<Length>; 4],
@@ -359,6 +363,8 @@ pub struct ComputedStyle {
     pub outline_offset: f32,
     pub background: ColorValue,
     pub opacity: f32,
+    /// `aspect-ratio` (width over height): a box whose height is not set is as tall as its width allows.
+    pub aspect_ratio: Option<f32>,
     pub shadows: Vec<Shadow>,
     pub overflow: (Overflow, Overflow),
     pub flex_direction: FlexDirection,
@@ -430,10 +436,12 @@ impl Default for ComputedStyle {
             grid_column: (GridLine::Auto, GridLine::Auto),
             grid_row: (GridLine::Auto, GridLine::Auto),
             background_image: None,
+            mask_image: None,
             background_size: BackgroundSize::Auto,
             background_repeat: true,
             background_position: (0.0, 0.0),
             opacity: 1.0,
+            aspect_ratio: None,
             shadows: Vec::new(),
             overflow: (Overflow::Visible, Overflow::Visible),
             flex_direction: FlexDirection::Row,
@@ -1579,6 +1587,18 @@ fn try_apply(
             }
         }
         "background-image" => style.background_image = values.iter().find_map(url_of),
+        "mask" | "-webkit-mask" => {
+            style.mask_image = values.iter().find_map(url_of);
+            if style.mask_image.is_some() {
+                style.background_size = BackgroundSize::Auto;
+                style.background_repeat = true;
+                style.background_position = (0.0, 0.0);
+                for v in values {
+                    background_word(style, v);
+                }
+            }
+        }
+        "mask-image" | "-webkit-mask-image" => style.mask_image = values.iter().find_map(url_of),
         "background-size" => {
             style.background_size = match word.as_deref()? {
                 "cover" => BackgroundSize::Cover,
@@ -1629,6 +1649,19 @@ fn try_apply(
                 }
             }
             style.background_position = position;
+        }
+        "aspect-ratio" => {
+            // `1`, `16 / 9`, or `auto`.
+            let number = |v: Option<&Value>| match v {
+                Some(Value::Number(n)) if *n > 0.0 => Some(*n),
+                _ => None,
+            };
+            style.aspect_ratio = match values {
+                [Value::Ident(a)] if a.eq_ignore_ascii_case("auto") => None,
+                [n] => Some(number(Some(n))?),
+                [w, Value::Delim('/'), h] => Some(number(Some(w))? / number(Some(h))?),
+                _ => return None,
+            };
         }
         "opacity" => {
             style.opacity = match one()? {

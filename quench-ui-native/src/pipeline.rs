@@ -342,6 +342,39 @@ fn build(
     }
 }
 
+/// The address a masked box's tinted picture is kept under: the mask's, and the colour it is painted in.
+fn tinted_key(url: &str, color: Css) -> String {
+    format!("{url}\u{0}{},{},{},{}", color.r, color.g, color.b, color.a)
+}
+
+/// The boxes that have a mask: the key, the mask's address, the colour it is painted in.
+fn collect_masks(b: &LayoutBox, out: &mut Vec<(usize, String, Css)>) {
+    if let Some(url) = &b.style.mask_image {
+        out.push((b.key, url.clone(), b.style.resolve(b.style.background)));
+    }
+    for child in &b.children {
+        collect_masks(child, out);
+    }
+}
+
+/// `picture` seen through as a mask: its shape in `color` (straight alpha: the picture's, times the colour's).
+fn tinted(picture: &crate::dom::Picture, color: Css) -> crate::dom::Picture {
+    let mut rgba = Vec::with_capacity(picture.rgba.len());
+    for px in picture.rgba.as_chunks::<4>().0 {
+        let alpha = (u32::from(px[3]) * u32::from(color.a) + 127) / 255;
+        rgba.extend_from_slice(&[
+            color.r,
+            color.g,
+            color.b,
+            u8::try_from(alpha).unwrap_or(255),
+        ]);
+    }
+    crate::dom::Picture {
+        rgba: Rc::new(rgba),
+        ..picture.clone()
+    }
+}
+
 /// The boxes that have a `background-image`, by key.
 fn collect_backgrounds(b: &LayoutBox, out: &mut Vec<(usize, String)>) {
     if let Some(url) = &b.style.background_image {
@@ -558,6 +591,25 @@ impl NativeRenderer {
         let mut backgrounds: Vec<(usize, String)> = Vec::new();
         collect_backgrounds(&boxes, &mut backgrounds);
         self.load_images(backgrounds.iter().map(|(_, url)| url.clone()).collect());
+        // The pictures that boxes use as a `mask`, in the colour of the box.
+        let mut masks: Vec<(usize, String, Css)> = Vec::new();
+        collect_masks(&boxes, &mut masks);
+        self.load_images(masks.iter().map(|(_, url, _)| url.clone()).collect());
+        {
+            let mut dom = self.dom.borrow_mut();
+            for (_, url, color) in &masks {
+                let key = tinted_key(url, *color);
+                if dom.images.contains_key(&key) {
+                    continue;
+                }
+                let made = dom
+                    .images
+                    .get(url)
+                    .and_then(Option::as_ref)
+                    .map(|p| tinted(p, *color));
+                dom.images.insert(key, made);
+            }
+        }
         // The page background is the root's, or else the body's, and it fills the whole canvas.
         let page = [Some(&*boxes), boxes.children.first()]
             .into_iter()
@@ -587,6 +639,20 @@ impl NativeRenderer {
             }
             if let Some((_, url)) = backgrounds.iter().find(|(k, _)| *k == key)
                 && let Some(Some(image)) = dom.images.get(url)
+                && let Some(b) = box_of(&boxes, key)
+            {
+                out.push(Decoration::Background {
+                    rgba: Rc::clone(&image.rgba),
+                    width: image.width,
+                    height: image.height,
+                    size: b.style.background_size,
+                    repeat: b.style.background_repeat,
+                    position: b.style.background_position,
+                    scale: dom.zoom / image.scale,
+                });
+            }
+            if let Some((_, url, color)) = masks.iter().find(|(k, _, _)| *k == key)
+                && let Some(Some(image)) = dom.images.get(&tinted_key(url, *color))
                 && let Some(b) = box_of(&boxes, key)
             {
                 out.push(Decoration::Background {

@@ -1964,4 +1964,45 @@ fn touch_action_says_which_finger_movements_the_platform_may_take() {
     assert_eq!(of("touch-action: sideways"), TouchAction::AUTO);
 }
 
+#[quench_test::test]
+fn a_mask_keeps_its_address_and_is_sized_and_placed_like_a_background() {
+    let s = style(
+        "p { background: #123; -webkit-mask: url(icon.svg) center/contain no-repeat }",
+        3,
+    );
+    assert_eq!(s.mask_image.as_deref(), Some("icon.svg"));
+    assert_eq!(s.background_size, BackgroundSize::Contain);
+    assert!(!s.background_repeat);
+    assert_eq!(s.background_position, (0.5, 0.5));
+    assert_eq!(s.background_image, None, "the mask is not a background");
+    let s = style(
+        "p { mask-image: url('b.png') } p { -webkit-mask-image: url('c.png') }",
+        3,
+    );
+    assert_eq!(s.mask_image.as_deref(), Some("c.png"));
+    // `none` is no mask.
+    assert_eq!(
+        style("p { mask: url(a.png); mask: none }", 3).mask_image,
+        None
+    );
+}
+
+#[quench_test::test]
+fn an_aspect_ratio_is_a_number_or_two_and_auto_clears_it() {
+    assert_eq!(style("p { aspect-ratio: 1 }", 3).aspect_ratio, Some(1.0));
+    assert_eq!(
+        style("p { aspect-ratio: 16 / 9 }", 3).aspect_ratio,
+        Some(16.0 / 9.0)
+    );
+    assert_eq!(
+        style("p { aspect-ratio: 2; aspect-ratio: auto }", 3).aspect_ratio,
+        None
+    );
+    assert_eq!(
+        style("p { aspect-ratio: 2; aspect-ratio: banana }", 3).aspect_ratio,
+        Some(2.0)
+    );
+    assert_eq!(style("p { aspect-ratio: 0 }", 3).aspect_ratio, None);
+}
+
 quench_test::main!();
