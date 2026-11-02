@@ -5,13 +5,20 @@
 //! TTL, revocation is a delete, and there is nothing to sweep. Refresh-token
 //! rotation is a single atomic take, so a replayed token cannot win a race.
 //!
-//! Four keys per session:
+//! A session may belong to a *client* (an installed app: `daybook-android`): a user holds one session per client,
+//! a new sign-in from the same client replaces the old one, and its refresh token is long-lived - it is only
+//! replaced once it is older than the caller's `rotate_after` (see [`SessionDb::rotate_with`]), and every use
+//! slides its expiry forward. This is what lets an app stay signed in for months without a lost response ever
+//! costing it its session.
+//!
+//! Keys per session:
 //!
 //! ```text
 //! session:{sid}         -> { username, refresh_hash }   TTL = refresh lifetime
 //! refresh:{token_hash}  -> sid                          TTL = refresh lifetime
 //! user:{username}       -> set of sids                  TTL = refresh lifetime
 //! reuse:{old_hash}      -> { sid, username, token }      TTL = grace window
+//! client:{user}:{name}  -> sid                          TTL = refresh lifetime (client sessions only)
 //! ```
 //!
 //! The third is an index, and the only key that is not reachable from a token.
@@ -58,6 +65,23 @@ pub struct Session {
 /// this module's own doc comment for why this exists at all.
 const REUSE_GRACE_SECS: u64 = 30;
 
+/// A live session found by its refresh token, and how long it lives from this use.
+struct Held {
+    id: String,
+    username: String,
+    client: Option<String>,
+    ttl: u64,
+}
+
+impl Held {
+    fn session(&self) -> Session {
+        Session {
+            id: self.id.clone(),
+            username: self.username.clone(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct SessionDb {
     store: CacheStore,
@@ -95,6 +119,10 @@ impl SessionDb {
         format!("reuse:{old_hash}")
     }
 
+    fn client_key(username: &str, client: &str) -> String {
+        format!("client:{username}:{client}")
+    }
+
     fn user_key(username: &str) -> String {
         format!("user:{username}")
     }
@@ -102,6 +130,42 @@ impl SessionDb {
     pub async fn create(
         &self,
         username: &str,
+        ttl_secs: i64,
+    ) -> quench_core::Result<(Session, String)> {
+        self.create_inner(username, None, ttl_secs).await
+    }
+
+    /// A session for an installed app. The user's earlier session of the same `client`, if any, ends: one per app.
+    pub async fn create_for_client(
+        &self,
+        username: &str,
+        client: &str,
+        ttl_secs: i64,
+    ) -> quench_core::Result<(Session, String)> {
+        let key = Self::client_key(username, client);
+        if let Some(old) = self
+            .store
+            .get(&key)
+            .await?
+            .and_then(|v| v.as_str().map(str::to_string))
+        {
+            self.revoke(&old, username).await?;
+        }
+        let created = self.create_inner(username, Some(client), ttl_secs).await?;
+        self.store
+            .set(
+                &key,
+                json!(&created.0.id),
+                Some(ttl_secs.max(1).cast_unsigned()),
+            )
+            .await?;
+        Ok(created)
+    }
+
+    async fn create_inner(
+        &self,
+        username: &str,
+        client: Option<&str>,
         ttl_secs: i64,
     ) -> quench_core::Result<(Session, String)> {
         let refresh_token = new_refresh_token();
@@ -115,7 +179,12 @@ impl SessionDb {
         self.store
             .set(
                 &Self::session_key(&session.id),
-                json!({ "username": username, "refresh_hash": refresh_hash }),
+                json!({
+                    "username": username,
+                    "refresh_hash": refresh_hash,
+                    "client": client,
+                    "rotated_at": now_secs(),
+                }),
                 Some(ttl),
             )
             .await?;
@@ -147,6 +216,19 @@ impl SessionDb {
         refresh_token: &str,
         ttl_secs: i64,
     ) -> quench_core::Result<Option<(Session, String)>> {
+        self.rotate_with(refresh_token, ttl_secs, ttl_secs, 0).await
+    }
+
+    /// Like [`rotate`](Self::rotate), but a *client* session's token younger than `rotate_after_secs` is kept as it
+    /// is: only the expiry slides forward and the same token is returned. Sessions without a client always rotate
+    /// and live `ttl_secs`; a client's live `client_ttl_secs` from each use.
+    pub async fn rotate_with(
+        &self,
+        refresh_token: &str,
+        ttl_secs: i64,
+        client_ttl_secs: i64,
+        rotate_after_secs: u64,
+    ) -> quench_core::Result<Option<(Session, String)>> {
         let old_hash = hash_refresh_token(refresh_token);
         let Some(session_id) = self.store.take(&Self::refresh_key(&old_hash)).await? else {
             return self.rotate_from_reuse(&old_hash).await;
@@ -167,51 +249,113 @@ impl SessionDb {
             return Ok(None);
         };
 
+        let client = record
+            .get("client")
+            .and_then(|v| v.as_str())
+            .map(str::to_string);
+        let ttl = if client.is_some() {
+            client_ttl_secs
+        } else {
+            ttl_secs
+        }
+        .max(1)
+        .cast_unsigned();
+        let rotated_at = record
+            .get("rotated_at")
+            .and_then(quench_serde::Value::as_u64)
+            .unwrap_or(0);
+        let held = Held {
+            id: session_id,
+            username,
+            client,
+            ttl,
+        };
+
+        if held.client.is_some() && now_secs().saturating_sub(rotated_at) < rotate_after_secs {
+            // Still young: the same token goes on, with its life extended.
+            self.extend(&held, &old_hash, &record).await?;
+            return Ok(Some((held.session(), refresh_token.to_string())));
+        }
+        let next_token = self.replace(&held, &old_hash).await?;
+        Ok(Some((held.session(), next_token)))
+    }
+
+    /// Keeps the token and its session, with their lifetime renewed.
+    async fn extend(
+        &self,
+        held: &Held,
+        hash: &str,
+        record: &quench_serde::Value,
+    ) -> quench_core::Result<()> {
+        let ttl = Some(held.ttl);
+        self.store
+            .set(&Self::refresh_key(hash), json!(&held.id), ttl)
+            .await?;
+        self.store
+            .set(&Self::session_key(&held.id), record.clone(), ttl)
+            .await?;
+        self.store
+            .add_to_set(&Self::user_key(&held.username), &held.id, ttl)
+            .await?;
+        self.keep_client_slot(held).await
+    }
+
+    /// Replaces the consumed token `old_hash` with a new one, leaving the recovery entry behind. Returns the token.
+    async fn replace(&self, held: &Held, old_hash: &str) -> quench_core::Result<String> {
+        let ttl = Some(held.ttl);
         let next_token = new_refresh_token();
         let next_hash = hash_refresh_token(&next_token);
-        let ttl = ttl_secs.max(1).cast_unsigned();
 
         self.store
             .set(
-                &Self::session_key(&session_id),
-                json!({ "username": username, "refresh_hash": next_hash }),
-                Some(ttl),
+                &Self::session_key(&held.id),
+                json!({
+                    "username": held.username,
+                    "refresh_hash": next_hash,
+                    "client": held.client,
+                    "rotated_at": now_secs(),
+                }),
+                ttl,
             )
             .await?;
+        self.keep_client_slot(held).await?;
         self.store
-            .set(
-                &Self::refresh_key(&next_hash),
-                json!(&session_id),
-                Some(ttl),
-            )
+            .set(&Self::refresh_key(&next_hash), json!(&held.id), ttl)
             .await?;
         // The session keys just had their lifetime extended; the index has to
         // follow or it expires first and the session becomes unrevokable.
         // `add_to_set` is idempotent, so re-adding is how the TTL is refreshed.
         self.store
-            .add_to_set(&Self::user_key(&username), &session_id, Some(ttl))
+            .add_to_set(&Self::user_key(&held.username), &held.id, ttl)
             .await?;
         // The recovery path for whoever asks again with `refresh_token` before
         // finding out this already happened - see `rotate_from_reuse`.
         self.store
             .set(
-                &Self::reuse_key(&old_hash),
+                &Self::reuse_key(old_hash),
                 json!({
-                    "session_id": session_id,
-                    "username": username,
+                    "session_id": held.id,
+                    "username": held.username,
                     "refresh_token": next_token,
                 }),
                 Some(REUSE_GRACE_SECS),
             )
             .await?;
+        Ok(next_token)
+    }
 
-        Ok(Some((
-            Session {
-                id: session_id,
-                username,
-            },
-            next_token,
-        )))
+    /// A client's session is found by `client:{user}:{name}`; its lifetime follows the session's.
+    async fn keep_client_slot(&self, held: &Held) -> quench_core::Result<()> {
+        if let Some(client) = &held.client {
+            self.store
+                .set(
+                    &Self::client_key(&held.username, client),
+                    json!(&held.id),
+                    Some(held.ttl),
+                )
+                .await?;
+        }
+        Ok(())
     }
 
     /// The recovery path for a refresh token that `rotate` just found already
@@ -256,7 +400,7 @@ impl SessionDb {
             return Ok(false);
         };
         if let Some(id) = session_id.as_str() {
-            // Read the owner before dropping the record, or the index entry
+            // Read the owner before dropping the record, or the index entries
             // cannot be found to remove.
             let username = self
                 .store
@@ -268,11 +412,11 @@ impl SessionDb {
                         .and_then(|value| value.as_str())
                         .map(str::to_string)
                 });
-            self.store.remove(&Self::session_key(id)).await?;
-            if let Some(username) = username {
-                self.store
-                    .remove_from_set(&Self::user_key(&username), id)
-                    .await?;
+            match username {
+                Some(username) => {
+                    self.revoke(id, &username).await?;
+                }
+                None => self.store.remove(&Self::session_key(id)).await?,
             }
             quench_log::info!("revoked session {id}");
         }
@@ -295,6 +439,11 @@ impl SessionDb {
 
         if let Some(hash) = record.get("refresh_hash").and_then(|v| v.as_str()) {
             self.store.remove(&Self::refresh_key(hash)).await?;
+        }
+        if let Some(client) = record.get("client").and_then(|v| v.as_str()) {
+            self.store
+                .remove(&Self::client_key(username, client))
+                .await?;
         }
         self.store.remove(&Self::session_key(id)).await?;
         self.store
@@ -353,6 +502,12 @@ impl SessionDb {
         };
         Ok(record.get("username").and_then(|v| v.as_str()) == Some(username))
     }
+}
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
 }
 
 fn new_refresh_token() -> String {

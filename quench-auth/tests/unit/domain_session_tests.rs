@@ -149,3 +149,98 @@ async fn a_logout_clears_its_index_entry_too() {
         "a logged-out session left in the index would be reported as live"
     );
 }
+
+#[quench_test::test]
+async fn a_client_holds_one_session_and_a_new_sign_in_replaces_it() {
+    let sessions = sessions();
+    let (first, old) = sessions
+        .create_for_client("user", "app", 3600)
+        .await
+        .unwrap();
+    let (second, _) = sessions
+        .create_for_client("user", "app", 3600)
+        .await
+        .unwrap();
+    let (other, _) = sessions
+        .create_for_client("user", "other", 3600)
+        .await
+        .unwrap();
+
+    assert!(!sessions.is_active(&first.id, "user").await.unwrap());
+    assert!(sessions.rotate(&old, 3600).await.unwrap().is_none());
+    assert!(sessions.is_active(&second.id, "user").await.unwrap());
+    assert!(sessions.is_active(&other.id, "user").await.unwrap());
+}
+
+#[quench_test::test]
+async fn a_young_client_token_is_kept_and_an_old_one_is_replaced() {
+    let sessions = sessions();
+    let (_, token) = sessions
+        .create_for_client("user", "app", 3600)
+        .await
+        .unwrap();
+
+    let (_, same) = sessions
+        .rotate_with(&token, 3600, 3600, 3600)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        same, token,
+        "younger than the limit: the same token goes on"
+    );
+    let (_, again) = sessions
+        .rotate_with(&token, 3600, 3600, 3600)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(again, token, "and it keeps working");
+
+    let (_, next) = sessions
+        .rotate_with(&token, 3600, 3600, 0)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_ne!(next, token, "older than the limit: replaced");
+    assert!(
+        sessions
+            .rotate_with(&next, 3600, 3600, 3600)
+            .await
+            .unwrap()
+            .is_some()
+    );
+}
+
+#[quench_test::test]
+async fn sessions_without_a_client_always_rotate() {
+    let sessions = sessions();
+    let (_, token) = sessions.create("user", 3600).await.unwrap();
+    let (_, next) = sessions
+        .rotate_with(&token, 3600, 3600, 3600)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_ne!(next, token);
+}
+
+#[quench_test::test]
+async fn revoking_a_client_session_frees_its_slot() {
+    let sessions = sessions();
+    let (session, token) = sessions
+        .create_for_client("user", "app", 3600)
+        .await
+        .unwrap();
+    assert!(sessions.revoke(&session.id, "user").await.unwrap());
+    assert!(
+        sessions
+            .rotate_with(&token, 3600, 3600, 3600)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let (again, _) = sessions
+        .create_for_client("user", "app", 3600)
+        .await
+        .unwrap();
+    assert!(sessions.is_active(&again.id, "user").await.unwrap());
+}
