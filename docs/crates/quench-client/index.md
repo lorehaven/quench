@@ -11,7 +11,7 @@ permalink: /crates/quench-client/
 | | |
 |---|---|
 | Crate / library name | `quench-client` / `quench_client` |
-| Version | 0.2.17 |
+| Version | 0.2.18 |
 | Edition | 2024 (workspace) |
 | Custom test harness | `harness = false` |
 | Unsafe code | none |

@@ -8,7 +8,7 @@ permalink: /crates/quench-fullstack/
 
 `quench-fullstack` (library `quench_fullstack`) serves `quench-ui` apps from `quench-http` and lets them call server code. The page is rendered on the server from the same components the browser runs, the browser hydrates it (`quench-ui-web`), and everything goes out with content-hashed asset names and a strict Content-Security-Policy. A function marked `#[server]` (from `quench-fullstack-macros`, re-exported here) is an ordinary `async fn` to the code that calls it, in the browser or on the server. Sessions work by cookie in the browser and by bearer token in a native shell.
 
-* Version: `0.1.7` (`quench-fullstack/Cargo.toml`). Library name `quench_fullstack`; `[lib] harness = false`.
+* Version: `0.1.10` (`quench-fullstack/Cargo.toml`). Library name `quench_fullstack`; `[lib] harness = false`.
 * No `[features]` table. The split is by target: the crate builds for `wasm32` and for native targets, and the server half is `#[cfg(not(target_arch = "wasm32"))]`.
 
 ## Install

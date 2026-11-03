@@ -13,12 +13,12 @@ How to get the workspace, what is in it, and how to use your first crate. Everyt
 
 ## Workspace layout
 
-The root `Cargo.toml` is a Cargo workspace (`resolver = "2"`) with 61 member crates, all named `quench-*`, plus `examples/*`.
+The root `Cargo.toml` is a Cargo workspace (`resolver = "2"`) with 62 member crates, all named `quench-*`, plus `examples/*`.
 
 | Path | Content |
 |---|---|
 | `quench-<name>/` | one crate each; library name `quench_<name>`; `-macros` directories are proc-macro crates |
-| `examples/` | `basic`, `db_example`, `forge_service_demo`, `http_demo`, `native_gallery`, `native_window`, `ui_web_app`, `ui_web_server` (each a workspace member; their package names start with `quench-example-`, except `quench-db-example`) |
+| `examples/` | `basic`, `db_example`, `forge_service_demo`, `http_demo`, `native_gallery`, `native_window`, `tutorial_app`, `tutorial_server`, `ui_web_app`, `ui_web_server` (each a workspace member; their package names start with `quench-example-`, except `quench-db-example`) |
 | `docs/` | this book |
 | `scripts/` | `security.fish`, `deps.fish`, `features.fish`, `coverage.fish`, `test-env.fish`, `prune-deny.py`, `unsafe-allowlist.txt` and the Android/Linux end-to-end helpers |
 | `fuzz/` | the libFuzzer targets (a separate workspace) |
@@ -96,6 +96,7 @@ The program was built and run as a scratch crate with path dependencies on these
 
 ## Next
 
+* [Tutorial: your first app](tutorial.md): a full-stack app, step by step.
 * [Architecture](architecture.md): which crates depend on which.
 * [Conventions](conventions.md) and [Dependency policy](dependency-policy.md).
 * The per-crate reference: [Crates](../crates/index.md), starting with [quench-core](../crates/quench-core/index.md), [quench-serde](../crates/quench-serde/index.md) and [quench-log](../crates/quench-log/index.md).

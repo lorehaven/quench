@@ -8,7 +8,7 @@ permalink: /crates/quench-style/
 
 `quench-style` (crate `quench_style`) holds everything about how Quench front ends look: a tiny CSS rule builder (`CssRule`), four colour themes, design tokens (spacing, radii, type, elevation, motion, target sizes), the shared base stylesheet of the application shell, mobile and desktop layers, a component stylesheet for the `quench-ui` kit, and a Fluent (`.ftl`) translation bundle generator. A server-rendered page ([quench-web](../quench-web/index.md)), the WASM UI ([quench-ui](../quench-ui/index.md)) and a WebView on mobile or desktop all read the same output.
 
-* Version: `0.1.2`. Edition 2024. No features. `unsafe_code = "deny"`; none present.
+* Version: `0.1.3`. Edition 2024. No features. `unsafe_code = "deny"`; none present.
 * The "style engine" is data plus a string renderer: no parsing, no cascade (that is [quench-css](../quench-css/index.md)). `CssRule::render` emits **CSS Nesting** (child rules are written inside their parent, `&` for the parent selector), which modern browsers and `quench-css` read.
 * Builds for `wasm32-unknown-unknown`. The functions in `i18n` and `assets` use `std::fs` and fail at run time on that target: call them from the server or build tool only.
 

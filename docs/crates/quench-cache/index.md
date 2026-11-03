@@ -10,7 +10,7 @@ permalink: /crates/quench-cache/
 
 | | |
 |---|---|
-| Version | `0.1.20` |
+| Version | `0.1.21` |
 | Edition | `2024` (workspace) |
 | MSRV | not declared |
 | Async | `CacheStore` methods are `async`; `DataCache` and `RequestCache` are synchronous |

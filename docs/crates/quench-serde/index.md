@@ -10,7 +10,7 @@ permalink: /crates/quench-serde/
 
 | | |
 |---|---|
-| Version | 0.1.7 |
+| Version | 0.1.8 |
 | Edition | 2024 (workspace) |
 | Test harness | `harness = false`, `quench_test::main!()` |
 | Builds for `wasm32-unknown-unknown` | yes (it depends only on `quench-core` and the derive crate) |

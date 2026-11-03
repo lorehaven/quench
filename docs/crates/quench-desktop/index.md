@@ -8,7 +8,7 @@ permalink: /crates/quench-desktop/
 
 `quench-desktop` is the Linux desktop host for a Quench UI bundle: a GTK 3 window around webkit2gtk 4.1 that serves the app's assets from its own origin (`quench://app/`) and carries the same plugin bridge the Android host has. It replaces Electron and Tauri for Quench apps. The generated `desktop/` crate (`quench linux init`) is a few lines around it.
 
-Version: **0.1.0**. Edition 2024 (workspace). Linux only (`#![cfg(target_os = "linux")]`).
+Version: **0.1.1**. Edition 2024 (workspace). Linux only (`#![cfg(target_os = "linux")]`).
 
 The parts that need no GTK are always built: the bundle and its routing, the bridge, the plugins, the origin rules. The window itself (`ffi`, `host`, the control socket) needs the `window` feature and, to link, the system libraries `gtk-3` and `webkit2gtk-4.1`.
 
@@ -18,7 +18,7 @@ The parts that need no GTK are always built: the bundle and its routing, the bri
 
 ```toml
 [dependencies]
-quench-desktop = { version = "0.1.0", registry = "ennor", features = ["window"] }
+quench-desktop = { version = "0.1.1", registry = "ennor", features = ["window"] }
 ```
 
 ## Features

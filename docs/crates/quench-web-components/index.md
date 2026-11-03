@@ -11,7 +11,7 @@ permalink: /crates/quench-web-components/
 | | |
 |---|---|
 | Crate / library name | `quench-web-components` / `quench_web_components` |
-| Version | 0.1.20 |
+| Version | 0.1.21 |
 | Edition | 2024 (workspace) |
 | Unsafe code | none |
 

@@ -10,7 +10,7 @@ permalink: /crates/quench-proto/
 
 > **Not Protocol Buffers.** Despite its name this crate has nothing to do with protobuf; "proto" is the HTTP *protocol* layer. There is no protobuf code anywhere in it.
 
-* Version: `0.1.10`. Edition 2024. No `unsafe` code (`unsafe_code = "deny"`; none present).
+* Version: `0.1.11`. Edition 2024. No `unsafe` code (`unsafe_code = "deny"`; none present).
 * **HTTP/1.1 only.** HTTP/2 and HTTP/3 are not implemented; `Version::HTTP_2` and `HTTP_3` exist as values only. TLS is normally terminated at the ingress; the `tls` feature re-exports `quench-tls` for services that terminate it themselves.
 * Parsing is *strict*: anything that could make two parsers disagree about where a message ends is rejected (request-smuggling defence). See [Internals](internals.md).
 * Async runtime: `tokio` (only the `io-util`, `net`, `sync`, `time` features). The drivers are generic over [`io::Io`](api.md#io).

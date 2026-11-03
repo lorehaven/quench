@@ -12,7 +12,7 @@ nav_order: 4
 
 | | |
 |---|---|
-| Version | 0.1.2 |
+| Version | 0.1.3 |
 | Edition | 2024 (workspace; no `rust-version` is declared; the sources use let-chains, so a toolchain that supports edition 2024 is needed) |
 | License | MIT |
 | Test harness | `harness = false` in `[lib]`; the unit tests run through `quench_test::main!()` (see [testing](testing.md)) |
@@ -22,7 +22,7 @@ nav_order: 4
 
 ```toml
 [dependencies]
-quench-args = { version = "0.1.2", registry = "ennor" }
+quench-args = { version = "0.1.3", registry = "ennor" }
 ```
 
 Inside the workspace: `quench-args = { workspace = true }`.

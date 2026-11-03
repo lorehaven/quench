@@ -8,7 +8,7 @@ permalink: /crates/quench-http/
 
 `quench-http` (library name `quench_http`) is Quench's HTTP server framework: a router, extractors, middleware, a dependency-injection container, WebSocket and server-sent-event helpers, and an HTTP/1.1 server loop with graceful shutdown. Routes and components are registered by attribute macros (`#[get]`, `#[injectable]`, ...) and discovered at link time, so there is no registration list to maintain. It replaces `actix-web` (`Service`/`Transform` boilerplate, `.service(handler)` lists) in the estate. The protocol layer underneath is `quench-proto` (not a dependency you call directly: `quench_http::http` re-exports it).
 
-* Version: `0.1.15` (`quench-http/Cargo.toml`). Edition and license come from the workspace.
+* Version: `0.1.16` (`quench-http/Cargo.toml`). Edition and license come from the workspace.
 * Companion crate: `quench-http-macros` `0.1.3` (see [quench-http-macros](../quench-http-macros/index.md)). The macros are re-exported from `quench_http::prelude`.
 * `autotests = false`, `[lib] harness = false`: all test targets are listed explicitly and use the `quench-test` harness.
 
@@ -20,7 +20,7 @@ quench-http = { registry = "ennor", version = "0.1" }
 tokio = { version = "1", features = ["full"] }
 ```
 
-Inside this workspace the dependency is declared as `quench-http = { path = "quench-http", registry = "ennor", version = "0.1.0", default-features = false }` (root `Cargo.toml`), so a workspace member that writes `quench-http = { workspace = true }` gets **no** `tls` feature unless it adds `features = ["tls"]`.
+Inside this workspace the dependency is declared as `quench-http = { path = "quench-http", registry = "ennor", version = "0.1.16", default-features = false }` (root `Cargo.toml`), so a workspace member that writes `quench-http = { workspace = true }` gets **no** `tls` feature unless it adds `features = ["tls"]`.
 
 ## Features
 

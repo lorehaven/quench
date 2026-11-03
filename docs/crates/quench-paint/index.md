@@ -7,7 +7,7 @@ has_children: true
 
 `quench-paint` (crate `quench_paint`) paints a laid-out box tree ([quench-layout](../quench-layout/index.md) `LayoutBox`) into a [quench-raster](../quench-raster/index.md) `Canvas`: shadows, backgrounds, borders with radii and dashes, inset shadows, overflow clipping, text, outlines, opacity (through a layer), `translate`/`rotate`/`scale`, scroll bars, and host-supplied decorations (check marks, images, carets).
 
-* Version: 0.1.5. Edition 2024. No features. No `rust-version`.
+* Version: 0.1.7. Edition 2024. No features. No `rust-version`.
 * Dependencies: `quench-css` (computed style types), `quench-layout` (the box tree, `Fonts`), `quench-raster` (the canvas). Dev: `quench-test`.
 
 ```toml

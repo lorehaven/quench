@@ -1,0 +1,35 @@
+[package]
+name = "quench-example-tutorial-app"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - the tutorial app: a shared pantry list (shared crate, browser entry)"
+keywords = ["development", "tools"]
+categories = ["development-tools"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "quench_example_tutorial_app"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+quench-fullstack = { workspace = true }
+quench-serde = { workspace = true }
+quench-ui = { workspace = true }
+quench-ui-web = { workspace = true }
+
+[dev-dependencies]
+quench-test = { workspace = true }
+tokio = { workspace = true }
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false
+
+[lints]
+workspace = true

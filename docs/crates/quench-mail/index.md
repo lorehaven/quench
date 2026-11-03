@@ -8,7 +8,7 @@ permalink: /crates/quench-mail/
 
 `quench-mail` (library `quench_mail`) builds an email message and submits it to an authenticated SMTP server over TLS or STARTTLS. It exists so a service can send a verification or password-reset mail without a general-purpose mail stack. It does two things: compose a message, and deliver it.
 
-* Version: `0.1.12` (`quench-mail/Cargo.toml`). Edition, authors, license and repository come from the workspace.
+* Version: `0.1.13` (`quench-mail/Cargo.toml`). Edition, authors, license and repository come from the workspace.
 * Not in scope (stated in `src/lib.rs`): attachments, receiving mail, connection pooling. Also absent from the code: DKIM signing, SMTPUTF8 (addresses are ASCII only).
 
 ## Install

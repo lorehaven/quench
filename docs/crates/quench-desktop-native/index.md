@@ -8,13 +8,13 @@ permalink: /crates/quench-desktop-native/
 
 `quench-desktop-native` runs a `quench_ui_native::NativeRenderer` in a Wayland window. It joins [quench-desktop-wayland](../quench-desktop-wayland/index.md) (window, input) and [quench-desktop-atspi](../quench-desktop-atspi/index.md) (screen readers): it draws a frame whenever the renderer says something changed, turns pointer, wheel, keyboard and input-method events into renderer calls, blinks the caret, repeats held keys, syncs the system clipboard and publishes the accessibility tree.
 
-Version: **0.1.7**. Edition 2024 (workspace). Linux only (`#![cfg(target_os = "linux")]`). No `unsafe`.
+Version: **0.1.10**. Edition 2024 (workspace). Linux only (`#![cfg(target_os = "linux")]`). No `unsafe`.
 
 ## Install
 
 ```toml
 [dependencies]
-quench-desktop-native = { version = "0.1.7", registry = "ennor" }
+quench-desktop-native = { version = "0.1.10", registry = "ennor" }
 ```
 
 ## Features

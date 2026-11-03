@@ -8,7 +8,7 @@ permalink: /crates/quench-db/
 
 `quench-db` (library `quench_db`) is a small ORM and database abstraction layer. It has two independent halves: a `Model`/`Crud` pair that gives plain CRUD access to Postgres or to an in-memory store behind one `Db` enum, and a versioned migration engine (catalog, planner, runner) that installs and evolves database schemas. It replaces `sqlx`-style model code in the estate's services; the Postgres wire client underneath is [quench-pg](../quench-pg/index.md).
 
-* Version: `0.2.14` (`quench-db/Cargo.toml`). Edition `2024` (workspace). No `rust-version` is declared in the manifest or the workspace.
+* Version: `0.2.16` (`quench-db/Cargo.toml`). Edition `2024` (workspace). No `rust-version` is declared in the manifest or the workspace.
 * No derive macros: a model implements `Model` by hand and needs only `quench_serde::Serialize` + `Deserialize` (+ `Clone`, `Debug`, `Send`, `Sync`, `Unpin`).
 * No `unsafe` in the crate.
 

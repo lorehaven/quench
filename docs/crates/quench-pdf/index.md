@@ -8,7 +8,7 @@ permalink: /crates/quench-pdf/
 
 `quench-pdf` (crate `quench_pdf`) is a PDF **reader that extracts text** page by page. It depends only on [quench-archive](../quench-archive/index.md) (for Flate) and replaces `pdf-extract` and `lopdf` in the estate. It does not write, render, edit or decrypt PDFs.
 
-* Version: `0.1.2`. Edition 2024. No features. `unsafe_code = "deny"`; none present.
+* Version: `0.1.3`. Edition 2024. No features. `unsafe_code = "deny"`; none present.
 * Entry points: `extract_pages(&[u8]) -> Result<Vec<String>>`, `extract_text(&[u8]) -> Result<String>`, and `Document` for structure access.
 * Reads cross-reference tables and streams (rebuilding by scanning when damaged), object streams, the page tree, content streams including form XObjects, simple and composite (CID) fonts via `ToUnicode`, base encodings and `Differences`.
 * Rejects encrypted files with `Error::Unsupported`. Text drawn as outlines or images (scans) is not extracted; there is no OCR.

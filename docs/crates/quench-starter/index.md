@@ -8,7 +8,7 @@ permalink: /crates/quench-starter/
 
 `quench-starter` (library `quench_starter`) is the server bootstrap crate shared by the Forge HTTP services. It wraps what every service repeats: HTTPS with an HTTP-to-HTTPS redirect server (or plain HTTP), base-path scoping, health and readiness routes, request logging, correlation ids, security headers, database bootstrap via `quench-db`, logging initialisation, and a few helpers (service wait, retries, circuit breaker, request metrics), behind one entry point, `http::serve`.
 
-* Version: `0.4.19` (`quench-starter/Cargo.toml`). `[lib] harness = false`.
+* Version: `0.4.22` (`quench-starter/Cargo.toml`). `[lib] harness = false`.
 * No `[features]` table.
 
 ## Install

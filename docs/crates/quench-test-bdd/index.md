@@ -12,7 +12,7 @@ nav_order: 49
 
 | | |
 |---|---|
-| Version | 0.1.3 |
+| Version | 0.1.4 |
 | Edition | 2024 |
 | License | MIT |
 | Features | none |
@@ -20,7 +20,7 @@ nav_order: 49
 
 ```toml
 [dev-dependencies]
-quench-test-bdd = { version = "0.1.3", registry = "ennor" }
+quench-test-bdd = { version = "0.1.4", registry = "ennor" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 ```
 

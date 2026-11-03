@@ -12,7 +12,7 @@ permalink: /crates/quench-core/
 
 | | |
 |---|---|
-| Version | 0.1.7 |
+| Version | 0.1.8 |
 | Edition | 2024 (workspace) |
 | License | MIT (workspace) |
 | Test harness | `harness = false`, `quench_test::main!()` ([testing](testing.md)) |

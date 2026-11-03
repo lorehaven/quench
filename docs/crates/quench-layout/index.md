@@ -7,7 +7,7 @@ has_children: true
 
 `quench-layout` (crate `quench_layout`) places boxes. It takes a tree of styled nodes (computed styles from [quench-css](../quench-css/index.md), text measured with [quench-text](../quench-text/index.md)) and a viewport size, and returns a tree of boxes with positions and sizes: block and inline flow, flexbox, grid, positioning, margin collapsing. [quench-paint](../quench-paint/index.md) draws that tree; [quench-ui-native](../quench-ui-native/index.md) drives the whole pipeline.
 
-* Version: 0.1.5. Edition 2024. No features. No `rust-version`.
+* Version: 0.1.7. Edition 2024. No features. No `rust-version`.
 * Dependencies: `quench-css` (the `ComputedStyle` it reads), `quench-text` (fonts, measuring). Dev: `quench-test`.
 * All types are `!Send` (nodes are shared with `Rc`).
 

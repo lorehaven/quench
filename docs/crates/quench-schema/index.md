@@ -12,7 +12,7 @@ nav_order: 40
 
 | | |
 |---|---|
-| Version | 0.1.3 |
+| Version | 0.1.4 |
 | Edition | 2024 |
 | License | MIT |
 | Features | none |
@@ -20,7 +20,7 @@ nav_order: 40
 
 ```toml
 [dependencies]
-quench-schema = { version = "0.1.3", registry = "ennor" }
+quench-schema = { version = "0.1.4", registry = "ennor" }
 quench-serde = { version = "0.1", registry = "ennor" }
 ```
 

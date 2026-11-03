@@ -8,7 +8,7 @@ permalink: /crates/quench-archive/
 
 `quench-archive` (crate `quench_archive`) reads and writes tar and zip archives and the compression formats under them: raw deflate, gzip and zstd (decoder and encoder). It has **no dependencies** and replaces the `tar`, `zip`, `zstd` and `flate2` crates. It is also the inflate/CRC-32 provider of [quench-image](../quench-image/index.md) and [quench-pdf](../quench-pdf/index.md).
 
-* Version: `0.1.2`. Edition 2024. No features. `unsafe_code = "deny"` through the workspace lints; none present.
+* Version: `0.1.3`. Edition 2024. No features. `unsafe_code = "deny"` through the workspace lints; none present.
 * Everything works on byte slices and `Vec<u8>` (tar), or on `Read + Seek` (zip reading). Nothing touches the filesystem.
 * **Every decoder takes a limit** on the size of its output, so a small hostile input cannot expand without bound. `tar::Reader` yields slices of its input and never allocates more than the archive itself.
 

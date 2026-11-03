@@ -7,7 +7,7 @@ has_children: true
 
 `quench-raster` (crate `quench_raster`) is a software rasteriser with no dependencies. It draws anti-aliased rectangles, rounded rectangles, shadows, images, layers and arbitrary paths into a premultiplied BGRA pixel buffer. It is the lowest layer of the native renderer: [quench-text](../quench-text/index.md) turns glyph outlines into `Path`s, [quench-paint](../quench-paint/index.md) turns boxes into `Canvas` calls.
 
-* Version: 0.1.3. Edition 2024 (workspace). No `rust-version` is set.
+* Version: 0.1.4. Edition 2024 (workspace). No `rust-version` is set.
 * No `unsafe` in the crate sources. No features. No dependencies (`[dependencies]` is empty; dev-dependency `quench-test`).
 
 ```toml

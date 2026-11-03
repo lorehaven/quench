@@ -8,7 +8,7 @@ permalink: /crates/quench-svg/
 
 `quench-svg` (crate `quench_svg`) draws SVG: a document string in, straight-alpha RGBA pixels out (a `quench_image::Image`), through the software rasteriser [quench-raster](../quench-raster/index.md). It exists so the [native renderer](../quench-ui-native/index.md) can show `<img src="*.svg">` and so tools can rasterize icons without `resvg`/`usvg`.
 
-* Version: `0.1.3`. Edition 2024. No features. `unsafe_code = "deny"`; none present.
+* Version: `0.1.6`. Edition 2024. No features. `unsafe_code = "deny"`; none present.
 * Two public functions and one error enum. It is a **subset** renderer: no text, gradients, filters, masks, clip paths, markers, dashes, `evenodd`, or CSS in `<style>` (see [Supported SVG](supported.md)).
 * Limits: 16 384 pixels per side and 64 Mi pixels (`TooLarge`), at most 100 000 drawn elements, XML nesting 64, `use` depth 8.
 

@@ -10,7 +10,7 @@ permalink: /crates/quench-log/
 
 | | |
 |---|---|
-| Version | 0.1.9 |
+| Version | 0.1.10 |
 | Edition | 2024 (workspace) |
 | Features | none |
 | Test harness | `harness = false`, `tests/unit.rs` with `quench_test::main!()` |

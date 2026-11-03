@@ -8,7 +8,7 @@ permalink: /crates/quench-crypto/
 
 `quench-crypto` (crate `quench_crypto`) is the cryptography of the Quench estate: hashes, MACs, key derivation, password hashing, signatures, authenticated encryption, one-time passwords, `age` file encryption and JSON Web Tokens. It sits on [`ring`](https://github.com/briansmith/ring) (the one crypto backend allowed in the workspace; `rustls` already uses it) and replaces `sha2`, `argon2`, `ed25519-dalek`, `jsonwebtoken`, `chacha20poly1305`, `age` and the constant-time helpers.
 
-* Version: `0.1.8`. Edition 2024 (no `rust-version` is declared; the sources use let-chains, so a toolchain that supports edition 2024 and `if let ... &&` chains is needed).
+* Version: `0.1.9`. Edition 2024 (no `rust-version` is declared; the sources use let-chains, so a toolchain that supports edition 2024 and `if let ... &&` chains is needed).
 * No `unsafe` code in the crate (`unsafe_code = "deny"` through `[lints] workspace = true`; grep finds none).
 * Primitives written in this crate rather than taken from `ring`: Argon2id and BLAKE2b, HChaCha20 (for XChaCha20-Poly1305), X25519 scalar multiplication, age (header and payload framing, bech32), HOTP/TOTP, JWT. Everything else (SHA-1/2, HMAC, PBKDF2, Ed25519, RSA verify, ChaCha20-Poly1305) is `ring`.
 

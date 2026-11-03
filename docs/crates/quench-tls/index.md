@@ -11,7 +11,7 @@ permalink: /crates/quench-tls/
 | | |
 |---|---|
 | Crate / library name | `quench-tls` / `quench_tls` |
-| Version | 0.1.8 |
+| Version | 0.1.9 |
 | Edition | 2024 (workspace) |
 | Crypto backend | `ring` (rustls features: `ring`, `std`, `tls12`, `logging`; `aws-lc-rs` is not built) |
 | Protocol versions | TLS 1.2 and 1.3 (rustls safe defaults) |

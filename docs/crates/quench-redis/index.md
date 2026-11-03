@@ -10,7 +10,7 @@ permalink: /crates/quench-redis/
 
 | | |
 |---|---|
-| Version | `0.1.8` |
+| Version | `0.1.9` |
 | Edition | `2024` (workspace) |
 | MSRV | not declared (`rust-version` is not set in the manifest) |
 | Runtime | `tokio` only; there is no blocking API |

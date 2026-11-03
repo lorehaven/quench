@@ -10,7 +10,7 @@ permalink: /crates/quench-auth/
 
 | | |
 |---|---|
-| Version | `0.4.16` |
+| Version | `0.4.19` |
 | Edition | `2024` (workspace) |
 | MSRV | not declared |
 

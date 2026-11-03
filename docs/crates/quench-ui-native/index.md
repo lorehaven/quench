@@ -9,7 +9,7 @@ has_children: true
 
 It replaces the browser as the place where a `quench-ui` view lives, on platforms where the framework runs without a WebView (Linux/Wayland through `quench-desktop-native`, Android through `quench-android-surface`).
 
-* Version: 0.1.5. Edition 2024 (workspace). No `rust-version`.
+* Version: 0.1.8. Edition 2024 (workspace). No `rust-version`.
 * No `unsafe` code (the workspace sets `unsafe_code = "deny"`; `src/` contains none).
 * Thread model: everything is `!Send`/`!Sync` (`Rc`, `RefCell`). One renderer lives on one thread. Only the `Sender` returned by [`channel`](api-timers.md#channel) crosses threads.
 * The workspace denies `missing_debug_implementations`; `NativeRenderer` implements `Debug` by hand (prints only the node count). Clippy allowances for float arithmetic are at the top of `src/lib.rs`.
@@ -23,7 +23,7 @@ quench-ui-native = { version = "0.1", registry = "ennor" }
 quench-raster = { version = "0.1", registry = "ennor" }
 ```
 
-(The workspace declares `quench-ui-native = { path = "quench-ui-native", registry = "ennor", version = "0.1.0" }`.)
+(The workspace declares `quench-ui-native = { path = "quench-ui-native", registry = "ennor", version = "0.1.8" }`.)
 
 ## Features
 

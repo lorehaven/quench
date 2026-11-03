@@ -10,7 +10,7 @@ permalink: /crates/quench-tz/
 
 | | |
 |---|---|
-| Version | 0.1.3 |
+| Version | 0.1.4 |
 | Edition | 2024 (workspace) |
 | Features | none |
 | Database | `data/zones.qtz`, 151,994 bytes, version `2026e`, 598 names (345 distinct rule sets), embedded with `include_bytes!` |

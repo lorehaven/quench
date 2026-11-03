@@ -7,7 +7,7 @@ has_children: true
 
 `quench-text` (crate `quench_text`) turns a string into pixels with no third-party dependencies: a TrueType parser, pair kerning, line breaking, four weights of Noto Sans embedded so text looks the same on every machine, and a fallback to fonts installed on the machine for characters Noto lacks. It draws through [quench-raster](../quench-raster/index.md). [quench-layout](../quench-layout/index.md) measures text with it and [quench-paint](../quench-paint/index.md) draws with it.
 
-* Version: 0.1.4. Edition 2024. No features. No `rust-version`.
+* Version: 0.1.5. Edition 2024. No features. No `rust-version`.
 * Dependencies: `quench-raster` (paths and the canvas). Dev: `quench-core`, `quench-test`.
 * The published package includes `src/**`, `tests/**`, `fonts/**`, `Cargo.toml` (`include` in the manifest).
 

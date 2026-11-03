@@ -379,6 +379,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-example-tutorial-app"
+version = "0.1.0"
+dependencies = [
+ "quench-fullstack",
+ "quench-serde",
+ "quench-test",
+ "quench-ui",
+ "quench-ui-web",
+ "tokio",
+]
+
+[[package]]
+name = "quench-example-tutorial-server"
+version = "0.1.0"
+dependencies = [
+ "quench-example-tutorial-app",
+ "quench-fullstack",
+ "quench-http",
+ "quench-serde",
+ "tokio",
+]
+
+[[package]]
 name = "quench-example-ui-web-app"
 version = "0.1.0"
 dependencies = [

@@ -12,7 +12,7 @@ nav_order: 48
 
 | | |
 |---|---|
-| Version | 0.1.3 |
+| Version | 0.1.4 |
 | Edition | 2024 |
 | License | MIT |
 | Features | none |
@@ -20,7 +20,7 @@ nav_order: 48
 
 ```toml
 [dev-dependencies]
-quench-test = { version = "0.1.3", registry = "ennor" }
+quench-test = { version = "0.1.4", registry = "ennor" }
 
 [[test]]
 name = "api"

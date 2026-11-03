@@ -8,13 +8,13 @@ permalink: /crates/quench-android-surface/
 
 `quench-android-surface` is the program side of an Android app drawn by the native renderer (no `WebView`). The Kotlin host owns a `SurfaceView`, the input method and the accessibility services and starts this program as a process of its own; the two talk over the program's standard input and output with a small binary protocol. Touches, keys and text go in; frames, keyboard requests, the focused text field, the accessibility tree and calls to the host's plugins come out.
 
-Version: **0.1.5**. Edition 2024 (workspace). No `unsafe`, no JNI.
+Version: **0.1.8**. Edition 2024 (workspace). No `unsafe`, no JNI.
 
 ## Install
 
 ```toml
 [dependencies]
-quench-android-surface = { version = "0.1.5", registry = "ennor" }
+quench-android-surface = { version = "0.1.8", registry = "ennor" }
 ```
 
 The Kotlin side is added to a project with `quench plugin add surface` (see [quench-tool plugins](../quench-tool/plugins.md#surface)).

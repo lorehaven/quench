@@ -8,7 +8,7 @@ permalink: /crates/quench-image/
 
 `quench-image` (crate `quench_image`) decodes raster images to straight-alpha RGBA and encodes PNG, with one dependency: [quench-archive](../quench-archive/index.md) (inflate, deflate, CRC-32, Adler-32). It replaces the `image`, `png`, `jpeg-decoder`, `gif` and `webp` crates for the [native renderer](../quench-ui-native/index.md)'s `<img>`. Vector drawings are [quench-svg](../quench-svg/index.md).
 
-* Version: `0.1.0`. Edition 2024. No features. `unsafe_code = "deny"`; none present.
+* Version: `0.1.2`. Edition 2024. No features. `unsafe_code = "deny"`; none present.
 * Formats read, chosen by the first bytes: **PNG**, **JPEG**, **GIF**, **WebP** (lossless VP8L, lossy VP8 key frames, alpha, extended container). Formats written: **PNG** (8-bit RGBA only).
 * Limits: 16 384 pixels per side and 64 Mi pixels (`64 << 20 = 67 108 864`) in total, otherwise `Error::TooLarge`.
 * Damaged input is an `Error`, never a panic (the tests cut and flip bytes of real files).

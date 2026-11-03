@@ -12,7 +12,7 @@ nav_order: 8
 
 | | |
 |---|---|
-| Version | 0.1.14 |
+| Version | 0.1.15 |
 | Edition | 2024 |
 | License | MIT |
 | Platforms | everything but `keys`, `term`, `tty` is portable; those three are `cfg(all(unix, feature = "tui"))` |
@@ -21,9 +21,9 @@ nav_order: 8
 
 ```toml
 [dependencies]
-quench-cli = { version = "0.1.14", registry = "ennor" }
+quench-cli = { version = "0.1.15", registry = "ennor" }
 # without the line editor and terminal control:
-# quench-cli = { version = "0.1.14", registry = "ennor", default-features = false }
+# quench-cli = { version = "0.1.15", registry = "ennor", default-features = false }
 ```
 
 ## Features

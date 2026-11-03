@@ -11,7 +11,7 @@ permalink: /crates/quench-web/
 | | |
 |---|---|
 | Crate / library name | `quench-web` / `quench_web` |
-| Version | 0.1.25 |
+| Version | 0.1.26 |
 | Edition | 2024 (workspace) |
 | Custom test harness | `harness = false` (`quench_test::main!()`) |
 | Unsafe code | none |

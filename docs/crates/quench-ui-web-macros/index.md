@@ -13,7 +13,7 @@ Version: **0.1.0**. Edition: 2024 (workspace). No `rust-version`. Features: none
 
 ```toml
 [dependencies]
-quench-ui-web = { version = "0.1.7", registry = "ennor" }   # re-exports #[plugin]
+quench-ui-web = { version = "0.1.0", registry = "ennor" }   # re-exports #[plugin]
 ```
 
 Depending on `quench-ui-web-macros = { version = "0.1.0", registry = "ennor" }` directly works only together with `quench-ui-web`.

@@ -8,7 +8,7 @@ permalink: /crates/quench-tool/
 
 `quench-tool` provides the `quench` command: one command per step of building a `quench-ui` app, in the way of the `flutter` CLI. It creates projects, runs a dev loop with browser reload, builds release binaries, bundles and packages (APK, AAB, `.deb`, `.rpm`, Arch, source tarball), generates the Android and Linux desktop hosts, manages the Android plugins and checks the machine. It runs `cargo`, `gradle` (the project's wrapper), `keytool`, `adb` and `node`; it has no build system of its own.
 
-Version: **0.1.13** (`quench --version` prints `quench 0.1.13`). Edition 2024 (workspace). The package has a library (`quench_tool`) and the binary `quench` (`src/main.rs`: `std::process::exit(quench_tool::run(std::env::args_os().skip(1)))`).
+Version: **0.1.14** (`quench --version` prints `quench 0.1.14`). Edition 2024 (workspace). The package has a library (`quench_tool`) and the binary `quench` (`src/main.rs`: `std::process::exit(quench_tool::run(std::env::args_os().skip(1)))`).
 
 ## Install
 

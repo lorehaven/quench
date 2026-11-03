@@ -12,7 +12,7 @@ nav_order: 47
 
 | | |
 |---|---|
-| Version | 0.1.3 |
+| Version | 0.1.4 |
 | Edition | 2024 |
 | License | MIT |
 | Features | none |
@@ -22,7 +22,7 @@ nav_order: 47
 
 ```toml
 [dependencies]
-quench-template = { version = "0.1.3", registry = "ennor" }
+quench-template = { version = "0.1.4", registry = "ennor" }
 quench-serde = { version = "0.1", registry = "ennor" }   # for json! and Value
 ```
 

@@ -7,7 +7,7 @@ has_children: true
 
 `quench-css` (crate `quench_css`) is a CSS engine with no dependencies. It tokenizes and parses stylesheets (with nesting, `@media`, `@supports`, `@keyframes`), matches selectors against any tree that implements the `Element` trait, runs the cascade with inheritance and custom properties, and returns a typed `ComputedStyle` per element. It exists so that the native renderer can read the same stylesheets that `quench-style` emits for the browser, without a WebView or a third-party CSS crate. [quench-layout](../quench-layout/index.md) and [quench-paint](../quench-paint/index.md) read `ComputedStyle`; [quench-ui-native](../quench-ui-native/index.md) drives the pipeline.
 
-* Version: 0.1.2. Edition 2024. No `rust-version` is set.
+* Version: 0.1.4. Edition 2024. No `rust-version` is set.
 * Features: none (the crate has no `[features]` section).
 * `unsafe`: none; the workspace sets `unsafe_code = "deny"`.
 * Thread safety: `Stylesheet`, `Rule`, `Cascade`, `ComputedStyle`, `Length` and `Calc` hold `Rc` and are `!Send` and `!Sync`. `Color`, `MediaEnv`, `Token`, `Value` and the plain enums are `Send + Sync`.

@@ -8,7 +8,7 @@ permalink: /crates/quench-k8s/
 
 `quench-k8s` (library `quench_k8s`) is a generic Kubernetes API client. It replaces `kube` and `k8s-openapi`: objects are plain `quench_serde::Value`s, so any kind, custom resources included, goes through the same calls to read, create, replace, patch, delete, watch, and read a pod's log. It authenticates from a kubeconfig (bearer token, token file, client certificate, basic) or from the pod's service account, and its HTTP and TLS come from `quench-client`.
 
-* Version: `0.1.5` (`quench-k8s/Cargo.toml`); library name `quench_k8s`.
+* Version: `0.1.6` (`quench-k8s/Cargo.toml`); library name `quench_k8s`.
 * No `[features]` table of its own. It enables the `tls` feature of `quench-client` and the `yaml` feature of `quench-serde`.
 
 ## Install

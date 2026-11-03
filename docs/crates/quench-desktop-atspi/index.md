@@ -8,13 +8,13 @@ permalink: /crates/quench-desktop-atspi/
 
 `quench-desktop-atspi` makes a native-renderer window readable by screen readers such as Orca on Linux. Screen readers talk to applications over a second D-Bus, the accessibility bus. This crate speaks the D-Bus wire protocol itself (no `libdbus`, no `zbus`), connects to that bus, registers the application with the AT-SPI registry and answers the `Accessible`, `Component`, `Action`, `Text`, `EditableText` and `Value` interfaces from the `AccessNode` tree that `quench-ui-native` produces.
 
-Version: **0.1.5**. Edition 2024 (workspace). Linux only (`#![cfg(target_os = "linux")]`). No `unsafe`.
+Version: **0.1.8**. Edition 2024 (workspace). Linux only (`#![cfg(target_os = "linux")]`). No `unsafe`.
 
 ## Install
 
 ```toml
 [dependencies]
-quench-desktop-atspi = { version = "0.1.5", registry = "ennor" }
+quench-desktop-atspi = { version = "0.1.8", registry = "ennor" }
 ```
 
 ## Features

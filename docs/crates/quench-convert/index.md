@@ -12,7 +12,7 @@ nav_order: 11
 
 | | |
 |---|---|
-| Version | 0.1.3 |
+| Version | 0.1.4 |
 | Edition | 2024 |
 | License | MIT |
 | Dependencies | `quench-serde`; dev: `quench-test` |
@@ -20,8 +20,8 @@ nav_order: 11
 
 ```toml
 [dependencies]
-quench-convert = { version = "0.1.3", registry = "ennor" }                       # all four formats
-# quench-convert = { version = "0.1.3", registry = "ennor", default-features = false, features = ["csv"] }
+quench-convert = { version = "0.1.4", registry = "ennor" }                       # all four formats
+# quench-convert = { version = "0.1.4", registry = "ennor", default-features = false, features = ["csv"] }
 ```
 
 ## Features

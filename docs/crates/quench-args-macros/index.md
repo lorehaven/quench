@@ -22,7 +22,7 @@ nav_order: 5
 ```toml
 # you normally depend on quench-args only
 [dependencies]
-quench-args = { version = "0.1.2", registry = "ennor" }
+quench-args = { version = "0.1.0", registry = "ennor" }
 ```
 
 ## Pages

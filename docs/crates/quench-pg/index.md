@@ -8,7 +8,7 @@ permalink: /crates/quench-pg/
 
 `quench-pg` (library `quench_pg`) is a PostgreSQL client written against `tokio`: the v3 wire protocol over TCP, Unix sockets or TLS, SCRAM-SHA-256 authentication, parameterised queries with typed rows, transactions and a connection pool. It replaces `sqlx`/`tokio-postgres` in the workspace. Rows are read through `quench-serde`, which is how [quench-db](../quench-db/index.md) maps models without a derive.
 
-* Version: `0.1.9` (`quench-pg/Cargo.toml`). Edition `2024` (workspace); no `rust-version` is declared. The code uses `Duration::from_mins`, so it needs a toolchain where that is stable (Rust 1.91 or later).
+* Version: `0.1.10` (`quench-pg/Cargo.toml`). Edition `2024` (workspace); no `rust-version` is declared. The code uses `Duration::from_mins`, so it needs a toolchain where that is stable (Rust 1.91 or later).
 * The library target has `harness = false` and its unit tests run under `quench-test` (`quench_test::main!()` in `src/lib.rs`).
 * No `unsafe`.
 * Everything travels in PostgreSQL's **text** format. There is no prepared-statement cache, no `COPY`, no `LISTEN` support (notifications are logged and dropped), no binary format.

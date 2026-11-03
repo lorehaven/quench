@@ -12,13 +12,13 @@ Nothing in the core knows about the DOM. Backends plug in behind `Renderer`: the
 
 Everything runs on one thread (`Rc`/`RefCell`). Signals, memos, effects, scopes, views and mounts are `!Send` and `!Sync`.
 
-Version: **0.1.3**. Edition: 2024 (workspace). No `rust-version` is set.
+Version: **0.1.4**. Edition: 2024 (workspace). No `rust-version` is set.
 
 ## Install
 
 ```toml
 [dependencies]
-quench-ui = { version = "0.1.3", registry = "ennor" }
+quench-ui = { version = "0.1.4", registry = "ennor" }
 ```
 
 Inside the workspace the dependency is `quench-ui = { workspace = true }`. The workspace table pins `version = "0.1.0"` with a `path`, which is satisfied by the 0.1.3 path crate.

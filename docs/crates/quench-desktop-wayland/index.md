@@ -8,7 +8,7 @@ permalink: /crates/quench-desktop-wayland/
 
 `quench-desktop-wayland` is a Wayland client written against the wire protocol, with no `libwayland`: a window with two shared-memory buffers that a `quench_raster::Canvas` draws straight into, pointer, keyboard and scroll input, key repeat information, an input method (text-input v3) and the clipboard. It replaces `wayland-client` and `winit` for the native renderer.
 
-Version: **0.1.5**. Edition 2024 (workspace). Linux only (`#![cfg(target_os = "linux")]`: the crate is empty on other targets).
+Version: **0.1.6**. Edition 2024 (workspace). Linux only (`#![cfg(target_os = "linux")]`: the crate is empty on other targets).
 
 `unsafe` is confined to `src/sys.rs` (file-descriptor passing with `sendmsg`/`recvmsg`, `memfd_create`, `mmap`), which carries `#![allow(unsafe_code)]` and a safety comment per block. Everything else is safe code.
 
@@ -16,7 +16,7 @@ Version: **0.1.5**. Edition 2024 (workspace). Linux only (`#![cfg(target_os = "l
 
 ```toml
 [dependencies]
-quench-desktop-wayland = { version = "0.1.5", registry = "ennor" }
+quench-desktop-wayland = { version = "0.1.6", registry = "ennor" }
 ```
 
 ## Features

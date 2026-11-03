@@ -7,7 +7,7 @@ has_children: true
 
 `quench-ui-web` (library `quench_ui_web`) runs a [`quench-ui`](../quench-ui/index.md) app in the browser. The app compiles to WebAssembly (`wasm32-unknown-unknown`); one small hand-written JavaScript file, `quench.js` (399 lines, embedded in the crate as `QUENCH_JS`), loads the module and gives it the DOM, timers, `fetch`, `EventSource`, history and storage. There is no `wasm-bindgen`, `web-sys` or `js-sys`: both sides talk through the plain functions documented in [Internals](internals.md). The crate implements the `Renderer` trait of `quench-ui` for the DOM, an executor with `sleep`/`fetch`/`EventSource` futures, the router's `History`, the `Platform` trait, and the typed clients of the Android/desktop host plugins.
 
-Version: **0.1.7**. Edition: 2024 (workspace). No `rust-version` is set. License, authors and repository come from the workspace.
+Version: **0.1.8**. Edition: 2024 (workspace). No `rust-version` is set. License, authors and repository come from the workspace.
 
 Everything runs on one thread. State is kept in `thread_local!` tables; views, mounts, nodes, futures and `EventSource` are `!Send`. On every target other than `wasm32` the JavaScript side is replaced by an in-memory host (`quench_ui_web::mock`), so nearly all code runs under `cargo test` (see [Testing](testing.md)).
 
@@ -15,11 +15,11 @@ Everything runs on one thread. State is kept in `thread_local!` tables; views, m
 
 ```toml
 [dependencies]
-quench-ui = { version = "0.1.3", registry = "ennor" }
-quench-ui-web = { version = "0.1.7", registry = "ennor" }
+quench-ui = { version = "0.1.8", registry = "ennor" }
+quench-ui-web = { version = "0.1.8", registry = "ennor" }
 ```
 
-Inside the workspace use `quench-ui-web = { workspace = true }`. The workspace pins `version = "0.1.0"` with a `path`. Build the app as a `cdylib`:
+Inside the workspace use `quench-ui-web = { workspace = true }`. The workspace pins `version = "0.1.8"` with a `path`. Build the app as a `cdylib`:
 
 ```bash
 cargo build --target wasm32-unknown-unknown --profile wasm -p <app>

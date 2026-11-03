@@ -12,7 +12,7 @@ nav_order: 39
 
 | | |
 |---|---|
-| Version | 0.1.2 |
+| Version | 0.1.3 |
 | Edition | 2024 |
 | License | MIT |
 | Features | none |
@@ -22,7 +22,7 @@ nav_order: 39
 
 ```toml
 [dependencies]
-quench-regex = { version = "0.1.2", registry = "ennor" }
+quench-regex = { version = "0.1.3", registry = "ennor" }
 ```
 
 ## Where to go next

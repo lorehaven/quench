@@ -10,7 +10,7 @@ permalink: /crates/quench-config/
 
 | | |
 |---|---|
-| Version | 0.1.13 |
+| Version | 0.1.14 |
 | Edition | 2024 (workspace) |
 | Features | none (it enables `quench-serde`'s `yaml` feature internally) |
 | Source | one file, `src/lib.rs` (151 lines) |
