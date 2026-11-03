@@ -1,7 +1,7 @@
 ---
 title: "Tutorial: your first app"
 parent: Guides
-nav_order: 2
+nav_order: 15
 ---
 
 This tutorial builds a small full-stack app from nothing: a shared pantry list. You write the data type, the server functions that change it, the screen, and the server that renders and serves it, and you test each part. It takes about an hour and ends with a page that is rendered on the server and taken over by WebAssembly in the browser.
