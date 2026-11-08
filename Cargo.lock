@@ -108,7 +108,7 @@ dependencies = [
 
 [[package]]
 name = "quench-android"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "quench-core",
  "quench-serde",
@@ -118,7 +118,7 @@ dependencies = [
 
 [[package]]
 name = "quench-android-surface"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "quench-css",
  "quench-raster",
@@ -130,14 +130,14 @@ dependencies = [
 
 [[package]]
 name = "quench-archive"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "quench-test",
 ]
 
 [[package]]
 name = "quench-args"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "quench-args-macros",
  "quench-test",
@@ -154,7 +154,7 @@ dependencies = [
 
 [[package]]
 name = "quench-auth"
-version = "0.4.19"
+version = "0.4.20"
 dependencies = [
  "quench-cache",
  "quench-client",
@@ -171,7 +171,7 @@ dependencies = [
 
 [[package]]
 name = "quench-cache"
-version = "0.1.21"
+version = "0.1.22"
 dependencies = [
  "quench-core",
  "quench-redis",
@@ -182,7 +182,7 @@ dependencies = [
 
 [[package]]
 name = "quench-cli"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "quench-core",
  "quench-test",
@@ -190,7 +190,7 @@ dependencies = [
 
 [[package]]
 name = "quench-client"
-version = "0.2.18"
+version = "0.2.19"
 dependencies = [
  "quench-core",
  "quench-http",
@@ -203,7 +203,7 @@ dependencies = [
 
 [[package]]
 name = "quench-config"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "quench-core",
  "quench-serde",
@@ -212,7 +212,7 @@ dependencies = [
 
 [[package]]
 name = "quench-convert"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "quench-serde",
  "quench-test",
@@ -220,7 +220,7 @@ dependencies = [
 
 [[package]]
 name = "quench-core"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "getrandom 0.4.3",
  "quench-core-macros",
@@ -238,7 +238,7 @@ dependencies = [
 
 [[package]]
 name = "quench-crypto"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "quench-core",
  "quench-serde",
@@ -248,7 +248,7 @@ dependencies = [
 
 [[package]]
 name = "quench-css"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "quench-style",
  "quench-test",
@@ -256,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "quench-db"
-version = "0.2.16"
+version = "0.2.17"
 dependencies = [
  "quench-core",
  "quench-crypto",
@@ -281,7 +281,7 @@ dependencies = [
 
 [[package]]
 name = "quench-desktop"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "quench-core",
  "quench-serde",
@@ -290,7 +290,7 @@ dependencies = [
 
 [[package]]
 name = "quench-desktop-atspi"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "quench-test",
  "quench-ui-native",
@@ -298,7 +298,7 @@ dependencies = [
 
 [[package]]
 name = "quench-desktop-native"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "quench-desktop-atspi",
  "quench-desktop-wayland",
@@ -310,7 +310,7 @@ dependencies = [
 
 [[package]]
 name = "quench-desktop-wayland"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "libc",
  "quench-core",
@@ -429,7 +429,7 @@ dependencies = [
 
 [[package]]
 name = "quench-fullstack"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "quench-archive",
  "quench-auth",
@@ -457,14 +457,14 @@ dependencies = [
 
 [[package]]
 name = "quench-html"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "quench-test",
 ]
 
 [[package]]
 name = "quench-http"
-version = "0.1.16"
+version = "0.1.17"
 dependencies = [
  "quench-core",
  "quench-http-macros",
@@ -487,7 +487,7 @@ dependencies = [
 
 [[package]]
 name = "quench-image"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "quench-archive",
  "quench-test",
@@ -495,7 +495,7 @@ dependencies = [
 
 [[package]]
 name = "quench-k8s"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "quench-client",
  "quench-core",
@@ -507,7 +507,7 @@ dependencies = [
 
 [[package]]
 name = "quench-layout"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "quench-css",
  "quench-test",
@@ -516,7 +516,7 @@ dependencies = [
 
 [[package]]
 name = "quench-log"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "quench-core",
  "quench-log-macros",
@@ -535,7 +535,7 @@ dependencies = [
 
 [[package]]
 name = "quench-mail"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "quench-core",
  "quench-test",
@@ -554,7 +554,7 @@ dependencies = [
 
 [[package]]
 name = "quench-paint"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "quench-css",
  "quench-layout",
@@ -564,7 +564,7 @@ dependencies = [
 
 [[package]]
 name = "quench-pdf"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "quench-archive",
  "quench-test",
@@ -572,7 +572,7 @@ dependencies = [
 
 [[package]]
 name = "quench-pg"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "quench-core",
  "quench-crypto",
@@ -585,7 +585,7 @@ dependencies = [
 
 [[package]]
 name = "quench-proto"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "quench-core",
  "quench-crypto",
@@ -596,21 +596,21 @@ dependencies = [
 
 [[package]]
 name = "quench-qr"
-version = "0.1.3"
-dependencies = [
- "quench-test",
-]
-
-[[package]]
-name = "quench-raster"
 version = "0.1.4"
 dependencies = [
  "quench-test",
 ]
 
 [[package]]
+name = "quench-raster"
+version = "0.1.5"
+dependencies = [
+ "quench-test",
+]
+
+[[package]]
 name = "quench-redis"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "quench-core",
  "quench-test",
@@ -620,14 +620,14 @@ dependencies = [
 
 [[package]]
 name = "quench-regex"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "quench-test",
 ]
 
 [[package]]
 name = "quench-schema"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "quench-regex",
  "quench-serde",
@@ -644,7 +644,7 @@ dependencies = [
 
 [[package]]
 name = "quench-serde"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "quench-core",
  "quench-serde-macros",
@@ -662,7 +662,7 @@ dependencies = [
 
 [[package]]
 name = "quench-sqlite"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "quench-core",
  "quench-test",
@@ -670,7 +670,7 @@ dependencies = [
 
 [[package]]
 name = "quench-starter"
-version = "0.4.22"
+version = "0.4.23"
 dependencies = [
  "quench-auth",
  "quench-cli",
@@ -687,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "quench-style"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "quench-core",
  "quench-serde",
@@ -696,7 +696,7 @@ dependencies = [
 
 [[package]]
 name = "quench-svg"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "quench-css",
  "quench-image",
@@ -706,7 +706,7 @@ dependencies = [
 
 [[package]]
 name = "quench-template"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "quench-serde",
  "quench-test",
@@ -714,7 +714,7 @@ dependencies = [
 
 [[package]]
 name = "quench-test"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "quench-core",
  "quench-regex",
@@ -725,7 +725,7 @@ dependencies = [
 
 [[package]]
 name = "quench-test-bdd"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "quench-args",
  "quench-core",
@@ -766,7 +766,7 @@ dependencies = [
 
 [[package]]
 name = "quench-text"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "quench-core",
  "quench-raster",
@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "quench-tls"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "quench-core",
  "quench-test",
@@ -786,7 +786,7 @@ dependencies = [
 
 [[package]]
 name = "quench-tool"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "quench-archive",
  "quench-args",
@@ -799,7 +799,7 @@ dependencies = [
 
 [[package]]
 name = "quench-tz"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "quench-core",
  "quench-test",
@@ -807,14 +807,14 @@ dependencies = [
 
 [[package]]
 name = "quench-ui"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "quench-test",
 ]
 
 [[package]]
 name = "quench-ui-native"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "quench-core",
  "quench-css",
@@ -830,7 +830,7 @@ dependencies = [
 
 [[package]]
 name = "quench-ui-web"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "quench-serde",
  "quench-test",
@@ -849,7 +849,7 @@ dependencies = [
 
 [[package]]
 name = "quench-web"
-version = "0.1.26"
+version = "0.1.27"
 dependencies = [
  "quench-core",
  "quench-style",
@@ -858,7 +858,7 @@ dependencies = [
 
 [[package]]
 name = "quench-web-components"
-version = "0.1.21"
+version = "0.1.22"
 dependencies = [
  "quench-test",
  "quench-web",

@@ -1,6 +1,6 @@
 [package]
 name = "quench-text"
-version = "0.1.5"
+version = "0.1.6"
 edition = { workspace = true }
 authors = { workspace = true }
 description = "Quench - fonts and text with no dependencies: a TrueType parser, kerning, the OpenType MATH table, line breaking, Noto Sans embedded (Noto Sans Math optional), drawn through quench-raster"
