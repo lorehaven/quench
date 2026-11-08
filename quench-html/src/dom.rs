@@ -193,6 +193,7 @@ impl<'a> Node<'a> {
         self.entry().parent.map(|p| self.at(p))
     }
 
+    #[must_use]
     pub fn children(self) -> impl DoubleEndedIterator<Item = Node<'a>> + 'a {
         let node = self;
         self.entry().children.iter().map(move |&c| node.at(c))

@@ -107,8 +107,10 @@ pub fn parse(tex: &str) -> Result<Formula, Error> {
     parse::parse(tex, &mut Macros::new())
 }
 
-/// Reads a formula with the macros defined so far, and keeps the definitions it makes (`\newcommand`, `\def`,
-/// `\DeclareMathOperator`) in `macros` for the formulas after it. A formula that fails changes nothing.
+/// Reads a formula with the macros defined so far.
+///
+/// Keeps the definitions it makes (`\newcommand`, `\def`, `\DeclareMathOperator`) in `macros` for the formulas
+/// after it. A formula that fails changes nothing.
 ///
 /// # Errors
 /// As [`parse`]; `macros` is then left as it was.

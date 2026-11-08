@@ -67,14 +67,17 @@ impl Map {
         Some(value)
     }
 
+    #[must_use]
     pub fn iter(&self) -> impl ExactSizeIterator<Item = (&String, &Value)> {
         self.entries.iter().map(|(k, v)| (k, v))
     }
 
+    #[must_use]
     pub fn keys(&self) -> impl ExactSizeIterator<Item = &String> {
         self.entries.iter().map(|(k, _)| k)
     }
 
+    #[must_use]
     pub fn values(&self) -> impl ExactSizeIterator<Item = &Value> {
         self.entries.iter().map(|(_, v)| v)
     }
