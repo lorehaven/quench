@@ -1,7 +1,7 @@
 ---
 title: quench-security
 parent: Crates
-nav_order: 41
+nav_order: 42
 has_children: true
 permalink: /crates/quench-security/
 ---

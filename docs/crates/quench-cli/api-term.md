@@ -17,12 +17,15 @@ pub struct RawMode { /* tty: File, saved: String */ }
 
 impl RawMode {
     pub fn enable(fd: i32) -> io::Result<Option<Self>>
+    pub fn enable_with_read_timeout(fd: i32, tenths: u8) -> io::Result<Option<Self>>
     pub fn enable_keeping_input(fd: i32) -> io::Result<Option<Self>>
 }
 impl Drop for RawMode   // restores the saved attributes (errors ignored)
 ```
 
 `enable(fd)`: `Ok(None)` when `fd` is not a terminal (or not open; negative values and nonexistent descriptors count as not a terminal). Otherwise saves the attributes (`stty -g`) and runs `stty -echo -icanon -isig -iexten -ixon -icrnl -inlcr -istrip min 1 time 0`: no echo, no line buffering, no signals from the keyboard (Ctrl-C arrives as byte 3), no CR translation. Dropping the value restores the saved attributes. Errors: `stty` cannot be run or refuses the terminal.
+
+`enable_with_read_timeout(fd, tenths)` works like `enable`, but sets `min 0 time {tenths}` instead of `min 1 time 0`. A read then returns `Ok(0)` after `tenths` tenths of a second when no input comes, and `tenths` of 0 makes reads return at once. This lets a program wait for an answer from the terminal without a thread that keeps reading afterwards, the problem `Keys` has (see below). `graphics::detect::detect` uses `enable_with_read_timeout(0, 1)` ([graphics](api-graphics.md), section `detect`). An `Ok(0)` here does not mean end of input. Errors and the `None` case are the same as for `enable`.
 
 `enable_keeping_input(fd)` is the same function (`stty` does not flush input in either case); the name stays for callers that poll for keys between work.
 

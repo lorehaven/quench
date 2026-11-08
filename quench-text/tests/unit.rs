@@ -457,7 +457,7 @@ fn the_machines_fonts_are_indexed_by_coverage_and_loaded_when_needed() {
         2,
         "the broken and the non-font files are left out"
     );
-    assert!(system.candidates('日').is_empty());
+    assert_eq!(system.candidates('日').len(), 0);
     assert_eq!(system.candidates('я').len(), 2);
     // A set that has none of a character itself loads it from there: here a face that is in the directory only.
     let set = FontSet::new(Arc::new(Font::parse(REGULAR).unwrap()))
@@ -626,10 +626,10 @@ const GOLDEN: [u64; 4] = [
 #[quench_test::test]
 fn files_that_are_not_fonts_are_refused_by_what_is_wrong_with_them() {
     assert_eq!(Font::parse(Vec::new()).unwrap_err(), FontError::NotTrueType);
-    assert_eq!(
-        Font::parse(&b"OTTO\0\0\0\0\0\0\0\0"[..]).unwrap_err(),
-        FontError::NotTrueType
-    );
+    // A CFF font is refused by name, so that a caller can say why.
+    let cff = Font::parse(&b"OTTO\0\0\0\0\0\0\0\0"[..]).unwrap_err();
+    assert_eq!(cff, FontError::Cff);
+    assert_eq!(cff.to_string(), "CFF outlines are not read");
     assert_eq!(
         Font::parse(&b"\0\x01\0\0"[..]).unwrap_err(),
         FontError::Truncated("directory")
@@ -683,10 +683,11 @@ fn files_that_are_not_fonts_are_refused_by_what_is_wrong_with_them() {
     assert_eq!(Font::parse(zero).unwrap_err(), FontError::Truncated("head"));
     for e in [
         FontError::NotTrueType,
+        FontError::Cff,
         FontError::Missing("x"),
         FontError::Truncated("y"),
     ] {
-        assert!(!e.to_string().is_empty());
+        assert_ne!(e.to_string(), "");
     }
 }
 
@@ -764,4 +765,487 @@ fn a_text_laid_out_again_is_the_same_and_each_size_and_width_is_its_own() {
     // The empty text still has its line, cached or not.
     assert_eq!(fonts.layout("", 16.0, None).lines.len(), 1);
     assert_eq!(fonts.layout("", 16.0, None).lines.len(), 1);
+}
+
+// ---- The MATH table ----
+
+/// A small `MATH` table built by hand: no constants, no variants; glyph info with italic corrections for glyphs 5
+/// and 9 (coverage format 1) and corner kerns for glyph 7 (coverage format 2): top right in three height bands,
+/// bottom left one value at every height. The offsets are written out as the specification lays them.
+fn handmade_math() -> Vec<u8> {
+    let words: [i16; 44] = [
+        1, 0, 0, 10,
+        0, // @0 header: version 1.0, constants none, glyph info at 10, variants none
+        8, 0, 0,
+        28, // @10 MathGlyphInfo: italics at +8 (18), no accents, no extended shapes, kerns at +28 (38)
+        12, 2, 145, 0, -7, 0, // @18 italics: coverage at +12 (30), two value records
+        1, 2, 5, 9, // @30 coverage format 1: glyphs 5 and 9
+        12, 1, 22, 0, 0,
+        44, // @38 MathKernInfo: coverage at +12 (50), one record: top right +22, bottom left +44
+        2, 1, 7, 7, 0, // @50 coverage format 2: glyph 7, coverage index 0
+        2, 100, 0, 300, 0, -50, 0, -20, 0, 10,
+        0, // @60 MathKern: heights 100, 300; kerns -50, -20, 10
+        0, -30, 0, // @82 MathKern: no heights, one kern
+    ];
+    words.iter().flat_map(|w| w.to_be_bytes()).collect()
+}
+
+/// `font` with its table `tag` replaced by `table`, appended at the end of the file (the directory entry is
+/// renamed and repointed, so the file keeps its table count).
+fn with_table(font: &[u8], replaced: [u8; 4], tag: [u8; 4], table: &[u8]) -> Vec<u8> {
+    let mut bytes = font.to_vec();
+    let count = usize::from(u16::from_be_bytes([bytes[4], bytes[5]]));
+    let record = (0..count)
+        .map(|i| 12 + i * 16)
+        .find(|r| bytes[*r..*r + 4] == replaced)
+        .unwrap();
+    let at = bytes.len() as u32;
+    bytes[record..record + 4].copy_from_slice(&tag);
+    bytes[record + 8..record + 12].copy_from_slice(&at.to_be_bytes());
+    bytes[record + 12..record + 16].copy_from_slice(&(table.len() as u32).to_be_bytes());
+    bytes.extend_from_slice(table);
+    bytes
+}
+
+#[quench_test::test]
+fn math_kerns_are_looked_up_by_height_band() {
+    use quench_text::{Math, MathKernCorner as Corner};
+    let math = Math::parse(&handmade_math()).unwrap();
+    assert_eq!(math.constants(), None);
+    assert_eq!(math.kerned_glyphs().collect::<Vec<_>>(), [7]);
+    // Below the first height, between the two (a height on a boundary is in the band below), above the last.
+    for (height, kern) in [
+        (i16::MIN, -50),
+        (0, -50),
+        (100, -50),
+        (101, -20),
+        (300, -20),
+        (301, 10),
+        (i16::MAX, 10),
+    ] {
+        assert_eq!(math.kern(7, Corner::TopRight, height), kern, "{height}");
+    }
+    assert_eq!(math.kern(7, Corner::BottomLeft, -1000), -30);
+    assert_eq!(math.kern(7, Corner::BottomLeft, 1000), -30);
+    // A corner the font leaves out, and a glyph without kerns, kern by nothing.
+    assert_eq!(math.kern(7, Corner::TopLeft, 0), 0);
+    assert_eq!(math.kern(7, Corner::BottomRight, 0), 0);
+    assert_eq!(math.kern(8, Corner::TopRight, 0), 0);
+    let info = math.kern_info(7).unwrap();
+    assert_eq!(info.corner(Corner::TopRight).correction_heights, [100, 300]);
+    assert_eq!(info.top_right.kern_values, [-50, -20, 10]);
+    assert_eq!(
+        (math.italics_correction(5), math.italics_correction(9)),
+        (Some(145), Some(-7))
+    );
+    assert_eq!(math.italics_correction(6), None);
+    assert_eq!(math.top_accent_attachment(5), None);
+    assert!(!math.is_extended_shape(5));
+    assert_eq!(math.vertical_glyphs().count(), 0);
+    assert_eq!(math.min_connector_overlap(), 0);
+
+    // The same table in a font: the font finds it; a font without one has none.
+    let font = Font::parse(with_table(REGULAR, *b"post", *b"MATH", &handmade_math())).unwrap();
+    assert_eq!(font.math(), Some(&math));
+    assert!(noto_sans().math().is_none());
+}
+
+#[quench_test::test]
+fn a_damaged_math_table_reads_as_absent_or_empty_and_never_panics() {
+    use quench_text::{Math, MathKernCorner as Corner};
+    let table = handmade_math();
+    for length in 0..table.len() {
+        let math = Math::parse(&table[..length]);
+        assert_eq!(math.is_some(), length >= 10, "{length}");
+        if let Some(math) = math {
+            // Each subtable is read whole or not at all.
+            assert!([0, -20].contains(&math.kern(7, Corner::TopRight, 200)));
+            assert!([None, Some(145)].contains(&math.italics_correction(5)));
+        }
+    }
+    // Another version, or offsets and counts pointing anywhere.
+    let mut other = table.clone();
+    other[1] = 2;
+    assert_eq!(Math::parse(&other), None);
+    for at in (0..table.len()).step_by(2) {
+        for value in [0u16, 1, 2, 3, 0x7FFF, 0xFFFF] {
+            let mut bytes = table.clone();
+            bytes[at..at + 2].copy_from_slice(&value.to_be_bytes());
+            if let Some(math) = Math::parse(&bytes) {
+                for corner in [
+                    Corner::TopRight,
+                    Corner::TopLeft,
+                    Corner::BottomRight,
+                    Corner::BottomLeft,
+                ] {
+                    let _ = math.kern(7, corner, 150);
+                }
+                let _ = (math.italics_correction(5), math.kerned_glyphs().count());
+            }
+        }
+    }
+}
+
+#[quench_test::test]
+fn glyph_bounds_come_from_the_glyph_header() {
+    let font = noto_sans();
+    let o = font.bounds(font.glyph('o').unwrap()).unwrap();
+    let h = font.bounds(font.glyph('H').unwrap()).unwrap();
+    assert!(o.x_min < o.x_max && o.y_min < 0 && o.y_max > 0, "{o:?}");
+    assert!(h.y_min == 0 && h.y_max > o.y_max, "{h:?} {o:?}");
+    // A space has no outline, so no box; nor has a glyph past the last.
+    assert_eq!(font.bounds(font.glyph(' ').unwrap()), None);
+    assert_eq!(font.bounds(font.glyph_count()), None);
+}
+
+#[cfg(feature = "math-font")]
+mod math_font {
+    use quench_text::{Font, GlyphConstruction, Math, MathKernCorner, noto_sans_math};
+
+    const MATH_FONT: &[u8] = include_bytes!("../fonts/NotoSansMath-Regular.ttf");
+
+    fn glyph(c: char) -> u16 {
+        noto_sans_math().glyph(c).unwrap()
+    }
+
+    #[quench_test::test]
+    fn the_math_font_is_embedded_with_its_constants() {
+        let font = noto_sans_math();
+        assert_eq!((font.units_per_em(), font.glyph_count()), (1000, 5130));
+        assert_eq!(font.name(1).as_deref(), Some("Noto Sans Math"));
+        assert!(font.name(5).unwrap().starts_with("Version 3.000"));
+        assert!(font.name(0).unwrap().contains("Google LLC"));
+        assert_eq!(
+            font.name(14).as_deref(),
+            Some("https://openfontlicense.org")
+        );
+        assert!(include_str!("../fonts/README.md").contains("NotoSansMath-Regular.ttf"));
+        assert!(
+            font.name(13)
+                .unwrap()
+                .contains("SIL Open Font License, Version 1.1")
+        );
+        assert_eq!(
+            (font.ascent(), font.descent(), font.line_gap()),
+            (1069, -423, 0)
+        );
+        let c = *font.math().unwrap().constants().unwrap();
+        assert_eq!(
+            (
+                c.script_percent_scale_down,
+                c.script_script_percent_scale_down
+            ),
+            (60, 50)
+        );
+        assert_eq!((c.axis_height, c.accent_base_height), (278, 556));
+        // The rest: rules have a thickness, gaps are gaps, shifts go the way their names say.
+        for (name, value) in [
+            ("fraction_rule_thickness", c.fraction_rule_thickness),
+            ("overbar_rule_thickness", c.overbar_rule_thickness),
+            ("underbar_rule_thickness", c.underbar_rule_thickness),
+            ("radical_rule_thickness", c.radical_rule_thickness),
+            ("radical_vertical_gap", c.radical_vertical_gap),
+            (
+                "radical_display_style_vertical_gap",
+                c.radical_display_style_vertical_gap,
+            ),
+            ("fraction_numerator_gap_min", c.fraction_numerator_gap_min),
+            (
+                "fraction_denominator_gap_min",
+                c.fraction_denominator_gap_min,
+            ),
+            ("stack_gap_min", c.stack_gap_min),
+            ("superscript_shift_up", c.superscript_shift_up),
+            ("subscript_shift_down", c.subscript_shift_down),
+            ("fraction_numerator_shift_up", c.fraction_numerator_shift_up),
+            (
+                "fraction_denominator_shift_down",
+                c.fraction_denominator_shift_down,
+            ),
+            ("sub_superscript_gap_min", c.sub_superscript_gap_min),
+            ("space_after_script", c.space_after_script),
+            ("upper_limit_gap_min", c.upper_limit_gap_min),
+            ("lower_limit_gap_min", c.lower_limit_gap_min),
+            (
+                "radical_degree_bottom_raise_percent",
+                c.radical_degree_bottom_raise_percent,
+            ),
+        ] {
+            assert!(value > 0 && value < 1000, "{name} = {value}");
+        }
+        assert!(c.display_operator_min_height > 1000);
+        assert!(c.delimited_sub_formula_min_height > 1000);
+        assert!(c.superscript_shift_up_cramped < c.superscript_shift_up);
+        assert!(c.fraction_numerator_display_style_shift_up > c.fraction_numerator_shift_up);
+        assert!(c.flattened_accent_base_height > c.accent_base_height);
+        // The kern after a radical's degree pulls the radicand back under it.
+        assert!(c.radical_kern_after_degree < 0 && c.radical_kern_before_degree > 0);
+        // Parsed once: the same table each time.
+        assert!(std::ptr::eq(font.math().unwrap(), font.math().unwrap()));
+    }
+
+    /// Checks a construction: variants that grow, starting at the glyph itself, and an assembly of real glyphs
+    /// with at least one extender.
+    fn grows(font: &Font, base: u16, construction: &GlyphConstruction, with_assembly: bool) {
+        let variants = &construction.variants;
+        assert!(
+            variants.windows(2).all(|w| w[0].advance < w[1].advance),
+            "{variants:?}"
+        );
+        if let Some(first) = variants.first() {
+            assert_eq!(first.glyph, base);
+        }
+        assert!(variants.iter().all(|v| v.glyph < font.glyph_count()));
+        let Some(assembly) = &construction.assembly else {
+            assert!(!with_assembly, "{base}: no assembly");
+            return;
+        };
+        assert!(assembly.parts.len() >= 2);
+        assert!(assembly.parts.iter().any(|p| p.extender));
+        assert!(assembly.parts.iter().any(|p| !p.extender));
+        for part in &assembly.parts {
+            assert!(part.glyph < font.glyph_count() && part.full_advance > 0);
+            assert!(font.bounds(part.glyph).is_some(), "{part:?}");
+        }
+        // The first part has no start connector and the last no end connector.
+        assert_eq!(assembly.parts[0].start_connector_length, 0);
+        assert_eq!(assembly.parts.last().unwrap().end_connector_length, 0);
+    }
+
+    #[quench_test::test]
+    fn delimiters_radicals_and_integrals_grow_by_variants_then_assemblies() {
+        let font = noto_sans_math();
+        let math = font.math().unwrap();
+        assert_eq!(math.min_connector_overlap(), 100);
+        for c in [
+            '(', ')', '[', ']', '{', '}', '|', '\u{2016}', '\u{221A}', '\u{222B}',
+        ] {
+            let g = glyph(c);
+            let vertical = math.vertical_construction(g).unwrap();
+            assert!(vertical.variants.len() >= 2, "{c:?}");
+            grows(&font, g, vertical, true);
+            assert!(math.horizontal_construction(g).is_none());
+            assert!(math.is_extended_shape(g), "{c:?}");
+        }
+        // `(`: bottom hook, extender, top hook. The integral's assembly leans: it has an italic correction.
+        let paren = math.vertical_construction(glyph('(')).unwrap();
+        let parts = &paren.assembly.as_ref().unwrap().parts;
+        assert_eq!(
+            parts.iter().map(|p| p.extender).collect::<Vec<_>>(),
+            [false, true, false]
+        );
+        let integral = math.vertical_construction(glyph('\u{222B}')).unwrap();
+        assert!(integral.assembly.as_ref().unwrap().italics_correction > 0);
+        // A large operator has a display size but no assembly; an angle bracket only variants.
+        let sum = math.vertical_construction(glyph('\u{2211}')).unwrap();
+        assert!(sum.variants.len() >= 2 && sum.assembly.is_none());
+        grows(&font, glyph('\u{2211}'), sum, false);
+        assert!(
+            math.vertical_construction(glyph('\u{27E8}'))
+                .unwrap()
+                .assembly
+                .is_none()
+        );
+        // Ordinary letters do not grow.
+        assert!(math.vertical_construction(glyph('x')).is_none());
+        assert!(!math.is_extended_shape(glyph('x')));
+        assert!(math.vertical_glyphs().count() > 100);
+    }
+
+    #[quench_test::test]
+    fn braces_and_arrows_grow_wider() {
+        let font = noto_sans_math();
+        let math = font.math().unwrap();
+        // The over-brace: wider variants, then an assembly with two extenders around the middle tip.
+        let brace = math.horizontal_construction(glyph('\u{23DE}')).unwrap();
+        grows(&font, glyph('\u{23DE}'), brace, true);
+        let parts = &brace.assembly.as_ref().unwrap().parts;
+        assert_eq!(
+            parts.iter().map(|p| p.extender).collect::<Vec<_>>(),
+            [false, true, false, true, false]
+        );
+        // Arrows have only an assembly: a shaft that repeats and a head.
+        for c in ['\u{2192}', '\u{2190}'] {
+            let arrow = math.horizontal_construction(glyph(c)).unwrap();
+            assert_eq!(arrow.variants.len(), 0);
+            grows(&font, glyph(c), arrow, true);
+        }
+        // A wide hat: variants only, and its first variant is not the combining glyph itself.
+        let hat = math.horizontal_construction(glyph('\u{0302}')).unwrap();
+        assert!(hat.variants.len() >= 3 && hat.assembly.is_none());
+        assert!(math.horizontal_glyphs().count() > 10);
+    }
+
+    #[quench_test::test]
+    fn math_letters_have_italic_corrections_and_accent_attachments() {
+        let font = noto_sans_math();
+        let math = font.math().unwrap();
+        // The mathematical alphanumerics are beyond the BMP: the format 12 character map finds them.
+        let italic_f = glyph('\u{1D453}');
+        let bold_a = glyph('\u{1D400}');
+        let reals = glyph('\u{211D}');
+        let mut ids = vec![italic_f, bold_a, reals, glyph('A'), glyph('\u{1D538}')];
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), 5, "each its own glyph");
+        // U+1D455 is a hole in the block (italic h is U+210E).
+        assert_eq!(font.glyph('\u{1D455}'), None);
+        assert!(font.glyph('\u{210E}').is_some());
+        assert_eq!(math.italics_correction(italic_f), Some(145));
+        assert_eq!(math.italics_correction(bold_a), None);
+        // The accent goes over the ink: inside the letter's box.
+        for g in [bold_a, reals, glyph('a'), italic_f] {
+            let accent = math.top_accent_attachment(g).unwrap();
+            let bounds = font.bounds(g).unwrap();
+            assert!(
+                bounds.x_min < accent && accent < bounds.x_max,
+                "{g}: {accent} {bounds:?}"
+            );
+        }
+        assert_eq!(math.top_accent_attachment(glyph('\u{222B}')), None);
+        // This font has no math kerns at all: every corner kerns by nothing.
+        assert_eq!(math.kerned_glyphs().count(), 0);
+        assert_eq!(math.kern(italic_f, MathKernCorner::TopRight, 500), 0);
+    }
+
+    /// The real font with its `MATH` table's directory length set to `length`.
+    fn with_math_length(length: u32) -> Vec<u8> {
+        let mut bytes = MATH_FONT.to_vec();
+        let record = (0..18)
+            .map(|i| 12 + i * 16)
+            .find(|r| &bytes[*r..*r + 4] == b"MATH")
+            .unwrap();
+        bytes[record + 12..record + 16].copy_from_slice(&length.to_be_bytes());
+        bytes
+    }
+
+    fn math_table() -> &'static [u8] {
+        let record = (0..18)
+            .map(|i| 12 + i * 16)
+            .find(|r| &MATH_FONT[*r..*r + 4] == b"MATH")
+            .unwrap();
+        let word =
+            |at: usize| u32::from_be_bytes(MATH_FONT[at..at + 4].try_into().unwrap()) as usize;
+        let (offset, length) = (word(record + 8), word(record + 12));
+        &MATH_FONT[offset..offset + length]
+    }
+
+    /// Everything a typesetter asks of the table, for whatever comes out.
+    fn ask_everything(math: &Math) {
+        let _ = math.constants();
+        for g in (0..5200).step_by(7) {
+            let _ = (
+                math.italics_correction(g),
+                math.top_accent_attachment(g),
+                math.is_extended_shape(g),
+                math.kern(g, MathKernCorner::BottomLeft, 100),
+                math.vertical_construction(g),
+                math.horizontal_construction(g),
+            );
+        }
+    }
+
+    #[quench_test::test]
+    fn damage_to_one_direction_of_growth_leaves_the_other() {
+        let full = math_table();
+        let word =
+            |bytes: &[u8], at: usize| usize::from(u16::from_be_bytes([bytes[at], bytes[at + 1]]));
+        let variants = word(full, 8);
+        let vertical_count = word(full, variants + 6);
+        let intact = Math::parse(full).unwrap();
+        let (vertical, horizontal) = (
+            intact.vertical_glyphs().count(),
+            intact.horizontal_glyphs().count(),
+        );
+        assert!(vertical > 100 && horizontal > 10);
+        // A construction offset pointing past the table, first among the vertical ones, then the horizontal.
+        for (field, damaged_vertical) in [
+            (variants + 10, true),
+            (variants + 10 + vertical_count * 2, false),
+        ] {
+            let mut bytes = full.to_vec();
+            bytes[field..field + 2].copy_from_slice(&0xFFFF_u16.to_be_bytes());
+            let math = Math::parse(&bytes).unwrap();
+            let counts = (
+                math.vertical_glyphs().count(),
+                math.horizontal_glyphs().count(),
+            );
+            if damaged_vertical {
+                assert_eq!(
+                    counts,
+                    (0, horizontal),
+                    "the horizontal constructions survive"
+                );
+                assert_eq!(
+                    math.horizontal_construction(glyph('\u{23DE}')),
+                    intact.horizontal_construction(glyph('\u{23DE}'))
+                );
+            } else {
+                assert_eq!(counts, (vertical, 0), "the vertical constructions survive");
+                assert_eq!(
+                    math.vertical_construction(glyph('(')),
+                    intact.vertical_construction(glyph('('))
+                );
+            }
+            // The rest of the table is untouched.
+            assert_eq!(math.constants(), intact.constants());
+            assert_eq!(math.min_connector_overlap(), 100);
+        }
+    }
+
+    #[quench_test::test]
+    fn the_real_math_table_cut_short_or_scrambled_never_panics() {
+        let full = math_table();
+        assert_eq!(full.len(), 20_200);
+        // Cut short in the directory: the font reads, the table shrinks to what is left.
+        for length in [0, 1, 9, 10, 100, 223, 224, 300, 3000, 10_000, 20_199] {
+            let font = Font::parse(with_math_length(length)).unwrap();
+            let math = font.math();
+            assert_eq!(math.is_some(), length >= 10, "{length}");
+            if let Some(math) = math {
+                // The constants (214 bytes from offset 10) are there whole, or not at all.
+                assert_eq!(math.constants().is_some(), length >= 224, "{length}");
+                ask_everything(math);
+            }
+        }
+        // Longer than the file: the table is missing.
+        assert!(
+            Font::parse(with_math_length(u32::MAX))
+                .unwrap()
+                .math()
+                .is_none()
+        );
+        // Every cut of the table itself.
+        for length in (0..full.len()).step_by(97) {
+            if let Some(math) = Math::parse(&full[..length]) {
+                ask_everything(&math);
+            }
+        }
+        // Garbage, after an intact header and in place of it.
+        let mut state = 0x9E37_79B9_7F4A_7C15_u64;
+        for round in 0..40 {
+            let mut bytes = full.to_vec();
+            for _ in 0..=(round * 8) {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                let at = if round % 2 == 0 {
+                    (state as usize) % 600
+                } else {
+                    (state as usize) % bytes.len()
+                };
+                bytes[at] = (state >> 32) as u8;
+            }
+            if round % 5 == 0 {
+                bytes[..2].copy_from_slice(&[0, 1]);
+            }
+            if let Some(math) = Math::parse(&bytes) {
+                ask_everything(&math);
+            }
+        }
+        let garbage: Vec<u8> = (0..20_000u32)
+            .map(|i| (i.wrapping_mul(2_654_435_761) >> 13) as u8)
+            .collect();
+        let _ = Math::parse(&garbage).map(|m| ask_everything(&m));
+    }
 }

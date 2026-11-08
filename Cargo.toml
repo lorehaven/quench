@@ -55,6 +55,8 @@ members = [
   "quench-html",
   "quench-test",
   "quench-text",
+  "quench-tex",
+  "quench-markdown-term",
   "quench-test-macros",
   "quench-test-bdd",
   "quench-test-bdd-macros",
@@ -125,6 +127,8 @@ quench-tls = { path = "quench-tls", registry = "ennor", version = "0.1.0" }
 quench-raster = { path = "quench-raster", registry = "ennor", version = "0.1.0" }
 quench-qr = { path = "quench-qr", registry = "ennor", version = "0.1.0" }
 quench-text = { path = "quench-text", registry = "ennor", version = "0.1.0" }
+quench-tex = { path = "quench-tex", registry = "ennor", version = "0.1.0" }
+quench-markdown-term = { path = "quench-markdown-term", registry = "ennor", version = "0.1.0" }
 quench-test = { path = "quench-test", registry = "ennor", version = "0.1.0" }
 quench-test-bdd = { path = "quench-test-bdd", registry = "ennor", version = "0.1.0" }
 quench-test-bdd-macros = { path = "quench-test-bdd-macros", registry = "ennor", version = "0.1.0" }

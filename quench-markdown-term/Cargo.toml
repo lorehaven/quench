@@ -1,0 +1,42 @@
+[package]
+name = "quench-markdown-term"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - Markdown laid out for a terminal: the quench-html syntax tree as styled lines for a width, with ANSI and plain writers"
+keywords = ["markdown", "terminal", "ansi", "commonmark", "pager"]
+categories = ["command-line-interface", "text-processing"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+autotests = false
+
+[lib]
+name = "quench_markdown_term"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[features]
+# `TexMath`: formulas as Unicode and two-dimensional text through quench-tex.
+tex = ["dep:quench-tex"]
+
+[dependencies]
+quench-html = { workspace = true, default-features = false, features = ["markdown"] }
+quench-tex = { workspace = true, optional = true }
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false
+
+[[test]]
+name = "tex"
+path = "tests/tex.rs"
+required-features = ["tex"]
+harness = false
+
+[dev-dependencies]
+quench-test = { workspace = true }

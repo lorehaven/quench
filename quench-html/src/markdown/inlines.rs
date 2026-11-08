@@ -1,33 +1,20 @@
-//! Inline content: emphasis, code spans, links, images, autolinks, raw HTML and breaks.
+//! Inline content: emphasis, code spans, links, images, autolinks, raw HTML and breaks; with the extensions
+//! of [`Options`], strikethrough, math and footnote references too.
 
+use super::ast::{Inline, Options};
 use super::blocks::Reference;
 use super::scan;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
-pub enum Inline {
-    Text(String),
-    Code(String),
-    Emph(Vec<Self>),
-    Strong(Vec<Self>),
-    Link {
-        destination: String,
-        title: String,
-        children: Vec<Self>,
-    },
-    Image {
-        destination: String,
-        title: String,
-        children: Vec<Self>,
-    },
-    Html(String),
-    SoftBreak,
-    HardBreak,
-}
+/// How deep emphasis and brackets may nest. Beyond it delimiters and brackets stay text, so input built to
+/// nest thousands deep cannot exhaust the stack of the recursive steps after parsing.
+pub const MAX_NESTING: usize = 64;
 
 /// An item while parsing: finished content, or a delimiter run / bracket still to be resolved.
 #[derive(Debug, Clone)]
 enum Item {
+    /// Emphasis, a link or an image already made, and how deep its tree is (1 when its children are leaves).
+    Nested(Inline, usize),
     Node(Inline),
     Delim {
         ch: u8,
@@ -50,6 +37,11 @@ struct Parser<'a> {
     pos: usize,
     items: Vec<Item>,
     references: &'a HashMap<String, Reference>,
+    /// The normalized labels of the footnote definitions, and the label as defined.
+    footnotes: &'a HashMap<String, String>,
+    options: Options,
+    /// Where plain text stops: the characters that may start something.
+    specials: Vec<char>,
 }
 
 const fn is_unicode_whitespace(c: char) -> bool {
@@ -69,14 +61,29 @@ const fn is_combining(c: char) -> bool {
     matches!(c as u32, 0x0300..=0x036F | 0x1AB0..=0x1AFF | 0x1DC0..=0x1DFF | 0x20D0..=0x20FF | 0xFE20..=0xFE2F)
 }
 
-/// Parses the inline content of a paragraph or heading.
-pub fn parse(content: &str, references: &HashMap<String, Reference>) -> Vec<Inline> {
+/// Parses the inline content of a paragraph, heading or table cell.
+pub fn parse(
+    content: &str,
+    references: &HashMap<String, Reference>,
+    footnotes: &HashMap<String, String>,
+    options: Options,
+) -> Vec<Inline> {
     let subject = content.trim_matches([' ', '\t', '\n']);
+    let mut specials = vec!['\n', '\\', '`', '*', '_', '[', ']', '!', '<', '&'];
+    if options.strikethrough {
+        specials.push('~');
+    }
+    if options.math {
+        specials.push('$');
+    }
     let mut parser = Parser {
         subject,
         pos: 0,
         items: Vec::new(),
         references,
+        footnotes,
+        options,
+        specials,
     };
     while parser.pos < subject.len() {
         parser.parse_inline();
@@ -109,10 +116,18 @@ impl Parser<'_> {
             b'\\' => self.backslash(),
             b'`' => self.backticks(),
             b'*' | b'_' => self.delimiters(c),
+            b'~' if self.options.strikethrough => self.delimiters(c),
+            b'$' if self.options.math => self.math(),
+            b'[' if self.footnote_reference() => {}
             b'[' => {
                 let index = self.pos;
                 self.pos += 1;
                 self.open_bracket("[", false, index);
+            }
+            b'!' if self.subject[self.pos + 1..].starts_with("[^") && self.is_footnote(1) => {
+                // `![^1]` is a `!` and a footnote reference, not an image.
+                self.pos += 1;
+                self.push_text("!");
             }
             b'!' => {
                 if self.subject[self.pos + 1..].starts_with('[') {
@@ -131,13 +146,89 @@ impl Parser<'_> {
                 // Plain text up to the next special character.
                 let end = self
                     .rest()
-                    .find(['\n', '\\', '`', '*', '_', '[', ']', '!', '<', '&'])
+                    .find(self.specials.as_slice())
                     .map_or(self.subject.len(), |i| self.pos + i);
                 let text = &self.subject[self.pos..end.max(self.pos + 1)];
                 let text = text.to_string();
                 self.pos += text.len();
                 self.push_text(&text);
             }
+        }
+    }
+
+    /// `[^label]` at `pos + skip` naming a defined footnote: the label's length.
+    fn footnote_at(&self, skip: usize) -> Option<(usize, &str)> {
+        if !self.options.footnotes {
+            return None;
+        }
+        let rest = self.subject[self.pos + skip..].strip_prefix("[^")?;
+        let end = rest.find(']')?;
+        let label = &rest[..end];
+        if label.is_empty() || label.contains(|c: char| c.is_whitespace() || c == '[') {
+            return None;
+        }
+        let defined = self
+            .footnotes
+            .get(&scan::normalize_label(&format!("[{label}]")))?;
+        Some((end + 3, defined.as_str()))
+    }
+
+    fn is_footnote(&self, skip: usize) -> bool {
+        self.footnote_at(skip).is_some()
+    }
+
+    /// A footnote reference at `pos`, if there is one; its number is given later, in document order.
+    fn footnote_reference(&mut self) -> bool {
+        let Some((len, label)) = self.footnote_at(0) else {
+            return false;
+        };
+        let label = label.to_string();
+        self.pos += len;
+        self.items.push(Item::Node(Inline::FootnoteReference {
+            label,
+            number: 0,
+            occurrence: 0,
+        }));
+        true
+    }
+
+    /// `$...$` or `$$...$$`, by GitHub's rules, so that prices and shell variables are not math: the opening
+    /// `$` is not followed by a space, the closing one is not preceded by one nor followed by a digit. The TeX
+    /// is kept as written (`\$` inside it is TeX's escaped dollar).
+    fn math(&mut self) {
+        let rest = self.rest();
+        let double = rest.starts_with("$$");
+        let open = if double { 2 } else { 1 };
+        let body = &rest[open..];
+        let found = if double {
+            find_unescaped(body, "$$").filter(|&end| end > 0)
+        } else if body.starts_with([' ', '\t', '\n', '$']) {
+            None
+        } else {
+            let mut from = 0;
+            loop {
+                let Some(end) = find_unescaped(&body[from..], "$").map(|e| e + from) else {
+                    break None;
+                };
+                let before = body[..end].chars().next_back();
+                let after = body[end + 1..].chars().next();
+                if end > 0
+                    && !before.is_some_and(char::is_whitespace)
+                    && !after.is_some_and(|c| c.is_ascii_digit())
+                {
+                    break Some(end);
+                }
+                from = end + 1;
+            }
+        };
+        if let Some(end) = found {
+            let tex = body[..end].replace('\n', " ");
+            self.pos += open + end + open;
+            self.items
+                .push(Item::Node(Inline::Math(tex.trim().to_string())));
+        } else {
+            self.pos += open;
+            self.push_text(&"$".repeat(open));
         }
     }
 
@@ -245,6 +336,15 @@ impl Parser<'_> {
     }
 
     fn open_bracket(&mut self, text: &str, image: bool, index: usize) {
+        let open = self
+            .items
+            .iter()
+            .filter(|i| matches!(i, Item::Bracket { .. }))
+            .count();
+        if open >= MAX_NESTING {
+            self.push_text(text);
+            return;
+        }
         // An earlier bracket now has another after it, which rules out its shortcut form.
         for item in &mut self.items {
             if let Item::Bracket { bracket_after, .. } = item {
@@ -352,6 +452,10 @@ impl Parser<'_> {
             }
         }
 
+        if matched && reaches(&self.items[opener_at + 1..], MAX_NESTING) {
+            matched = false;
+        }
+        let depth = nested_depth(&self.items[opener_at + 1..]) + 1;
         if matched {
             let inner: Vec<Item> = self.items.split_off(opener_at + 1);
             self.items.pop();
@@ -380,7 +484,7 @@ impl Parser<'_> {
                     children,
                 }
             };
-            self.items.push(Item::Node(node));
+            self.items.push(Item::Nested(node, depth));
         } else {
             self.items[opener_at] =
                 Item::Node(Inline::Text(if image { "![" } else { "[" }.to_string()));
@@ -441,8 +545,22 @@ impl Parser<'_> {
 }
 
 /// Turns items into final inlines: delimiter runs are matched into emphasis, leftovers become text.
-fn resolve(mut items: Vec<Item>) -> Vec<Inline> {
-    let mut i = 0;
+fn resolve(items: Vec<Item>) -> Vec<Inline> {
+    resolve_at(items, 0)
+}
+
+/// [`resolve`] at nesting `depth`: from [`MAX_NESTING`] on, delimiters are no longer matched.
+fn resolve_at(mut items: Vec<Item>, depth: usize) -> Vec<Inline> {
+    // Too deep: leave every delimiter as text.
+    let mut i = if depth >= MAX_NESTING { items.len() } else { 0 };
+    // Openers before `floor` are no longer looked at: every one of them would hold a tree that reached the
+    // nesting limit (cmark's "openers bottom" serves the same purpose). Without it each refused closer is
+    // walked over again by every closer after it.
+    let mut floor = 0;
+    // cmark's openers bottom: where the search for an opener of a closer of this kind (character, whether it can
+    // also open, run length mod 3) last failed. No opener below it can match a later closer of the same kind,
+    // so the search stops there: otherwise every unmatched closer is walked over by each closer after it.
+    let mut bottoms: HashMap<(u8, bool, usize), usize> = HashMap::new();
     while i < items.len() {
         let Item::Delim {
             ch,
@@ -455,15 +573,28 @@ fn resolve(mut items: Vec<Item>) -> Vec<Inline> {
             i += 1;
             continue;
         };
-        // Look back for a matching opener.
-        let opener = (0..i).rev().find(|&j| {
-            matches!(&items[j], Item::Delim { ch: c, can_open: true, original: o, can_close: oc, .. }
-                if *c == ch && {
+        // Look back for a matching opener. Tildes match a run of the same length, one or two.
+        let kind = (ch, closer_can_open, original % 3);
+        let bottom = bottoms.get(&kind).copied().unwrap_or(0).max(floor);
+        let opener = (bottom..i).rev().find(|&j| {
+            matches!(&items[j], Item::Delim { ch: c, can_open: true, original: o, can_close: oc, count: n }
+                if *c == ch && if ch == b'~' {
+                    *n == count && count <= 2
+                } else {
                     let both = closer_can_open || *oc;
                     !both || (o + original) % 3 != 0 || (o % 3 == 0 && original % 3 == 0)
                 })
         });
+        // Matching would nest the tree too deep: leave the closer unmatched.
+        let opener = opener.filter(|&j| {
+            let deep = reaches(&items[j + 1..i], MAX_NESTING);
+            if deep {
+                floor = i;
+            }
+            !deep
+        });
         let Some(j) = opener else {
+            bottoms.insert(kind, i);
             if !closer_can_open {
                 // This closer can never match: it is plain text.
                 items[i] = Item::Node(Inline::Text((ch as char).to_string().repeat(count)));
@@ -478,18 +609,32 @@ fn resolve(mut items: Vec<Item>) -> Vec<Inline> {
             i += 1;
             continue;
         };
-        let used = if count >= 2 && open_count >= 2 { 2 } else { 1 };
-        // Everything between the two delimiters becomes the emphasis content.
+        let used = if ch == b'~' {
+            count
+        } else if count >= 2 && open_count >= 2 {
+            2
+        } else {
+            1
+        };
+        // Everything between the two delimiters becomes the emphasis content. That shifts the items above
+        // the opener, so a bottom above it no longer points where it was set: look from the opener again
+        // (looking further than needed is always correct, only slower).
+        for b in bottoms.values_mut() {
+            *b = (*b).min(j);
+        }
         let inner: Vec<Item> = items.drain(j + 1..i).collect();
-        let children = resolve(inner);
-        let node = if used == 2 {
+        let tree_depth = nested_depth(&inner) + 1;
+        let children = resolve_at(inner, depth + 1);
+        let node = if ch == b'~' {
+            Inline::Strikethrough(children)
+        } else if used == 2 {
             Inline::Strong(children)
         } else {
             Inline::Emph(children)
         };
         // After draining, the closer is at j + 1.
         let closer_index = j + 1;
-        items.insert(closer_index, Item::Node(node));
+        items.insert(closer_index, Item::Nested(node, tree_depth));
         let closer_at = closer_index + 1;
         if let Item::Delim { count, .. } = &mut items[closer_at] {
             *count -= used;
@@ -512,9 +657,46 @@ fn resolve(mut items: Vec<Item>) -> Vec<Inline> {
     items
         .into_iter()
         .map(|item| match item {
-            Item::Node(n) => n,
+            Item::Node(n) | Item::Nested(n, _) => n,
             Item::Delim { ch, count, .. } => Inline::Text((ch as char).to_string().repeat(count)),
             Item::Bracket { image, .. } => Inline::Text(if image { "![" } else { "[" }.to_string()),
         })
         .collect()
+}
+
+/// The depth of the deepest tree among `items`.
+fn nested_depth(items: &[Item]) -> usize {
+    items
+        .iter()
+        .map(|item| match item {
+            Item::Nested(_, depth) => *depth,
+            _ => 0,
+        })
+        .max()
+        .unwrap_or(0)
+}
+
+/// Whether a tree among `items` is `limit` deep, looking no further than the first that is: refused matches
+/// leave long runs behind such a tree, and scanning them every time would make deep input quadratic.
+fn reaches(items: &[Item], limit: usize) -> bool {
+    items
+        .iter()
+        .any(|item| matches!(item, Item::Nested(_, depth) if *depth >= limit))
+}
+
+/// The first `needle` in `s` that is not escaped by a backslash.
+fn find_unescaped(s: &str, needle: &str) -> Option<usize> {
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'\\' {
+            i += 2;
+            continue;
+        }
+        if bytes[i..].starts_with(needle.as_bytes()) {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
 }

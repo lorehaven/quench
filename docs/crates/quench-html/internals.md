@@ -4,7 +4,7 @@ parent: quench-html
 nav_order: 4
 ---
 
-What the parser, the selector engine, the entity decoder and the Markdown renderer do, read from `src/dom.rs`, `selector.rs`, `entities.rs` and `markdown/`.
+What the parser, the selector engine, the entity decoder and the Markdown parser and renderer do, read from `src/dom.rs`, `selector.rs`, `entities.rs` and `markdown/`.
 
 ## Tree building
 
@@ -50,14 +50,57 @@ an+b      := odd | even | integer | [-]an[+-b]
 
 ## Markdown
 
-* CommonMark 0.31 only. Passes the 652 spec examples. Output formatting follows the spec's HTML (newlines between blocks, `<img ... />`, `<br />`, `<hr />`).
-* Not part of this renderer: GFM tables, task lists, strikethrough, autolink literals, footnotes, heading ids, smart punctuation, front matter. `| a | b |` lines are paragraph text.
+`markdown::parse` runs in two passes, then any renderer walks the result:
+
+1. **Blocks** (`markdown/blocks.rs`): the CommonMark block algorithm, line by line, into an internal tree of containers and leaves with their raw text. Link reference definitions are taken off the start of paragraphs when the paragraph closes. With the options it also reads tables, footnote definitions and `$$` math blocks.
+2. **Build** (`markdown/build.rs`): the internal tree becomes the public `ast::Document`. It parses the inlines of every paragraph, heading and table cell (`markdown/inlines.rs`), numbers the footnotes, takes task markers off their items and recognises display math.
+3. **Render** (`markdown/render.rs`): `render_html` writes the `ast::Document` as HTML; it reads nothing but the tree.
+
+* CommonMark 0.31: passes the 652 spec examples with `Options::COMMONMARK`. Output formatting follows the spec's HTML (newlines between blocks, `<img ... />`, `<br />`, `<hr />`).
+* The GFM extensions pass the 24 cmark-gfm examples kept in `tests/fixtures/gfm-extensions.json` (see [Testing](testing.md)), so their HTML matches cmark-gfm's and GitHub's byte for byte.
+* Not read, with any options: smart punctuation, GFM extended autolinks (`www.example.com`, bare `https://...` without `<>`), the GFM tag filter (`<script>`, `<iframe>`, ... are not neutralised), definition lists, heading ids, front matter, emoji shortcodes, `==highlight==`, sub/superscript.
 * Raw HTML blocks and inline HTML are copied through unchanged; link destinations are not filtered by scheme (`javascript:` is kept; characters are percent-encoded per the spec's URL normalisation).
+
+## Markdown extensions
+
+How each option changes parsing. Each rule is in the source file named.
+
+### Tables (`tables`, `blocks.rs`, `build.rs`)
+
+* A table starts when a line is a **delimiter row** directly under a paragraph line (not indented 4 or more). The delimiter row is split into cells at unescaped `|`, with one leading and one trailing `|` dropped and every cell trimmed; each cell must be one or more `-` with an optional `:` at either end. It **must contain a `|`**, so `text\n---` stays a setext heading. The check runs **before** setext headings, so `a\n|---` is a one-column table.
+* The header is the last line of the paragraph and must split into exactly as many cells as the delimiter row; otherwise there is no table (the lines stay paragraph text). Earlier lines of the paragraph stay a paragraph above the table.
+* Every following non-blank line is a row (pipes optional, indentation allowed) until a blank line or a line that starts another block (`>`, `#`, a list item, a fence, ...).
+* Cells: split like the delimiter row; `\|` is a cell character and becomes `|` before the cell's inlines are parsed, also inside code spans. Rows are cut or padded with empty cells to the header's width.
+* Tables work in any container (list items, block quotes, footnotes).
+
+### Strikethrough (`strikethrough`, `inlines.rs`)
+
+`~` is a delimiter character like `*` (same left/right-flanking rules). A closing run matches only an opener run of the **same length**, and only lengths 1 and 2 match: `~a~`, `~~a~~` are struck; `~a~~`, `~~~a~~~` stay text. The whole run is used, so there is no nesting by splitting runs.
+
+### Task lists (`task_lists`, `build.rs`)
+
+An item is a task when its first block is a paragraph whose text starts with `[ ]`, `[x]` or `[X]` followed by a space, a tab or a line end. The marker is removed and `ListItem::task` is set; the rest of the paragraph (possibly empty) stays the item's first paragraph. Tight lists put the checkbox straight into `<li>`, loose lists inside the `<p>`.
+
+### Footnotes (`footnotes`, `blocks.rs`, `inlines.rs`, `build.rs`)
+
+* **Definition:** `[^label]:` at the start of a line (indented at most 3 columns). The label is not empty and contains no whitespace and no `[`; otherwise the line is read as CommonMark (e.g. a link reference definition). The definition is a container: the rest of its first line starts its first block, and it continues over blank lines and lines indented by 4 or more columns (those 4 columns are removed), plus lazy continuation lines of an open paragraph. Labels are normalised like link labels (case-folded, whitespace collapsed); the first definition of a label wins.
+* **Reference:** `[^label]` naming a **defined** footnote. It is checked before links, so it never becomes a link; an undefined `[^label]` is parsed as ordinary brackets (text, or a link if a link reference matches). `![^1]` is `!` followed by a reference, not an image.
+* **Numbering** (`build.rs`): references are numbered while the inlines are built, in document order. Footnotes get numbers 1, 2, ... by first reference. After the body, the referenced footnotes are built in that order, and references found inside them add further footnotes at the end of the list, until no new one appears (so a footnote referenced only from another footnote is kept). Each reference records its `occurrence` (1, 2, ...); `Footnote::references` is the total. Unreferenced definitions are dropped.
+
+### Math (`math`, `blocks.rs`, `inlines.rs`, `build.rs`)
+
+* **Inline** (`inlines.rs`), by GitHub's dollar rules so that prices and shell variables are not math: `$` opens when not followed by a space, tab, newline or another `$`; the closing `$` is the next unescaped `$` that is not preceded by whitespace and not followed by an ASCII digit, with at least one character in between. `$$` opens a span closed by the next unescaped `$$` (non-empty content, no other condition): this is kramdown's inline `$$...$$`. A backslash skips the next character while searching, so `\$` inside the TeX is kept as TeX. Without a match the dollars are text. Inside, nothing is parsed: newlines become spaces and the TeX is trimmed. Code spans and other constructs that start earlier take precedence (`` `$x$` `` is code); a `\$` outside math is an escaped dollar.
+* **Display**, three forms, all giving `Block::Math`:
+  * a block between a line that is only `$$` (indented at most 3, trailing spaces allowed) and the next such line. Lines in between are kept verbatim, with up to the opening line's indentation removed. Without a closing line it runs to the end of its container, like a code fence;
+  * a paragraph whose trimmed text starts and ends with `$$`, has non-blank content and no other `$$` inside (`build.rs`); the TeX is trimmed;
+  * a fenced code block (backticks or tildes) whose info string's first word is `math`; its final newline is removed.
+* Without `math`, a `math` fence is an ordinary code block with `class="language-math"`.
 
 ## Security notes
 
-* No sanitizer. Never insert `to_html` output or `Node::html()` of untrusted input into a page without filtering `script`, event-handler attributes (`on*`), `javascript:`/`data:` URLs, `style`, `iframe`, `object`, `embed`, `svg` and friends.
+* No sanitizer. Never insert `to_html` / `to_html_with` / `render_html` output or `Node::html()` of untrusted input into a page without filtering `script`, event-handler attributes (`on*`), `javascript:`/`data:` URLs, `style`, `iframe`, `object`, `embed`, `svg` and friends.
+* In the Markdown output, text, code, TeX, table cells, attribute values and footnote labels are escaped (footnote labels are also percent-encoded in `href`/`id`, so `[^"><script>...]` cannot break out, as cmark-gfm's example 21 in the fixtures checks); only raw HTML from the input and link/image destinations by scheme are left unfiltered.
 * `Node::html()` re-escapes text and attribute values, but writes `script`/`style` text and comment bodies verbatim; text of `noscript`, `iframe`, `xmp`, `noembed`, `noframes` is parsed raw and re-escaped on output, so a round trip of those elements changes their text.
 * Limits: no size, depth or node-count limit is applied by the parser. Observed in a debug build while writing this page: 20 000 consecutive `<script>x</script>` took about 4 s (every raw-text start tag lower-cases the remainder of the input, so cost is quadratic in input size times the number of raw-text elements); 5 000 nested `<div>` took about 0.5 s and 200 000 did not finish within the time available (implicit-end-tag scans walk the open-element stack, so cost grows quadratically with depth). Bound the input size before parsing untrusted HTML.
 * `Node::html()` / `inner_html()` serialise recursively: a document nested deeper than the thread's stack allows can overflow it (from the source; not tested). `descendants`, `select` and `text` are iterative.
-* Markdown nesting of 2 000 blockquote levels rendered in under a millisecond in the same debug build; no recursion limit is documented by the crate.
+* Markdown nesting is limited, so building the tree and rendering it (both recursive: `build.rs`, `render.rs`) stay shallow whatever the input. Containers (block quotes, list items, footnote definitions) nest at most `MAX_DEPTH` = 64 deep (`blocks.rs`); a marker beyond that is text. Emphasis, strikethrough, links and images nest at most `MAX_NESTING` = 64 deep (`inlines.rs`): every made node carries the depth of its tree, a match that would go deeper is refused and its delimiters stay text, and no more than 64 brackets are open at once. Emphasis matching uses cmark's *openers bottom* (where the search for an opener of a closer of the same character, the same can-open, and the same run length mod 3 last failed), so unmatched closers are not walked over again and deep input stays linear. The tests run 10 000 nested `>`, 5 000 nested `- `, 20 000 nested `*`, `_`, `~`, `[` and `![`, and 5 000 footnote markers on a thread with a 2 MiB stack (a tokio worker's), each in well under 2 s in a debug build.

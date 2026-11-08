@@ -3,7 +3,7 @@ title: quench-test
 parent: Crates
 has_children: true
 permalink: /crates/quench-test/
-nav_order: 48
+nav_order: 50
 ---
 
 `quench-test` (library `quench_test`) is the test harness of the workspace. A test target sets `harness = false` and calls `quench_test::main!()`; `#[quench_test::test]` replaces `#[test]` and `#[tokio::test]`. The binary accepts the command line `cargo test` passes, prints what the standard harness prints, runs tests on a thread pool, and writes JSON and HTML result pages. The crate also carries what service tests need around it: a command runner (`assert_cmd`), predicates (`predicates`) and a mock HTTP server (`wiremock`).

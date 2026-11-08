@@ -1,7 +1,7 @@
 ---
 title: quench-style
 parent: Crates
-nav_order: 45
+nav_order: 47
 has_children: true
 permalink: /crates/quench-style/
 ---

@@ -1,21 +1,26 @@
 //! A TrueType font (`glyf` outlines): its tables, character map, metrics and glyph outlines.
 //!
 //! The parser reads what text needs and nothing else: `head`, `maxp`, `hhea`, `hmtx`, `cmap` (formats 4 and
-//! 12), `loca`, `glyf` (simple and composite glyphs), `name`, and the pair kerning of `GPOS`. Every read is
-//! bounds-checked, so a damaged or hostile file is an error or a missing glyph, never a panic or an overrun.
+//! 12), `loca`, `glyf` (simple and composite glyphs), `name`, the pair kerning of `GPOS`, and `MATH` for a math
+//! font (see [`crate::Math`]). Every read is bounds-checked, so a damaged or hostile file is an error or a missing
+//! glyph, never a panic or an overrun.
 
 use std::borrow::Cow;
 use std::fmt;
+use std::sync::OnceLock;
 
 use quench_raster::Path;
 
 use crate::gpos::Kerning;
+use crate::math::Math;
 
 /// Why bytes are not a font this crate can use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FontError {
-    /// Not an sfnt with TrueType outlines (`OTTO` fonts, with CFF outlines, are not read).
+    /// Not an sfnt font file at all.
     NotTrueType,
+    /// An OpenType font with CFF outlines (`OTTO`), which this crate does not read.
+    Cff,
     /// A table the font cannot work without is missing.
     Missing(&'static str),
     /// A table is cut short or points outside the file.
@@ -26,6 +31,7 @@ impl fmt::Display for FontError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotTrueType => f.write_str("not a TrueType font"),
+            Self::Cff => f.write_str("CFF outlines are not read"),
             Self::Missing(table) => write!(f, "the `{table}` table is missing"),
             Self::Truncated(table) => write!(f, "the `{table}` table is cut short"),
         }
@@ -41,6 +47,15 @@ pub struct Point {
     pub y: f32,
     /// On the curve; an off-curve point is a quadratic control point.
     pub on: bool,
+}
+
+/// A glyph's bounding box from its `glyf` header, in font units with y pointing up.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Bounds {
+    pub x_min: i16,
+    pub y_min: i16,
+    pub x_max: i16,
+    pub y_max: i16,
 }
 
 /// A glyph's closed contours.
@@ -126,6 +141,9 @@ pub struct Font {
     /// Where the chosen character map starts and its format (4 or 12).
     cmap: (usize, u16),
     kerning: Kerning,
+    /// Where the `MATH` table is (offset and length), and the table read on first use.
+    math_table: Option<(usize, usize)>,
+    math: OnceLock<Option<Math>>,
 }
 
 impl fmt::Debug for Font {
@@ -170,6 +188,7 @@ impl Font {
         // A TrueType file (`0x00010000` or `true`), or the first font of a collection is not read here.
         match bytes.get(..4) {
             Some([0, 1, 0, 0] | b"true") => {}
+            Some(b"OTTO") => return Err(FontError::Cff),
             _ => return Err(FontError::NotTrueType),
         }
         let count = usize::from(u16_at(bytes, 4).ok_or(FontError::Truncated("directory"))?);
@@ -225,10 +244,13 @@ impl Font {
             name: table(b"name").map(|t| t.0),
             cmap,
             kerning,
+            math_table: table(b"MATH"),
+            math: OnceLock::new(),
             data,
         })
     }
 
+    /// Font units per em: the size a glyph is designed at (1000 or 2048, usually).
     #[must_use]
     pub const fn units_per_em(&self) -> u16 {
         self.units_per_em
@@ -252,6 +274,7 @@ impl Font {
         self.line_gap
     }
 
+    /// How many glyphs the font has (ids are below this).
     #[must_use]
     pub const fn glyph_count(&self) -> u16 {
         self.num_glyphs
@@ -326,6 +349,32 @@ impl Font {
             }
         }
         fallback
+    }
+
+    /// The `MATH` table, read on first use; `None` when the font has none or its header is damaged.
+    #[must_use]
+    pub fn math(&self) -> Option<&Math> {
+        self.math
+            .get_or_init(|| {
+                let (at, length) = self.math_table?;
+                Math::parse(self.data.get(at..at.checked_add(length)?)?)
+            })
+            .as_ref()
+    }
+
+    /// The bounding box of `glyph` from its `glyf` header, or `None` for a glyph with no outline (a space),
+    /// one out of range, or one whose header is cut short.
+    #[must_use]
+    pub fn bounds(&self, glyph: u16) -> Option<Bounds> {
+        let data: &[u8] = &self.data;
+        let (start, end) = self.glyph_range(glyph)?;
+        let header = data.get(start..end)?;
+        Some(Bounds {
+            x_min: i16_at(header, 2)?,
+            y_min: i16_at(header, 4)?,
+            x_max: i16_at(header, 6)?,
+            y_max: i16_at(header, 8)?,
+        })
     }
 
     /// The outline of `glyph`, or `None` for a glyph with no outline (a space) or one that is damaged.

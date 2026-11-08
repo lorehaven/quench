@@ -4,7 +4,7 @@ parent: Guides
 nav_order: 2
 ---
 
-How the crates depend on each other. The edges below are the **normal and build dependencies between workspace crates** read from each `Cargo.toml` (`cargo metadata --no-deps --all-features`, 2026-10-30). Dev-dependencies are listed separately. The levels are computed: a crate's level is one more than the highest level among its workspace dependencies.
+How the crates depend on each other. The edges below are the **normal and build dependencies between workspace crates** read from each `Cargo.toml` (`cargo metadata --no-deps --all-features`, 2026-11-08). Dev-dependencies are listed separately. The levels are computed: a crate's level is one more than the highest level among its workspace dependencies.
 
 ## Layers
 
@@ -12,8 +12,8 @@ How the crates depend on each other. The edges below are the **normal and build 
 |---|---|
 | 0, no workspace dependency | `quench-core-macros`, `quench-serde-macros`, `quench-log-macros`, `quench-http-macros`, `quench-args-macros`, `quench-fullstack-macros`, `quench-ui-web-macros`, `quench-test-macros`, `quench-test-bdd-macros`, `quench-archive`, `quench-css`, `quench-html`, `quench-qr`, `quench-raster`, `quench-regex`, `quench-ui`, `quench-security` |
 | 1 | `quench-core` (-> core-macros), `quench-args`, `quench-image`, `quench-pdf`, `quench-text`, `quench-desktop-wayland` |
-| 2 | `quench-serde` (-> core, serde-macros), `quench-tz`, `quench-tls`, `quench-cli`, `quench-layout`, `quench-svg` |
-| 3 | `quench-log`, `quench-config`, `quench-crypto`, `quench-test`, `quench-schema`, `quench-template`, `quench-convert`, `quench-style`, `quench-redis`, `quench-mail`, `quench-paint`, `quench-ui-web`, `quench-android`, `quench-desktop` |
+| 2 | `quench-serde` (-> core, serde-macros), `quench-tz`, `quench-tls`, `quench-cli`, `quench-layout`, `quench-svg`, `quench-tex` (with `typeset`) |
+| 3 | `quench-log`, `quench-config`, `quench-crypto`, `quench-test`, `quench-schema`, `quench-template`, `quench-convert`, `quench-style`, `quench-redis`, `quench-mail`, `quench-paint`, `quench-ui-web`, `quench-android`, `quench-desktop`, `quench-markdown-term` (with `tex`) |
 | 4 | `quench-proto`, `quench-pg`, `quench-cache`, `quench-web`, `quench-ui-native`, `quench-test-bdd` |
 | 5 | `quench-http`, `quench-client`, `quench-db`, `quench-web-components`, `quench-desktop-atspi`, `quench-android-surface` |
 | 6 | `quench-auth`, `quench-k8s`, `quench-desktop-native`, `quench-tool` |
@@ -48,12 +48,13 @@ quench-core-macros ──> quench-core ──> quench-serde <── quench-serde
 | UI | `quench-ui` (no workspace deps); `quench-ui-web` -> serde, ui, ui-web-macros; native stack: `quench-css`, `quench-raster`, `quench-text` -> raster, `quench-layout` -> css, text, `quench-paint` -> css, layout, raster, `quench-svg` -> css, image, raster, `quench-ui-native` -> core, css, image, layout, paint, raster, svg, ui |
 | Hosts | `quench-desktop` -> core, serde; `quench-desktop-wayland` -> raster (+ `libc`); `quench-desktop-atspi` -> ui-native; `quench-desktop-native` -> atspi, wayland, ui, ui-native; `quench-android` -> core, serde, tz; `quench-android-surface` -> raster, serde, ui, ui-native |
 | Files and formats | `quench-archive`, `quench-html`, `quench-qr`, `quench-regex` (no deps); `quench-image` -> archive; `quench-pdf` -> archive |
+| Markdown and math | `quench-html` (Markdown syntax tree, no deps); `quench-tex` (no deps; with `typeset` -> text with `math-font`, raster, image); `quench-markdown-term` -> html (with `tex` -> tex); terminal graphics for typeset formulas in `quench-cli` |
 | Testing | `quench-test` -> core, regex, serde, test-macros (+ `tokio`); `quench-test-bdd` -> args, core, regex, test, test-bdd-macros |
 | Tooling | `quench-args` -> args-macros; `quench-cli` -> core; `quench-tool` -> archive, args, client, crypto, serde, template |
 
 ## Dev-dependency edges
 
-Almost every crate has `quench-test` as a dev-dependency. This creates a cycle that Cargo accepts because dev-dependencies are not part of the normal graph: `quench-test` depends on `quench-core`, while `quench-core` dev-depends on `quench-test`. Other dev-only edges: `quench-cache` (core, redis), `quench-client` (http), `quench-k8s` (http), `quench-http` (proto), `quench-fullstack` (proto), `quench-css` (style), `quench-desktop-native` (raster), `quench-desktop-wayland` (core), `quench-text` (core), `quench-ui-native` (style), `quench-android-surface` (css), `quench-security` (core).
+Almost every crate has `quench-test` as a dev-dependency. This creates a cycle that Cargo accepts because dev-dependencies are not part of the normal graph: `quench-test` depends on `quench-core`, while `quench-core` dev-depends on `quench-test`. Other dev-only edges: `quench-cache` (core, redis), `quench-client` (http), `quench-k8s` (http), `quench-http` (proto), `quench-fullstack` (proto), `quench-css` (style), `quench-desktop-native` (raster), `quench-desktop-wayland` (core), `quench-text` (core), `quench-tex` (svg, text), `quench-ui-native` (style), `quench-android-surface` (css), `quench-security` (core).
 
 ## Third-party edges
 

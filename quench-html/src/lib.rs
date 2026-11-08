@@ -1,6 +1,7 @@
 //! HTML without dependencies.
 //!
-//! - [`mod@markdown`] (feature `markdown`): `CommonMark` to HTML, passing the whole `CommonMark` 0.31 test suite.
+//! - [`mod@markdown`] (feature `markdown`): Markdown to HTML or to a syntax tree: `CommonMark` 0.31 (its whole
+//!   test suite passes), and as options GFM tables, strikethrough, task lists, footnotes and math.
 //! - [`dom`] and [`selector`] (feature `parse`): a tolerant HTML parser that builds a document tree, and a
 //!   CSS selector engine to query it.
 //!

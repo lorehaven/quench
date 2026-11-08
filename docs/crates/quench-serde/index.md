@@ -1,7 +1,7 @@
 ---
 title: quench-serde
 parent: Crates
-nav_order: 42
+nav_order: 43
 has_children: true
 permalink: /crates/quench-serde/
 ---

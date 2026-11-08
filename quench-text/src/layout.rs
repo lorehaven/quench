@@ -28,6 +28,22 @@ pub fn noto_sans() -> Arc<Font> {
     }))
 }
 
+/// The embedded math font, Noto Sans Math (with a `MATH` table), parsed once. Only with the `math-font` feature.
+///
+/// # Panics
+/// Never for the file that is embedded (a test parses it).
+#[cfg(feature = "math-font")]
+#[must_use]
+pub fn noto_sans_math() -> Arc<Font> {
+    static FONT: OnceLock<Arc<Font>> = OnceLock::new();
+    Arc::clone(FONT.get_or_init(|| {
+        Arc::new(
+            Font::parse(&include_bytes!("../fonts/NotoSansMath-Regular.ttf")[..])
+                .expect("the embedded font is valid"),
+        )
+    }))
+}
+
 /// The embedded bold face, parsed once.
 ///
 /// # Panics

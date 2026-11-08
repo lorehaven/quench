@@ -1,10 +1,16 @@
 //! Block structure: containers (block quotes, lists) and leaves (paragraphs, headings, code, HTML).
 //!
 //! This follows the reference algorithm of the `CommonMark` spec: each line first continues the open
-//! containers, then may start new blocks, and what is left is added to the innermost open block.
+//! containers, then may start new blocks, and what is left is added to the innermost open block. With the
+//! extensions of [`Options`] it also reads tables, footnote definitions and `$$` math blocks.
 
+use super::ast::Options;
 use super::scan;
 use std::collections::HashMap;
+
+/// How deep containers (block quotes, list items, footnotes) may nest. A marker beyond it is text, so input
+/// built to nest thousands deep cannot exhaust the stack of the recursive steps after parsing.
+pub const MAX_DEPTH: usize = 64;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
@@ -17,6 +23,21 @@ pub enum Kind {
     ThematicBreak,
     CodeBlock,
     HtmlBlock,
+    /// A GFM table: `rows` holds the header row first, then the body rows, as raw text.
+    Table,
+    /// `[^label]: ...`, a container of the blocks of a footnote.
+    FootnoteDefinition,
+    /// A display formula between `$$` lines.
+    MathBlock,
+}
+
+/// How a table column is aligned, from its delimiter cell (`:--`, `:-:`, `--:`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Align {
+    None,
+    Left,
+    Center,
+    Right,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -51,6 +72,12 @@ pub struct Node {
     html_type: u8,
     pub list: ListData,
     start_line: usize,
+    /// A table's column alignments.
+    pub aligns: Vec<Align>,
+    /// A table's rows (the header first), each the raw text of the line.
+    pub rows: Vec<String>,
+    /// A footnote definition's label, as written.
+    pub label: String,
 }
 
 impl Node {
@@ -73,6 +100,9 @@ impl Node {
             html_type: 0,
             list: ListData::default(),
             start_line,
+            aligns: Vec::new(),
+            rows: Vec::new(),
+            label: String::new(),
         }
     }
 }
@@ -87,6 +117,8 @@ pub struct Reference {
 pub struct Document {
     pub nodes: Vec<Node>,
     pub references: HashMap<String, Reference>,
+    /// Footnote definitions by normalized label: the node of the first definition of each.
+    pub footnotes: HashMap<String, usize>,
 }
 
 struct Parser {
@@ -106,6 +138,8 @@ struct Parser {
     blank: bool,
     partially_consumed_tab: bool,
     references: HashMap<String, Reference>,
+    footnotes: HashMap<String, usize>,
+    options: Options,
 }
 
 const fn is_space_or_tab(c: Option<u8>) -> bool {
@@ -113,19 +147,24 @@ const fn is_space_or_tab(c: Option<u8>) -> bool {
 }
 
 const fn accepts_lines(kind: Kind) -> bool {
-    matches!(kind, Kind::Paragraph | Kind::CodeBlock | Kind::HtmlBlock)
+    matches!(
+        kind,
+        Kind::Paragraph | Kind::CodeBlock | Kind::HtmlBlock | Kind::MathBlock
+    )
 }
 
 const fn can_contain(parent: Kind, child: Kind) -> bool {
     match parent {
-        Kind::Document | Kind::BlockQuote | Kind::Item => !matches!(child, Kind::Item),
+        Kind::Document | Kind::BlockQuote | Kind::Item | Kind::FootnoteDefinition => {
+            !matches!(child, Kind::Item)
+        }
         Kind::List => matches!(child, Kind::Item),
         _ => false,
     }
 }
 
 /// Parses Markdown into its block tree.
-pub fn parse(text: &str) -> Document {
+pub fn parse(text: &str, options: Options) -> Document {
     let text = text.replace('\0', "\u{FFFD}");
     let mut parser = Parser {
         nodes: vec![Node::new(Kind::Document, 1)],
@@ -144,6 +183,8 @@ pub fn parse(text: &str) -> Document {
         blank: false,
         partially_consumed_tab: false,
         references: HashMap::new(),
+        footnotes: HashMap::new(),
+        options,
     };
     let mut lines: Vec<&str> = Vec::new();
     let mut start = 0;
@@ -182,6 +223,7 @@ pub fn parse(text: &str) -> Document {
     Document {
         nodes: parser.nodes,
         references: parser.references,
+        footnotes: parser.footnotes,
     }
 }
 
@@ -392,6 +434,12 @@ impl Parser {
                 let content = std::mem::take(&mut self.nodes[id].content);
                 self.nodes[id].literal = scan::strip_trailing_blank_lines(&content).to_string();
             }
+            Kind::MathBlock => {
+                // The first line is what followed the opening `$$`, which is nothing.
+                let content = std::mem::take(&mut self.nodes[id].content);
+                let rest = content.split_once('\n').map_or("", |(_, rest)| rest);
+                self.nodes[id].literal = rest.to_string();
+            }
             Kind::List => {
                 let items = self.nodes[id].children.clone();
                 let mut tight = true;
@@ -501,7 +549,31 @@ impl Parser {
                 }
             }
             Kind::HtmlBlock => u8::from(self.blank && matches!(self.nodes[id].html_type, 6 | 7)),
-            Kind::Paragraph => u8::from(self.blank),
+            Kind::Paragraph | Kind::Table => u8::from(self.blank),
+            Kind::FootnoteDefinition => {
+                if self.blank {
+                    self.advance_next_nonspace();
+                    0
+                } else if self.indent >= 4 {
+                    self.advance_offset(4, true);
+                    0
+                } else {
+                    1
+                }
+            }
+            Kind::MathBlock => {
+                let rest = &self.line[self.next_nonspace.min(self.line.len())..];
+                if self.indent <= 3 && rest.trim_end_matches([' ', '\t']) == "$$" {
+                    self.finalize(id);
+                    return 2;
+                }
+                let mut skip = self.nodes[id].fence_offset;
+                while skip > 0 && is_space_or_tab(self.peek(self.offset)) {
+                    self.advance_offset(1, true);
+                    skip -= 1;
+                }
+                0
+            }
         }
     }
 
@@ -539,12 +611,18 @@ impl Parser {
             && accepts_lines(self.nodes[container].kind);
         while !matched_leaf {
             self.find_next_nonspace();
+            let tip_is_table = self.nodes[self.tip].kind == Kind::Table;
             let special = self.peek(self.next_nonspace).is_some_and(|c| {
                 matches!(
                     c,
                     b'#' | b'`' | b'~' | b'*' | b'+' | b'_' | b'=' | b'<' | b'>' | b'-' | b'0'
                         ..=b'9'
-                )
+                ) || (c == b'[' && self.options.footnotes)
+                    || (c == b'$' && self.options.math)
+                    || (c == b'|' && self.options.tables)
+                    || (self.options.tables
+                        && self.nodes[container].kind == Kind::Paragraph
+                        && !tip_is_table)
             });
             if !self.indented && !special {
                 self.advance_next_nonspace();
@@ -588,7 +666,12 @@ impl Parser {
             self.nodes[id].last_line_blank = last_line_blank;
             cursor = self.nodes[id].parent;
         }
-        if accepts_lines(kind) {
+        if kind == Kind::Table {
+            if self.offset < self.line.len() && !self.blank {
+                let row = self.line[self.offset..].to_string();
+                self.nodes[container].rows.push(row);
+            }
+        } else if accepts_lines(kind) {
             self.add_line();
             if kind == Kind::HtmlBlock {
                 let html_type = self.nodes[container].html_type;
@@ -612,9 +695,45 @@ impl Parser {
     fn try_block_starts(&mut self, container: usize) -> u8 {
         let first = self.peek(self.next_nonspace);
         let rest = self.line[self.next_nonspace.min(self.line.len())..].to_string();
+        let room = self.depth(container) < MAX_DEPTH;
+
+        // Footnote definition: `[^label]:`.
+        if self.options.footnotes
+            && room
+            && !self.indented
+            && first == Some(b'[')
+            && let Some((label, used)) = footnote_definition_start(&rest)
+        {
+            self.advance_next_nonspace();
+            self.advance_offset(used, false);
+            self.close_unmatched();
+            let id = self.add_child(Kind::FootnoteDefinition);
+            self.footnotes
+                .entry(scan::normalize_label(&format!("[{label}]")))
+                .or_insert(id);
+            self.nodes[id].label = label;
+            // What follows the marker on its line starts the first block, whatever its indent.
+            self.find_next_nonspace();
+            self.advance_next_nonspace();
+            return 1;
+        }
+
+        // Math block: a line that is only `$$`.
+        if self.options.math
+            && !self.indented
+            && first == Some(b'$')
+            && rest.trim_end_matches([' ', '\t']) == "$$"
+        {
+            self.close_unmatched();
+            let id = self.add_child(Kind::MathBlock);
+            self.nodes[id].fence_offset = self.indent;
+            self.advance_next_nonspace();
+            self.advance_offset(2, false);
+            return 2;
+        }
 
         // Block quote.
-        if !self.indented && first == Some(b'>') {
+        if room && !self.indented && first == Some(b'>') {
             self.advance_next_nonspace();
             self.advance_offset(1, false);
             if is_space_or_tab(self.peek(self.offset)) {
@@ -682,6 +801,34 @@ impl Parser {
             }
         }
 
+        // Table: a delimiter row under a paragraph line with as many cells.
+        if self.options.tables
+            && !self.indented
+            && self.nodes[container].kind == Kind::Paragraph
+            && let Some(aligns) = delimiter_row(&rest)
+        {
+            let content = self.nodes[container].content.clone();
+            let mut lines: Vec<&str> = content.lines().collect();
+            if let Some(header) = lines.pop()
+                && split_row(header).len() == aligns.len()
+            {
+                let header = header.to_string();
+                let before = if lines.is_empty() {
+                    String::new()
+                } else {
+                    format!("{}\n", lines.join("\n"))
+                };
+                self.close_unmatched();
+                self.nodes[container].content = before;
+                self.finalize(container);
+                let id = self.add_child(Kind::Table);
+                self.nodes[id].aligns = aligns;
+                self.nodes[id].rows.push(header);
+                self.advance_offset(self.line.len() - self.offset, false);
+                return 2;
+            }
+        }
+
         // Setext heading.
         if !self.indented && self.nodes[container].kind == Kind::Paragraph {
             let marker = rest.bytes().next();
@@ -727,7 +874,8 @@ impl Parser {
         }
 
         // List item.
-        if (!self.indented || self.nodes[container].kind == Kind::List)
+        if room
+            && (!self.indented || self.nodes[container].kind == Kind::List)
             && let Some(data) = self.parse_list_marker(container, &rest)
         {
             self.close_unmatched();
@@ -743,14 +891,27 @@ impl Parser {
             return 1;
         }
 
-        // Indented code block.
-        if self.indented && self.nodes[self.tip].kind != Kind::Paragraph && !self.blank {
+        // Indented code block (a table's rows may be indented).
+        if self.indented
+            && !matches!(self.nodes[self.tip].kind, Kind::Paragraph | Kind::Table)
+            && !self.blank
+        {
             self.advance_offset(4, true);
             self.close_unmatched();
             self.add_child(Kind::CodeBlock);
             return 2;
         }
         0
+    }
+
+    /// How many containers `id` is inside of.
+    fn depth(&self, mut id: usize) -> usize {
+        let mut depth = 0;
+        while let Some(parent) = self.nodes[id].parent {
+            depth += 1;
+            id = parent;
+        }
+        depth
     }
 
     fn parse_list_marker(&mut self, container: usize, rest: &str) -> Option<ListData> {
@@ -844,4 +1005,73 @@ fn strip_closing_hashes(text: &str) -> String {
         return before.trim().to_string();
     }
     trimmed.trim_start_matches([' ', '\t']).to_string()
+}
+
+/// `[^label]:` at the start of `s`: the label and the bytes the marker takes. A label is not empty and has no
+/// whitespace or brackets.
+fn footnote_definition_start(s: &str) -> Option<(String, usize)> {
+    let inner = s.strip_prefix("[^")?;
+    let end = inner.find(']')?;
+    let label = &inner[..end];
+    if label.is_empty() || label.contains(|c: char| c.is_whitespace() || c == '[') {
+        return None;
+    }
+    inner[end + 1..]
+        .starts_with(':')
+        .then(|| (label.to_string(), 2 + end + 2))
+}
+
+/// The cells of a table row: split at pipes that are not escaped, without a leading and a trailing pipe, each
+/// trimmed. `\|` stays as it is here; it becomes `|` before the cell's inlines are read.
+pub fn split_row(line: &str) -> Vec<String> {
+    let mut row = line.trim();
+    if let Some(rest) = row.strip_prefix('|') {
+        row = rest;
+    }
+    if row.ends_with('|') && !row.ends_with("\\|") {
+        row = &row[..row.len() - 1];
+    }
+    let mut cells = Vec::new();
+    let mut cell = String::new();
+    let mut chars = row.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => {
+                cell.push(c);
+                if let Some(next) = chars.next() {
+                    cell.push(next);
+                }
+            }
+            '|' => cells.push(std::mem::take(&mut cell)),
+            _ => cell.push(c),
+        }
+    }
+    cells.push(cell);
+    cells.iter().map(|c| c.trim().to_string()).collect()
+}
+
+/// The alignments of a delimiter row (`| :-- | :-: | --: |`), or `None` when the line is not one. It needs a
+/// pipe, so that `---` under a line stays a setext heading.
+fn delimiter_row(line: &str) -> Option<Vec<Align>> {
+    let line = line.trim_end_matches([' ', '\t']);
+    if !line.contains('|') {
+        return None;
+    }
+    split_row(line)
+        .iter()
+        .map(|cell| {
+            let left = cell.starts_with(':');
+            let right = cell.ends_with(':') && cell.len() > 1;
+            let dashes = cell.trim_start_matches(':').trim_end_matches(':');
+            if dashes.is_empty() || !dashes.bytes().all(|c| c == b'-') {
+                return None;
+            }
+            Some(match (left, right) {
+                (true, true) => Align::Center,
+                (true, false) => Align::Left,
+                (false, true) => Align::Right,
+                (false, false) => Align::None,
+            })
+        })
+        .collect()
 }

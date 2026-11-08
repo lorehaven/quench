@@ -1,7 +1,7 @@
 ---
 title: quench-redis
 parent: Crates
-nav_order: 38
+nav_order: 39
 has_children: true
 permalink: /crates/quench-redis/
 ---

@@ -1,7 +1,7 @@
 ---
 title: quench-starter
 parent: Crates
-nav_order: 44
+nav_order: 46
 has_children: true
 permalink: /crates/quench-starter/
 ---

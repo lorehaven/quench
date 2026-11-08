@@ -3,8 +3,8 @@ name = "quench-html"
 version = "0.1.3"
 edition = { workspace = true }
 authors = { workspace = true }
-description = "Quench - HTML without dependencies: a tolerant parser with CSS selectors for extraction, and a CommonMark to HTML renderer"
-keywords = ["html", "css", "selectors", "markdown", "commonmark"]
+description = "Quench - HTML without dependencies: a tolerant parser with CSS selectors for extraction, and a Markdown parser (CommonMark, GFM tables, strikethrough, task lists, footnotes, math) with an HTML renderer"
+keywords = ["html", "css", "markdown", "commonmark", "gfm"]
 categories = ["parser-implementations", "web-programming"]
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -20,7 +20,7 @@ path = "src/lib.rs"
 default = ["parse", "markdown"]
 # The HTML parser, the document tree and CSS selectors.
 parse = []
-# CommonMark to HTML.
+# Markdown (CommonMark, GFM extensions, math): a syntax tree and an HTML renderer.
 markdown = []
 
 [lints]

@@ -3,7 +3,7 @@ title: quench-test-macros
 parent: Crates
 has_children: true
 permalink: /crates/quench-test-macros/
-nav_order: 51
+nav_order: 53
 ---
 
 `quench-test-macros` is the proc-macro crate behind [quench-test](../quench-test/index.md). It provides the single attribute `#[test]`, re-exported as `quench_test::test`. Use it through `quench-test`: the generated code names `::quench_test::..`, so the crate that uses the attribute must depend on `quench-test` (as a dev-dependency).

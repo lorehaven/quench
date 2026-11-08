@@ -1,7 +1,7 @@
 ---
 title: quench-sqlite
 parent: Crates
-nav_order: 62
+nav_order: 45
 has_children: true
 permalink: /crates/quench-sqlite/
 ---

@@ -3,7 +3,7 @@ title: quench-regex
 parent: Crates
 has_children: true
 permalink: /crates/quench-regex/
-nav_order: 39
+nav_order: 40
 ---
 
 `quench-regex` (library `quench_regex`) is a regular-expression engine with no dependencies. It replaces the `regex` crate in the tools of the workspace: the API follows `regex` (`Regex`, `RegexBuilder`, `Match`, `Captures`, `find_iter`, `captures_iter`, `replace`/`replace_all`/`replacen`, `split`, `escape`, `Replacer`, `NoExpand`), so a tool switches by changing its imports. Matching is a Pike VM: the time is proportional to the text length times the program size for every pattern, never exponential.

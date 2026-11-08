@@ -1,7 +1,7 @@
 ---
 title: quench-proto
 parent: Crates
-nav_order: 35
+nav_order: 36
 has_children: true
 permalink: /crates/quench-proto/
 ---

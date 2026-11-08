@@ -1,7 +1,7 @@
 ---
 title: quench-tool
 parent: Crates
-nav_order: 54
+nav_order: 57
 has_children: true
 permalink: /crates/quench-tool/
 ---

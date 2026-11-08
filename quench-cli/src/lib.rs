@@ -1,5 +1,6 @@
 #[cfg(feature = "repl")]
 pub mod editor;
+pub mod graphics;
 #[cfg(all(unix, feature = "tui"))]
 pub mod keys;
 pub mod prelude;

@@ -3,7 +3,7 @@ title: quench-template
 parent: Crates
 has_children: true
 permalink: /crates/quench-template/
-nav_order: 47
+nav_order: 49
 ---
 {% raw %}
 `quench-template` (library `quench_template`) is a Jinja-compatible template engine over `quench_serde::Value`. It replaces `minijinja` and removes the serde bridge: the render context, globals and filter arguments are plain `Value`s. Templates are parsed once into a tree and rendered by a small interpreter; output is never escaped.

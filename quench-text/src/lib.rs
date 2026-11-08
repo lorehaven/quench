@@ -1,5 +1,6 @@
 //! Fonts and text with no dependencies: a TrueType parser, kerning, line breaking, Noto Sans embedded, and
-//! text drawn through [`quench_raster`].
+//! text drawn through [`quench_raster`]. For math typesetting it reads the OpenType `MATH` table
+//! ([`Font::math`]), and with the `math-font` feature embeds Noto Sans Math ([`noto_sans_math`]).
 //!
 //! ```
 //! use quench_raster::{Canvas, Color};
@@ -25,10 +26,17 @@
 mod font;
 mod gpos;
 mod layout;
+mod math;
 mod system;
 
-pub use font::{Font, FontError, Outline, Point};
+pub use font::{Bounds, Font, FontError, Outline, Point};
+#[cfg(feature = "math-font")]
+pub use layout::noto_sans_math;
 pub use layout::{
     FontSet, Glyph, Layout, Line, noto_sans, noto_sans_bold, noto_sans_light, noto_sans_medium,
+};
+pub use math::{
+    GlyphAssembly, GlyphConstruction, GlyphPart, GlyphVariant, Math, MathConstants, MathKern,
+    MathKernCorner, MathKernInfo,
 };
 pub use system::SystemFonts;

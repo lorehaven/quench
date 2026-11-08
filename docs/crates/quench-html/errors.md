@@ -4,7 +4,7 @@ parent: quench-html
 nav_order: 3
 ---
 
-The only error type is `selector::SelectorError`, returned by `Selector::parse`. Parsing HTML and rendering Markdown cannot fail.
+The only error type is `selector::SelectorError`, returned by `Selector::parse`. Parsing HTML, parsing Markdown (`markdown::parse`, with any `Options`) and rendering it (`to_html`, `to_html_with`, `render_html`) cannot fail: they return a value, not a `Result`. Markdown that is not valid for an extension is read as ordinary text (an undefined `[^x]`, an unclosed `$`, a table whose header and delimiter row differ in width). Nesting deeper than 64 is read as text rather than nested (see [Security notes](internals.md#security-notes)), so no input can overflow the stack.
 
 `Display` is `invalid selector: {message}`. Messages produced (positions are byte offsets into the selector text):
 

@@ -15,7 +15,7 @@ Quench is a Rust framework built from small crates that each do one job with as 
 * **HTTP services**: `quench-http` for routing and middleware, `quench-starter` for TLS, health and database wiring, `quench-auth` for session verification, `quench-db` and `quench-pg` for data.
 * **Full-stack web apps**: `quench-ui` views and signals served by `quench-fullstack` with server rendering and typed server functions, or compiled to WebAssembly with `quench-ui-web`.
 * **Mobile and desktop apps**: the same UI in `quench-android` or `quench-desktop`, or rendered natively with `quench-ui-native`.
-* **Command-line tools**: `quench-args` for parsing, `quench-cli` for styling, `quench-tool` to scaffold, run and release projects.
+* **Command-line tools**: `quench-args` for parsing, `quench-cli` for styling and terminal graphics, `quench-tool` to scaffold, run and release projects.
 * **Libraries for everyday data work**: JSON/TOML/YAML (`quench-serde`), regex, templates, archives, PDF text, QR codes, PNG and SVG.
 * **Testing**: `quench-test` and `quench-test-bdd` produce JSON and HTML result pages; `quench-security` runs the security gate.
 
@@ -72,13 +72,15 @@ Every crate has a README in its directory. The book icon (📖) links to the cra
 
 | Crate | Description | Docs |
 | --- | --- | --- |
-| [`quench-html`](./quench-html/) | HTML parser with CSS selectors, and CommonMark to HTML | [📖](https://lorehaven.github.io/quench/crates/quench-html/) |
+| [`quench-html`](./quench-html/) | HTML parser with CSS selectors, and Markdown (CommonMark, GFM tables, footnotes, task lists, math) as a syntax tree and HTML | [📖](https://lorehaven.github.io/quench/crates/quench-html/) |
+| [`quench-markdown-term`](./quench-markdown-term/) | Markdown laid out for the terminal: wrapped text, tables, code frames, footnotes, ANSI and plain output | [📖](https://lorehaven.github.io/quench/crates/quench-markdown-term/) |
 | [`quench-pdf`](./quench-pdf/) | PDF text extraction (xref tables and streams, object streams, fonts, encodings) | [📖](https://lorehaven.github.io/quench/crates/quench-pdf/) |
 | [`quench-qr`](./quench-qr/) | QR code encoder (ISO 18004, versions 1-40) with SVG output, no dependencies | [📖](https://lorehaven.github.io/quench/crates/quench-qr/) |
 | [`quench-image`](./quench-image/) | PNG decoding (every colour type, Adam7) and encoding, no dependencies | [📖](https://lorehaven.github.io/quench/crates/quench-image/) |
 | [`quench-svg`](./quench-svg/) | An SVG renderer: shapes, paths with arcs, transforms, fills and strokes into RGBA | [📖](https://lorehaven.github.io/quench/crates/quench-svg/) |
 | [`quench-raster`](./quench-raster/) | Software rasteriser: anti-aliased paths, rounded rectangles, premultiplied BGRA canvas, no dependencies | [📖](https://lorehaven.github.io/quench/crates/quench-raster/) |
-| [`quench-text`](./quench-text/) | A TrueType parser, kerning, line breaking and Noto Sans embedded, drawn through quench-raster | [📖](https://lorehaven.github.io/quench/crates/quench-text/) |
+| [`quench-text`](./quench-text/) | A TrueType parser, kerning, line breaking and Noto Sans embedded, drawn through quench-raster; the OpenType MATH table and Noto Sans Math | [📖](https://lorehaven.github.io/quench/crates/quench-text/) |
+| [`quench-tex`](./quench-tex/) | TeX math: a reader, Unicode and two-dimensional text output, and a typesetter (TeX's layout rules, OpenType MATH) drawing PNG and SVG | [📖](https://lorehaven.github.io/quench/crates/quench-tex/) |
 
 ### User interfaces
 
@@ -112,7 +114,7 @@ Every crate has a README in its directory. The book icon (📖) links to the cra
 
 | Crate | Description | Docs |
 | --- | --- | --- |
-| [`quench-cli`](./quench-cli/) | Shared terminal UI styling for CLI tools | [📖](https://lorehaven.github.io/quench/crates/quench-cli/) |
+| [`quench-cli`](./quench-cli/) | Shared terminal UI styling for CLI tools, and terminal graphics (kitty, sixel) | [📖](https://lorehaven.github.io/quench/crates/quench-cli/) |
 | [`quench-args`](./quench-args/) | Command-line parsing with clap-compatible derives, no clap | [📖](https://lorehaven.github.io/quench/crates/quench-args/) |
 | [`quench-args-macros`](./quench-args-macros/) | Derive macros for Quench Args (`Parser`, `Args`, `Subcommand`, `ValueEnum`) | [📖](https://lorehaven.github.io/quench/crates/quench-args-macros/) |
 | [`quench-tool`](./quench-tool/) | The `quench` command: new projects, a dev loop with live reload, release builds, doctor | [📖](https://lorehaven.github.io/quench/crates/quench-tool/) |

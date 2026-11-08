@@ -1,7 +1,7 @@
 ---
 title: quench-svg
 parent: Crates
-nav_order: 46
+nav_order: 48
 has_children: true
 permalink: /crates/quench-svg/
 ---

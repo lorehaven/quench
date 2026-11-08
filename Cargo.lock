@@ -544,6 +544,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "quench-markdown-term"
+version = "0.1.0"
+dependencies = [
+ "quench-html",
+ "quench-test",
+ "quench-tex",
+]
+
+[[package]]
 name = "quench-paint"
 version = "0.1.7"
 dependencies = [
@@ -742,6 +751,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "quench-tex"
+version = "0.1.0"
+dependencies = [
+ "quench-image",
+ "quench-raster",
+ "quench-svg",
+ "quench-test",
+ "quench-text",
 ]
 
 [[package]]

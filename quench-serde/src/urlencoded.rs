@@ -248,7 +248,7 @@ mod tests {
             [("a", "1"), ("b", ""), ("c", ""), ("d", "x y")]
                 .map(|(k, v)| (k.to_string(), v.to_string()))
         );
-        assert!(parse_pairs("").is_empty());
+        assert_eq!(parse_pairs("").len(), 0);
         assert_eq!(parse_pairs("a=b=c")[0].1, "b=c");
     }
 

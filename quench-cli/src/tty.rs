@@ -59,6 +59,21 @@ impl RawMode {
     ///
     /// The error if `stty` cannot be run or refuses the terminal.
     pub fn enable(fd: i32) -> io::Result<Option<Self>> {
+        Self::enable_with(fd, "1", "0")
+    }
+
+    /// Like [`enable`](Self::enable), but a read returns after `tenths` tenths of a second with nothing
+    /// (`Ok(0)`) when no input comes (`min 0 time tenths`), so a program can wait for an answer from the
+    /// terminal without a thread left reading after it. `tenths` of 0 makes reads return at once.
+    ///
+    /// # Errors
+    ///
+    /// As [`enable`](Self::enable).
+    pub fn enable_with_read_timeout(fd: i32, tenths: u8) -> io::Result<Option<Self>> {
+        Self::enable_with(fd, "0", &tenths.to_string())
+    }
+
+    fn enable_with(fd: i32, min: &str, time: &str) -> io::Result<Option<Self>> {
         let Some((tty, saved)) = save(fd)? else {
             return Ok(None);
         };
@@ -66,7 +81,7 @@ impl RawMode {
             &tty,
             &[
                 "-echo", "-icanon", "-isig", "-iexten", "-ixon", "-icrnl", "-inlcr", "-istrip",
-                "min", "1", "time", "0",
+                "min", min, "time", time,
             ],
         )?;
         Ok(Some(Self { tty, saved }))
@@ -103,6 +118,11 @@ mod tests {
         assert!(RawMode::enable(reader.as_raw_fd()).unwrap().is_none());
         assert!(RawMode::enable_keeping_input(-1).unwrap().is_none());
         assert!(RawMode::enable(-1).unwrap().is_none());
+        assert!(
+            RawMode::enable_with_read_timeout(reader.as_raw_fd(), 1)
+                .unwrap()
+                .is_none()
+        );
         assert!(open_fd(-1).is_none() && open_fd(1 << 20).is_none());
         assert!(save(-1).unwrap().is_none());
     }

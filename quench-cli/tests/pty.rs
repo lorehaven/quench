@@ -8,6 +8,7 @@
 #![allow(clippy::wildcard_imports)]
 
 use quench_cli::editor::LineEditor;
+use quench_cli::graphics::detect::{Environment, detect_in};
 use quench_cli::term::{is_tty, read_secret, size_of};
 use quench_cli::tty::RawMode;
 use std::fs;
@@ -204,6 +205,42 @@ fn a_plain_stdin_falls_back_to_reading_lines() {
     assert_eq!(
         fs::read_to_string(outcome_file).unwrap(),
         "Line(\"first line\")\nEof\n"
+    );
+}
+
+/// Runs only inside the child: prints without a newline (so the text waits in Rust's stdout buffer),
+/// then detects graphics on the pty, which never answers.
+#[quench_test::test]
+fn child_detects_graphics_after_pending_output() {
+    let Ok(path) = std::env::var(CHILD_ENV) else {
+        return;
+    };
+    print!("pending-before-queries");
+    let environment = Environment {
+        term: Some("xterm-256color".to_owned()),
+        graphics: None,
+        multiplexer: false,
+        terminal: true,
+    };
+    let capabilities = detect_in(&environment, Duration::from_millis(200));
+    println!("after-queries");
+    fs::write(path, format!("{:?}\n", capabilities.protocol())).unwrap();
+}
+
+#[quench_test::test]
+fn pending_output_reaches_the_terminal_before_the_graphics_queries() {
+    let run = drive(
+        "pty::child_detects_graphics_after_pending_output",
+        "after-queries",
+        b"",
+    );
+    assert_eq!(run.outcome, "None\n");
+    let pending = run.screen.find("pending-before-queries");
+    let queries = run.screen.find("\x1b_Gi=31");
+    assert!(
+        pending.is_some() && queries.is_some() && pending < queries,
+        "the queries overtook the pending output: {:?}",
+        run.screen
     );
 }
 

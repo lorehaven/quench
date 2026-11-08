@@ -3,7 +3,7 @@ title: quench-test-bdd
 parent: Crates
 has_children: true
 permalink: /crates/quench-test-bdd/
-nav_order: 49
+nav_order: 51
 ---
 
 `quench-test-bdd` (library `quench_test_bdd`) is a light Gherkin runtime. You write `.feature` files, give their steps Rust functions with `#[given]`, `#[when]` and `#[then]`, and run them with a `Runner`. Scenarios run concurrently (those tagged `@serial` one by one afterwards), a failed step skips the rest of its scenario, and results are printed and written as JSON and HTML reports through `quench_test::report`. It replaces `cucumber` and `gherkin`.

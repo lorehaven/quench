@@ -1,7 +1,7 @@
 ---
 title: quench-serde-macros
 parent: Crates
-nav_order: 43
+nav_order: 44
 has_children: true
 permalink: /crates/quench-serde-macros/
 ---

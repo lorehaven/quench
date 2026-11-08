@@ -3,7 +3,7 @@ title: quench-schema
 parent: Crates
 has_children: true
 permalink: /crates/quench-schema/
-nav_order: 40
+nav_order: 41
 ---
 
 `quench-schema` (library `quench_schema`) validates `quench_serde::Value`s against JSON Schema, using the draft 2020-12 keywords that Kubernetes CRDs and configuration files use. It replaces the `jsonschema` crate; its messages are written to read like that crate's. Schemas are compiled once (patterns become `quench_regex::Regex` values), validation returns every problem found, not just the first.

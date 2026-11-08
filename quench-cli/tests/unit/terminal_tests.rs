@@ -15,8 +15,8 @@ fn ansi_constants_are_non_empty_escape_sequences() {
     for code in [RESET, BOLD, DIM, CYAN, BLUE, GREEN, YELLOW, WHITE] {
         assert!(code.starts_with('\x1b'));
     }
-    assert!(!SEP.is_empty());
-    assert!(!SEP_THIN.is_empty());
+    assert_ne!(SEP, "");
+    assert_ne!(SEP_THIN, "");
 }
 
 #[quench_test::test]

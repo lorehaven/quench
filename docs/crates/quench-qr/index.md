@@ -1,7 +1,7 @@
 ---
 title: quench-qr
 parent: Crates
-nav_order: 36
+nav_order: 37
 has_children: true
 permalink: /crates/quench-qr/
 ---

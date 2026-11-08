@@ -1,0 +1,46 @@
+[package]
+name = "quench-tex"
+version = "0.1.0"
+edition = { workspace = true }
+authors = { workspace = true }
+description = "Quench - TeX math with no dependencies: a reader for TeX math formulas, with Unicode and two-dimensional text output, and (feature typeset) a typesetter by TeX's rules with an OpenType MATH font, drawn to PNG and SVG"
+keywords = ["tex", "latex", "math", "unicode", "formula"]
+categories = ["text-processing"]
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+autotests = false
+
+[lib]
+name = "quench_tex"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# The typesetter (`quench_tex::typeset`): TeX's layout with Noto Sans Math (embedded), drawn to PNG and SVG.
+typeset = ["dep:quench-text", "dep:quench-raster", "dep:quench-image"]
+
+[dependencies]
+quench-text = { workspace = true, optional = true, features = ["math-font"] }
+quench-raster = { workspace = true, optional = true }
+quench-image = { workspace = true, optional = true }
+
+[[test]]
+name = "unit"
+path = "tests/unit.rs"
+harness = false
+
+[[test]]
+name = "typeset"
+path = "tests/typeset.rs"
+harness = false
+required-features = ["typeset"]
+
+[dev-dependencies]
+quench-test = { workspace = true }
+quench-svg = { workspace = true }
+quench-text = { workspace = true, features = ["math-font"] }

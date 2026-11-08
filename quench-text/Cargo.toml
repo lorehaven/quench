@@ -3,7 +3,7 @@ name = "quench-text"
 version = "0.1.5"
 edition = { workspace = true }
 authors = { workspace = true }
-description = "Quench - fonts and text with no dependencies: a TrueType parser, kerning, line breaking, Noto Sans embedded, drawn through quench-raster"
+description = "Quench - fonts and text with no dependencies: a TrueType parser, kerning, the OpenType MATH table, line breaking, Noto Sans embedded (Noto Sans Math optional), drawn through quench-raster"
 keywords = ["font", "truetype", "text", "layout"]
 categories = ["text-processing", "rendering"]
 homepage = { workspace = true }
@@ -16,6 +16,11 @@ include = ["src/**", "tests/**", "fonts/**", "Cargo.toml"]
 [lib]
 name = "quench_text"
 path = "src/lib.rs"
+
+[features]
+default = []
+# Embeds Noto Sans Math (1 MB), for typesetting formulas: `noto_sans_math()`.
+math-font = []
 
 [dependencies]
 quench-raster = { workspace = true }

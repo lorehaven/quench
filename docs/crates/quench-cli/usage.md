@@ -80,3 +80,38 @@ The prompt goes to standard error, echo is off, a newline is printed afterwards.
 ## 7. A full-screen loop
 
 See the `Keys` example in [keys, term and tty](api-term.md#struct-keys): enable raw mode, print `ENTER_ALTERNATE_SCREEN` and `HIDE_CURSOR`, loop on `poll`/`read`, and print `SHOW_CURSOR` and `LEAVE_ALTERNATE_SCREEN` before returning. `RawMode` restores the terminal on drop, including when the loop returns early with `?`; a panic that aborts does not run `Drop`.
+
+## 8. A picture or formula in the terminal
+
+Goal: show an image inline where the terminal can draw one, and text where it cannot. Ask the terminal once at start-up, then pick the protocol. See [graphics](api-graphics.md) for every item.
+
+```rust,no_run
+use quench_cli::graphics::detect::{DEFAULT_TIMEOUT, Protocol, detect};
+use quench_cli::graphics::{Rgb, kitty, sixel};
+
+fn show(png: &[u8], rgba: &[u8], width: usize, height: usize, text: &str)
+    -> Result<(), sixel::SixelError>
+{
+    let caps = detect(DEFAULT_TIMEOUT);           // unix + `tui`; never fails
+    match caps.protocol() {
+        Some(Protocol::Kitty) => print!("{}", kitty::transmit_png(png, 1, kitty::Placement::cells(12, 1))),
+        Some(Protocol::Sixel) => {
+            let background = caps.background.unwrap_or(Rgb::BLACK);
+            print!("{}", sixel::encode(rgba, width, height, background)?);
+        }
+        None => print!("{text}"),
+    }
+    Ok(())
+}
+```
+
+The PNG for kitty and the RGBA pixels for sixel come from elsewhere, for example [quench-image](../quench-image/index.md) (`decode`, `encode_png`). Sixel needs RGBA pixels; kitty takes the PNG file as it is. `caps.cell_size_px` tells how many pixels one cell has, so you can size the image to whole cells.
+
+Kitty keeps the image under its id. To show it again (after scrolling, say), print `kitty::place(1, placement)`. To free it, print `kitty::delete(1)`.
+
+Pitfalls:
+
+* Call `detect` once, before the line editor or key reader starts. The probe takes up to about 200 ms, and keys typed during it are lost. A reply that arrives later than the timeout ends up in the program's input.
+* Nothing is asked, and `protocol()` is `None`, when stdin or stdout is not a terminal, when `TERM` is `dumb` or unset, and inside tmux or screen. Set `QUENCH_GRAPHICS=kitty`, `sixel` or `none` to override the answer. Inside tmux or screen the queries are never sent, even with an override: the forced protocol comes back with `cell_size_px` and `background` set to `None`, so have a default for them. The program does not wrap the image sequences for tmux passthrough either.
+* `detect` flushes standard output and standard error and writes its queries through Rust's `stdout()`, so text you printed before it (even `print!` without a newline) shows before the queries. Output written to descriptor 1 some other way (a `File` on `/dev/stdout`, a child process) is not ordered by this.
+* For sixel, blend onto the real background. A formula antialiased onto black looks wrong on a light terminal. `caps.background` is the terminal's `OSC 11` answer, or `None`.
