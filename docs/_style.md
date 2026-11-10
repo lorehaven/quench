@@ -1,11 +1,11 @@
 # Documentation style guide (shared by the Quench and Forge books)
 
-This file is for authors: Jekyll ignores files that start with `_`, so it is not published. Both books follow it.
+This file is for authors: the site generator leaves out files that start with `_`, so it is not published. Both books follow it.
 
 ## Two books, one theme
 
 * `quench/docs` is **the Quench book** (framework crates). `forge/docs` is **the Forge book** (libs, CLIs, services, apps).
-* Both are Jekyll sites with the `just-the-docs` remote theme (see each `_config.yml`). Navigation comes from front matter, so every page has it:
+* Both are built by `anvil docs build` into a static site (see each `_config.yml`); the navigation model is just-the-docs'. Navigation comes from front matter, so every page has it:
 
 ```yaml
 ---
@@ -18,7 +18,7 @@ permalink: /crates/quench-args/   # only on the section's index page
 ---
 ```
 
-* Use **relative Markdown links to `.md` files** inside one book (`[quench-core](../quench-core/index.md)`); the `jekyll-relative-links` plugin turns them into site links, and they also work on GitHub. Links **between** the two books are not possible with relative paths on a published site: write "see `quench-http` in the Quench book" with the name in code font, and no link.
+* Use **relative Markdown links to `.md` files** inside one book (`[quench-core](../quench-core/index.md)`); the build turns them into site links, and they also work on GitHub. Links **between** the two books are not possible with relative paths on a published site: write "see `quench-http` in the Quench book" with the name in code font, and no link.
 * One `#` heading per page, equal to the front-matter title is **not** required: the theme renders the title; start page bodies at `##` after one short lead paragraph (no `#` heading in the body).
 * Code blocks always carry a language (`rust`, `toml`, `yaml`, `bash`, `text`, `json`, `http`).
 
@@ -54,7 +54,7 @@ One directory per service: `docs/services/<service>/` in the Forge book.
 |---|---|
 | `index.md` | Purpose, crates in the service (`core`, `app`, `web`, `service`), ports/paths (`BASE_PATH`), dependencies (Postgres, Redis, other services), authentication model, links to the other pages. `has_children: true`, `parent: Services`. |
 | `api.md` | The HTTP API, **rendered from `openapi.yaml`**: one section per tag, one subsection per operation: method and path, summary, auth/permission needed, path/query/header parameters, request body (field table, JSON example), responses (status, body, example), errors. Keep it in step with the YAML. |
-| `openapi.yaml` | **OpenAPI 3.1** document, hand-checked against the code, in the service's docs directory (published as a static file by Jekyll: give it front matter-free content and add `/services/<service>/openapi.yaml` link on the api page). Contains: `info` (title, version = the service's crate version, description), `servers` (`/{base}` variable), `tags`, `paths` for **every** route registered by the service (including `/ui/...` SSO routes and static asset routes, tagged `ui`), `components.schemas` for every request/response type (taken from the `*-core` and service types and their `serde` attributes, with required/optional exactly as serialized), `components.securitySchemes` (session cookie, bearer app/access token), per-operation `security`, and `x-permission: service:action` where the code enforces a grant. Reuse schemas with `$ref`; give examples. |
+| `openapi.yaml` | **OpenAPI 3.1** document, hand-checked against the code, in the service's docs directory (published as a static file by the build: give it front matter-free content and add `/services/<service>/openapi.yaml` link on the api page). Contains: `info` (title, version = the service's crate version, description), `servers` (`/{base}` variable), `tags`, `paths` for **every** route registered by the service (including `/ui/...` SSO routes and static asset routes, tagged `ui`), `components.schemas` for every request/response type (taken from the `*-core` and service types and their `serde` attributes, with required/optional exactly as serialized), `components.securitySchemes` (session cookie, bearer app/access token), per-operation `security`, and `x-permission: service:action` where the code enforces a grant. Reuse schemas with `$ref`; give examples. |
 | `configuration.md` | Every env var the service reads (name, type, default, meaning, where read), config files, feature flags (`FEATURE_*`), secrets (names only, never values), ports. |
 | `data.md` | Database schema it owns (tables, columns, constraints, migrations in order), Redis keys, files. |
 | `operations.md` | Run locally (foreman), run in the cluster (image, env, probes, `homecloud` overlay names), health endpoints, metrics, logging, failure modes, limits. |
@@ -79,7 +79,7 @@ Get the command list from the argument definitions in the source **and** from th
 
 ## Reports (gaps and mismatches)
 
-Every author writes `docs/_reports/<area>.md` (ignored by Jekyll) with three lists: **(1) stale or wrong statements found in the old docs** (what they said, what the code does), **(2) things that exist in the code but were undocumented**, **(3) open questions** (behaviour you could not determine from the code, TODOs and suspected bugs, with file:line). Do not fix source code to match the docs; list suspected bugs.
+Every author writes `docs/_reports/<area>.md` (left out of the site) with three lists: **(1) stale or wrong statements found in the old docs** (what they said, what the code does), **(2) things that exist in the code but were undocumented**, **(3) open questions** (behaviour you could not determine from the code, TODOs and suspected bugs, with file:line). Do not fix source code to match the docs; list suspected bugs.
 
 ## Mechanics and limits
 

@@ -68,7 +68,7 @@ packages = [
     "quench-web-components",
 ]
 
-# `anvil docs check|build|release`: this repository's book (a Jekyll site of Markdown files). The warehouse is
+# `anvil docs check|build|release`: this repository's book (a site of Markdown files). The warehouse is
 # the one forge's `.anvil/artifacts.toml` names; the `docs` files storage is declared in homecloud.
 [docs]
 out = "target/docs"

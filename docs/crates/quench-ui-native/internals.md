@@ -10,7 +10,7 @@ Design notes that matter to users. Source: `src/dom.rs`, `src/pipeline.rs`, `src
 
 All nodes live in one `Vec<DomNode>` (`kind`, `parent: Option<usize>`, `children: Vec<usize>`). `NodeId`, layout box keys and accessibility ids are indexes into it. `<html>` is 0, `<body>` is 1. Node kinds: `Element { tag, attrs, handlers, styles }`, `Text`, `Anchor`.
 
-* `remove` only detaches. A removed node (and its subtree) stays in the arena: the arena never shrinks and indexes are never reused. Consequences: memory grows with the number of nodes ever created; whole-arena scans (`<img>` resolution, label `for` / `aria-labelledby` id lookup, radio groups in `toggle`, `label_target`) also see detached nodes. A detached radio with the same `name` has its `checked` cleared by a click; a detached element with a matching `id` can be found as a label target. See the [report](../../_reports/ui-native.md).
+* `remove` only detaches. A removed node (and its subtree) stays in the arena: the arena never shrinks and indexes are never reused. Consequences: memory grows with the number of nodes ever created; whole-arena scans (`<img>` resolution, label `for` / `aria-labelledby` id lookup, radio groups in `toggle`, `label_target`) also see detached nodes. A detached radio with the same `name` has its `checked` cleared by a click; a detached element with a matching `id` can be found as a label target. See the report (in `docs/_reports`).
 * Animation state (`last`, `running`, `started`) is keyed by node index and is not cleaned when a node is removed.
 * Layout key `usize::MAX` marks the anonymous block that centres button/field content; it is skipped by hit testing and accessibility bounds.
 

@@ -84,7 +84,7 @@ Number of nodes in the subtree including self.
 pub fn accessibility_tree(&self) -> AccessNode
 ```
 
-Lays the document out first when there is no layout yet or the `dirty` flag is set (note: see [report](../../_reports/ui-native.md) on `dirty` versus `stale`), then walks the DOM from `<body>` (node 1). The root is:
+Lays the document out first when there is no layout yet or the `dirty` flag is set (note: see the ui-native report in `docs/_reports` on `dirty` versus `stale`), then walks the DOM from `<body>` (node 1). The root is:
 
 * `id: 0`, `role: Role::Document`, `name`: the `aria-label` of `<body>` (else empty), `bounds: (0, 0, viewport.0, viewport.1)`, no actions, children = the nodes found under body.
 

@@ -59,7 +59,7 @@ Space, `>`, `+`, `~`.
 pub enum AttrOp { Exists, Equals, Includes, Prefix, Suffix, Substring, DashMatch }
 ```
 
-`[a]`, `[a=v]`, `[a~=v]`, `[a^=v]`, `[a$=v]`, `[a*=v]`, `[a|=v]`. **Not re-exported from the crate root** (`lib.rs` does not list it), although `Simple::Attribute` has a field of this type; downstream code can read the field but cannot write the type's path. See the [gap report](../../_reports/ui-css.md).
+`[a]`, `[a=v]`, `[a~=v]`, `[a^=v]`, `[a$=v]`, `[a*=v]`, `[a|=v]`. **Not re-exported from the crate root** (`lib.rs` does not list it), although `Simple::Attribute` has a field of this type; downstream code can read the field but cannot write the type's path. See the gap report (in `docs/_reports`).
 
 ## `Simple`
 
