@@ -160,7 +160,6 @@ impl NativeRenderer {
         match action {
             AccessAction::Focus => {
                 self.focus_node(id, true);
-                true
             }
             AccessAction::Click => {
                 let Some((x, y, w, h)) = center else {
@@ -168,7 +167,6 @@ impl NativeRenderer {
                 };
                 self.pointer_down(x + w / 2.0, y + h / 2.0);
                 self.pointer_up(x + w / 2.0, y + h / 2.0);
-                true
             }
             AccessAction::ScrollIntoView => {
                 let Some((_, y, _, h)) = center else {
@@ -180,9 +178,9 @@ impl NativeRenderer {
                 } else if y + h > viewport {
                     self.wheel(0.0, 0.0, 0.0, y + h - viewport);
                 }
-                true
             }
         }
+        true
     }
 }
 

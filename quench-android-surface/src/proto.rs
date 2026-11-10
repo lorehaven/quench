@@ -420,7 +420,7 @@ pub fn encode_tree(root: &AccessNode) -> Vec<u8> {
         set(13, n.actions.contains(&AccessAction::ScrollIntoView));
         out.extend_from_slice(&flags.to_be_bytes());
         out.push(n.level);
-        for v in [n.bounds.0, n.bounds.1, n.bounds.2, n.bounds.3] {
+        for v in <[_; 4]>::from(n.bounds) {
             out.extend_from_slice(&v.to_be_bytes());
         }
         put(out, &n.name);

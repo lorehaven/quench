@@ -626,7 +626,7 @@ impl<W: Write> Surface<W> {
                             text: &s.text,
                             cursor: utf16_len(&s.text, s.cursor),
                             anchor: utf16_len(&s.text, s.anchor),
-                            rect: [s.rect.0, s.rect.1, s.rect.2, s.rect.3],
+                            rect: s.rect.into(),
                         },
                     )?;
                 }

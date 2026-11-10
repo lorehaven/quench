@@ -561,6 +561,7 @@ mod tests {
     }
 
     #[quench_test::test]
+    #[allow(clippy::mut_mut)] // the `&mut &mut` impl is what this checks
     fn works_through_references_boxes_and_pins() {
         block_on(async {
             let mut inner = iter(vec!['a', 'b']);
