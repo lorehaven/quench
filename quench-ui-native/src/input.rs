@@ -912,6 +912,10 @@ impl NativeRenderer {
                     text[..(cursor as usize).min(text.len())].chars().count()
                 };
                 self.dom.borrow_mut().ui.preedit = Some((text.to_string(), cursor_chars));
+                // As a browser does: `input` carries the text with the composition in it (listeners that only
+                // take committed text, like `Field`, ignore it while composing, and may show it as a preview).
+                let shown = displayed_value(&self.dom.borrow(), f);
+                self.dispatch(f, &Event::Input(shown), true);
             }
             _ => {
                 self.dom.borrow_mut().ui.preedit = None;

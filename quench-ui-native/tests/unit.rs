@@ -927,6 +927,7 @@ fn an_input_method_composes_commits_and_deletes_around_the_caret() {
         *log.borrow(),
         [
             "start ab",
+            "input abni",
             "input ab你",
             "end ab你",
             "input abc",

@@ -108,6 +108,8 @@ pub mod rules {
 pub struct Field {
     name: Rc<str>,
     value: Signal<String>,
+    /// The value with the half-typed text of an input method in it (equal to `value` when none is composing).
+    live: Signal<String>,
     error: Signal<Option<String>>,
     touched: Signal<bool>,
     rules: Rc<RefCell<Vec<Rule>>>,
@@ -129,6 +131,7 @@ impl Field {
         Self {
             name: name.into(),
             value: create_signal(initial.to_string()),
+            live: create_signal(initial.to_string()),
             error: create_signal(None),
             touched: create_signal(false),
             rules: Rc::new(RefCell::new(Vec::new())),
@@ -159,10 +162,18 @@ impl Field {
         self.value.get_untracked()
     }
 
+    /// The value with the half-typed text of an input method in it, for a preview that should not lag a word behind
+    /// the keyboard (a hint about what is being typed). Anything that stores the field uses [`Field::value`].
+    #[must_use]
+    pub fn live_value(&self) -> String {
+        self.live.get()
+    }
+
     /// Changes the value. Once the user has been through the field the new value is checked at once.
     pub fn set(&self, value: &str) {
         batch(|| {
             self.value.set(value.to_string());
+            self.live.set(value.to_string());
             if self.touched.get_untracked() {
                 let _ = self.validate();
             } else {
@@ -196,6 +207,7 @@ impl Field {
     pub fn reset(&self, initial: &str) {
         batch(|| {
             self.value.set(initial.to_string());
+            self.live.set(initial.to_string());
             self.error.set(None);
             self.touched.set(false);
         });
@@ -234,7 +246,9 @@ impl Field {
                     .map(|_| format!("{}-error", described.name))
             })
             .on_input(move |v| {
-                if !typed.composing.get() {
+                if typed.composing.get() {
+                    typed.live.set(v.to_string());
+                } else {
                     typed.set(v);
                 }
             })
