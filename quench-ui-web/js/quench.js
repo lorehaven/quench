@@ -5,7 +5,7 @@
 //   <script type="module" src="/quench.js?wasm=/app.wasm"></script>      (add &dev=0 or &dev=1 to force)
 
 const EVENTS = ["click", "dblclick", "input", "change", "keydown", "keyup", "submit", "focus", "blur",
-  "pointerdown", "pointerup", "pointermove", "compositionstart", "compositionend", "scroll", "transitionend", "resize", "pointercancel"];
+  "pointerdown", "pointerup", "pointermove", "compositionstart", "compositionend", "scroll", "transitionend", "resize", "pointercancel", "wheel"];
 const FOCUSABLE = "a[href],button,input,select,textarea,[tabindex]:not([tabindex='-1'])";
 const LEVELS = ["debug", "info", "warn", "error"];
 const FORM_PROPS = new Set(["value", "checked", "selected"]);
@@ -94,6 +94,7 @@ export async function start(url, options = {}) {
     free.push(h);
   }
 
+  const mods = (e) => (e.ctrlKey ? 1 : 0) | (e.shiftKey ? 2 : 0) | (e.altKey ? 4 : 0) | (e.metaKey ? 8 : 0);
   function listen(h, kind) {
     const node = get(h);
     const type = EVENTS[kind];
@@ -117,13 +118,15 @@ export async function start(url, options = {}) {
       else if (type.startsWith("composition")) payload = String(event.currentTarget.value ?? event.data ?? "");
       else if (type === "scroll") [a, b] = [event.currentTarget.scrollTop, event.currentTarget.scrollLeft];
       else if (type === "keydown" || type === "keyup") {
-        payload = event.key;
-        flags = (event.ctrlKey ? 1 : 0) | (event.shiftKey ? 2 : 0) | (event.altKey ? 4 : 0) | (event.metaKey ? 8 : 0);
+        [payload, flags] = [event.key, mods(event)];
+      } else if (type === "wheel") {
+        const r = event.currentTarget.getBoundingClientRect(), u = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? r.height : 1; // lines, pages -> px
+        [payload, flags] = [[event.clientX - r.left, event.clientY - r.top, r.width, r.height, event.deltaX * u, event.deltaY * u].join(","), mods(event)];
       } else if (type.startsWith("pointer")) [a, b, c] = [event.clientX, event.clientY, event.pointerId];
       const [ptr, len] = put(encoder.encode(payload));
       if (dispatch(h, kind, ptr, len, a, b, c, flags) === 1) event.preventDefault(); // a listener asked for it
     };
-    node.addEventListener(type, fn);
+    node.addEventListener(type, fn, type === "wheel" ? { passive: false } : undefined); // passive listeners cannot stop a zoom
     entry.push([type, fn]);
     listeners.set(h, entry);
   }

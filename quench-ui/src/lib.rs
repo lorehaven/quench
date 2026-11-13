@@ -45,7 +45,7 @@ pub mod view;
 pub mod virtual_list;
 
 pub use event::{
-    Event, EventKind, Handler, KeyEvent, PointerEvent, ScrollEvent, Size, prevent_default,
+    Event, EventKind, Handler, KeyEvent, PointerEvent, ScrollEvent, Size, WheelEvent, prevent_default,
     take_prevent_request,
 };
 pub use mount::{Mount, mount};
@@ -59,7 +59,7 @@ pub use view::{Element, IntoView, Key, View, element, fragment};
 
 /// Everything a component usually needs.
 pub mod prelude {
-    pub use crate::event::{Event, EventKind, KeyEvent, PointerEvent};
+    pub use crate::event::{Event, EventKind, KeyEvent, PointerEvent, WheelEvent};
     pub use crate::mount::{Mount, mount};
     pub use crate::reactive::{
         Effect, Memo, Scope, Signal, batch, create_effect, create_memo, create_root, create_signal,

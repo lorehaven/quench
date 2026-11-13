@@ -27,6 +27,10 @@ pub enum EventKind {
     TransitionEnd,
     /// The element's size changed (also reported once when it is first laid out).
     Resize,
+    /// The wheel (or a trackpad's two-finger scroll or pinch, which arrives as a wheel with the
+    /// ctrl key down). The web backend registers it as non-passive, so a listener may call
+    /// [`prevent_default`] to stop the page from scrolling or zooming.
+    Wheel,
 }
 
 impl EventKind {
@@ -52,6 +56,7 @@ impl EventKind {
             Self::Scroll => "scroll",
             Self::TransitionEnd => "transitionend",
             Self::Resize => "resize",
+            Self::Wheel => "wheel",
         }
     }
 }
@@ -84,6 +89,26 @@ pub struct PointerEvent {
     pub x: f64,
     pub y: f64,
     pub pointer_id: i32,
+}
+
+/// One tick of the wheel over an element. Positions are in CSS pixels, relative to the element's
+/// top-left corner, with the element's size so a listener can zoom about the pointer.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[allow(clippy::struct_excessive_bools)] // the four modifier keys
+pub struct WheelEvent {
+    pub x: f64,
+    pub y: f64,
+    /// The element's width and height.
+    pub width: f64,
+    pub height: f64,
+    /// How far the wheel turned, in CSS pixels (lines and pages are converted by the browser
+    /// layer): positive `dy` is away from the user (scroll down, zoom out).
+    pub dx: f64,
+    pub dy: f64,
+    pub ctrl: bool,
+    pub shift: bool,
+    pub alt: bool,
+    pub meta: bool,
 }
 
 /// How far an element has scrolled, in CSS pixels.
@@ -143,6 +168,7 @@ pub enum Event {
     Scroll(ScrollEvent),
     TransitionEnd,
     Resize(Size),
+    Wheel(WheelEvent),
 }
 
 impl Event {
@@ -168,6 +194,7 @@ impl Event {
             Self::Scroll(_) => EventKind::Scroll,
             Self::TransitionEnd => EventKind::TransitionEnd,
             Self::Resize(_) => EventKind::Resize,
+            Self::Wheel(_) => EventKind::Wheel,
         }
     }
 }

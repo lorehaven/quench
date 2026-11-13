@@ -81,7 +81,7 @@ Only these `env` imports exist: the table is the complete list of 30.
 
 ### Event types per kind
 
-`EVENTS = ["click","dblclick","input","change","keydown","keyup","submit","focus","blur","pointerdown","pointerup","pointermove","compositionstart","compositionend","scroll","transitionend","resize","pointercancel"]`, index = kind.
+`EVENTS = ["click","dblclick","input","change","keydown","keyup","submit","focus","blur","pointerdown","pointerup","pointermove","compositionstart","compositionend","scroll","transitionend","resize","pointercancel","wheel"]`, index = kind.
 
 | Kinds | Payload `ptr/len` | `a`, `b`, `c` | `flags` |
 |---|---|---|---|

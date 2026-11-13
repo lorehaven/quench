@@ -1,9 +1,9 @@
 //! Turns the numbers `quench.js` sends into a typed [`Event`].
 
-use quench_ui::{Event, EventKind, KeyEvent, PointerEvent, ScrollEvent, Size};
+use quench_ui::{Event, EventKind, KeyEvent, PointerEvent, ScrollEvent, Size, WheelEvent};
 
 /// The listener kinds in the order of the contract's event table.
-const KINDS: [EventKind; 18] = [
+const KINDS: [EventKind; 19] = [
     EventKind::Click,
     EventKind::DoubleClick,
     EventKind::Input,
@@ -22,6 +22,7 @@ const KINDS: [EventKind; 18] = [
     EventKind::TransitionEnd,
     EventKind::Resize,
     EventKind::PointerCancel,
+    EventKind::Wheel,
 ];
 
 /// The number `quench.js` uses for `kind`.
@@ -37,7 +38,8 @@ pub fn kind_code(kind: EventKind) -> u32 {
 /// The event a listener of `kind` receives, or `None` for a number outside the table.
 ///
 /// `payload` is the text (value or key), `(a, b, c)` a pointer's x, y and id, and `flags` the
-/// modifier bits: 1 ctrl, 2 shift, 4 alt, 8 meta.
+/// modifier bits: 1 ctrl, 2 shift, 4 alt, 8 meta. A wheel's `payload` is `x,y,width,height,dx,dy`
+/// (CSS pixels, `x` and `y` relative to the element).
 #[must_use]
 pub fn decode(kind: u32, payload: String, a: f64, b: f64, c: i32, flags: u32) -> Option<Event> {
     let key = |payload: String| KeyEvent {
@@ -74,5 +76,21 @@ pub fn decode(kind: u32, payload: String, a: f64, b: f64, c: i32, flags: u32) ->
             width: a,
             height: b,
         }),
+        EventKind::Wheel => {
+            let n: Vec<f64> = payload.split(',').filter_map(|v| v.parse().ok()).collect();
+            let at = |i: usize| n.get(i).copied().unwrap_or(0.0);
+            Event::Wheel(WheelEvent {
+                x: at(0),
+                y: at(1),
+                width: at(2),
+                height: at(3),
+                dx: at(4),
+                dy: at(5),
+                ctrl: flags & 1 != 0,
+                shift: flags & 2 != 0,
+                alt: flags & 4 != 0,
+                meta: flags & 8 != 0,
+            })
+        }
     })
 }

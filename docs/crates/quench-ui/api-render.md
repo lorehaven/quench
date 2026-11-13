@@ -23,6 +23,7 @@ pub enum EventKind {
     Scroll,
     TransitionEnd,      // a CSS transition finished
     Resize,             // the element's size changed (also reported once when first laid out)
+    Wheel,              // the wheel or a trackpad scroll/pinch (ctrl down); non-passive, so prevent_default stops page zoom
 }
 
 #[must_use]

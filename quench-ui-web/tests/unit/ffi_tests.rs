@@ -76,11 +76,17 @@ fn decoding_fills_in_payloads_and_modifier_flags() {
         Some(Event::Submit)
     );
     assert_eq!(
-        decode_event(18, String::new(), 0.0, 0.0, 0, 0),
+        decode_event(19, String::new(), 0.0, 0.0, 0, 0),
         None,
         "past the table"
     );
     assert_eq!(decode_event(u32::MAX, String::new(), 0.0, 0.0, 0, 0), None);
+    // A wheel carries its position, the element's size and the distance in the payload.
+    let Some(Event::Wheel(w)) = decode_event(18, "10,20,300,400,0,-53.5".to_string(), 0.0, 0.0, 0, 1) else {
+        panic!("not a wheel event");
+    };
+    assert_eq!((w.x, w.y, w.width, w.height, w.dx, w.dy), (10.0, 20.0, 300.0, 400.0, 0.0, -53.5));
+    assert!(w.ctrl && !w.shift);
 }
 
 #[quench_test::test]
