@@ -45,8 +45,8 @@ pub mod view;
 pub mod virtual_list;
 
 pub use event::{
-    Event, EventKind, Handler, KeyEvent, PointerEvent, ScrollEvent, Size, WheelEvent, prevent_default,
-    take_prevent_request,
+    Event, EventKind, Handler, KeyEvent, PointerEvent, ScrollEvent, Size, WheelEvent,
+    prevent_default, take_prevent_request,
 };
 pub use mount::{Mount, mount};
 pub use reactive::{

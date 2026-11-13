@@ -103,7 +103,11 @@ fn nothing_is_taken_from_the_input_while_an_input_method_composes() {
         "",
         "the half-typed text is not the value"
     );
-    assert_eq!(f.live_value(), "ni\u{2019}", "a preview sees the composition");
+    assert_eq!(
+        f.live_value(),
+        "ni\u{2019}",
+        "a preview sees the composition"
+    );
     r.fire(input, &Event::CompositionEnd("\u{4f60}".into()));
     assert_eq!(f.live_value(), "\u{4f60}");
     assert_eq!(f.value_untracked(), "\u{4f60}");
