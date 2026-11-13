@@ -81,4 +81,4 @@ title = "Quench"
 
 # Cargo never prunes target/: after `anvil build|test|nextest|lint` it is trimmed to this many GiB (`anvil clean --max-size`).
 [build]
-max_target_gb = 20
+max_target_gb = 45
