@@ -35,10 +35,15 @@ mod filter;
 mod font;
 mod glyphs;
 mod object;
+mod outline;
+mod render;
 mod text;
 
-pub use doc::Document;
+pub use doc::{Document, Page};
 pub use error::{Error, Result};
+pub use object::{Dict, Object, Stream};
+pub use outline::{OutlineItem, PageLink};
+pub use render::{RenderedPage, TextRun};
 
 use std::collections::HashMap;
 

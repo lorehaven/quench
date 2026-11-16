@@ -27,7 +27,13 @@ pub trait Platform {
     fn cancel(&self, id: u32);
     /// Whether the user asked for less motion (`prefers-reduced-motion: reduce`).
     fn prefers_reduced_motion(&self) -> bool { false }
+    /// Asks the person to pick files; `done` gets them, or an empty list on cancel. Call it while handling a click or key.
+    fn pick_files(&self, accept: &str, multiple: bool, done: Box<dyn FnOnce(Vec<PickedFile>)>) { done(Vec::new()) }
+    /// Offers `bytes` to the person as a file to save.
+    fn download(&self, name: &str, mime: &str, bytes: &[u8]) {}
 }
+
+pub struct PickedFile { pub name: String, pub mime: String, pub bytes: Vec<u8> }
 ```
 
 The services a host provides. `prefers_reduced_motion` has a default of `false`. Ids are the implementation's; `Timer` stores them as `u32`.
@@ -41,6 +47,11 @@ The services a host provides. `prefers_reduced_motion` has a default of `false`.
 | `now` | `#[must_use] pub fn now() -> f64` | The platform's clock, or `0.0` when none is installed. |
 | `after` | `pub fn after(ms: u32, f: impl FnOnce() + 'static) -> Timer` | Runs `f` after `ms` ms. **With no platform installed it runs `f` at once** (synchronously, before returning) and returns `Timer(0)`, so a UI built without a host (a server render) still reaches its final state. |
 | `prefers_reduced_motion` | `#[must_use] pub fn prefers_reduced_motion() -> bool` | `false` with no platform installed. |
+| `pick_files` | `pub fn pick_files(accept: &str, multiple: bool, done: impl FnOnce(Vec<PickedFile>) + 'static)` | Opens the host's file picker; `accept` is a comma-separated list of extensions or media types as in an HTML file input. **With no platform installed `done` runs at once with no files.** The browser only shows a picker for a click or key press, so call it from inside such a listener. |
+| `download` | `pub fn download(name: &str, mime: &str, bytes: &[u8])` | Offers the bytes as a file to save. Does nothing with no platform installed. |
+| `open_in_tab` | `pub fn open_in_tab(mime: &str, bytes: &[u8])` | Shows the bytes (a PDF, an image) in a new browser tab instead of saving them: a download with an empty name, which the web host opens with `window.open`. Call it from a click, or the browser blocks the popup. |
+| `on_drop` | `pub fn on_drop(handler: impl Fn(Vec<PickedFile>) + 'static)` | Asks to be told when the person drops files on the page (one handler is kept; a later one replaces it). |
+| `deliver_drop` | `pub fn deliver_drop(files: Vec<PickedFile>)` | What a host calls with dropped files; does nothing when there is no handler. |
 
 ### Timer
 
@@ -69,6 +80,9 @@ A platform whose clock and timers move only when told to; for tests.
 | `advance` | `pub fn advance(&self, ms: f64)` | Moves the clock forward by `ms`, running the timers that fall due, earliest first (a timer that a callback starts and that falls due within the same span runs too, in the same call). While a callback runs the clock reads the timer's due time (never earlier than before); at the end it reads `start + ms`. |
 | `pending` | `#[must_use] pub fn pending(&self) -> usize` | Timers that have not run. |
 | `set_reduced_motion` | `pub fn set_reduced_motion(&self, on: bool)` | What `prefers_reduced_motion` answers. |
+| `pending_picks` | `#[must_use] pub fn pending_picks(&self) -> Vec<(String, bool)>` | The pickers waiting for an answer, oldest first: `(accept, multiple)`. |
+| `answer_pick` | `pub fn answer_pick(&self, files: Vec<PickedFile>) -> bool` | Answers the oldest picker (an empty list is a cancel); `false` when none is waiting. |
+| `downloads` | `#[must_use] pub fn downloads(&self) -> Vec<(String, String, Vec<u8>)>` | The files offered for saving, oldest first: `(name, mime, bytes)`. |
 
 Trait behaviour: `after` stores `(id, now + ms)` and returns the next id; `cancel` removes by id; timers with equal due times run in a stable order of insertion by `min_by` (the first stored among equals). Callbacks run with no internal borrow held, so they may call `after` and `cancel`.
 

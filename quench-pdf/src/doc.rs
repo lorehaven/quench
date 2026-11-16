@@ -17,6 +17,8 @@ enum Entry {
 #[derive(Debug, Clone)]
 pub struct Page {
     pub dict: Dict,
+    /// The number of the page's object, when it is one of its own.
+    pub object: Option<u32>,
 }
 
 /// A parsed PDF file.
@@ -72,7 +74,7 @@ impl Document {
         Ok(doc)
     }
 
-    fn catalog(&self) -> Option<Dict> {
+    pub(crate) fn catalog(&self) -> Option<Dict> {
         match self.get(&self.trailer, "Root") {
             Some(Object::Dict(d)) if d.contains_key("Pages") => Some(d),
             _ => None,
@@ -495,6 +497,15 @@ impl Document {
     }
 
     fn decode_stream(&self, stream: &Stream) -> Result<Vec<u8>> {
+        self.decode_until(stream, false).map(|(data, _)| data)
+    }
+
+    /// An image's bytes with the filters undone up to a JPEG one: the data, and whether it is a JPEG file (left as it is).
+    pub(crate) fn decode_image(&self, stream: &Stream) -> Result<(Vec<u8>, bool)> {
+        self.decode_until(stream, true)
+    }
+
+    fn decode_until(&self, stream: &Stream, stop_at_jpeg: bool) -> Result<(Vec<u8>, bool)> {
         let filters: Vec<String> = match self
             .get(&stream.dict, "Filter")
             .or_else(|| self.get(&stream.dict, "F"))
@@ -522,9 +533,12 @@ impl Document {
         };
         let mut data = stream.raw.clone();
         for (i, name) in filters.iter().enumerate() {
+            if stop_at_jpeg && matches!(name.as_str(), "DCTDecode" | "DCT") {
+                return Ok((data, true));
+            }
             data = filter::apply(name, &data, params.get(i).and_then(Option::as_ref))?;
         }
-        Ok(data)
+        Ok((data, false))
     }
 
     /// The decoded bytes of a stream object (or a reference to one).
@@ -587,7 +601,11 @@ impl Document {
             for (k, v) in inherit {
                 page.entry(k).or_insert(v);
             }
-            out.push(Page { dict: page });
+            let object = match node {
+                Object::Ref(n, _) => Some(*n),
+                _ => None,
+            };
+            out.push(Page { dict: page, object });
         }
     }
 

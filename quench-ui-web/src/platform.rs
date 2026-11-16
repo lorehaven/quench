@@ -4,7 +4,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use quench_ui::platform::Platform;
+use quench_ui::platform::{PickedFile, Platform};
 
 use crate::exec::{sleep, spawn};
 use crate::host;
@@ -52,5 +52,13 @@ impl Platform for WebPlatform {
 
     fn prefers_reduced_motion(&self) -> bool {
         host::prefers_reduced_motion()
+    }
+
+    fn pick_files(&self, accept: &str, multiple: bool, done: Box<dyn FnOnce(Vec<PickedFile>)>) {
+        crate::files::pick(accept, multiple, done);
+    }
+
+    fn download(&self, name: &str, mime: &str, bytes: &[u8]) {
+        host::download(name, mime, bytes);
     }
 }

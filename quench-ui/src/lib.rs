@@ -45,8 +45,9 @@ pub mod view;
 pub mod virtual_list;
 
 pub use event::{
-    Event, EventKind, Handler, KeyEvent, PointerEvent, ScrollEvent, Size, WheelEvent,
-    prevent_default, take_prevent_request,
+    ClipboardData, Event, EventKind, Handler, KeyEvent, PasteEvent, PointerEvent, ScrollEvent,
+    BeforeInputEvent, BlockPoint, EditSelectionEvent, SelectionEvent, Size, WheelEvent, byte_to_utf16, prevent_default, set_clipboard,
+    take_clipboard_request, take_prevent_request, utf16_to_byte,
 };
 pub use mount::{Mount, mount};
 pub use reactive::{
@@ -59,7 +60,10 @@ pub use view::{Element, IntoView, Key, View, element, fragment};
 
 /// Everything a component usually needs.
 pub mod prelude {
-    pub use crate::event::{Event, EventKind, KeyEvent, PointerEvent, WheelEvent};
+    pub use crate::event::{
+        BeforeInputEvent, BlockPoint, EditSelectionEvent, Event, EventKind, KeyEvent, PasteEvent,
+        PointerEvent, SelectionEvent, WheelEvent,
+    };
     pub use crate::mount::{Mount, mount};
     pub use crate::reactive::{
         Effect, Memo, Scope, Signal, batch, create_effect, create_memo, create_root, create_signal,

@@ -644,3 +644,16 @@ fn a_newline_straight_after_pre_or_textarea_survives_html_parsing() {
         "<div><pre>\n\nfirst</pre><textarea>\n\nsecond</textarea><pre>no newline</pre></div>"
     );
 }
+
+#[quench_test::test]
+fn utf16_offsets_and_byte_offsets_convert_both_ways() {
+    // "é" is 2 bytes and 1 unit, "😀" 4 bytes and 2 units.
+    let text = "a\u{e9}\u{1F600}b";
+    assert_eq!(quench_ui::utf16_to_byte(text, 0), 0);
+    assert_eq!(quench_ui::utf16_to_byte(text, 2), 3);
+    assert_eq!(quench_ui::utf16_to_byte(text, 4), 7);
+    assert_eq!(quench_ui::utf16_to_byte(text, 99), text.len());
+    assert_eq!(quench_ui::byte_to_utf16(text, 3), 2);
+    assert_eq!(quench_ui::byte_to_utf16(text, 7), 4);
+    assert_eq!(quench_ui::byte_to_utf16(text, 0), 0);
+}

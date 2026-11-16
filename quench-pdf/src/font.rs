@@ -249,6 +249,12 @@ impl Font {
         }
     }
 
+    /// Whether the file says how wide the glyphs are (the standard fonts need not).
+    #[must_use]
+    pub fn has_widths(&self) -> bool {
+        !self.widths.is_empty()
+    }
+
     /// The glyphs a shown string stands for.
     #[must_use]
     pub fn decode(&self, bytes: &[u8]) -> Vec<Glyph> {

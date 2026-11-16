@@ -98,6 +98,9 @@ struct State {
     storage_sets: Vec<(String, String)>,
     reduced_motion: bool,
     bridge_sent: Vec<String>,
+    clipboard_sets: Vec<(String, String)>,
+    file_picks: Vec<(u32, String, bool)>,
+    downloads: Vec<(String, String, Vec<u8>)>,
 }
 
 impl State {
@@ -131,6 +134,9 @@ impl State {
             storage_sets: Vec::new(),
             reduced_motion: false,
             bridge_sent: Vec::new(),
+            clipboard_sets: Vec::new(),
+            file_picks: Vec::new(),
+            downloads: Vec::new(),
         }
     }
 
@@ -490,6 +496,50 @@ pub fn storage_sets() -> Vec<(String, String)> {
     with(|s| s.storage_sets.clone())
 }
 
+/// What the module put on the clipboard (a copy or cut listener's choice): `(text, html)`, oldest first.
+#[must_use]
+pub fn clipboard_sets() -> Vec<(String, String)> {
+    with(|s| s.clipboard_sets.clone())
+}
+
+/// The pickers the module opened, oldest first: `(id, accept, multiple)`.
+#[must_use]
+pub fn file_picks() -> Vec<(u32, String, bool)> {
+    with(|s| s.file_picks.clone())
+}
+
+/// The files the module offered for saving, oldest first: `(name, mime, bytes)`.
+#[must_use]
+pub fn downloads() -> Vec<(String, String, Vec<u8>)> {
+    with(|s| s.downloads.clone())
+}
+
+/// The person picked these files `(name, mime, bytes)` in picker `id`, as `quench.js` reports them: one call per file.
+/// An empty list is a cancel.
+pub fn answer_file_pick(id: u32, files: &[(&str, &str, &[u8])]) {
+    let total = u32::try_from(files.len()).unwrap_or(u32::MAX);
+    if files.is_empty() {
+        crate::q_file_picked(id, 0, 0, 0, 0, 0, 0, 0, 0);
+        return;
+    }
+    for (index, (name, mime, data)) in files.iter().enumerate() {
+        let (np, nl) = ffi::alloc_copy(name.as_bytes());
+        let (mp, ml) = ffi::alloc_copy(mime.as_bytes());
+        let (dp, dl) = ffi::alloc_copy(data);
+        crate::q_file_picked(
+            id,
+            u32::try_from(index).unwrap_or(0),
+            total,
+            np,
+            nl,
+            mp,
+            ml,
+            dp,
+            dl,
+        );
+    }
+}
+
 /// Sets what `prefers-reduced-motion` reports.
 pub fn set_reduced_motion(on: bool) {
     with(|s| s.reduced_motion = on);
@@ -764,6 +814,21 @@ pub(crate) mod imports {
 
     pub fn prefers_reduced_motion() -> bool {
         with(|s| s.reduced_motion)
+    }
+
+    pub fn clipboard_set(text: &str, html: &str) {
+        with(|s| s.clipboard_sets.push((text.to_string(), html.to_string())));
+    }
+
+    pub fn file_pick(id: u32, accept: &str, multiple: bool) {
+        with(|s| s.file_picks.push((id, accept.to_string(), multiple)));
+    }
+
+    pub fn download(name: &str, mime: &str, data: &[u8]) {
+        with(|s| {
+            s.downloads
+                .push((name.to_string(), mime.to_string(), data.to_vec()));
+        });
     }
 
     pub fn focus(h: u32) {

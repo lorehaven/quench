@@ -11,6 +11,8 @@ mod browser_tests;
 mod dom_tests;
 #[path = "unit/ffi_tests.rs"]
 mod ffi_tests;
+#[path = "unit/files_tests.rs"]
+mod files_tests;
 #[path = "unit/platform_tests.rs"]
 mod platform_tests;
 #[path = "unit/plugin_tests.rs"]

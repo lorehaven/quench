@@ -5,7 +5,7 @@
 //   <script type="module" src="/quench.js?wasm=/app.wasm"></script>      (add &dev=0 or &dev=1 to force)
 
 const EVENTS = ["click", "dblclick", "input", "change", "keydown", "keyup", "submit", "focus", "blur",
-  "pointerdown", "pointerup", "pointermove", "compositionstart", "compositionend", "scroll", "transitionend", "resize", "pointercancel", "wheel"];
+  "pointerdown", "pointerup", "pointermove", "compositionstart", "compositionend", "scroll", "transitionend", "resize", "pointercancel", "wheel", "copy", "cut", "paste", "contextmenu", "selection", "beforeinput", "editselection"];
 const FOCUSABLE = "a[href],button,input,select,textarea,[tabindex]:not([tabindex='-1'])";
 const LEVELS = ["debug", "info", "warn", "error"];
 const FORM_PROPS = new Set(["value", "checked", "selected"]);
@@ -85,7 +85,7 @@ export async function start(url, options = {}) {
 
   function release(h) {
     if (h < 2 || !nodes[h]) return;
-    for (const [type, fn] of listeners.get(h) ?? []) nodes[h].removeEventListener(type, fn);
+    for (const [type, fn, , target] of listeners.get(h) ?? []) (target ?? nodes[h]).removeEventListener(type, fn);
     listeners.delete(h);
     resizes.get(h)?.disconnect();
     resizes.delete(h);
@@ -94,6 +94,32 @@ export async function start(url, options = {}) {
     free.push(h);
   }
 
+  // --- editable elements: positions are (block = the n-th child, UTF-16 offset in the block's text) ---
+  const blockOf = (node, container) => { let b = container; while (b && b.parentNode !== node) b = b.parentNode; return b; };
+  function pointOf(node, container, offset) {
+    if (container === node) { const kids = node.children, i = Math.min(offset, kids.length - 1); return i < 0 ? null : offset < kids.length ? [i, 0] : [i, kids[i].textContent.length]; }
+    const b = blockOf(node, container);
+    if (!b) return null;
+    const r = document.createRange(); r.selectNodeContents(b); r.setEnd(container, offset);
+    return [[...node.children].indexOf(b), r.toString().length];
+  }
+  function placeAt(node, [block, offset]) { // the DOM position of a block point
+    const b = node.children[Math.min(block, node.children.length - 1)];
+    if (!b) return [node, 0];
+    const walk = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+    for (let t = walk.nextNode(), left = offset; t; t = walk.nextNode()) { if (left <= t.length) return [t, left]; left -= t.length; }
+    return [b, b.childNodes.length];
+  }
+  function editSelect(node, v) { // `v` is "anchorBlock,anchorOffset,focusBlock,focusOffset"
+    const n = v.split(",").map(Number);
+    queueMicrotask(() => { // after the blocks are drawn
+      if (document.activeElement !== node) node.focus({ preventScroll: true });
+      const [a, f] = [placeAt(node, n.slice(0, 2)), placeAt(node, n.slice(2, 4))]; // a fifth number may follow: it only makes the value new
+      getSelection().setBaseAndExtent(a[0], a[1], f[0], f[1]);
+    });
+  }
+
+  let clip = null; // what a copy or cut listener asked for, while its event is delivered (`q_clipboard_set`)
   const mods = (e) => (e.ctrlKey ? 1 : 0) | (e.shiftKey ? 2 : 0) | (e.altKey ? 4 : 0) | (e.metaKey ? 8 : 0);
   function listen(h, kind) {
     const node = get(h);
@@ -101,6 +127,46 @@ export async function start(url, options = {}) {
     if (!node || !type) return;
     const entry = listeners.get(h) ?? [];
     if (entry.some(([t, , own]) => t === type && !own)) return;
+    if (type === "editselection") { // the selection inside an editable element
+      const fn = () => {
+        const s = getSelection();
+        const [a, f] = [s.anchorNode && pointOf(node, s.anchorNode, s.anchorOffset), s.focusNode && pointOf(node, s.focusNode, s.focusOffset)];
+        if (a && f && node.contains(s.anchorNode) && node.contains(s.focusNode)) dispatch(h, kind, ...put(encoder.encode(JSON.stringify([...a, ...f]))), 0, 0, 0, 0);
+      };
+      document.addEventListener("selectionchange", fn);
+      entry.push(["selectionchange", fn, true, document]);
+      entry.push([type, null]);
+      listeners.set(h, entry);
+      return;
+    }
+    if (type === "beforeinput") { // a change to an editable element: the app makes it (an input method's composition is left to the browser, then read back)
+      const send = (kindType, data, range) => dispatch(h, kind, ...put(encoder.encode(JSON.stringify([...range[0], ...range[1], kindType, data]))), 0, 0, 0, 0);
+      const fn = (event) => {
+        const t = event.getTargetRanges?.()[0], s = getSelection();
+        const from = t ? pointOf(node, t.startContainer, t.startOffset) : s.rangeCount && pointOf(node, s.anchorNode, s.anchorOffset);
+        const to = t ? pointOf(node, t.endContainer, t.endOffset) : s.rangeCount && pointOf(node, s.focusNode, s.focusOffset);
+        if (!from || !to) return;
+        if (event.isComposing) return; // the browser composes; `compositionend` reads the result
+        event.preventDefault();
+        const [a, b] = from[0] < to[0] || (from[0] === to[0] && from[1] <= to[1]) ? [from, to] : [to, from];
+        send(event.inputType, event.data ?? event.dataTransfer?.getData("text/plain") ?? "", [a, b]);
+      };
+      const done = () => {
+        const s = getSelection(), p = s.focusNode && pointOf(node, s.focusNode, s.focusOffset);
+        if (p) send("compositionEnd", node.children[p[0]].textContent, [[p[0], 0], [p[0], node.children[p[0]].textContent.length]]);
+      };
+      node.addEventListener("beforeinput", fn); node.addEventListener("compositionend", done);
+      entry.push([type, fn], ["compositionend", done, true]);
+      listeners.set(h, entry);
+      return;
+    }
+    if (type === "selection") { // a text field's caret or selection: there is no event for it, so listen to what moves it
+      const fn = () => dispatch(h, kind, ...put(new Uint8Array(0)), node.selectionStart ?? 0, node.selectionEnd ?? 0, 0, 0);
+      for (const t of ["select", "keyup", "pointerup", "input", "focus"]) { node.addEventListener(t, fn); entry.push([t, fn, true]); }
+      entry.push([type, null]);
+      listeners.set(h, entry);
+      return;
+    }
     if (type === "resize") { // an element has no resize event: observe it
       const watch = new ResizeObserver(([e]) => dispatch(h, kind, ...put(new Uint8Array(0)), e.contentRect.width, e.contentRect.height, 0, 0));
       watch.observe(node);
@@ -123,8 +189,17 @@ export async function start(url, options = {}) {
         const r = event.currentTarget.getBoundingClientRect(), u = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? r.height : 1; // lines, pages -> px
         [payload, flags] = [[event.clientX - r.left, event.clientY - r.top, r.width, r.height, event.deltaX * u, event.deltaY * u].join(","), mods(event)];
       } else if (type.startsWith("pointer")) [a, b, c] = [event.clientX, event.clientY, event.pointerId];
+      else if (type === "contextmenu") { event.preventDefault(); [a, b] = [event.clientX, event.clientY]; }
+      else if (type === "paste") payload = JSON.stringify({ text: event.clipboardData?.getData("text/plain") ?? "", html: event.clipboardData?.getData("text/html") ?? "" });
+      clip = null;
       const [ptr, len] = put(encoder.encode(payload));
       if (dispatch(h, kind, ptr, len, a, b, c, flags) === 1) event.preventDefault(); // a listener asked for it
+      if (clip && (type === "copy" || type === "cut") && event.clipboardData) { // the listener chose what goes on the clipboard
+        event.clipboardData.setData("text/plain", clip.text);
+        if (clip.html) event.clipboardData.setData("text/html", clip.html);
+        event.preventDefault();
+      }
+      clip = null;
     };
     node.addEventListener(type, fn, type === "wheel" ? { passive: false } : undefined); // passive listeners cannot stop a zoom
     entry.push([type, fn]);
@@ -200,9 +275,11 @@ export async function start(url, options = {}) {
   const setAttr = (h, name, value) => {
     const node = get(h);
     if (node?.nodeType !== 1) return;
-    if (hydrating && node.getAttribute(name) === value) return; // the server got it right
+    if (hydrating && node.getAttribute(name) === value) { if (name === "value" && "value" in node && node.value !== value) node.value = value; return; } // the server got it right (a textarea shows its text, not the attribute)
     if (hydrating && origin.get(h) === "claimed") bad(`${name}="${value}"`, node, node);
     node.setAttribute(name, value);
+    if (name === "edit-selection") editSelect(node, value); // "anchorBlock,anchorOffset,focusBlock,focusOffset"
+    if (name === "selection" && node.setSelectionRange) { const [a, b] = value.split(",").map(Number); node.setSelectionRange(a, b); } // "start,end" in UTF-16 units
     // an input being composed or typed in already shows this value: setting it again would move the caret
     if (FORM_PROPS.has(name) && name in node && !(name === "value" && node.value === value)) node[name] = name === "value" ? value : true;
   };
@@ -298,7 +375,52 @@ export async function start(url, options = {}) {
     Object.defineProperty(globalThis, "__quenchBridge", { value: (data) => bridgeAnswer({ data }) });
   }
 
+  // --- files: the picker needs the person's own click, so the Rust side calls it from inside an event handler ----
+  async function sendFiles(id, list) {
+    if (list.length === 0) { call(() => ex.q_file_picked(id, 0, 0, ...put(new Uint8Array(0)), ...put(new Uint8Array(0)), ...put(new Uint8Array(0)))); return; }
+    for (let i = 0; i < list.length; i++) {
+      const file = list[i], data = new Uint8Array(await file.arrayBuffer());
+      call(() => ex.q_file_picked(id, i, list.length, ...put(encoder.encode(file.name)), ...put(encoder.encode(file.type)), ...put(data)));
+    }
+  }
+  // Files dropped on the page arrive as a pick with the id 0xFFFFFFFF.
+  addEventListener("dragover", (e) => { if (e.dataTransfer?.types?.includes("Files")) e.preventDefault(); });
+  addEventListener("drop", (e) => { if (e.dataTransfer?.files?.length) { e.preventDefault(); sendFiles(0xFFFFFFFF, [...e.dataTransfer.files]); } });
+  function pickFiles(id, accept, multiple) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept;
+    input.multiple = multiple;
+    input.style.display = "none";
+    document.body.appendChild(input);
+    let finished = false;
+    const finish = async (files) => {
+      if (finished) return;
+      finished = true;
+      input.remove();
+      await sendFiles(id, [...files]);
+    };
+    input.addEventListener("change", () => finish(input.files));
+    input.addEventListener("cancel", () => finish([]));
+    input.click();
+  }
+  function download(name, mime, data) {
+    const url = URL.createObjectURL(new Blob([data], { type: mime || "application/octet-stream" }));
+    if (!name) { window.open(url, "_blank"); setTimeout(() => URL.revokeObjectURL(url), 120000); return; } // no name: show it in a tab
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
   const env = {
+    q_clipboard_set: guarded((tp, tl, hp, hl) => { clip = { text: text(tp, tl), html: text(hp, hl) }; }),
+    q_file_pick: guarded((id, ap, al, multiple) => pickFiles(id, text(ap, al), multiple !== 0)),
+    q_download: guarded((np, nl, mp, ml, dp, dl) => download(text(np, nl), text(mp, ml), bytes().slice(dp, dp + dl))),
     q_create_el: guarded((p, n) => createElement(text(p, n))),
     q_create_text: guarded((p, n) => createText(text(p, n))),
     q_create_anchor: guarded(() => (hydrating

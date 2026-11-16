@@ -1,9 +1,13 @@
 //! Turns the numbers `quench.js` sends into a typed [`Event`].
 
-use quench_ui::{Event, EventKind, KeyEvent, PointerEvent, ScrollEvent, Size, WheelEvent};
+use quench_serde::{Value, json};
+use quench_ui::{
+    BeforeInputEvent, BlockPoint, EditSelectionEvent, Event, EventKind, KeyEvent, PasteEvent,
+    PointerEvent, ScrollEvent, SelectionEvent, Size, WheelEvent,
+};
 
 /// The listener kinds in the order of the contract's event table.
-const KINDS: [EventKind; 19] = [
+const KINDS: [EventKind; 26] = [
     EventKind::Click,
     EventKind::DoubleClick,
     EventKind::Input,
@@ -23,6 +27,13 @@ const KINDS: [EventKind; 19] = [
     EventKind::Resize,
     EventKind::PointerCancel,
     EventKind::Wheel,
+    EventKind::Copy,
+    EventKind::Cut,
+    EventKind::Paste,
+    EventKind::ContextMenu,
+    EventKind::Selection,
+    EventKind::BeforeInput,
+    EventKind::EditSelection,
 ];
 
 /// The number `quench.js` uses for `kind`.
@@ -76,6 +87,59 @@ pub fn decode(kind: u32, payload: String, a: f64, b: f64, c: i32, flags: u32) ->
             width: a,
             height: b,
         }),
+        EventKind::ContextMenu => Event::ContextMenu(pointer),
+        // JSON: [startBlock, startOffset, endBlock, endOffset, inputType, data]
+        EventKind::BeforeInput => {
+            let v = json::from_str::<Value>(&payload).unwrap_or(Value::Null);
+            let n = |i: usize| {
+                v.get(i)
+                    .and_then(Value::as_i64)
+                    .and_then(|x| usize::try_from(x).ok())
+                    .unwrap_or(0)
+            };
+            let s = |i: usize| v.get(i).and_then(Value::as_str).unwrap_or_default().to_string();
+            Event::BeforeInput(BeforeInputEvent {
+                input_type: s(4),
+                data: s(5),
+                start: BlockPoint { block: n(0), offset: n(1) },
+                end: BlockPoint { block: n(2), offset: n(3) },
+            })
+        }
+        // JSON: [anchorBlock, anchorOffset, focusBlock, focusOffset]
+        EventKind::EditSelection => {
+            let v = json::from_str::<Value>(&payload).unwrap_or(Value::Null);
+            let n = |i: usize| {
+                v.get(i)
+                    .and_then(Value::as_i64)
+                    .and_then(|x| usize::try_from(x).ok())
+                    .unwrap_or(0)
+            };
+            Event::EditSelection(EditSelectionEvent {
+                anchor: BlockPoint { block: n(0), offset: n(1) },
+                focus: BlockPoint { block: n(2), offset: n(3) },
+            })
+        }
+        EventKind::Selection => Event::Selection(SelectionEvent {
+            start: a.max(0.0) as usize,
+            end: b.max(0.0) as usize,
+        }),
+        EventKind::Copy => Event::Copy,
+        EventKind::Cut => Event::Cut,
+        // The payload is JSON: {"text": ..., "html": ...}; anything else is an empty paste.
+        EventKind::Paste => {
+            let value = json::from_str::<Value>(&payload).unwrap_or(Value::Null);
+            let field = |name: &str| {
+                value
+                    .get(name)
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string()
+            };
+            Event::Paste(PasteEvent {
+                text: field("text"),
+                html: field("html"),
+            })
+        }
         EventKind::Wheel => {
             let n: Vec<f64> = payload.split(',').filter_map(|v| v.parse().ok()).collect();
             let at = |i: usize| n.get(i).copied().unwrap_or(0.0);

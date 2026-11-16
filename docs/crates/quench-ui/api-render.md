@@ -24,6 +24,8 @@ pub enum EventKind {
     TransitionEnd,      // a CSS transition finished
     Resize,             // the element's size changed (also reported once when first laid out)
     Wheel,              // the wheel or a trackpad scroll/pinch (ctrl down); non-passive, so prevent_default stops page zoom
+    Copy, Cut,          // the person copied or cut with focus inside the element; a listener answers with `set_clipboard(text, html)`
+    Paste,              // the person pasted; the event carries `PasteEvent { text, html }`; call `prevent_default()` if you used it
 }
 
 #[must_use]
@@ -60,6 +62,9 @@ pub enum Event {
     Scroll(ScrollEvent),
     TransitionEnd,
     Resize(Size),
+    Wheel(WheelEvent),
+    Copy, Cut,
+    Paste(PasteEvent),             // text/plain and text/html from the clipboard (empty strings when absent)
 }
 
 #[must_use]

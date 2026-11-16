@@ -16,9 +16,67 @@ pub trait Platform {
     fn prefers_reduced_motion(&self) -> bool {
         false
     }
+    /// Asks the person to pick files (`accept` is a comma-separated list of extensions or media types, as in an HTML file
+    /// input) and calls `done` with them, or with none when they cancel. It must be called while handling a click or
+    /// another action of the person, or the browser will not show the picker. The default picks nothing.
+    fn pick_files(&self, accept: &str, multiple: bool, done: Box<dyn FnOnce(Vec<PickedFile>)>) {
+        let _ = (accept, multiple);
+        done(Vec::new());
+    }
+    /// Offers `bytes` to the person as a file to save. The default does nothing.
+    fn download(&self, name: &str, mime: &str, bytes: &[u8]) {
+        let _ = (name, mime, bytes);
+    }
 }
 
+/// A file the person picked.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PickedFile {
+    pub name: String,
+    /// The media type the host reports; may be empty.
+    pub mime: String,
+    pub bytes: Vec<u8>,
+}
+
+/// Asks the person to pick files; `done` gets them, or an empty list on cancel. With no platform installed it is called at
+/// once with none. See [`Platform::pick_files`] for when it may be called.
+pub fn pick_files(accept: &str, multiple: bool, done: impl FnOnce(Vec<PickedFile>) + 'static) {
+    match current() {
+        Some(p) => p.pick_files(accept, multiple, Box::new(done)),
+        None => done(Vec::new()),
+    }
+}
+
+/// Offers `bytes` to the person as a file called `name` to save. Nothing happens with no platform installed.
+pub fn download(name: &str, mime: &str, bytes: &[u8]) {
+    if let Some(p) = current() {
+        p.download(name, mime, bytes);
+    }
+}
+
+/// Asks to be told when the person drops files on the page. One handler is kept (a later one replaces it).
+pub fn on_drop(handler: impl Fn(Vec<PickedFile>) + 'static) {
+    DROP_HANDLER.with(|h| *h.borrow_mut() = Some(Rc::new(handler)));
+}
+
+/// A host calls this with the files the person dropped. Does nothing when nobody asked to hear of them.
+pub fn deliver_drop(files: Vec<PickedFile>) {
+    let handler = DROP_HANDLER.with(|h| h.borrow().clone());
+    if let Some(h) = handler {
+        h(files);
+    }
+}
+
+/// Shows `bytes` (a PDF, an image, a page) in a new browser tab instead of saving it, so the person can read or print it.
+/// It is a download with no name, which a host that saves files may take as "show it". Call it while handling a click.
+pub fn open_in_tab(mime: &str, bytes: &[u8]) {
+    download("", mime, bytes);
+}
+
+type DropHandler = Rc<dyn Fn(Vec<PickedFile>)>;
+
 thread_local! {
+    static DROP_HANDLER: RefCell<Option<DropHandler>> = const { RefCell::new(None) };
     static PLATFORM: RefCell<Option<Rc<dyn Platform>>> = const { RefCell::new(None) };
 }
 
@@ -73,6 +131,7 @@ pub fn prefers_reduced_motion() -> bool {
 }
 
 type Pending = (u32, f64, Box<dyn FnOnce()>);
+type PendingPick = (String, bool, Box<dyn FnOnce(Vec<PickedFile>)>);
 
 /// A platform whose clock and timers move only when told to.
 pub struct ManualPlatform {
@@ -80,6 +139,8 @@ pub struct ManualPlatform {
     next: Cell<u32>,
     reduced: Cell<bool>,
     timers: RefCell<Vec<Pending>>,
+    picks: RefCell<Vec<PendingPick>>,
+    downloads: RefCell<Vec<(String, String, Vec<u8>)>>,
 }
 
 impl std::fmt::Debug for ManualPlatform {
@@ -106,7 +167,37 @@ impl ManualPlatform {
             next: Cell::new(1),
             reduced: Cell::new(false),
             timers: RefCell::new(Vec::new()),
+            picks: RefCell::new(Vec::new()),
+            downloads: RefCell::new(Vec::new()),
         }
+    }
+
+    /// The pickers waiting for an answer, oldest first: `(accept, multiple)`.
+    #[must_use]
+    pub fn pending_picks(&self) -> Vec<(String, bool)> {
+        self.picks
+            .borrow()
+            .iter()
+            .map(|(a, m, _)| (a.clone(), *m))
+            .collect()
+    }
+
+    /// Answers the oldest picker with these files (an empty list is a cancel). `false` when none is waiting.
+    pub fn answer_pick(&self, files: Vec<PickedFile>) -> bool {
+        let first = {
+            let mut picks = self.picks.borrow_mut();
+            (!picks.is_empty()).then(|| picks.remove(0))
+        };
+        first.is_some_and(|(_, _, done)| {
+            done(files);
+            true
+        })
+    }
+
+    /// The files offered for saving, oldest first: `(name, mime, bytes)`.
+    #[must_use]
+    pub fn downloads(&self) -> Vec<(String, String, Vec<u8>)> {
+        self.downloads.borrow().clone()
     }
 
     /// Moves the clock forward, running the timers that fall due, earliest first (including those
@@ -162,5 +253,17 @@ impl Platform for ManualPlatform {
 
     fn prefers_reduced_motion(&self) -> bool {
         self.reduced.get()
+    }
+
+    fn pick_files(&self, accept: &str, multiple: bool, done: Box<dyn FnOnce(Vec<PickedFile>)>) {
+        self.picks
+            .borrow_mut()
+            .push((accept.to_string(), multiple, done));
+    }
+
+    fn download(&self, name: &str, mime: &str, bytes: &[u8]) {
+        self.downloads
+            .borrow_mut()
+            .push((name.to_string(), mime.to_string(), bytes.to_vec()));
     }
 }

@@ -5,7 +5,7 @@ nav_order: 61
 has_children: true
 ---
 
-`quench-ui-web` (library `quench_ui_web`) runs a [`quench-ui`](../quench-ui/index.md) app in the browser. The app compiles to WebAssembly (`wasm32-unknown-unknown`); one small hand-written JavaScript file, `quench.js` (399 lines, embedded in the crate as `QUENCH_JS`), loads the module and gives it the DOM, timers, `fetch`, `EventSource`, history and storage. There is no `wasm-bindgen`, `web-sys` or `js-sys`: both sides talk through the plain functions documented in [Internals](internals.md). The crate implements the `Renderer` trait of `quench-ui` for the DOM, an executor with `sleep`/`fetch`/`EventSource` futures, the router's `History`, the `Platform` trait, and the typed clients of the Android/desktop host plugins.
+`quench-ui-web` (library `quench_ui_web`) runs a [`quench-ui`](../quench-ui/index.md) app in the browser. The app compiles to WebAssembly (`wasm32-unknown-unknown`); one small hand-written JavaScript file, `quench.js` (450 lines, embedded in the crate as `QUENCH_JS`), loads the module and gives it the DOM, timers, `fetch`, `EventSource`, history, storage, the file picker, downloads and the clipboard. There is no `wasm-bindgen`, `web-sys` or `js-sys`: both sides talk through the plain functions documented in [Internals](internals.md). The crate implements the `Renderer` trait of `quench-ui` for the DOM, an executor with `sleep`/`fetch`/`EventSource` futures, the router's `History`, the `Platform` trait, and the typed clients of the Android/desktop host plugins.
 
 Version: **0.1.8**. Edition: 2024 (workspace). No `rust-version` is set. License, authors and repository come from the workspace.
 

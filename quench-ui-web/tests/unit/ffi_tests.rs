@@ -76,11 +76,16 @@ fn decoding_fills_in_payloads_and_modifier_flags() {
         Some(Event::Submit)
     );
     assert_eq!(
-        decode_event(19, String::new(), 0.0, 0.0, 0, 0),
+        decode_event(26, String::new(), 0.0, 0.0, 0, 0),
         None,
         "past the table"
     );
     assert_eq!(decode_event(u32::MAX, String::new(), 0.0, 0.0, 0, 0), None);
+    // A selection carries its two offsets.
+    assert_eq!(
+        decode_event(23, String::new(), 3.0, 9.0, 0, 0),
+        Some(Event::Selection(quench_ui::SelectionEvent { start: 3, end: 9 }))
+    );
     // A wheel carries its position, the element's size and the distance in the payload.
     let Some(Event::Wheel(w)) =
         decode_event(18, "10,20,300,400,0,-53.5".to_string(), 0.0, 0.0, 0, 1)

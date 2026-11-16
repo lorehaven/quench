@@ -734,3 +734,158 @@ fn a_damaged_cross_reference_stream_file_is_rebuilt_from_its_object_streams() {
 }
 
 quench_test::main!();
+
+// ---------------------------------------------------------------- drawing a page
+
+fn svg_of(content: &str, extra: &[Vec<u8>]) -> String {
+    let bytes = one_page(content.as_bytes(), font(""), extra);
+    Document::load(&bytes)
+        .expect("a PDF")
+        .render_page(0)
+        .expect("a page")
+        .svg
+}
+
+#[quench_test::test]
+fn draws_paths_in_their_colours_under_a_flip_with_clips_and_dashes() {
+    let svg = svg_of(
+        "q 1 0 0 rg 10 10 100 50 re f Q q 0 0 1 RG 3 w [4 2] 0 d 20 20 m 80 90 l S Q q 0 0 50 50 re W n 0 1 0 rg 0 0 100 100 re f Q",
+        &[],
+    );
+    assert!(svg.starts_with("<svg") && svg.ends_with("</svg>"));
+    assert!(
+        svg.contains("matrix(1 0 0 -1 0 792)"),
+        "the page is flipped: {svg}"
+    );
+    assert!(svg.contains("fill=\"#ff0000\""), "{svg}");
+    assert!(
+        svg.contains("stroke=\"#0000ff\"")
+            && svg.contains("stroke-width=\"3\"")
+            && svg.contains("stroke-dasharray=\"4 2\""),
+        "{svg}"
+    );
+    assert!(
+        svg.contains("<clipPath id=\"c1\">")
+            && svg.contains("<g clip-path=\"url(#c1)\">")
+            && svg.contains("fill=\"#00ff00\""),
+        "{svg}"
+    );
+    // The clip ends with the state it was set in.
+    assert_eq!(
+        svg.matches("<g ").count() - 1,
+        svg.matches("</g>").count() - 1
+    );
+}
+
+#[quench_test::test]
+fn draws_text_with_each_glyph_where_the_file_puts_it() {
+    let bytes = one_page(
+        b"BT /F1 12 Tf 100 700 Td (Hi) Tj 0 -20 Td [(A) -500 (B)] TJ ET",
+        font("/FirstChar 65 /LastChar 66 /Widths [600 700]"),
+        &[],
+    );
+    let svg = Document::load(&bytes)
+        .expect("a PDF")
+        .render_page(0)
+        .expect("a page")
+        .svg;
+    assert!(svg.contains("font-size=\"12\""), "{svg}");
+    assert!(svg.contains("<tspan x=\"0 13.2\">AB"), "{svg}");
+    assert!(svg.contains(">Hi</tspan>") || svg.contains(">Hi"), "{svg}");
+    // The text is turned over to stand upright under the page's flip.
+    assert!(svg.contains("matrix(1 0 0 -1 100 700)"), "{svg}");
+    // A is 600 thousandths wide; the adjustment of 500 thousandths adds half the size.
+    let line = svg.split("<text").nth(2).expect("a second text");
+    let xs: Vec<f64> = line
+        .split("<tspan x=\"")
+        .nth(1)
+        .and_then(|t| t.split('"').next())
+        .map(|l| l.split(' ').filter_map(|v| v.parse().ok()).collect())
+        .unwrap_or_default();
+    assert_eq!(xs.len(), 2, "{line}");
+    assert!((xs[1] - xs[0] - 13.2).abs() < 0.01, "{xs:?}");
+    // Invisible text (a scan's text layer) is not drawn.
+    let hidden = svg_of("BT /F1 12 Tf 3 Tr 100 700 Td (Hidden) Tj ET", &[]);
+    assert!(!hidden.contains("Hidden"));
+}
+
+#[quench_test::test]
+fn draws_every_page_of_real_files_and_reports_their_sizes() {
+    for bytes in [
+        &include_bytes!("fixtures/cairo.pdf")[..],
+        include_bytes!("fixtures/mpl3.pdf"),
+        include_bytes!("fixtures/lo.pdf"),
+        include_bytes!("fixtures/rl_canvas.pdf"),
+        include_bytes!("fixtures/fpdf.pdf"),
+        include_bytes!("fixtures/qpdf_objstm.pdf"),
+    ] {
+        let doc = Document::load(bytes).expect("a PDF");
+        assert_eq!(doc.page_count(), extract_pages(bytes).expect("text").len());
+        for i in 0..doc.page_count() {
+            let page = doc.render_page(i).expect("a page");
+            assert!(page.width > 100.0 && page.height > 100.0);
+            assert!(page.svg.starts_with("<svg") && page.svg.ends_with("</svg>"));
+            assert_eq!(
+                page.svg.matches("<g").count(),
+                page.svg.matches("</g>").count()
+            );
+        }
+        assert!(doc.render_page(doc.page_count()).is_none());
+    }
+    let lo = Document::load(include_bytes!("fixtures/lo.pdf")).expect("a PDF");
+    assert!(lo.render_page(0).expect("a page").svg.contains("<tspan"));
+}
+
+#[quench_test::test]
+fn gives_the_text_of_a_page_with_where_it_is_for_a_viewer_to_select() {
+    let bytes = one_page(
+        b"BT /F1 12 Tf 100 700 Td (Hello) Tj ET BT /F1 10 Tf 0 1 -1 0 50 50 Tm (Up) Tj ET",
+        font(""),
+        &[],
+    );
+    let page = Document::load(&bytes)
+        .expect("a PDF")
+        .render_page(0)
+        .expect("a page");
+    // The upright text only; a page is 792 points tall, the baseline 700 up is 92 down.
+    assert_eq!(page.runs.len(), 1, "{:?}", page.runs);
+    let run = &page.runs[0];
+    assert_eq!(run.text, "Hello");
+    assert!(
+        (run.x - 100.0).abs() < 0.01
+            && (run.y - 92.0).abs() < 0.01
+            && (run.size - 12.0).abs() < 0.01,
+        "{run:?}"
+    );
+    // The test font has no widths, so Helvetica's are used: 2278 thousandths of 12.
+    assert!((run.width - 27.336).abs() < 0.01, "{run:?}");
+}
+
+#[quench_test::test]
+fn reads_the_outline_and_the_links_with_their_pages_and_addresses() {
+    let objects = vec![
+        b"<< /Type /Catalog /Pages 2 0 R /Outlines 7 0 R /Dests << /Two [4 0 R /Fit] >> >>".to_vec(),
+        b"<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 300] /Annots [5 0 R 6 0 R 11 0 R] >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 300] >>".to_vec(),
+        b"<< /Type /Annot /Subtype /Link /Rect [10 20 110 40] /A << /S /URI /URI (https://example.org/a) >> >>".to_vec(),
+        b"<< /Type /Annot /Subtype /Link /Rect [10 100 60 120] /Dest [4 0 R /XYZ 0 300 0] >>".to_vec(),
+        b"<< /Type /Outlines /First 8 0 R /Last 9 0 R /Count 3 >>".to_vec(),
+        b"<< /Title (First) /Parent 7 0 R /Next 9 0 R /Dest [3 0 R /Fit] /First 10 0 R /Last 10 0 R >>".to_vec(),
+        b"<< /Title <FEFF00530065006300EF> /Parent 7 0 R /Prev 8 0 R /A << /S /GoTo /D (Two) >> >>".to_vec(),
+        b"<< /Title (Child) /Parent 8 0 R /Dest [4 0 R /Fit] >>".to_vec(),
+        b"<< /Type /Annot /Subtype /Link /Rect [0 0 5 5] /A << /S /GoTo /D (Two) >> >>".to_vec(),
+    ];
+    let doc = Document::load(&build(&objects, "")).expect("a PDF");
+    let outline = doc.outline();
+    let shown: Vec<(&str, usize, Option<usize>)> = outline.iter().map(|o| (o.title.as_str(), o.level, o.page)).collect();
+    assert_eq!(shown, [("First", 0, Some(0)), ("Child", 1, Some(1)), ("Sec\u{ef}", 0, Some(1))]);
+    let links = doc.render_page(0).expect("a page").links;
+    assert_eq!(links.len(), 3, "{links:?}");
+    assert_eq!(links[0].uri.as_deref(), Some("https://example.org/a"));
+    // A box from the top: 300 high, the link's top edge at 40 from the bottom.
+    assert!((links[0].x - 10.0).abs() < 0.01 && (links[0].y - 260.0).abs() < 0.01 && (links[0].width - 100.0).abs() < 0.01);
+    assert_eq!(links[1].page, Some(1));
+    assert_eq!(links[2].page, Some(1), "a named destination");
+    assert!(doc.render_page(1).expect("a page").links.is_empty());
+}

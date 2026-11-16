@@ -8,7 +8,7 @@
 #![allow(unsafe_code)] // `#[unsafe(no_mangle)]`: the export attribute is the only unsafe left here
 
 use crate::browser;
-use crate::{dom, events, exec, fetch, history, sse, state};
+use crate::{dom, events, exec, fetch, files, history, host, sse, state};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
@@ -72,8 +72,13 @@ pub extern "C" fn q_dispatch_event(
 ) -> u32 {
     let payload = lossy(&take(address, len));
     let _ = quench_ui::take_prevent_request();
+    let _ = quench_ui::take_clipboard_request();
     if let Some(event) = events::decode(kind, payload, a, b, c, flags) {
         dom::dispatch(handle, &event);
+    }
+    // A copy or cut listener that chose what goes on the clipboard tells the page before the event ends.
+    if let Some(data) = quench_ui::take_clipboard_request() {
+        host::clipboard_set(&data.text, &data.html);
     }
     u32::from(quench_ui::take_prevent_request())
 }
@@ -115,6 +120,31 @@ pub extern "C" fn q_sse_event(
     let name = lossy(&take(name_address, name_len));
     let data = lossy(&take(data_address, data_len));
     sse::event(id, kind, name, data);
+}
+
+/// A file the person picked arrived (`index` of `total`, 0 when they cancelled). All three buffers are consumed.
+#[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
+#[allow(clippy::too_many_arguments)] // the shape fixed by the contract
+pub extern "C" fn q_file_picked(
+    id: u32,
+    index: u32,
+    total: u32,
+    name_address: usize,
+    name_len: usize,
+    mime_address: usize,
+    mime_len: usize,
+    data_address: usize,
+    data_len: usize,
+) {
+    let name = lossy(&take(name_address, name_len));
+    let mime = lossy(&take(mime_address, mime_len));
+    let bytes = take(data_address, data_len);
+    files::picked(
+        id,
+        index,
+        total,
+        quench_ui::platform::PickedFile { name, mime, bytes },
+    );
 }
 
 /// Polls every task that is ready.

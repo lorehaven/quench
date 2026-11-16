@@ -25,6 +25,8 @@ mod reactive_tests;
 mod form_tests;
 #[path = "unit/gesture_tests.rs"]
 mod gesture_tests;
+#[path = "unit/host_services_tests.rs"]
+mod host_services_tests;
 #[path = "unit/html_tests.rs"]
 mod html_tests;
 #[path = "unit/i18n_tests.rs"]

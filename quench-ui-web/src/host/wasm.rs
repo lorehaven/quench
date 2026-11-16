@@ -48,6 +48,16 @@ unsafe extern "C" {
     safe fn q_focus(h: u32);
     safe fn q_trap_focus(h: u32);
     safe fn q_history(op: u32, ptr: usize, len: usize);
+    safe fn q_clipboard_set(text_ptr: usize, text_len: usize, html_ptr: usize, html_len: usize);
+    safe fn q_file_pick(id: u32, accept_ptr: usize, accept_len: usize, multiple: u32);
+    safe fn q_download(
+        name_ptr: usize,
+        name_len: usize,
+        mime_ptr: usize,
+        mime_len: usize,
+        data_ptr: usize,
+        data_len: usize,
+    );
 }
 
 pub fn create_element(tag: &str) -> u32 {
@@ -204,4 +214,36 @@ pub fn storage_set(key: &str, value: &str) {
 
 pub fn prefers_reduced_motion() -> bool {
     q_reduced_motion() != 0
+}
+
+/// Puts text and HTML on the clipboard for the copy or cut event being delivered.
+pub fn clipboard_set(text: &str, html: &str) {
+    q_clipboard_set(
+        text.as_ptr().addr(),
+        text.len(),
+        html.as_ptr().addr(),
+        html.len(),
+    );
+}
+
+/// Opens the browser's file picker (from inside an event handler); the answer arrives as `q_file_picked`.
+pub fn file_pick(id: u32, accept: &str, multiple: bool) {
+    q_file_pick(
+        id,
+        accept.as_ptr().addr(),
+        accept.len(),
+        u32::from(multiple),
+    );
+}
+
+/// Hands the browser a file to save.
+pub fn download(name: &str, mime: &str, data: &[u8]) {
+    q_download(
+        name.as_ptr().addr(),
+        name.len(),
+        mime.as_ptr().addr(),
+        mime.len(),
+        data.as_ptr().addr(),
+        data.len(),
+    );
 }

@@ -70,7 +70,11 @@ Declared in `src/host/wasm.rs` (`#[link(wasm_import_module = "env")] unsafe exte
 | `q_trap_focus(h)` | Adds a `keydown` listener on the node: Tab/Shift+Tab move among `a[href],button,input,select,textarea,[tabindex]:not([tabindex='-1'])` that are not disabled and have client rects, wrapping; with none inside, Tab is prevented. Removed on release. |
 | `q_history(op, ptr, len)` | `0` save scroll, `pushState({}, "", url)`, `scrollTo(0,0)`; `1` `replaceState`; `2` `history.back()`; `3` `history.forward()` (the code treats any `op` other than 0, 1, 2 as forward). |
 
-Only these `env` imports exist: the table is the complete list of 30.
+| `q_file_pick(id, accept_ptr, accept_len, multiple)` | Appends a hidden `<input type=file>` with that `accept` and `multiple`, and `click()`s it (so it must run inside an event handler of the person's). On `change` it reads each file's bytes and calls the export `q_file_picked(id, index, total, name, mime, data)` once per file, in order; on `cancel`, or with no file chosen, it calls it once with `total` 0 and empty buffers. The input is removed afterwards. |
+| `q_download(name_ptr, name_len, mime_ptr, mime_len, data_ptr, data_len)` | Copies the bytes out of memory, makes a `Blob` (type `mime`, or `application/octet-stream` when empty), and clicks a hidden `<a download=name>` for its object URL; the URL is revoked after 10 s. With an empty `name` it opens the URL in a new tab (`window.open`) instead and revokes it after 2 minutes. |
+| `q_clipboard_set(text_ptr, text_len, html_ptr, html_len)` | Remembers `{text, html}` for the `copy` or `cut` event being delivered; see Clipboard below. |
+
+Only these `env` imports exist: the table is the complete list of 33.
 
 ## Exports (JS calls Rust)
 
@@ -81,7 +85,7 @@ Only these `env` imports exist: the table is the complete list of 30.
 
 ### Event types per kind
 
-`EVENTS = ["click","dblclick","input","change","keydown","keyup","submit","focus","blur","pointerdown","pointerup","pointermove","compositionstart","compositionend","scroll","transitionend","resize","pointercancel","wheel"]`, index = kind.
+`EVENTS = ["click","dblclick","input","change","keydown","keyup","submit","focus","blur","pointerdown","pointerup","pointermove","compositionstart","compositionend","scroll","transitionend","resize","pointercancel","wheel","copy","cut","paste"]`, index = kind.
 
 | Kinds | Payload `ptr/len` | `a`, `b`, `c` | `flags` |
 |---|---|---|---|
@@ -91,7 +95,16 @@ Only these `env` imports exist: the table is the complete list of 30.
 | `keydown`, `keyup` | `event.key` | 0 | bit 1 ctrl, 2 shift, 4 alt, 8 meta |
 | `pointer*` | empty | `clientX`, `clientY`, `pointerId` | 0 |
 | `resize` | empty | content width, height (ResizeObserver; reported at first layout and on change) | 0 |
+| `paste` | `JSON.stringify({text, html})` from `clipboardData` (`text/plain`, `text/html`; empty strings when absent) | 0 | 0 |
 | others | empty | 0 | 0 |
+
+### Clipboard
+
+`copy` and `cut` listeners put data on the clipboard by calling `quench_ui::set_clipboard(text, html)` while the event is handled. `q_dispatch_event` reads that request after the listeners have run and passes it to the page with `q_clipboard_set`; when the dispatch returns, `quench.js` calls `event.clipboardData.setData("text/plain", text)` (and `"text/html"` when `html` is not empty) and `preventDefault()`. A copy or cut that no listener answered is left to the browser (it copies the selection). The three events reach a listener only when focus (or the selection) is inside the element it is on, because that is where the browser sends them. A `paste` listener that used the data calls `prevent_default()` so the browser does not also insert it.
+
+### Files
+
+`q_file_picked(id, index, total, name_ptr, name_len, mime_ptr, mime_len, data_ptr, data_len)` (an export, buffers consumed) reports one picked file; the Rust side (`files.rs`) collects them by `id` and calls the waiting `done` once `total` have arrived, or at once with none when `total` is 0. `quench_ui::platform::{pick_files, download}` are the typed entry points; `WebPlatform` implements them with `q_file_pick` and `q_download`.
 
 Touch input arrives as pointer events; scrolling and zooming are controlled with CSS `touch-action`.
 
@@ -152,3 +165,6 @@ Rust side: [API: bridge](api-bridge.md).
 ## Thread-safety
 
 No `Send`/`Sync`. All tables are `thread_local!`. `TaskWaker` is `Send + Sync` only because it holds an id.
+
+
+Files dropped on the page: `quench.js` cancels `dragover` for file drags and, on `drop`, sends the files through `q_file_picked` with the id `0xFFFFFFFF`; `files.rs` collects them and calls `quench_ui::platform::deliver_drop` once all have arrived.

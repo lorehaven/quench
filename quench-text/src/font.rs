@@ -294,6 +294,12 @@ impl Font {
         (id != 0 && id < self.num_glyphs).then_some(id)
     }
 
+    /// The font file as it was given (for embedding it in a document).
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.data
+    }
+
     /// How far the pen moves after `glyph`, in font units.
     #[must_use]
     pub fn advance(&self, glyph: u16) -> u16 {
