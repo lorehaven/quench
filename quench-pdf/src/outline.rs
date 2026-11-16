@@ -1,6 +1,10 @@
 //! The outline (bookmarks) of a file and the links on its pages.
 
-#![allow(clippy::chunks_exact_to_as_chunks, clippy::doc_markdown, clippy::manual_let_else)]
+#![allow(
+    clippy::chunks_exact_to_as_chunks,
+    clippy::doc_markdown,
+    clippy::manual_let_else
+)]
 
 use crate::doc::{Document, Page};
 use crate::object::{Dict, Object};

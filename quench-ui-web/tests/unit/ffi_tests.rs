@@ -84,7 +84,10 @@ fn decoding_fills_in_payloads_and_modifier_flags() {
     // A selection carries its two offsets.
     assert_eq!(
         decode_event(23, String::new(), 3.0, 9.0, 0, 0),
-        Some(Event::Selection(quench_ui::SelectionEvent { start: 3, end: 9 }))
+        Some(Event::Selection(quench_ui::SelectionEvent {
+            start: 3,
+            end: 9
+        }))
     );
     // A wheel carries its position, the element's size and the distance in the payload.
     let Some(Event::Wheel(w)) =

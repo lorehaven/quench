@@ -19,13 +19,23 @@ fn files_dropped_on_the_page_reach_the_handler_once_all_have_arrived() {
     let sink = got.clone();
     platform::on_drop(move |files| sink.borrow_mut().push(files));
     // The browser reports a drop as a pick with the largest id.
-    mock::answer_file_pick(u32::MAX, &[("a.xlsx", "", b"1"), ("b.csv", "text/csv", b"2")]);
+    mock::answer_file_pick(
+        u32::MAX,
+        &[("a.xlsx", "", b"1"), ("b.csv", "text/csv", b"2")],
+    );
     let all = got.borrow().clone();
     assert_eq!(all.len(), 1, "one call for the whole drop");
-    assert_eq!(all[0].iter().map(|f| f.name.as_str()).collect::<Vec<_>>(), ["a.xlsx", "b.csv"]);
+    assert_eq!(
+        all[0].iter().map(|f| f.name.as_str()).collect::<Vec<_>>(),
+        ["a.xlsx", "b.csv"]
+    );
     platform::on_drop(|_| {});
     mock::answer_file_pick(u32::MAX, &[("c", "", b"3")]);
-    assert_eq!(got.borrow().len(), 1, "a later handler replaces the earlier one");
+    assert_eq!(
+        got.borrow().len(),
+        1,
+        "a later handler replaces the earlier one"
+    );
 }
 
 #[quench_test::test]

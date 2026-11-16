@@ -97,12 +97,23 @@ pub fn decode(kind: u32, payload: String, a: f64, b: f64, c: i32, flags: u32) ->
                     .and_then(|x| usize::try_from(x).ok())
                     .unwrap_or(0)
             };
-            let s = |i: usize| v.get(i).and_then(Value::as_str).unwrap_or_default().to_string();
+            let s = |i: usize| {
+                v.get(i)
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string()
+            };
             Event::BeforeInput(BeforeInputEvent {
                 input_type: s(4),
                 data: s(5),
-                start: BlockPoint { block: n(0), offset: n(1) },
-                end: BlockPoint { block: n(2), offset: n(3) },
+                start: BlockPoint {
+                    block: n(0),
+                    offset: n(1),
+                },
+                end: BlockPoint {
+                    block: n(2),
+                    offset: n(3),
+                },
             })
         }
         // JSON: [anchorBlock, anchorOffset, focusBlock, focusOffset]
@@ -115,8 +126,14 @@ pub fn decode(kind: u32, payload: String, a: f64, b: f64, c: i32, flags: u32) ->
                     .unwrap_or(0)
             };
             Event::EditSelection(EditSelectionEvent {
-                anchor: BlockPoint { block: n(0), offset: n(1) },
-                focus: BlockPoint { block: n(2), offset: n(3) },
+                anchor: BlockPoint {
+                    block: n(0),
+                    offset: n(1),
+                },
+                focus: BlockPoint {
+                    block: n(2),
+                    offset: n(3),
+                },
             })
         }
         EventKind::Selection => Event::Selection(SelectionEvent {

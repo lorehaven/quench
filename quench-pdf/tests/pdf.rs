@@ -878,13 +878,27 @@ fn reads_the_outline_and_the_links_with_their_pages_and_addresses() {
     ];
     let doc = Document::load(&build(&objects, "")).expect("a PDF");
     let outline = doc.outline();
-    let shown: Vec<(&str, usize, Option<usize>)> = outline.iter().map(|o| (o.title.as_str(), o.level, o.page)).collect();
-    assert_eq!(shown, [("First", 0, Some(0)), ("Child", 1, Some(1)), ("Sec\u{ef}", 0, Some(1))]);
+    let shown: Vec<(&str, usize, Option<usize>)> = outline
+        .iter()
+        .map(|o| (o.title.as_str(), o.level, o.page))
+        .collect();
+    assert_eq!(
+        shown,
+        [
+            ("First", 0, Some(0)),
+            ("Child", 1, Some(1)),
+            ("Sec\u{ef}", 0, Some(1))
+        ]
+    );
     let links = doc.render_page(0).expect("a page").links;
     assert_eq!(links.len(), 3, "{links:?}");
     assert_eq!(links[0].uri.as_deref(), Some("https://example.org/a"));
     // A box from the top: 300 high, the link's top edge at 40 from the bottom.
-    assert!((links[0].x - 10.0).abs() < 0.01 && (links[0].y - 260.0).abs() < 0.01 && (links[0].width - 100.0).abs() < 0.01);
+    assert!(
+        (links[0].x - 10.0).abs() < 0.01
+            && (links[0].y - 260.0).abs() < 0.01
+            && (links[0].width - 100.0).abs() < 0.01
+    );
     assert_eq!(links[1].page, Some(1));
     assert_eq!(links[2].page, Some(1), "a named destination");
     assert!(doc.render_page(1).expect("a page").links.is_empty());

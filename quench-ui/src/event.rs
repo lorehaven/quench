@@ -167,7 +167,10 @@ pub fn utf16_to_byte(text: &str, units: usize) -> usize {
 /// The UTF-16 offset of a byte offset in `text` (a byte inside a character counts as its start).
 #[must_use]
 pub fn byte_to_utf16(text: &str, byte: usize) -> usize {
-    text.char_indices().take_while(|(i, _)| *i < byte).map(|(_, c)| c.len_utf16()).sum()
+    text.char_indices()
+        .take_while(|(i, _)| *i < byte)
+        .map(|(_, c)| c.len_utf16())
+        .sum()
 }
 
 /// One tick of the wheel over an element. Positions are in CSS pixels, relative to the element's
