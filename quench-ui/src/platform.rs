@@ -67,8 +67,9 @@ pub fn deliver_drop(files: Vec<PickedFile>) {
     }
 }
 
-/// Shows `bytes` (a PDF, an image, a page) in a new browser tab instead of saving it, so the person can read or print it.
-/// It is a download with no name, which a host that saves files may take as "show it". Call it while handling a click.
+/// Shows `bytes` (a PDF, an image, a page) in a new browser tab instead of saving it.
+///
+/// The person can read or print it there. It is a download with no name, which a host that saves files may take as "show it". Call it while handling a click.
 pub fn open_in_tab(mime: &str, bytes: &[u8]) {
     download("", mime, bytes);
 }

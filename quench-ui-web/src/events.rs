@@ -52,6 +52,12 @@ pub fn kind_code(kind: EventKind) -> u32 {
 /// modifier bits: 1 ctrl, 2 shift, 4 alt, 8 meta. A wheel's `payload` is `x,y,width,height,dx,dy`
 /// (CSS pixels, `x` and `y` relative to the element).
 #[must_use]
+#[allow(
+    clippy::too_many_lines,
+    clippy::many_single_char_names,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 pub fn decode(kind: u32, payload: String, a: f64, b: f64, c: i32, flags: u32) -> Option<Event> {
     let key = |payload: String| KeyEvent {
         key: payload,
