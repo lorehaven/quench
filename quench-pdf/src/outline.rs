@@ -232,3 +232,99 @@ impl Document {
         out
     }
 }
+
+/// A markup annotation of a page, in the file's own coordinates (y up).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Markup {
+    /// `Highlight`, `Underline`, `StrikeOut`, `Square` or `Text` (a note).
+    pub kind: String,
+    /// The boxes it covers: (x0, y0, x1, y1), one for each line of a highlight, else just its `Rect`.
+    pub boxes: Vec<(f64, f64, f64, f64)>,
+    pub color: (u8, u8, u8),
+    /// The text of a note, or the comment on a markup.
+    pub contents: String,
+}
+
+impl Document {
+    /// The markup annotations of page `index` (highlights, underlines, strike-outs, squares and notes).
+    #[must_use]
+    pub fn markup_of(&self, index: usize) -> Vec<Markup> {
+        let pages = self.pages();
+        let Some(page) = pages.get(index) else {
+            return Vec::new();
+        };
+        let Some(Object::Array(annots)) = self.get(&page.dict, "Annots") else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for a in annots.iter().take(5000) {
+            let Object::Dict(d) = self.resolve(a) else {
+                continue;
+            };
+            let kind = match self.get(&d, "Subtype").as_ref().and_then(Object::as_name) {
+                Some(k @ ("Highlight" | "Underline" | "StrikeOut" | "Square" | "Text")) => {
+                    k.to_string()
+                }
+                _ => continue,
+            };
+            let nums = |key: &str| -> Vec<f64> {
+                match self.get(&d, key) {
+                    Some(Object::Array(v)) => {
+                        v.iter().filter_map(|o| self.resolve(o).as_f64()).collect()
+                    }
+                    _ => Vec::new(),
+                }
+            };
+            let mut boxes: Vec<(f64, f64, f64, f64)> = nums("QuadPoints")
+                .chunks_exact(8)
+                .map(|q| {
+                    let xs = [q[0], q[2], q[4], q[6]];
+                    let ys = [q[1], q[3], q[5], q[7]];
+                    (
+                        xs.iter().copied().fold(f64::MAX, f64::min),
+                        ys.iter().copied().fold(f64::MAX, f64::min),
+                        xs.iter().copied().fold(f64::MIN, f64::max),
+                        ys.iter().copied().fold(f64::MIN, f64::max),
+                    )
+                })
+                .collect();
+            if boxes.is_empty() {
+                let r = nums("Rect");
+                if r.len() >= 4 {
+                    boxes.push((
+                        r[0].min(r[2]),
+                        r[1].min(r[3]),
+                        r[0].max(r[2]),
+                        r[1].max(r[3]),
+                    ));
+                }
+            }
+            let c = nums("C");
+            let byte = |v: f64| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+            let color = match c.len() {
+                1 => (byte(c[0]), byte(c[0]), byte(c[0])),
+                3 => (byte(c[0]), byte(c[1]), byte(c[2])),
+                4 => {
+                    let k = 1.0 - c[3];
+                    (
+                        byte((1.0 - c[0]) * k),
+                        byte((1.0 - c[1]) * k),
+                        byte((1.0 - c[2]) * k),
+                    )
+                }
+                _ => (255, 235, 59),
+            };
+            let contents = match self.get(&d, "Contents") {
+                Some(Object::String(s)) => text_string(&s),
+                _ => String::new(),
+            };
+            out.push(Markup {
+                kind,
+                boxes,
+                color,
+                contents,
+            });
+        }
+        out
+    }
+}

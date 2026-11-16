@@ -903,3 +903,24 @@ fn reads_the_outline_and_the_links_with_their_pages_and_addresses() {
     assert_eq!(links[2].page, Some(1), "a named destination");
     assert!(doc.render_page(1).expect("a page").links.is_empty());
 }
+
+#[quench_test::test]
+fn reads_markup_annotations_and_draws_them_over_the_page() {
+    let objects = vec![
+        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 300] /Annots [4 0 R 5 0 R 6 0 R] >>".to_vec(),
+        b"<< /Type /Annot /Subtype /Highlight /Rect [10 20 110 40] /QuadPoints [10 40 110 40 10 20 110 20] /C [1 0.9 0] >>".to_vec(),
+        b"<< /Type /Annot /Subtype /Text /Rect [150 200 170 220] /C [1 0.8 0] /Contents (A note) >>".to_vec(),
+        b"<< /Type /Annot /Subtype /Link /Rect [0 0 5 5] /A << /S /URI /URI (https://e.org/) >> >>".to_vec(),
+    ];
+    let doc = Document::load(&build(&objects, "")).expect("a PDF");
+    let marks = doc.markup_of(0);
+    assert_eq!(marks.len(), 2, "a link is not markup");
+    assert_eq!((marks[0].kind.as_str(), marks[0].boxes.clone(), marks[0].color), ("Highlight", vec![(10.0, 20.0, 110.0, 40.0)], (255, 230, 0)));
+    assert_eq!((marks[1].kind.as_str(), marks[1].contents.as_str()), ("Text", "A note"));
+    let page = doc.render_page(0).expect("a page");
+    assert!(page.svg.contains("mix-blend-mode:multiply") && page.svg.contains("#ffe600"), "{}", page.svg);
+    assert_eq!(page.origin, (0.0, 300.0));
+    assert_eq!(page.links.len(), 1);
+}

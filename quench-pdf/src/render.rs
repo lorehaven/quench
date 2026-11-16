@@ -54,6 +54,8 @@ pub struct RenderedPage {
     pub width: f64,
     pub height: f64,
     pub svg: String,
+    /// The top left of the page's box in the file's own coordinates (x, y of the top edge), to turn the other numbers back.
+    pub origin: (f64, f64),
     pub runs: Vec<TextRun>,
     /// The links on the page (none on rotated pages).
     pub links: Vec<crate::outline::PageLink>,
@@ -1347,6 +1349,65 @@ fn rect_of(doc: &Document, page: &Page, key: &str) -> Option<[f64; 4]> {
     })
 }
 
+impl Renderer<'_> {
+    /// Draw the markup annotations (highlights multiply with what is under them), in the file's coordinates.
+    fn markup(&mut self, marks: &[crate::outline::Markup]) {
+        for m in marks {
+            let colour = hex(m.color);
+            for (x0, y0, x1, y1) in &m.boxes {
+                let (x, y, w, h) = (
+                    num(*x0),
+                    num(*y0),
+                    num((x1 - x0).max(0.5)),
+                    num((y1 - y0).max(0.5)),
+                );
+                match m.kind.as_str() {
+                    "Highlight" => {
+                        let _ = write!(
+                            self.body,
+                            "<rect x=\"{x}\" y=\"{y}\" width=\"{w}\" height=\"{h}\" fill=\"{colour}\" style=\"mix-blend-mode:multiply\"/>"
+                        );
+                    }
+                    "Underline" => {
+                        let _ = write!(
+                            self.body,
+                            "<rect x=\"{x}\" y=\"{y}\" width=\"{w}\" height=\"0.8\" fill=\"{colour}\"/>"
+                        );
+                    }
+                    "StrikeOut" => {
+                        let mid = num((y0 + y1) / 2.0);
+                        let _ = write!(
+                            self.body,
+                            "<rect x=\"{x}\" y=\"{mid}\" width=\"{w}\" height=\"0.8\" fill=\"{colour}\"/>"
+                        );
+                    }
+                    "Square" => {
+                        let _ = write!(
+                            self.body,
+                            "<rect x=\"{x}\" y=\"{y}\" width=\"{w}\" height=\"{h}\" fill=\"none\" stroke=\"{colour}\" stroke-width=\"1.5\"/>"
+                        );
+                    }
+                    "Text" => {
+                        // A note: a small square at the top left of its box, with a fold.
+                        let top = num(*y1 - 14.0);
+                        let _ = write!(
+                            self.body,
+                            "<rect x=\"{x}\" y=\"{top}\" width=\"14\" height=\"14\" fill=\"{colour}\" stroke=\"#00000066\" stroke-width=\"0.6\"/><path d=\"M{} {}h8M{} {}h8M{} {}h5\" stroke=\"#00000099\" stroke-width=\"0.9\"/>",
+                            num(x0 + 3.0),
+                            num(y1 - 4.0),
+                            num(x0 + 3.0),
+                            num(y1 - 7.0),
+                            num(x0 + 3.0),
+                            num(y1 - 10.0)
+                        );
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
 impl Document {
     /// How many pages the file has.
     #[must_use]
@@ -1384,6 +1445,7 @@ impl Document {
             origin: (x0, y1),
         };
         r.run(&content, &resources, Gs::new(IDENTITY), 0);
+        r.markup(&self.markup_of(index));
         let (width, height, turn) = match rotate {
             90 => (h, w, format!("matrix(0 1 -1 0 {} 0) ", num(h))),
             180 => (w, h, format!("matrix(-1 0 0 -1 {} {}) ", num(w), num(h))),
@@ -1404,6 +1466,7 @@ impl Document {
             width,
             height,
             svg,
+            origin: (x0, y1),
             runs,
             links: if rotate == 0 {
                 self.links_of(index, (x0, y1))
