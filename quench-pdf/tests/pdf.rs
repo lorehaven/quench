@@ -917,10 +917,24 @@ fn reads_markup_annotations_and_draws_them_over_the_page() {
     let doc = Document::load(&build(&objects, "")).expect("a PDF");
     let marks = doc.markup_of(0);
     assert_eq!(marks.len(), 2, "a link is not markup");
-    assert_eq!((marks[0].kind.as_str(), marks[0].boxes.clone(), marks[0].color), ("Highlight", vec![(10.0, 20.0, 110.0, 40.0)], (255, 230, 0)));
-    assert_eq!((marks[1].kind.as_str(), marks[1].contents.as_str()), ("Text", "A note"));
+    assert_eq!(
+        (
+            marks[0].kind.as_str(),
+            marks[0].boxes.clone(),
+            marks[0].color
+        ),
+        ("Highlight", vec![(10.0, 20.0, 110.0, 40.0)], (255, 230, 0))
+    );
+    assert_eq!(
+        (marks[1].kind.as_str(), marks[1].contents.as_str()),
+        ("Text", "A note")
+    );
     let page = doc.render_page(0).expect("a page");
-    assert!(page.svg.contains("mix-blend-mode:multiply") && page.svg.contains("#ffe600"), "{}", page.svg);
+    assert!(
+        page.svg.contains("mix-blend-mode:multiply") && page.svg.contains("#ffe600"),
+        "{}",
+        page.svg
+    );
     assert_eq!(page.origin, (0.0, 300.0));
     assert_eq!(page.links.len(), 1);
 }
