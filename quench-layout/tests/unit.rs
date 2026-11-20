@@ -1082,6 +1082,20 @@ fn boxes_report_their_rectangles() {
 }
 
 #[quench_test::test]
+fn a_translated_box_is_reported_where_it_is_drawn() {
+    // A dialog centred with `translate(-50%, -50%)`: its fields are where the text is, not where layout put the dialog.
+    let b = run(&E(
+        "",
+        vec![E(
+            "width: 100px; height: 60px; transform: translate(-10px, 20px)",
+            vec![E("width: 10px; height: 10px", vec![])],
+        )],
+    ));
+    assert_eq!(b.position_of(2), Some((-10.0, 20.0)));
+    assert_eq!(b.position_of(3), Some((-10.0, 20.0)));
+}
+
+#[quench_test::test]
 fn a_replaced_box_keeps_its_proportions_when_one_side_is_given() {
     let mut root = ComputedStyle::default();
     root.display = Display::Block;

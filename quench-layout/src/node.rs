@@ -188,14 +188,21 @@ impl LayoutBox {
         self.children.iter().find_map(|c| c.find(key))
     }
 
-    /// The position of the box with this key from the root's border box (its absolute position on the page).
+    /// The position of the box with this key from the root's border box (its absolute position on the page,
+    /// translations included, as [`LayoutBox::text_fragments`] has them).
     #[must_use]
     pub fn position_of(&self, key: usize) -> Option<(f32, f32)> {
         if self.key == key {
             return Some((0.0, 0.0));
         }
-        self.children
-            .iter()
-            .find_map(|c| c.position_of(key).map(|(x, y)| (x + c.x, y + c.y)))
+        self.children.iter().find_map(|c| {
+            let t = &c.style.transform.translate;
+            c.position_of(key).map(|(x, y)| {
+                (
+                    x + c.x + t.0.resolve(c.width),
+                    y + c.y + t.1.resolve(c.height),
+                )
+            })
+        })
     }
 }
