@@ -191,6 +191,20 @@ fn tags_names_and_filters_select_scenarios() {
 }
 
 #[quench_test::test]
+fn a_feature_the_filter_left_nothing_of_is_not_reported() {
+    let root = dir("slice", &[("a.feature", GOOD), ("b.feature", GOOD)]);
+    let mut o = options(&root);
+    o.name = Some("^outline".to_string());
+    let summary = run(&root, o);
+    assert!(summary.scenarios.total() > 0);
+    assert!(
+        summary.report.suites.iter().all(|s| !s.cases.is_empty()),
+        "{:?}",
+        summary.report.to_json()
+    );
+}
+
+#[quench_test::test]
 fn fail_fast_skips_the_rest() {
     let text = "Feature: F\n  Scenario: one\n    Then it blows up\n\n  Scenario: two\n    Given a total of 1\n";
     let root = dir("ff", &[("c.feature", text)]);

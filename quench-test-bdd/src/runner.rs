@@ -308,6 +308,9 @@ impl<W: World> Runner<W> {
             case.steps.clone_from(&done.steps);
             report.suites[job.feature].cases.push(case);
         }
+        // A feature none of whose scenarios this run selected (a tag expression or a name filter) has nothing to report;
+        // listing it as an empty suite makes a run of one slice of a larger set look like it ran everything, 0 passed.
+        report.suites.retain(|suite| !suite.cases.is_empty());
         for (file, message) in errors {
             let mut case = Case::new("parse", Status::Failed, 0);
             case.message = Some(message);
