@@ -45,30 +45,23 @@ when  = "event != 'schedule'"
 needs = ["build"]
 
 [[stage.job]]
-name  = "unit"
-image = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
-secrets = ["ANVIL_APP_TOKEN", "ANVIL_GATEHOUSE_URL"]
-env   = { RUST_BACKTRACE = "1" }
-# The tests run on quench-test's own harness, which leaves a JSON/HTML report of the whole run in
-# target/debug/quench-test; conveyor keeps `summary.json` and `index.html` from there and shows them on the
-# repo's scan page. (nextest would run every test in a process of its own, so no process would see the whole
-# run to report on.) Doctests run as part of the same invocation.
-steps = [{ anvil = "test --all" }]
-
-[[stage.job]]
-name      = "coverage"
+name      = "unit"
 image     = "ossiriand.arda:8080/forge/ci/rust-builder:latest"
 secrets = ["ANVIL_APP_TOKEN", "ANVIL_GATEHOUSE_URL"]
 env       = { RUST_BACKTRACE = "1" }
-# `--lcov`/`--text` are separate report formats - one invocation can only
-# produce one, so the run that actually exercises the tests is kept
-# report-less and the two reports are regenerated from its profile data
-# instead of re-running everything twice. The plain `report` (no format
-# flag) is the human table `crate::scan::parse_coverage` reads.
+# One run does both jobs of this stage: the tests, and the coverage of them. The tests run on quench-test's own harness,
+# which leaves a JSON/HTML report of the whole run in a directory; conveyor keeps `summary.json` and `index.html` from
+# target/debug/quench-test and shows them on the repo's scan page. `cargo llvm-cov` builds under target/llvm-cov-target, where
+# the harness would put the report by default, so it is told where conveyor looks (an absolute path: a test runs in its
+# crate's directory). (nextest would run every test in a process of its own, so no process would see the whole run to report on.)
+# `--lcov`/`--text` are separate report formats - one invocation can only produce one, so the run that exercises the tests
+# is kept report-less and the two reports are made from its profile data. The plain `report` (no format flag) is the human
+# table `crate::scan::parse_coverage` reads. Doctests are not part of llvm-cov's run, so they follow it.
 steps = [
-  { run = "cargo llvm-cov --workspace --no-report" },
+  { run = "QUENCH_TEST_REPORT_DIR=\"$PWD/target/debug/quench-test\" cargo llvm-cov --workspace --no-fail-fast --no-report" },
   { run = "cargo llvm-cov report --lcov --output-path lcov.info" },
   { run = "cargo llvm-cov report" },
+  { run = "cargo test --workspace --doc --no-fail-fast" },
 ]
 artifacts = ["lcov.info"]
 
